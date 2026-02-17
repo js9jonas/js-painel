@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PUT(req: NextRequest, { params }: Ctx) {
   try {
-    const { id } = params;
+    const { id } = await params;
+
     const body = await req.json();
     const observacao =
       typeof body?.observacao === "string" ? body.observacao : null;
@@ -22,7 +22,6 @@ export async function PUT(
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    // Ajuda MUITO a enxergar erro de coluna/tipo
     return NextResponse.json(
       { ok: false, error: err?.message ?? "Erro desconhecido" },
       { status: 500 }
