@@ -8,7 +8,10 @@ import {
   type ClienteStatusTela,
   type DueFilter,
 } from "@/lib/clientes";
+import { getPlanos } from "@/lib/planos";
+import { getPacotes } from "@/lib/pacotes";
 import RowActions from "@/components/clientes/RowActions";
+import NovoClienteButton from "@/components/clientes/NovoClienteButton";
 
 function badgeClass(status: ClienteStatusTela) {
   switch (status) {
@@ -62,9 +65,11 @@ export default async function ClientesPage({ searchParams }: PageProps) {
   const page = toInt(sp.page, 1);
   const pageSize = toInt(sp.pageSize, 50);
 
-  const [total, data] = await Promise.all([
+  const [total, data, planos, pacotes] = await Promise.all([
     countClientes({ q, status, order, due }),
     getClientes({ q, status, order, page, pageSize, due }),
+    getPlanos(),
+    getPacotes(),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -108,6 +113,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               <p className="text-2xl font-bold text-zinc-900">{total}</p>
               <p className="text-xs text-zinc-500">Total de clientes</p>
             </div>
+            <NovoClienteButton planos={planos} pacotes={pacotes} />
           </div>
         </div>
 
@@ -244,7 +250,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   <td className="px-6 py-4">
                     {c.prox_vencimento ? (
                       <div className="text-sm font-medium text-zinc-900">
-                        {new Date(c.prox_vencimento).toLocaleDateString('pt-BR')}
+                        {new Date(c.prox_vencimento).toLocaleDateString("pt-BR")}
                       </div>
                     ) : (
                       <span className="text-zinc-400 text-xs">—</span>
@@ -311,8 +317,9 @@ export default async function ClientesPage({ searchParams }: PageProps) {
         <div className="flex items-center gap-2">
           <Link
             aria-disabled={page <= 1}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""
-              }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
+              page <= 1 ? "pointer-events-none opacity-40" : ""
+            }`}
             href={makeHref({ page: 1 })}
           >
             <span className="hidden sm:inline">«</span> Primeira
@@ -320,8 +327,9 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           <Link
             aria-disabled={page <= 1}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""
-              }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
+              page <= 1 ? "pointer-events-none opacity-40" : ""
+            }`}
             href={makeHref({ page: page - 1 })}
           >
             ← Anterior
@@ -329,8 +337,9 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           <Link
             aria-disabled={page >= totalPages}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page >= totalPages ? "pointer-events-none opacity-40" : ""
-              }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
+              page >= totalPages ? "pointer-events-none opacity-40" : ""
+            }`}
             href={makeHref({ page: page + 1 })}
           >
             Próxima →
@@ -338,8 +347,9 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           <Link
             aria-disabled={page >= totalPages}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page >= totalPages ? "pointer-events-none opacity-40" : ""
-              }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
+              page >= totalPages ? "pointer-events-none opacity-40" : ""
+            }`}
             href={makeHref({ page: totalPages })}
           >
             Última <span className="hidden sm:inline">»</span>

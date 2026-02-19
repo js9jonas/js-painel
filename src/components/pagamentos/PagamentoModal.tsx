@@ -1,8 +1,9 @@
 // src/components/pagamentos/PagamentoModal.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { updatePagamento } from "@/app/actions/pagamentos";
+import { buscarClientes, type ClienteBuscaRow } from "@/app/actions/buscarClientes";
 import type { PagamentoFullRow } from "@/lib/pagamentos";
 
 type Props = {
@@ -12,24 +13,83 @@ type Props = {
 };
 
 export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
-  // data_pgto pode vir como "2025-01-15" ou "2025-01-15T00:00:00.000Z"
   const rawDate = pagamento.data_pgto?.split("T")[0] ?? "";
 
-  const [dataPgto, setDataPgto] = useState(rawDate);
-  const [forma, setForma] = useState(pagamento.forma ?? "");
-  const [valor, setValor] = useState(pagamento.valor ?? "");
-  const [detalhes, setDetalhes] = useState(pagamento.detalhes ?? "");
-  const [tipo, setTipo] = useState(pagamento.tipo ?? "");
-  const [compra, setCompra] = useState(pagamento.compra ?? "");
+  // Campos do pagamento
+  const [dataPgto, setDataPgto]   = useState(rawDate);
+  const [forma, setForma]         = useState(pagamento.forma ?? "");
+  const [valor, setValor]         = useState(pagamento.valor ?? "");
+  const [detalhes, setDetalhes]   = useState(pagamento.detalhes ?? "");
+  const [tipo, setTipo]           = useState(pagamento.tipo ?? "");
+  const [compra, setCompra]       = useState(pagamento.compra ?? "");
+
+  // Estado do cliente selecionado
+  const [clienteId, setClienteId]     = useState(pagamento.id_cliente ?? "");
+  const [clienteNome, setClienteNome] = useState(pagamento.nome_cliente ?? "");
+
+  // Busca de cliente
+  const [busca, setBusca]               = useState(pagamento.nome_cliente ?? "");
+  const [resultados, setResultados]     = useState<ClienteBuscaRow[]>([]);
+  const [buscando, setBuscando]         = useState(false);
+  const [dropdownAberto, setDropdownAberto] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]            = useState<string | null>(null);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownAberto(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Debounce na busca
+  function handleBuscaChange(valor: string) {
+    setBusca(valor);
+    setDropdownAberto(true);
+
+    // Se limpou o campo, limpa o cliente selecionado
+    if (!valor.trim()) {
+      setClienteId("");
+      setClienteNome("");
+      setResultados([]);
+      return;
+    }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setBuscando(true);
+      try {
+        const rows = await buscarClientes(valor);
+        setResultados(rows);
+      } finally {
+        setBuscando(false);
+      }
+    }, 300);
+  }
+
+  function selecionarCliente(c: ClienteBuscaRow) {
+    setClienteId(c.id_cliente);
+    setClienteNome(c.nome);
+    setBusca(c.nome);
+    setResultados([]);
+    setDropdownAberto(false);
+  }
 
   function handleSave() {
     setError(null);
     startTransition(async () => {
       try {
         await updatePagamento(pagamento.id, {
-          data_pgto: dataPgto,
+          id_cliente:   clienteId || null,
+          nome_cliente: clienteNome || null,
+          data_pgto:    dataPgto,
           forma,
           valor,
           detalhes,
@@ -49,27 +109,83 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+
         <div className="mb-5">
           <h2 className="text-lg font-bold text-zinc-900">Editar Pagamento</h2>
-          <p className="text-sm text-zinc-500 mt-0.5">
-            {pagamento.nome_cliente
-              ? `${pagamento.nome_cliente} • `
-              : ""}
-            ID: {pagamento.id}
-          </p>
+          <p className="text-sm text-zinc-500 mt-0.5">ID: {pagamento.id}</p>
         </div>
 
         <div className="space-y-4">
+
+          {/* Busca de Cliente */}
+          <div ref={dropdownRef} className="relative">
+            <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
+              Cliente
+            </label>
+            <input
+              value={busca}
+              onChange={(e) => handleBuscaChange(e.target.value)}
+              onFocus={() => busca && setDropdownAberto(true)}
+              className={inputClass}
+              placeholder="🔍 Buscar cliente pelo nome..."
+              autoComplete="off"
+            />
+
+            {/* Indicador de cliente selecionado */}
+            {clienteId && clienteNome === busca && (
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-2.5 py-1 font-medium">
+                  ✓ ID {clienteId} — {clienteNome}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClienteId("");
+                    setClienteNome("");
+                    setBusca("");
+                  }}
+                  className="text-xs text-zinc-400 hover:text-zinc-600"
+                >
+                  ✕ limpar
+                </button>
+              </div>
+            )}
+
+            {/* Dropdown de resultados */}
+            {dropdownAberto && (busca.trim().length > 0) && (
+              <div className="absolute z-20 mt-1 w-full rounded-xl border border-zinc-200 bg-white shadow-lg overflow-hidden">
+                {buscando ? (
+                  <div className="px-4 py-3 text-sm text-zinc-500">Buscando...</div>
+                ) : resultados.length > 0 ? (
+                  <ul>
+                    {resultados.map((c) => (
+                      <li key={c.id_cliente}>
+                        <button
+                          type="button"
+                          onMouseDown={() => selecionarCliente(c)}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-50 transition-colors flex items-center justify-between gap-3"
+                        >
+                          <span className="font-medium text-zinc-900">{c.nome}</span>
+                          <span className="text-xs text-zinc-400 shrink-0">ID {c.id_cliente}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="px-4 py-3 text-sm text-zinc-400">
+                    Nenhum cliente encontrado
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Data e Valor */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                Data
-              </label>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Data</label>
               <input
                 type="date"
                 value={dataPgto}
@@ -78,9 +194,7 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                Valor (R$)
-              </label>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Valor (R$)</label>
               <input
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
@@ -90,11 +204,10 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
             </div>
           </div>
 
+          {/* Forma e Tipo */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                Forma
-              </label>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Forma</label>
               <input
                 value={forma}
                 onChange={(e) => setForma(e.target.value)}
@@ -103,9 +216,7 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                Tipo
-              </label>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Tipo</label>
               <input
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
@@ -115,6 +226,7 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
             </div>
           </div>
 
+          {/* Compra */}
           <div>
             <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
               Compra / Referência
@@ -127,10 +239,9 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
             />
           </div>
 
+          {/* Detalhes */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-              Detalhes
-            </label>
+            <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Detalhes</label>
             <textarea
               value={detalhes}
               onChange={(e) => setDetalhes(e.target.value)}
@@ -139,12 +250,11 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
               placeholder="Detalhes adicionais..."
             />
           </div>
+
         </div>
 
         {error && (
-          <p className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-            {error}
-          </p>
+          <p className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
         )}
 
         <div className="mt-6 flex justify-end gap-3">
