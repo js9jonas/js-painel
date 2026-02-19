@@ -3,9 +3,12 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getAssinaturasByClienteId, getClienteById, getPagamentosByClienteId } from "@/lib/clientes";
+import { getPlanos } from "@/lib/planos";
+import { getPacotes } from "@/lib/pacotes";
 import RenovarAssinatura from "@/components/clientes/RenovarAssinatura";
 import RowActions from "@/components/clientes/RowActions";
 import TabelaPagamentos from "@/components/clientes/TabelaPagamentos";
+import EditAssinaturaButton from "@/components/assinaturas/EditAssinaturaButton";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -15,10 +18,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
-    getPagamentosByClienteId(id, 999), // Buscar TODOS os pagamentos (limite alto)
+    getPagamentosByClienteId(id, 999),
+    getPlanos(),
+    getPacotes(),
   ]);
 
   const ativa = assinaturas.find((a) => (a.status ?? "").toLowerCase().trim() === "ativo") ?? null;
@@ -68,6 +73,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
           <div className="shrink-0">
             <RowActions
               idCliente={id}
+              nome={cliente?.nome ?? ""}
               telefone={cliente?.telefone ?? null}
               observacao={cliente?.observacao ?? null}
             />
@@ -75,7 +81,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
         </div>
 
         <p className="mt-3 text-sm text-zinc-600">
-          Assinaturas encontradas: <span className="font-medium text-zinc-900">{assinaturas.length}</span>
+          Assinaturas encontradas:{" "}
+          <span className="font-medium text-zinc-900">{assinaturas.length}</span>
         </p>
       </div>
 
@@ -100,8 +107,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
 
               <div className="text-sm">
-                <div className="text-zinc-500">Identificação</div>
-                <div className="font-medium text-zinc-900">{ativa.identificacao ?? "—"}</div>
+                <div className="text-zinc-500">Venc. contas</div>
+                <div className="font-medium text-zinc-900">{ativa.venc_contas ?? "—"}</div>
               </div>
 
               <div className="text-sm">
@@ -109,6 +116,24 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <div className="font-medium text-emerald-700">{ativa.status}</div>
               </div>
             </div>
+
+            {/* Identificação e Observação */}
+            {(ativa.identificacao || ativa.observacao) && (
+              <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                {ativa.identificacao && (
+                  <div className="text-sm">
+                    <div className="text-zinc-500">Identificação</div>
+                    <div className="text-zinc-800">{ativa.identificacao}</div>
+                  </div>
+                )}
+                {ativa.observacao && (
+                  <div className="text-sm">
+                    <div className="text-zinc-500">Observação</div>
+                    <div className="text-zinc-800">{ativa.observacao}</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Informações de Pacote e Plano */}
             <div className="grid sm:grid-cols-2 gap-4 p-4 bg-zinc-50 rounded-lg mb-4">
@@ -119,7 +144,9 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <div className="text-sm">
                     <div className="font-semibold text-zinc-900">{ativa.pacote_contrato}</div>
                     {ativa.pacote_telas && (
-                      <div className="text-zinc-600 mt-1">{ativa.pacote_telas} tela{ativa.pacote_telas > 1 ? 's' : ''}</div>
+                      <div className="text-zinc-600 mt-1">
+                        {ativa.pacote_telas} tela{ativa.pacote_telas > 1 ? "s" : ""}
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -134,8 +161,14 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <div className="text-sm">
                     <div className="font-semibold text-zinc-900">{ativa.plano_tipo}</div>
                     <div className="text-zinc-600 mt-1 space-x-2">
-                      {ativa.plano_meses && <span>{ativa.plano_meses} mês{ativa.plano_meses > 1 ? 'es' : ''}</span>}
-                      {ativa.plano_valor && <span>• R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span>}
+                      {ativa.plano_meses && (
+                        <span>
+                          {ativa.plano_meses} mês{ativa.plano_meses > 1 ? "es" : ""}
+                        </span>
+                      )}
+                      {ativa.plano_valor && (
+                        <span>• R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span>
+                      )}
                     </div>
                     {ativa.plano_descricao && (
                       <div className="text-xs text-zinc-500 mt-1">{ativa.plano_descricao}</div>
@@ -147,8 +180,23 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
             </div>
 
-            {/* Botão de renovar */}
-            <div className="flex justify-end">
+            {/* Botões */}
+            <div className="flex justify-end gap-2">
+              <EditAssinaturaButton
+                idCliente={id}
+                assinatura={{
+                  id_assinatura: ativa.id_assinatura,
+                  id_plano:      ativa.id_plano ?? null,
+                  id_pacote:     ativa.id_pacote ?? null,
+                  venc_contrato: ativa.venc_contrato ?? null,
+                  venc_contas:   ativa.venc_contas ?? null,
+                  status:        ativa.status ?? "ativo",
+                  identificacao: ativa.identificacao ?? null,
+                  observacao:    ativa.observacao ?? null,
+                }}
+                planos={planos}
+                pacotes={pacotes}
+              />
               <RenovarAssinatura
                 idAssinatura={ativa.id_assinatura}
                 vencAtual={ativa.venc_contrato ?? null}
@@ -174,6 +222,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <th className="px-4 py-3 text-left font-medium">ID</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Venc. contrato</th>
+                <th className="px-4 py-3 text-left font-medium">Venc. contas</th>
                 <th className="px-4 py-3 text-left font-medium">Identificação</th>
                 <th className="px-4 py-3 text-left font-medium">Pacote</th>
                 <th className="px-4 py-3 text-left font-medium">Plano</th>
@@ -186,37 +235,65 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <tr key={a.id_assinatura} className="hover:bg-zinc-50">
                   <td className="px-4 py-3 font-medium text-zinc-900">{a.id_assinatura}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                      a.status?.toLowerCase() === 'ativo' 
-                        ? 'bg-emerald-50 text-emerald-700' 
-                        : 'bg-zinc-100 text-zinc-600'
-                    }`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                        a.status?.toLowerCase() === "ativo"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-zinc-100 text-zinc-600"
+                      }`}
+                    >
                       {a.status ?? "—"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-zinc-700">{a.venc_contrato ?? "—"}</td>
+                  <td className="px-4 py-3 text-zinc-700">{a.venc_contas ?? "—"}</td>
                   <td className="px-4 py-3 text-zinc-700">{a.identificacao ?? "—"}</td>
                   <td className="px-4 py-3">
                     {a.pacote_contrato ?? "—"}
-                    {a.pacote_telas ? <span className="text-zinc-500"> • {a.pacote_telas} telas</span> : null}
+                    {a.pacote_telas ? (
+                      <span className="text-zinc-500"> • {a.pacote_telas} telas</span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     {a.plano_tipo ?? "—"}
-                    {a.plano_meses ? <span className="text-zinc-500"> • {a.plano_meses} mês(es)</span> : null}
-                    {a.plano_valor ? <span className="text-zinc-500"> • R$ {parseFloat(a.plano_valor).toFixed(2)}</span> : null}
+                    {a.plano_meses ? (
+                      <span className="text-zinc-500"> • {a.plano_meses} mês(es)</span>
+                    ) : null}
+                    {a.plano_valor ? (
+                      <span className="text-zinc-500">
+                        {" "}• R$ {parseFloat(a.plano_valor).toFixed(2)}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <RenovarAssinatura
-                      idAssinatura={a.id_assinatura}
-                      vencAtual={a.venc_contrato ?? null}
-                    />
+                    <div className="flex items-center gap-2">
+                      <EditAssinaturaButton
+                        idCliente={id}
+                        assinatura={{
+                          id_assinatura: a.id_assinatura,
+                          id_plano:      a.id_plano ?? null,
+                          id_pacote:     a.id_pacote ?? null,
+                          venc_contrato: a.venc_contrato ?? null,
+                          venc_contas:   a.venc_contas ?? null,
+                          status:        a.status ?? "ativo",
+                          identificacao: a.identificacao ?? null,
+                          observacao:    a.observacao ?? null,
+                        }}
+                        planos={planos}
+                        pacotes={pacotes}
+                      />
+                      <RenovarAssinatura
+                        idAssinatura={a.id_assinatura}
+                        vencAtual={a.venc_contrato ?? null}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
 
               {outras.length === 0 && (
                 <tr>
-                  <td className="px-4 py-10 text-center text-zinc-500" colSpan={7}>
+                  <td className="px-4 py-10 text-center text-zinc-500" colSpan={8}>
                     Nenhuma assinatura encontrada.
                   </td>
                 </tr>

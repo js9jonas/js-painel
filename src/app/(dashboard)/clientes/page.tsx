@@ -222,8 +222,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               {data.map((c) => (
                 <tr key={c.id_cliente} className="hover:bg-zinc-50/50 transition-colors">
                   <td className="px-6 py-4">
-                    <Link 
-                      href={`/clientes/${c.id_cliente}`} 
+                    <Link
+                      href={`/clientes/${c.id_cliente}`}
                       className="font-semibold text-zinc-900 hover:text-zinc-600 transition-colors"
                     >
                       {c.nome}
@@ -272,8 +272,9 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   </td>
 
                   <td className="px-6 py-4">
-                    <RowActions 
-                      idCliente={c.id_cliente} 
+                    <RowActions
+                      idCliente={c.id_cliente}
+                      nome={c.nome}
                       telefone={c.telefone ?? null}
                       observacao={c.observacao ?? null}
                     />
@@ -310,9 +311,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
         <div className="flex items-center gap-2">
           <Link
             aria-disabled={page <= 1}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page <= 1 ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""
+              }`}
             href={makeHref({ page: 1 })}
           >
             <span className="hidden sm:inline">«</span> Primeira
@@ -320,9 +320,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           <Link
             aria-disabled={page <= 1}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page <= 1 ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""
+              }`}
             href={makeHref({ page: page - 1 })}
           >
             ← Anterior
@@ -330,9 +329,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           <Link
             aria-disabled={page >= totalPages}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page >= totalPages ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page >= totalPages ? "pointer-events-none opacity-40" : ""
+              }`}
             href={makeHref({ page: page + 1 })}
           >
             Próxima →
@@ -340,9 +338,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           <Link
             aria-disabled={page >= totalPages}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page >= totalPages ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page >= totalPages ? "pointer-events-none opacity-40" : ""
+              }`}
             href={makeHref({ page: totalPages })}
           >
             Última <span className="hidden sm:inline">»</span>

@@ -1,24 +1,43 @@
-import Link from "next/link"
+// src/app/(dashboard)/layout.tsx
+import Link from "next/link";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen">
-      <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="font-semibold">JS Painel</Link>
-            <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-              <Link href="/dashboard">📊 Dashboard</Link>
-              <Link href="/clientes">👥 Clientes</Link>
-              <Link className="hover:text-foreground" href="/clientes">Clientes</Link>
-              <Link className="hover:text-foreground" href="/licencas">Licenças</Link>
-              <Link className="hover:text-foreground" href="/pagamentos">Pagamentos</Link>
-            </nav>
-          </div>
+    <div className="min-h-screen bg-zinc-50">
+      <header className="border-b border-zinc-200 bg-white shadow-sm sticky top-0 z-20">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
+          <Link href="/dashboard" className="font-bold text-zinc-900 text-base tracking-tight">
+            JS Painel
+          </Link>
+          <nav className="flex items-center gap-1 text-sm">
+            <Link
+              href="/dashboard"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              📊 Dashboard
+            </Link>
+            <Link
+              href="/clientes"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              👥 Clientes
+            </Link>
+            <Link
+              href="/planos"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              📋 Planos
+            </Link>
+            <Link
+              href="/pagamentos"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              💰 Pagamentos
+            </Link>
+          </nav>
         </div>
       </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-7xl px-6 py-6">{children}</main>
     </div>
-  )
+  );
 }

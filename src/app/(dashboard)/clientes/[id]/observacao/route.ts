@@ -3,9 +3,9 @@ import { pool } from "@/lib/db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function PUT(req: NextRequest, { params }: Ctx) {
+export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    const { id } = await params;
+    const { id } = await ctx.params;
 
     const body = await req.json();
     const observacao =
