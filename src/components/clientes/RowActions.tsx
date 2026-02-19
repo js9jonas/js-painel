@@ -1,17 +1,19 @@
+// src/components/clientes/RowActions.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import EditObservacaoModal from "./EditObservacaoModal";
+import EditClienteModal from "./EditClienteModal";
 
 type Props = {
   idCliente: string;
+  nome: string;
   telefone?: string | null;
   observacao?: string | null;
 };
 
-export default function RowActions({ idCliente, telefone, observacao }: Props) {
-  const [editObs, setEditObs] = useState(false);
+export default function RowActions({ idCliente, nome, telefone, observacao }: Props) {
+  const [editOpen, setEditOpen] = useState(false);
   const router = useRouter();
 
   return (
@@ -19,11 +21,11 @@ export default function RowActions({ idCliente, telefone, observacao }: Props) {
       <div className="flex items-center justify-end gap-2">
         <button
           type="button"
-          onClick={() => setEditObs(true)}
-          className="h-8 rounded-lg border bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
-          title="Editar observação"
+          onClick={() => setEditOpen(true)}
+          className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
+          title="Editar cliente"
         >
-          Editar
+          ✏️ Editar
         </button>
 
         <a
@@ -35,11 +37,12 @@ export default function RowActions({ idCliente, telefone, observacao }: Props) {
         </a>
       </div>
 
-      {editObs && (
-        <EditObservacaoModal
+      {editOpen && (
+        <EditClienteModal
           idCliente={idCliente}
+          nomeAtual={nome}
           observacaoAtual={observacao ?? null}
-          onClose={() => setEditObs(false)}
+          onClose={() => setEditOpen(false)}
           onSaved={() => router.refresh()}
         />
       )}

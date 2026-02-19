@@ -1,0 +1,43 @@
+# PATCH: src/lib/clientes.ts
+# Duas alterações necessárias:
+
+# ─────────────────────────────────────────────
+# 1) No tipo AssinaturaRow, adicione a linha:
+# ─────────────────────────────────────────────
+
+# ANTES:
+export type AssinaturaRow = {
+  id_assinatura: string;
+  status: string | null;
+  venc_contrato: string | null;
+  venc_contas: string | null;
+  identificacao: string | null;
+  id_plano: string | null;
+  id_pacote: string | null;
+  ...
+
+# DEPOIS (adicione observacao após identificacao):
+export type AssinaturaRow = {
+  id_assinatura: string;
+  status: string | null;
+  venc_contrato: string | null;
+  venc_contas: string | null;
+  identificacao: string | null;
+  observacao: string | null;       # ← ADICIONAR ESTA LINHA
+  id_plano: string | null;
+  id_pacote: string | null;
+  ...
+
+# ─────────────────────────────────────────────
+# 2) Na função getAssinaturasByClienteId,
+#    no SELECT, adicione observacao após identificacao:
+# ─────────────────────────────────────────────
+
+# ANTES:
+      a.identificacao,
+      a.id_plano::text AS id_plano,
+
+# DEPOIS:
+      a.identificacao,
+      a.observacao,                 # ← ADICIONAR ESTA LINHA
+      a.id_plano::text AS id_plano,

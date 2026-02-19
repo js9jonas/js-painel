@@ -1,0 +1,19 @@
+# ALTERAÇÃO NECESSÁRIA em src/app/(dashboard)/clientes/page.tsx
+#
+# O RowActions agora precisa receber a prop `nome`.
+# Encontre a linha com <RowActions e substitua por:
+
+# ANTES:
+<RowActions
+  idCliente={c.id_cliente}
+  telefone={c.telefone ?? null}
+  observacao={c.observacao ?? null}
+/>
+
+# DEPOIS:
+<RowActions
+  idCliente={c.id_cliente}
+  nome={c.nome}
+  telefone={c.telefone ?? null}
+  observacao={c.observacao ?? null}
+/>

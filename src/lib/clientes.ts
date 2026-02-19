@@ -30,6 +30,7 @@ export type AssinaturaRow = {
   venc_contrato: string | null;
   venc_contas: string | null;
   identificacao: string | null;
+  observacao: string | null;
   id_plano: string | null;
   id_pacote: string | null;
 
@@ -263,6 +264,7 @@ export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaR
       a.venc_contrato::text AS venc_contrato,
       a.venc_contas::text AS venc_contas,
       a.identificacao,
+      a.observacao, 
       a.id_plano::text AS id_plano,
       a.id_pacote::text AS id_pacote,
 
