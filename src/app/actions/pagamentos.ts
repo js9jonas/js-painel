@@ -5,6 +5,8 @@ import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 type PagamentoData = {
+  id_cliente: string | null;
+  nome_cliente: string | null;
   data_pgto: string;
   forma: string;
   valor: string;
@@ -16,9 +18,19 @@ type PagamentoData = {
 export async function updatePagamento(id: number, data: PagamentoData) {
   await pool.query(
     `UPDATE public.pagamentos
-     SET data_pgto = $1, forma = $2, valor = $3, detalhes = $4, tipo = $5, compra = $6
-     WHERE id = $7`,
+     SET
+       id_cliente = $1,
+       cliente    = $2,
+       data_pgto  = $3,
+       forma      = $4,
+       valor      = $5,
+       detalhes   = $6,
+       tipo       = $7,
+       compra     = $8
+     WHERE id = $9`,
     [
+      data.id_cliente ? BigInt(data.id_cliente) : null,
+      data.nome_cliente?.trim() || null,
       data.data_pgto || null,
       data.forma.trim() || null,
       data.valor || null,
@@ -35,7 +47,7 @@ export async function updatePagamento(id: number, data: PagamentoData) {
 
 export async function createPagamento(
   id_cliente: string,
-  data: PagamentoData
+  data: Omit<PagamentoData, "id_cliente" | "nome_cliente">
 ) {
   await pool.query(
     `INSERT INTO public.pagamentos (id_cliente, data_pgto, forma, valor, detalhes, tipo, compra)

@@ -1,19 +1,67 @@
-# ALTERAÇÃO NECESSÁRIA em src/app/(dashboard)/clientes/page.tsx
-#
-# O RowActions agora precisa receber a prop `nome`.
-# Encontre a linha com <RowActions e substitua por:
+# PATCH: src/app/(dashboard)/clientes/page.tsx
+# Três alterações para integrar o botão de novo cliente
+
+# ─────────────────────────────────────────────
+# 1) Adicione os imports no topo do arquivo
+# ─────────────────────────────────────────────
+
+# ANTES (imports existentes):
+import Link from "next/link";
+import {
+  countClientes,
+  getClientes,
+  ...
+} from "@/lib/clientes";
+import RowActions from "@/components/clientes/RowActions";
+
+# DEPOIS (adicione as 3 linhas):
+import Link from "next/link";
+import {
+  countClientes,
+  getClientes,
+  ...
+} from "@/lib/clientes";
+import RowActions from "@/components/clientes/RowActions";
+import { getPlanos } from "@/lib/planos";                          # ← ADD
+import { getPacotes } from "@/lib/pacotes";                        # ← ADD
+import NovoClienteButton from "@/components/clientes/NovoClienteButton";  # ← ADD
+
+# ─────────────────────────────────────────────
+# 2) No Promise.all, adicione as duas queries
+# ─────────────────────────────────────────────
 
 # ANTES:
-<RowActions
-  idCliente={c.id_cliente}
-  telefone={c.telefone ?? null}
-  observacao={c.observacao ?? null}
-/>
+  const [total, data] = await Promise.all([
+    countClientes({ q, status, order, due }),
+    getClientes({ q, status, order, page, pageSize, due }),
+  ]);
 
 # DEPOIS:
-<RowActions
-  idCliente={c.id_cliente}
-  nome={c.nome}
-  telefone={c.telefone ?? null}
-  observacao={c.observacao ?? null}
-/>
+  const [total, data, planos, pacotes] = await Promise.all([
+    countClientes({ q, status, order, due }),
+    getClientes({ q, status, order, page, pageSize, due }),
+    getPlanos(),
+    getPacotes(),
+  ]);
+
+# ─────────────────────────────────────────────
+# 3) No header, substitua o bloco do contador
+#    para incluir o botão ao lado
+# ─────────────────────────────────────────────
+
+# ANTES:
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-2xl font-bold text-zinc-900">{total}</p>
+              <p className="text-xs text-zinc-500">Total de clientes</p>
+            </div>
+          </div>
+
+# DEPOIS:
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-2xl font-bold text-zinc-900">{total}</p>
+              <p className="text-xs text-zinc-500">Total de clientes</p>
+            </div>
+            <NovoClienteButton planos={planos} pacotes={pacotes} />
+          </div>
