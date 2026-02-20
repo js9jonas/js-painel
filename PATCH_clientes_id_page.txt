@@ -1,0 +1,46 @@
+# PATCH: src/app/(dashboard)/clientes/[id]/page.tsx
+# Três alterações para integrar o AplicativosManager
+
+# ─────────────────────────────────────────────
+# 1) Adicione os imports no topo
+# ─────────────────────────────────────────────
+
+# Adicione junto aos outros imports:
+import { getAplicativosByClienteId, getApps } from "@/lib/aplicativos";
+import AplicativosManager from "@/components/aplicativos/AplicativosManager";
+
+# ─────────────────────────────────────────────
+# 2) No Promise.all, adicione as duas queries
+# ─────────────────────────────────────────────
+
+# ANTES:
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes] = await Promise.all([
+    getClienteById(id),
+    getAssinaturasByClienteId(id),
+    getPagamentosByClienteId(id, 999),
+    getPlanos(),
+    getPacotes(),
+  ]);
+
+# DEPOIS:
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps] = await Promise.all([
+    getClienteById(id),
+    getAssinaturasByClienteId(id),
+    getPagamentosByClienteId(id, 999),
+    getPlanos(),
+    getPacotes(),
+    getAplicativosByClienteId(id),
+    getApps(),
+  ]);
+
+# ─────────────────────────────────────────────
+# 3) Adicione o componente na página
+#    Sugestão: logo após o bloco de pagamentos
+#    (após <TabelaPagamentos pagamentos={todosPagamentos} />)
+# ─────────────────────────────────────────────
+
+      <AplicativosManager
+        idCliente={id}
+        aplicativos={aplicativos}
+        apps={apps}
+      />
