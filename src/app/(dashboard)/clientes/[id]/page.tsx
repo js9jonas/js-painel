@@ -5,10 +5,12 @@ import Link from "next/link";
 import { getAssinaturasByClienteId, getClienteById, getPagamentosByClienteId } from "@/lib/clientes";
 import { getPlanos } from "@/lib/planos";
 import { getPacotes } from "@/lib/pacotes";
+import { getAplicativosByClienteId, getApps } from "@/lib/aplicativos";
 import RenovarAssinatura from "@/components/clientes/RenovarAssinatura";
 import RowActions from "@/components/clientes/RowActions";
 import TabelaPagamentos from "@/components/clientes/TabelaPagamentos";
 import EditAssinaturaButton from "@/components/assinaturas/EditAssinaturaButton";
+import AplicativosManager from "@/components/aplicativos/AplicativosManager";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -18,12 +20,14 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
     getPlanos(),
     getPacotes(),
+    getAplicativosByClienteId(id),
+    getApps(),
   ]);
 
   const ativa = assinaturas.find((a) => (a.status ?? "").toLowerCase().trim() === "ativo") ?? null;
@@ -186,13 +190,13 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 idCliente={id}
                 assinatura={{
                   id_assinatura: ativa.id_assinatura,
-                  id_plano:      ativa.id_plano ?? null,
-                  id_pacote:     ativa.id_pacote ?? null,
+                  id_plano: ativa.id_plano ?? null,
+                  id_pacote: ativa.id_pacote ?? null,
                   venc_contrato: ativa.venc_contrato ?? null,
-                  venc_contas:   ativa.venc_contas ?? null,
-                  status:        ativa.status ?? "ativo",
+                  venc_contas: ativa.venc_contas ?? null,
+                  status: ativa.status ?? "ativo",
                   identificacao: ativa.identificacao ?? null,
-                  observacao:    ativa.observacao ?? null,
+                  observacao: ativa.observacao ?? null,
                 }}
                 planos={planos}
                 pacotes={pacotes}
@@ -205,9 +209,16 @@ export default async function ClienteDetalhePage({ params }: Props) {
           </div>
         </div>
       )}
+      {/* Aplicativos */}
+      <AplicativosManager
+        idCliente={id}
+        aplicativos={aplicativos}
+        apps={apps}
+      />
 
-      {/* COMPONENTE COM TODOS OS PAGAMENTOS */}
+      {/* Pagamentos */}
       <TabelaPagamentos pagamentos={todosPagamentos} />
+
 
       {/* Tabela completa de assinaturas */}
       <div className="rounded-2xl border bg-white overflow-hidden">
@@ -236,11 +247,10 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <td className="px-4 py-3 font-medium text-zinc-900">{a.id_assinatura}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                        a.status?.toLowerCase() === "ativo"
+                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${a.status?.toLowerCase() === "ativo"
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-zinc-100 text-zinc-600"
-                      }`}
+                        }`}
                     >
                       {a.status ?? "—"}
                     </span>
@@ -271,13 +281,13 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         idCliente={id}
                         assinatura={{
                           id_assinatura: a.id_assinatura,
-                          id_plano:      a.id_plano ?? null,
-                          id_pacote:     a.id_pacote ?? null,
+                          id_plano: a.id_plano ?? null,
+                          id_pacote: a.id_pacote ?? null,
                           venc_contrato: a.venc_contrato ?? null,
-                          venc_contas:   a.venc_contas ?? null,
-                          status:        a.status ?? "ativo",
+                          venc_contas: a.venc_contas ?? null,
+                          status: a.status ?? "ativo",
                           identificacao: a.identificacao ?? null,
-                          observacao:    a.observacao ?? null,
+                          observacao: a.observacao ?? null,
                         }}
                         planos={planos}
                         pacotes={pacotes}
