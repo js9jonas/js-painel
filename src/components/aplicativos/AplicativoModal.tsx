@@ -13,7 +13,7 @@ type Props = {
   onSaved: () => void;
 };
 
-const STATUS_OPTIONS = ["ativo", "inativo", "expirado", "bloqueado", "pendente"];
+const STATUS_OPTIONS = ["ativa", "inativa", "neutra"];
 
 function toDateInput(v: string | null): string {
   if (!v) return "";
@@ -27,7 +27,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
   const [mac, setMac]                   = useState(aplicativo?.mac ?? "");
   const [chave, setChave]               = useState(aplicativo?.chave ?? "");
   const [validade, setValidade]         = useState(toDateInput(aplicativo?.validade ?? null));
-  const [status, setStatus]             = useState(aplicativo?.status ?? "ativo");
+  const [status, setStatus]             = useState(aplicativo?.status ?? "ativa");
   const [observacao, setObservacao]     = useState(aplicativo?.observacao ?? "");
   const [idAssinatura, setIdAssinatura] = useState(String(aplicativo?.id_assinatura ?? ""));
   const [idConta, setIdConta]           = useState(String(aplicativo?.id_conta ?? ""));
@@ -42,6 +42,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
   function handleSave() {
     setError(null);
     const data: AplicativoData = {
+      id_cliente:     null,       // ← ADICIONAR esta linha
       id_app:         idApp        || null,
       mac:            mac          || null,
       chave:          chave        || null,
@@ -56,7 +57,10 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
     startTransition(async () => {
       try {
         if (isEdit && aplicativo) {
-          await updateAplicativo(aplicativo.id_app_registro, idCliente, data);
+          await updateAplicativo(aplicativo.id_app_registro, idCliente, {
+  ...data,
+  id_cliente: idCliente,
+});
         } else {
           await createAplicativo(idCliente, data);
         }

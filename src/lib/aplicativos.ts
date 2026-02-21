@@ -37,7 +37,7 @@ export async function getAplicativosByClienteId(id_cliente: string): Promise<Apl
        a.exige_licenca,
        ap.mac,
        ap.chave,
-       ap.validade::text,
+       to_char(ap.validade, 'YYYY-MM-DD') AS validade,
        ap.status,
        ap.observacao,
        ap.id_assinatura,

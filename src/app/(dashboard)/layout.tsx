@@ -23,6 +23,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               👥 Clientes
             </Link>
             <Link
+              href="/aplicativos"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              📱 Aplicativos
+            </Link>
+            <Link
               href="/planos"
               className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
             >
