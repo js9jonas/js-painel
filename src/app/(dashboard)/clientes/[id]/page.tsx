@@ -11,6 +11,7 @@ import RowActions from "@/components/clientes/RowActions";
 import TabelaPagamentos from "@/components/clientes/TabelaPagamentos";
 import EditAssinaturaButton from "@/components/assinaturas/EditAssinaturaButton";
 import AplicativosManager from "@/components/aplicativos/AplicativosManager";
+import NovaAssinaturaButton from "../../../../components/assinaturas/NovaAssinaturaButton";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -30,8 +31,25 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getApps(),
   ]);
 
-  const ativa = assinaturas.find((a) => (a.status ?? "").toLowerCase().trim() === "ativo") ?? null;
-  const outras = ativa ? assinaturas.filter((a) => a.id_assinatura !== ativa.id_assinatura) : assinaturas;
+  const ativa = [...assinaturas]
+    .filter((a) => (a.status ?? "").toLowerCase().trim() === "ativo")
+    .sort((a, b) => {
+      if (!a.venc_contrato) return 1;
+      if (!b.venc_contrato) return -1;
+      return a.venc_contrato.localeCompare(b.venc_contrato);
+    })[0] ?? null;
+
+  const outras = (ativa ? assinaturas.filter((a) => a.id_assinatura !== ativa.id_assinatura) : assinaturas)
+    .sort((a, b) => {
+      const statusAtivo = (s: string | null) => (s ?? "").toLowerCase() !== "inativo";
+      const aAtivo = statusAtivo(a.status);
+      const bAtivo = statusAtivo(b.status);
+      if (aAtivo && !bAtivo) return -1;
+      if (!aAtivo && bAtivo) return 1;
+      if (!a.venc_contrato) return 1;
+      if (!b.venc_contrato) return -1;
+      return a.venc_contrato.localeCompare(b.venc_contrato);
+    });
 
   return (
     <div className="space-y-4">
@@ -46,13 +64,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
             <h1 className="text-2xl font-semibold">
               {cliente?.nome ?? `Cliente #${id}`}
             </h1>
-
             <div className="mt-2 grid gap-1 text-sm text-zinc-600">
               <div>
                 <span className="text-zinc-500">ID:</span>{" "}
                 <span className="font-medium text-zinc-800">{id}</span>
               </div>
-
               <div>
                 <span className="text-zinc-500">Telefone:</span>{" "}
                 {cliente?.telefone ? (
@@ -61,7 +77,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <span className="text-zinc-400">—</span>
                 )}
               </div>
-
               <div>
                 <span className="text-zinc-500">Observação:</span>{" "}
                 {cliente?.observacao ? (
@@ -73,8 +88,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
             </div>
           </div>
 
-          {/* Ações rápidas do cliente */}
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
+            <NovaAssinaturaButton
+              idCliente={id}
+              planos={planos}
+              pacotes={pacotes}
+            />
             <RowActions
               idCliente={id}
               nome={cliente?.nome ?? ""}
@@ -96,32 +115,26 @@ export default async function ClienteDetalhePage({ params }: Props) {
           <div className="px-4 py-3 border-b bg-emerald-50 text-sm font-medium text-emerald-900">
             Assinatura ativa
           </div>
-
           <div className="p-4">
-            {/* Informações principais */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               <div className="text-sm">
                 <div className="text-zinc-500">ID</div>
                 <div className="font-medium text-zinc-900">{ativa.id_assinatura}</div>
               </div>
-
               <div className="text-sm">
                 <div className="text-zinc-500">Venc. contrato</div>
                 <div className="font-medium text-zinc-900">{ativa.venc_contrato ?? "—"}</div>
               </div>
-
               <div className="text-sm">
                 <div className="text-zinc-500">Venc. contas</div>
                 <div className="font-medium text-zinc-900">{ativa.venc_contas ?? "—"}</div>
               </div>
-
               <div className="text-sm">
                 <div className="text-zinc-500">Status</div>
                 <div className="font-medium text-emerald-700">{ativa.status}</div>
               </div>
             </div>
 
-            {/* Identificação e Observação */}
             {(ativa.identificacao || ativa.observacao) && (
               <div className="grid sm:grid-cols-2 gap-4 mb-4">
                 {ativa.identificacao && (
@@ -139,9 +152,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
             )}
 
-            {/* Informações de Pacote e Plano */}
             <div className="grid sm:grid-cols-2 gap-4 p-4 bg-zinc-50 rounded-lg mb-4">
-              {/* Pacote */}
               <div>
                 <div className="text-xs font-medium text-zinc-500 uppercase mb-2">Pacote</div>
                 {ativa.pacote_contrato ? (
@@ -157,8 +168,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <div className="text-sm text-zinc-400">Não informado</div>
                 )}
               </div>
-
-              {/* Plano */}
               <div>
                 <div className="text-xs font-medium text-zinc-500 uppercase mb-2">Plano</div>
                 {ativa.plano_tipo ? (
@@ -166,9 +175,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     <div className="font-semibold text-zinc-900">{ativa.plano_tipo}</div>
                     <div className="text-zinc-600 mt-1 space-x-2">
                       {ativa.plano_meses && (
-                        <span>
-                          {ativa.plano_meses} mês{ativa.plano_meses > 1 ? "es" : ""}
-                        </span>
+                        <span>{ativa.plano_meses} mês{ativa.plano_meses > 1 ? "es" : ""}</span>
                       )}
                       {ativa.plano_valor && (
                         <span>• R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span>
@@ -184,7 +191,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
             </div>
 
-            {/* Botões */}
             <div className="flex justify-end gap-2">
               <EditAssinaturaButton
                 idCliente={id}
@@ -209,23 +215,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
           </div>
         </div>
       )}
-      {/* Aplicativos */}
-      <AplicativosManager
-        idCliente={id}
-        aplicativos={aplicativos}
-        apps={apps}
-      />
-
-      {/* Pagamentos */}
-      <TabelaPagamentos pagamentos={todosPagamentos} />
-
 
       {/* Tabela completa de assinaturas */}
       <div className="rounded-2xl border bg-white overflow-hidden">
         <div className="px-4 py-3 border-b bg-zinc-50 text-sm font-medium text-zinc-700">
           Todas as assinaturas
         </div>
-
         <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead className="text-zinc-600 bg-zinc-50">
@@ -240,18 +235,16 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <th className="px-4 py-3 text-left font-medium">Ações</th>
               </tr>
             </thead>
-
             <tbody className="divide-y">
               {outras.map((a) => (
                 <tr key={a.id_assinatura} className="hover:bg-zinc-50">
                   <td className="px-4 py-3 font-medium text-zinc-900">{a.id_assinatura}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${a.status?.toLowerCase() === "ativo"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-zinc-100 text-zinc-600"
-                        }`}
-                    >
+                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                      a.status?.toLowerCase() === "ativo"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-zinc-100 text-zinc-600"
+                    }`}>
                       {a.status ?? "—"}
                     </span>
                   </td>
@@ -270,9 +263,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       <span className="text-zinc-500"> • {a.plano_meses} mês(es)</span>
                     ) : null}
                     {a.plano_valor ? (
-                      <span className="text-zinc-500">
-                        {" "}• R$ {parseFloat(a.plano_valor).toFixed(2)}
-                      </span>
+                      <span className="text-zinc-500"> • R$ {parseFloat(a.plano_valor).toFixed(2)}</span>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
@@ -300,7 +291,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   </td>
                 </tr>
               ))}
-
               {outras.length === 0 && (
                 <tr>
                   <td className="px-4 py-10 text-center text-zinc-500" colSpan={8}>
@@ -311,6 +301,14 @@ export default async function ClienteDetalhePage({ params }: Props) {
             </tbody>
           </table>
         </div>
+
+        <AplicativosManager
+          idCliente={id}
+          aplicativos={aplicativos}
+          apps={apps}
+        />
+
+        <TabelaPagamentos pagamentos={todosPagamentos} />
       </div>
     </div>
   );
