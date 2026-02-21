@@ -23,7 +23,7 @@ function formatValor(v: string | null) {
 
 function formatDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR");
+  return d.split("T")[0].split("-").reverse().join("/");
 }
 
 export default function PagamentosClient({

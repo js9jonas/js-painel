@@ -1,6 +1,6 @@
 // src/app/(dashboard)/clientes/page.tsx
 export const dynamic = "force-dynamic";
-
+import SearchInput from "@/components/clientes/SearchInput";
 import Link from "next/link";
 import {
   countClientes,
@@ -139,12 +139,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
             <input type="hidden" name="due" value={due} />
 
             <div className="flex-1 min-w-[240px]">
-              <input
-                name="q"
-                defaultValue={q}
-                placeholder="🔍 Buscar por nome ou observação..."
-                className="h-10 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
-              />
+              <SearchInput defaultValue={q} />
             </div>
 
             <select

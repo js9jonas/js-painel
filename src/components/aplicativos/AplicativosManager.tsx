@@ -29,7 +29,7 @@ function statusBadge(status: string | null) {
 
 function formatDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR");
+  return d.split("T")[0].split("-").reverse().join("/");
 }
 
 function isVencido(validade: string | null) {
