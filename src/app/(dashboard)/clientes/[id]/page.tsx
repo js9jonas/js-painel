@@ -33,7 +33,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   ]);
 
   const ativa = [...assinaturas]
-    .filter((a) => (a.status ?? "").toLowerCase().trim() === "ativo")
+    .filter((a) => ["ativo", "pendente"].includes((a.status ?? "").toLowerCase().trim()))
     .sort((a, b) => {
       if (!a.venc_contrato) return 1;
       if (!b.venc_contrato) return -1;
@@ -118,8 +118,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
       {/* Assinatura ativa destacada */}
       {ativa && (
         <div className="rounded-2xl border bg-white overflow-hidden">
-          <div className="px-4 py-3 border-b bg-emerald-50 text-sm font-medium text-emerald-900">
-            Assinatura ativa
+          <div className={`px-4 py-3 border-b text-sm font-medium ${ativa.status?.toLowerCase() === "pendente"
+              ? "bg-red-50 text-red-900"
+              : "bg-emerald-50 text-emerald-900"
+            }`}>
+            {ativa.status?.toLowerCase() === "pendente" ? "⚠️ Assinatura pendente" : "Assinatura ativa"}
           </div>
           <div className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
@@ -129,15 +132,21 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
               <div className="text-sm">
                 <div className="text-zinc-500">Venc. contrato</div>
-                <div className="font-medium text-zinc-900">{ativa.venc_contrato ?? "—"}</div>
+                <div className="font-medium text-zinc-900">
+                  {ativa.venc_contrato ? ativa.venc_contrato.split("T")[0].split("-").reverse().join("/") : "—"}
+                </div>
               </div>
               <div className="text-sm">
                 <div className="text-zinc-500">Venc. contas</div>
-                <div className="font-medium text-zinc-900">{ativa.venc_contas ?? "—"}</div>
+                <div className="font-medium text-zinc-900">
+                  {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "—"}
+                </div>
               </div>
               <div className="text-sm">
                 <div className="text-zinc-500">Status</div>
-                <div className="font-medium text-emerald-700">{ativa.status}</div>
+                <div className={`font-medium ${ativa.status?.toLowerCase() === "pendente" ? "text-red-600" : "text-emerald-700"}`}>
+                  {ativa.status}
+                </div>
               </div>
             </div>
 
@@ -246,11 +255,10 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <tr key={a.id_assinatura} className="hover:bg-zinc-50">
                   <td className="px-4 py-3 font-medium text-zinc-900">{a.id_assinatura}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                      a.status?.toLowerCase() === "ativo"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-zinc-100 text-zinc-600"
-                    }`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${a.status?.toLowerCase() === "ativo"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-zinc-100 text-zinc-600"
+                      }`}>
                       {a.status ?? "—"}
                     </span>
                   </td>

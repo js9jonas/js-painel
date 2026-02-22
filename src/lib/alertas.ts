@@ -59,7 +59,7 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
      WHERE lower(btrim(ap.status)) = 'ativa'
        AND ap.validade IS NOT NULL
        AND ap.validade::date <= CURRENT_DATE + ($1::int || ' days')::interval
-       AND ap.validade::date >= CURRENT_DATE
+       AND ap.validade::date >= CURRENT_DATE - 1
      ORDER BY ap.validade ASC`,
         [dias]
     );

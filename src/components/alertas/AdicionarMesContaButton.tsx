@@ -10,6 +10,7 @@ export default function AdicionarMesContaButton({ idAssinatura }: { idAssinatura
   const router = useRouter();
 
   function handleClick() {
+    if (!confirm("Adicionar 1 mês no vencimento da conta?")) return;
     startTransition(async () => {
       await adicionarMesConta(idAssinatura);
       router.refresh();
