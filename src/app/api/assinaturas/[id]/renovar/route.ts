@@ -36,20 +36,28 @@ export async function PUT(
 
     const ativar = body?.ativar !== false;
 
-    const sql = `
-      UPDATE public.assinaturas
-      SET
-        venc_contrato =
+const sql = `
+  UPDATE public.assinaturas
+  SET
+    venc_contrato =
+      CASE
+        WHEN $2::date IS NOT NULL THEN $2::date
+        ELSE (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
+      END,
+    venc_contas =
+      CASE
+        WHEN venc_contas IS NULL THEN
           CASE
             WHEN $2::date IS NOT NULL THEN $2::date
             ELSE (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
-          END,
-        status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
-        atualizado_em = NOW()
-      WHERE id_assinatura = $1::bigint
-      RETURNING id_assinatura::text AS id_assinatura, venc_contrato::text AS venc_contrato, status;
-    `;
-
+          END
+        ELSE (venc_contas::date + make_interval(months => 1))::date
+      END,
+    status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
+    atualizado_em = NOW()
+  WHERE id_assinatura = $1::bigint
+  RETURNING id_assinatura::text AS id_assinatura, venc_contrato::text AS venc_contrato, venc_contas::text AS venc_contas, status;
+`;
     const result = await pool.query(sql, [idAssinatura, dataManual, meses, ativar]);
 
     if (result.rowCount === 0) {
