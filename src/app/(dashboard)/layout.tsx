@@ -40,6 +40,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               💰 Pagamentos
             </Link>
+            <Link
+              href="/alertas"
+              className="rounded-lg px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700 font-medium transition-all"
+            >
+              🚨 Alertas
+            </Link>
           </nav>
         </div>
       </header>
