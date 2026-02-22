@@ -59,7 +59,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
   const q = toStr(sp.q);
   const status = (toStr(sp.status) as "todos" | ClienteStatusTela) || "todos";
-  const order = (toStr(sp.order) as "nome" | "vencimento") || "nome";
+  const order = (toStr(sp.order) as "nome" | "vencimento") || "vencimento";
   const due = (toStr(sp.due) as DueFilter) || "todos";
 
   const page = toInt(sp.page, 1);
@@ -79,7 +79,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
     if (q) p.set("q", q);
     if (status && status !== "todos") p.set("status", status);
-    if (order && order !== "nome") p.set("order", order);
+    if (order && order !== "vencimento") p.set("order", order);
     if (due && due !== "todos") p.set("due", due);
 
     p.set("pageSize", String(pageSize));

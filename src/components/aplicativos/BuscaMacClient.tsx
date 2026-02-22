@@ -71,7 +71,15 @@ export default function BuscaMacClient({ apps }: Props) {
                 {resultados.map((r) => (
                   <tr key={r.id_app_registro} className="hover:bg-zinc-50/50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">{r.nome_cliente ?? "—"}</div>
+                      <div className="font-medium text-zinc-900">
+                        {r.id_cliente ? (
+                          <a href={`/clientes/${r.id_cliente}`} className="hover:text-zinc-600 hover:underline transition-colors">
+                            {r.nome_cliente ?? `Cliente #${r.id_cliente}`}
+                          </a>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </div>
                       {r.id_cliente && (
                         <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
                       )}
@@ -80,7 +88,7 @@ export default function BuscaMacClient({ apps }: Props) {
                     <td className="px-4 py-3 font-mono text-xs text-zinc-600">{r.mac ?? "—"}</td>
                     <td className="px-4 py-3 font-mono text-xs text-zinc-600">{r.chave ?? "—"}</td>
                     <td className="px-4 py-3 text-zinc-700">
-                      {r.validade ? new Date(r.validade).toLocaleDateString("pt-BR") : "—"}
+                      {r.validade ? r.validade?.split("T")[0].split("-").reverse().join("/") ?? "—" : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${
