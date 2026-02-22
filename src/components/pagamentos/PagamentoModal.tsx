@@ -16,33 +16,34 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
   const rawDate = pagamento.data_pgto?.split("T")[0] ?? "";
 
   // Campos do pagamento
-  const [dataPgto, setDataPgto]   = useState(rawDate);
-  const [forma, setForma]         = useState(pagamento.forma ?? "");
-  const [valor, setValor]         = useState(pagamento.valor ?? "");
-  const [detalhes, setDetalhes]   = useState(pagamento.detalhes ?? "");
-  const [tipo, setTipo]           = useState(pagamento.tipo ?? "");
-  const [compra, setCompra]       = useState(pagamento.compra ?? "");
+  const [dataPgto, setDataPgto] = useState(rawDate);
+  const [forma, setForma] = useState(pagamento.forma ?? "");
+  const [valor, setValor] = useState(pagamento.valor ?? "");
+  const [detalhes, setDetalhes] = useState(pagamento.detalhes ?? "");
+  const [tipo, setTipo] = useState(pagamento.tipo ?? "");
+  const [compra, setCompra] = useState(pagamento.compra ?? "");
 
   // Estado do cliente selecionado
-  const [clienteId, setClienteId]     = useState(pagamento.id_cliente ?? "");
+  const [clienteId, setClienteId] = useState(pagamento.id_cliente ?? "");
   const [clienteNome, setClienteNome] = useState(pagamento.nome_cliente ?? "");
 
   // Busca de cliente
-  const [busca, setBusca]               = useState(pagamento.nome_cliente ?? "");
-  const [resultados, setResultados]     = useState<ClienteBuscaRow[]>([]);
-  const [buscando, setBuscando]         = useState(false);
+  const [busca, setBusca] = useState(pagamento.nome_cliente ?? "");
+  const [resultados, setResultados] = useState<ClienteBuscaRow[]>([]);
+  const [buscando, setBuscando] = useState(false);
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [isPending, startTransition] = useTransition();
-  const [error, setError]            = useState<string | null>(null);
-
+  const [error, setError] = useState<string | null>(null);
+  const [itemAtivo, setItemAtivo] = useState(-1);
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownAberto(false);
+
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -52,6 +53,7 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
   // Debounce na busca
   function handleBuscaChange(valor: string) {
     setBusca(valor);
+    setItemAtivo(-1);
     setDropdownAberto(true);
 
     // Se limpou o campo, limpa o cliente selecionado
@@ -82,14 +84,31 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
     setDropdownAberto(false);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!dropdownAberto || resultados.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setItemAtivo((prev) => Math.min(prev + 1, resultados.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setItemAtivo((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (itemAtivo >= 0 && resultados[itemAtivo]) selecionarCliente(resultados[itemAtivo]);
+    } else if (e.key === "Escape") {
+      setDropdownAberto(false);
+      setItemAtivo(-1);
+    }
+  }
+
   function handleSave() {
     setError(null);
     startTransition(async () => {
       try {
         await updatePagamento(pagamento.id, {
-          id_cliente:   clienteId || null,
+          id_cliente: clienteId || null,
           nome_cliente: clienteNome || null,
-          data_pgto:    dataPgto,
+          data_pgto: dataPgto,
           forma,
           valor,
           detalhes,
@@ -125,6 +144,7 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
               Cliente
             </label>
             <input
+              onKeyDown={handleKeyDown}
               value={busca}
               onChange={(e) => handleBuscaChange(e.target.value)}
               onFocus={() => busca && setDropdownAberto(true)}
@@ -160,15 +180,19 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
                   <div className="px-4 py-3 text-sm text-zinc-500">Buscando...</div>
                 ) : resultados.length > 0 ? (
                   <ul>
-                    {resultados.map((c) => (
+                    {resultados.map((c, i) => (
                       <li key={c.id_cliente}>
                         <button
                           type="button"
                           onMouseDown={() => selecionarCliente(c)}
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-50 transition-colors flex items-center justify-between gap-3"
+                          onMouseEnter={() => setItemAtivo(i)}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between gap-3 ${i === itemAtivo ? "bg-zinc-900 text-white" : "hover:bg-zinc-50"
+                            }`}
                         >
-                          <span className="font-medium text-zinc-900">{c.nome}</span>
-                          <span className="text-xs text-zinc-400 shrink-0">ID {c.id_cliente}</span>
+                          <span className="font-medium">{c.nome}</span>
+                          <span className={`text-xs shrink-0 ${i === itemAtivo ? "text-zinc-300" : "text-zinc-400"}`}>
+                            ID {c.id_cliente}
+                          </span>
                         </button>
                       </li>
                     ))}

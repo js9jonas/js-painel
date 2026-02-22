@@ -12,6 +12,7 @@ import TabelaPagamentos from "@/components/clientes/TabelaPagamentos";
 import EditAssinaturaButton from "@/components/assinaturas/EditAssinaturaButton";
 import AplicativosManager from "@/components/aplicativos/AplicativosManager";
 import NovaAssinaturaButton from "../../../../components/assinaturas/NovaAssinaturaButton";
+import BuscaClienteRapida from "@/components/clientes/BuscaClienteRapida";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -53,9 +54,14 @@ export default async function ClienteDetalhePage({ params }: Props) {
 
   return (
     <div className="space-y-4">
-      <Link href="/clientes" className="text-sm text-zinc-600 hover:underline">
-        ← Voltar
-      </Link>
+
+      {/* Navegação */}
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/clientes" className="text-sm text-zinc-600 hover:underline">
+          ← Voltar
+        </Link>
+        <BuscaClienteRapida />
+      </div>
 
       {/* Cabeçalho do cliente */}
       <div className="rounded-2xl border bg-white p-6">
