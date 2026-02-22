@@ -94,8 +94,7 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
   const q = (params.q ?? "").trim();
   const status = params.status ?? "todos";
   const due = params.due ?? "todos";
-  const order = params.order ?? "nome";
-
+  const order = params.order ?? "vencimento";
   const page = clamp(Number(params.page ?? 1) || 1, 1, 9999);
   const pageSize = clamp(Number(params.pageSize ?? 50) || 50, 10, 200);
   const offset = (page - 1) * pageSize;
@@ -141,9 +140,12 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
 
   const orderSql =
     order === "vencimento"
-      ? `ORDER BY (prox_vencimento IS NULL) ASC, prox_vencimento::date ASC, nome ASC`
+      ? `ORDER BY
+        (prox_vencimento IS NULL) ASC,
+        (prox_vencimento::date < CURRENT_DATE) ASC,
+        prox_vencimento::date ASC,
+        nome ASC`
       : `ORDER BY nome ASC`;
-
   const sql = `
     WITH base AS (
       SELECT
