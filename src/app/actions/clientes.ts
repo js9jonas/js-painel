@@ -20,3 +20,50 @@ export async function updateCliente(
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${id}`);
 }
+
+export type ContatoRow = {
+  id_contato: string;
+  telefone: string;
+  nome: string | null;
+  referencia: string | null;
+};
+
+export async function getContatosCliente(idCliente: string): Promise<ContatoRow[]> {
+  const { rows } = await pool.query<ContatoRow>(
+    `SELECT id_contato::text, telefone, nome
+     FROM public.contatos
+     WHERE id_cliente = $1::bigint
+     ORDER BY criado_em ASC`,
+    [idCliente]
+  );
+  return rows;
+}
+
+export async function salvarContato(
+  idCliente: string,
+  data: { idContato?: string; telefone: string; nome: string | null }
+): Promise<void> {
+  if (data.idContato) {
+    await pool.query(
+      `UPDATE public.contatos
+       SET telefone = $1, nome = $2, atualizado_em = NOW()
+       WHERE id_contato = $3::bigint`,
+      [data.telefone.trim(), data.nome?.trim() || null, data.idContato]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO public.contatos (id_cliente, telefone, nome, criado_em, atualizado_em)
+       VALUES ($1::bigint, $2, $3, NOW(), NOW())`,
+      [idCliente, data.telefone.trim(), data.nome?.trim() || null]
+    );
+  }
+  revalidatePath(`/clientes/${idCliente}`);
+}
+
+export async function deletarContato(idContato: string, idCliente: string): Promise<void> {
+  await pool.query(
+    `DELETE FROM public.contatos WHERE id_contato = $1::bigint`,
+    [idContato]
+  );
+  revalidatePath(`/clientes/${idCliente}`);
+}

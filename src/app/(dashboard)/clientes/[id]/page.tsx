@@ -119,8 +119,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
       {ativa && (
         <div className="rounded-2xl border bg-white overflow-hidden">
           <div className={`px-4 py-3 border-b text-sm font-medium ${ativa.status?.toLowerCase() === "pendente"
-              ? "bg-red-50 text-red-900"
-              : "bg-emerald-50 text-emerald-900"
+            ? "bg-red-50 text-red-900"
+            : "bg-emerald-50 text-emerald-900"
             }`}>
             {ativa.status?.toLowerCase() === "pendente" ? "⚠️ Assinatura pendente" : "Assinatura ativa"}
           </div>
@@ -225,6 +225,20 @@ export default async function ClienteDetalhePage({ params }: Props) {
               <RenovarAssinatura
                 idAssinatura={ativa.id_assinatura}
                 vencAtual={ativa.venc_contrato ?? null}
+                idCliente={id}
+                nomeCliente={cliente?.nome ?? ""}
+                pacoteNome={ativa.pacote_contrato ?? null}
+                planoValor={ativa.plano_valor ?? null}
+                idPlano={ativa.id_plano ?? null}
+                planoTipo={ativa.plano_tipo ?? null}
+                planoTelas={ativa.pacote_telas ?? null}
+                planos={planos.map(p => ({
+                  id_plano: String(p.id_plano),
+                  tipo: p.tipo ?? "",
+                  telas: p.telas ?? 0,
+                  meses: p.meses ?? 1,
+                  valor: String(p.valor ?? "0"),
+                }))}
               />
             </div>
           </div>
@@ -298,8 +312,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         pacotes={pacotes}
                       />
                       <RenovarAssinatura
-                        idAssinatura={a.id_assinatura}
-                        vencAtual={a.venc_contrato ?? null}
+                        idAssinatura={ativa.id_assinatura}
+                        vencAtual={ativa.venc_contrato ?? null}
+                        idCliente={id}
+                        nomeCliente={cliente?.nome ?? ""}
+                        pacoteNome={ativa.pacote_contrato ?? null}
+                        planoValor={ativa.plano_valor ?? null}
                       />
                     </div>
                   </td>
