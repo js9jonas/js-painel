@@ -1,8 +1,8 @@
-// src/components/clientes/EditClienteModal.tsx
+﻿// src/components/clientes/EditClienteModal.tsx
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { updateCliente, getContatosCliente, salvarContato, deletarContato, type ContatoRow } from "@/app/actions/clientes";
+import { updateCliente, getContatosCliente, salvarContatoV2, deletarContato, type ContatoRow } from "@/app/actions/clientes";
 
 type Props = {
   idCliente: string;
@@ -23,7 +23,7 @@ export default function EditClienteModal({
   const [editReferencia, setEditReferencia] = useState("");
   const [novaReferencia, setNovaReferencia] = useState("");
 
-  // Contato em edição inline
+  // Contato em ediÃ§Ã£o inline
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editTelefone, setEditTelefone] = useState("");
   const [editNome, setEditNome] = useState("");
@@ -38,7 +38,7 @@ export default function EditClienteModal({
   }, [idCliente]);
 
   function handleSaveCliente() {
-    if (!nome.trim()) { setError("Nome é obrigatório"); return; }
+    if (!nome.trim()) { setError("Nome Ã© obrigatÃ³rio"); return; }
     setError(null);
     startTransition(async () => {
       try {
@@ -98,10 +98,10 @@ export default function EditClienteModal({
               <input value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} placeholder="Nome do cliente" />
             </div>
             <div>
-              <label className={labelClass}>Observação</label>
+              <label className={labelClass}>ObservaÃ§Ã£o</label>
               <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={3}
                 className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all resize-none"
-                placeholder="Observações sobre o cliente..." />
+                placeholder="ObservaÃ§Ãµes sobre o cliente..." />
             </div>
           </div>
 
@@ -151,11 +151,11 @@ export default function EditClienteModal({
                       <div className="flex gap-2">
                         <button onClick={() => iniciarEdicao(c)}
                           className="text-xs border border-zinc-300 rounded-lg px-3 py-1 hover:bg-zinc-100">
-                          ✏️
+                          âœï¸
                         </button>
                         <button onClick={() => handleDeletarContato(c.id_contato)}
                           className="text-xs border border-red-200 text-red-600 rounded-lg px-3 py-1 hover:bg-red-50">
-                          🗑
+                          ðŸ—‘
                         </button>
                       </div>
                     </div>
@@ -202,7 +202,7 @@ export default function EditClienteModal({
           </button>
           <button onClick={handleSaveCliente} disabled={isPending || !nome.trim()}
             className="h-10 rounded-xl bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50">
-            {isPending ? "Salvando..." : "Salvar alterações"}
+            {isPending ? "Salvando..." : "Salvar alteraÃ§Ãµes"}
           </button>
         </div>
       </div>
