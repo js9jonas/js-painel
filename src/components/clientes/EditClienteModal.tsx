@@ -58,7 +58,7 @@ export default function EditClienteModal({
 
   async function handleSalvarContato(idContato: string) {
     if (!editTelefone.trim()) return;
-    await salvarContato(idCliente, { idContato, telefone: editTelefone, nome: editNome || null, referencia: editReferencia || null });
+    await salvarContatoV2(idCliente, { idContato, telefone: editTelefone, nome: editNome || null, referencia: editReferencia || null });
     setContatos(await getContatosCliente(idCliente));
     setEditandoId(null);
   }
@@ -71,7 +71,7 @@ export default function EditClienteModal({
 
   async function handleAdicionarContato() {
     if (!novoTelefone.trim()) return;
-    await salvarContato(idCliente, { telefone: novoTelefone, nome: novoNome || null, referencia: novaReferencia || null });
+    await salvarContatoV2(idCliente, { telefone: novoTelefone, nome: novoNome || null, referencia: novaReferencia || null });
     setContatos(await getContatosCliente(idCliente));
     setNovoTelefone(""); setNovoNome(""); setNovaReferencia(""); setAdicionando(false);
   }
@@ -209,3 +209,4 @@ export default function EditClienteModal({
     </div>
   );
 }
+
