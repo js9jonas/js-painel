@@ -39,7 +39,7 @@ export async function getContatosCliente(idCliente: string): Promise<ContatoRow[
   return rows;
 }
 
-export async function salvarContato(
+export async function salvarContatoV2(
   idCliente: string,
   data: { idContato?: string; telefone: string; nome: string | null }
 ): Promise<void> {
