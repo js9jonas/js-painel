@@ -1,4 +1,4 @@
-// src/app/actions/clientes.ts
+﻿// src/app/actions/clientes.ts
 "use server"; // v2
 
 import { pool } from "@/lib/db";
@@ -8,7 +8,7 @@ export async function updateCliente(
   id: string,
   data: { nome: string; observacao: string | null }
 ) {
-  if (!data.nome.trim()) throw new Error("Nome é obrigatório");
+  if (!data.nome.trim()) throw new Error("Nome Ã© obrigatÃ³rio");
 
   await pool.query(
     `UPDATE public.clientes
@@ -41,7 +41,7 @@ export async function getContatosCliente(idCliente: string): Promise<ContatoRow[
 
 export async function salvarContatoV2(
   idCliente: string,
-  data: { idContato?: string; telefone: string; nome: string | null }
+  data: { idContato?: string; telefone: string; nome: string | null; referencia: string | null }
 ): Promise<void> {
   if (data.idContato) {
     await pool.query(
@@ -67,3 +67,4 @@ export async function deletarContato(idContato: string, idCliente: string): Prom
   );
   revalidatePath(`/clientes/${idCliente}`);
 }
+
