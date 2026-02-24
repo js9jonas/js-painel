@@ -26,6 +26,36 @@ function formatDate(d: string | null) {
   return d.split("T")[0].split("-").reverse().join("/");
 }
 
+function BotaoOK({ id, onDone }: { id: number; onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleClick() {
+  setLoading(true);
+  try {
+    const res = await fetch("/api/pagamentos/marcar-ok", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [id] }),
+    });
+    const data = await res.json();
+    if (data.success) onDone();
+  } finally {
+    setLoading(false);
+  }
+}
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className="h-8 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition-colors"
+    >
+      {loading ? "..." : "OK"}
+    </button>
+  );
+}
+
 export default function PagamentosClient({
   data,
   total,
@@ -33,9 +63,7 @@ export default function PagamentosClient({
   pageSize,
   q,
 }: Props) {
-  const [modalPagamento, setModalPagamento] = useState<PagamentoFullRow | null>(
-    null
-  );
+  const [modalPagamento, setModalPagamento] = useState<PagamentoFullRow | null>(null);
   const router = useRouter();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -111,92 +139,84 @@ export default function PagamentosClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white">
-                {["Data", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", ""].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 px-6 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  )
-                )}
+                {["Data", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", ""].map((h) => (
+                  <th
+                    key={h}
+                    className="sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 px-6 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {data.map((p) => (
-                <tr
-                  key={p.id}
-                  className="hover:bg-zinc-50/50 transition-colors"
-                >
-                  <td className="px-6 py-4 font-medium text-zinc-900 whitespace-nowrap">
-                    {formatDate(p.data_pgto)}
-                  </td>
-                  <td className="px-6 py-4">
-                    {p.nome_cliente ? (
-                      <Link
-                        href={`/clientes/${p.id_cliente}`}
-                        className="font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
-                      >
-                        {p.nome_cliente}
-                      </Link>
-                    ) : (
-                      <span className="text-zinc-400 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {p.forma ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">
-                        {p.forma}
+              {data.map((p) => {
+                const isPendente = p.detalhes !== "OK";
+                return (
+                  <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-zinc-900 whitespace-nowrap">
+                      {formatDate(p.data_pgto)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {p.nome_cliente ? (
+                        <Link
+                          href={`/clientes/${p.id_cliente}`}
+                          className="font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
+                        >
+                          {p.nome_cliente}
+                        </Link>
+                      ) : (
+                        <span className="text-zinc-400 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {p.forma ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">
+                          {p.forma}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-emerald-700">
+                        {formatValor(p.valor)}
                       </span>
-                    ) : (
-                      <span className="text-zinc-400 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-emerald-700">
-                      {formatValor(p.valor)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-600 text-xs">
-                    {p.tipo ?? "—"}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-600 text-xs">
-                    {p.compra ?? "—"}
-                  </td>
-                  <td className="px-6 py-4 max-w-xs">
-                    <span
-                      className="text-zinc-600 text-xs truncate block"
-                      title={p.detalhes ?? ""}
-                    >
-                      {p.detalhes || "—"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => setModalPagamento(p)}
-                      className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
-                    >
-                      ✏️ Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-600 text-xs">{p.tipo ?? "—"}</td>
+                    <td className="px-6 py-4 text-zinc-600 text-xs">{p.compra ?? "—"}</td>
+                    <td className="px-6 py-4 max-w-xs">
+                      <span
+                        className="text-zinc-600 text-xs truncate block"
+                        title={p.detalhes ?? ""}
+                      >
+                        {p.detalhes || "—"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {isPendente && (
+                          <BotaoOK id={p.id} onDone={() => router.refresh()} />
+                        )}
+                        <button
+                          onClick={() => setModalPagamento(p)}
+                          className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
+                        >
+                          ✏️ Editar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {data.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-16 text-center text-zinc-500"
-                  >
+                  <td colSpan={8} className="px-6 py-16 text-center text-zinc-500">
                     <div className="flex flex-col items-center gap-2">
                       <div className="text-4xl">💰</div>
-                      <div className="font-medium">
-                        Nenhum pagamento encontrado
-                      </div>
-                      <div className="text-xs text-zinc-400">
-                        Tente ajustar os filtros
-                      </div>
+                      <div className="font-medium">Nenhum pagamento encontrado</div>
+                      <div className="text-xs text-zinc-400">Tente ajustar os filtros</div>
                     </div>
                   </td>
                 </tr>
@@ -211,8 +231,7 @@ export default function PagamentosClient({
         <div className="text-sm text-zinc-600">
           Mostrando{" "}
           <span className="font-semibold text-zinc-900">{data.length}</span> de{" "}
-          <span className="font-semibold text-zinc-900">{total}</span>{" "}
-          pagamentos
+          <span className="font-semibold text-zinc-900">{total}</span> pagamentos
           <span className="text-zinc-400 mx-2">•</span>
           Página{" "}
           <span className="font-semibold text-zinc-900">{page}</span> de{" "}

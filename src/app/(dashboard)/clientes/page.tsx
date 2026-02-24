@@ -19,6 +19,8 @@ function badgeClass(status: ClienteStatusTela) {
       return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
     case "sem_assinatura":
       return "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-600/20";
+    case "pendente":
+      return "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20";
     default:
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20";
   }
@@ -30,6 +32,8 @@ function badgeLabel(status: ClienteStatusTela) {
       return "Atrasado";
     case "sem_assinatura":
       return "Sem assinatura";
+    case "pendente":
+      return "Pendente";
     default:
       return "OK";
   }
@@ -150,6 +154,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               <option value="todos">Todos os status</option>
               <option value="ok">✅ OK</option>
               <option value="atrasado">❌ Atrasado</option>
+              <option value="pendente">⏳ Pendente</option>
               <option value="sem_assinatura">⚠️ Sem assinatura</option>
             </select>
 
@@ -253,11 +258,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   </td>
 
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${badgeClass(
-                        c.status_tela
-                      )}`}
-                    >
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${badgeClass(c.status_tela)}`}>
                       {badgeLabel(c.status_tela)}
                     </span>
                   </td>
@@ -312,39 +313,28 @@ export default async function ClientesPage({ searchParams }: PageProps) {
         <div className="flex items-center gap-2">
           <Link
             aria-disabled={page <= 1}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page <= 1 ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""}`}
             href={makeHref({ page: 1 })}
           >
             <span className="hidden sm:inline">«</span> Primeira
           </Link>
-
           <Link
             aria-disabled={page <= 1}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page <= 1 ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""}`}
             href={makeHref({ page: page - 1 })}
           >
             ← Anterior
           </Link>
-
           <Link
             aria-disabled={page >= totalPages}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page >= totalPages ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page >= totalPages ? "pointer-events-none opacity-40" : ""}`}
             href={makeHref({ page: page + 1 })}
           >
             Próxima →
           </Link>
-
           <Link
             aria-disabled={page >= totalPages}
-            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${
-              page >= totalPages ? "pointer-events-none opacity-40" : ""
-            }`}
+            className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center gap-2 transition-all shadow-sm ${page >= totalPages ? "pointer-events-none opacity-40" : ""}`}
             href={makeHref({ page: totalPages })}
           >
             Última <span className="hidden sm:inline">»</span>

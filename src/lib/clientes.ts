@@ -1,7 +1,7 @@
 // src/lib/clientes.ts
 import { pool } from "@/lib/db";
 
-export type ClienteStatusTela = "sem_assinatura" | "atrasado" | "ok";
+export type ClienteStatusTela = "sem_assinatura" | "atrasado" | "ok" | "pendente";
 export type DueFilter = "todos" | "ontem" | "hoje" | "amanha";
 
 export type ClienteRow = {
@@ -19,9 +19,9 @@ export type GetClientesParams = {
   q?: string;
   status?: "todos" | ClienteStatusTela;
   order?: "nome" | "vencimento";
-  page?: number; // 1..N
-  pageSize?: number; // ex: 50, 100
-  due?: DueFilter; // <-- NOVO (guias)
+  page?: number;
+  pageSize?: number;
+  due?: DueFilter;
 };
 
 export type AssinaturaRow = {
@@ -33,20 +33,15 @@ export type AssinaturaRow = {
   observacao: string | null;
   id_plano: string | null;
   id_pacote: string | null;
-
-  // detalhes pacote
   pacote_contrato: string | null;
   pacote_telas: number | null;
-
-  // detalhes plano
   plano_tipo: string | null;
   plano_telas: number | null;
   plano_meses: number | null;
-  plano_valor: string | null;      // vem como string no pg muitas vezes
+  plano_valor: string | null;
   plano_descricao: string | null;
 };
 
-// NOVO: Tipo para pagamentos
 export type PagamentoRow = {
   id: number;
   data_pgto: string | null;
@@ -56,7 +51,6 @@ export type PagamentoRow = {
   tipo: string | null;
   compra: string | null;
 };
-
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -79,14 +73,10 @@ function buildBaseWhere(q: string) {
 
 function dueOffset(due: DueFilter) {
   switch (due) {
-    case "ontem":
-      return -1;
-    case "hoje":
-      return 0;
-    case "amanha":
-      return 1;
-    default:
-      return null;
+    case "ontem": return -1;
+    case "hoje": return 0;
+    case "amanha": return 1;
+    default: return null;
   }
 }
 
@@ -99,7 +89,6 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
   const pageSize = clamp(Number(params.pageSize ?? 50) || 50, 10, 200);
   const offset = (page - 1) * pageSize;
 
-  // filtros pré-agregação (nome/obs)
   const values: any[] = [];
   const whereParts: string[] = [];
 
@@ -112,7 +101,6 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
 
   const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
-  // filtros pós-agregação (status_tela, due)
   const postWhereParts: string[] = [];
 
   if (status !== "todos") {
@@ -132,7 +120,6 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
     ? `WHERE ${postWhereParts.join(" AND ")}`
     : "";
 
-  // LIMIT e OFFSET (sempre por último)
   values.push(pageSize);
   const limitParam = `$${values.length}`;
   values.push(offset);
@@ -141,11 +128,12 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
   const orderSql =
     order === "vencimento"
       ? `ORDER BY
-        (prox_vencimento IS NULL) ASC,
-        (prox_vencimento::date < CURRENT_DATE) ASC,
-        prox_vencimento::date ASC,
-        nome ASC`
+          (prox_vencimento IS NULL) ASC,
+          (prox_vencimento::date < CURRENT_DATE) ASC,
+          prox_vencimento::date ASC,
+          nome ASC`
       : `ORDER BY nome ASC`;
+
   const sql = `
     WITH base AS (
       SELECT
@@ -160,13 +148,17 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
           FROM public.assinaturas a2
           LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
           WHERE a2.id_cliente = c.id_cliente
-            AND lower(btrim(a2.status)) = 'ativo'
+            AND lower(btrim(a2.status)) IN ('ativo', 'pendente')
           ORDER BY a2.venc_contrato DESC NULLS LAST
           LIMIT 1
         ) AS pacote_nome,
         CASE
-          WHEN COUNT(a.id_assinatura) = 0 THEN 'sem_assinatura'
-          WHEN MAX(a.venc_contrato) < CURRENT_DATE THEN 'atrasado'
+          WHEN COUNT(a.id_assinatura) = 0 AND COUNT(ap.id_assinatura) = 0
+            THEN 'sem_assinatura'
+          WHEN COUNT(ap.id_assinatura) > 0
+            THEN 'pendente'
+          WHEN MAX(a.venc_contrato) < CURRENT_DATE
+            THEN 'atrasado'
           ELSE 'ok'
         END AS status_tela
       FROM public.clientes c
@@ -179,9 +171,14 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         ORDER BY ct.atualizado_em DESC NULLS LAST, ct.criado_em DESC NULLS LAST, ct.id_contato DESC
         LIMIT 1
       ) ct ON true
+      -- assinaturas ativas (para vencimento e contagem)
       LEFT JOIN public.assinaturas a
         ON a.id_cliente = c.id_cliente
         AND lower(btrim(a.status)) = 'ativo'
+      -- assinaturas pendentes (para identificar status pendente)
+      LEFT JOIN public.assinaturas ap
+        ON ap.id_cliente = c.id_cliente
+        AND lower(btrim(ap.status)) = 'pendente'
       ${whereSql}
       GROUP BY c.id_cliente, c.nome, c.observacao, ct.telefone
     )
@@ -230,14 +227,21 @@ export async function countClientes(
         c.id_cliente::text AS id_cliente,
         MAX(a.venc_contrato)::text AS prox_vencimento,
         CASE
-          WHEN COUNT(a.id_assinatura) = 0 THEN 'sem_assinatura'
-          WHEN MAX(a.venc_contrato) < CURRENT_DATE THEN 'atrasado'
+          WHEN COUNT(a.id_assinatura) = 0 AND COUNT(ap.id_assinatura) = 0
+            THEN 'sem_assinatura'
+          WHEN COUNT(ap.id_assinatura) > 0
+            THEN 'pendente'
+          WHEN MAX(a.venc_contrato) < CURRENT_DATE
+            THEN 'atrasado'
           ELSE 'ok'
         END AS status_tela
       FROM public.clientes c
       LEFT JOIN public.assinaturas a
         ON a.id_cliente = c.id_cliente
-       AND lower(btrim(a.status)) = 'ativo'
+        AND lower(btrim(a.status)) = 'ativo'
+      LEFT JOIN public.assinaturas ap
+        ON ap.id_cliente = c.id_cliente
+        AND lower(btrim(ap.status)) = 'pendente'
       ${whereSql}
       GROUP BY c.id_cliente
     )
@@ -266,31 +270,24 @@ export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaR
       a.venc_contrato::text AS venc_contrato,
       a.venc_contas::text AS venc_contas,
       a.identificacao,
-      a.observacao, 
+      a.observacao,
       a.id_plano::text AS id_plano,
       a.id_pacote::text AS id_pacote,
-
       p.contrato::text AS pacote_contrato,
       p.telas::int AS pacote_telas,
-
       pl.tipo::text AS plano_tipo,
       pl.telas::int AS plano_telas,
       pl.meses::int AS plano_meses,
       pl.valor::text AS plano_valor,
       pl.descricao::text AS plano_descricao
-
     FROM public.assinaturas a
-    LEFT JOIN public.pacote p
-      ON p.id_pacote = a.id_pacote
-    LEFT JOIN public.planos pl
-      ON pl.id_plano = a.id_plano
-
+    LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
+    LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
     WHERE a.id_cliente = $1::bigint
     ORDER BY a.atualizado_em DESC NULLS LAST, a.criado_em DESC NULLS LAST;
     `,
     [id]
   );
-
   return rows;
 }
 
@@ -301,7 +298,6 @@ export async function getClienteById(id: string): Promise<ClienteDetalheRow | nu
       c.id_cliente::text AS id_cliente,
       c.nome,
       c.observacao,
-
       (
         SELECT ct.telefone::text
         FROM public.contatos ct
@@ -311,18 +307,15 @@ export async function getClienteById(id: string): Promise<ClienteDetalheRow | nu
         ORDER BY ct.atualizado_em DESC NULLS LAST, ct.criado_em DESC NULLS LAST, ct.id_contato DESC
         LIMIT 1
       ) AS telefone
-
     FROM public.clientes c
     WHERE c.id_cliente = $1::bigint
     LIMIT 1;
     `,
     [id]
   );
-
   return rows[0] ?? null;
 }
 
-// NOVA FUNÇÃO: Buscar últimos pagamentos do cliente
 export async function getPagamentosByClienteId(id: string, limit: number = 5): Promise<PagamentoRow[]> {
   const { rows } = await pool.query<PagamentoRow>(
     `
@@ -341,6 +334,5 @@ export async function getPagamentosByClienteId(id: string, limit: number = 5): P
     `,
     [id, limit]
   );
-
   return rows;
 }

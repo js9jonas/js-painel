@@ -312,12 +312,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         pacotes={pacotes}
                       />
                       <RenovarAssinatura
-                        idAssinatura={ativa.id_assinatura}
-                        vencAtual={ativa.venc_contrato ?? null}
+                        idAssinatura={a.id_assinatura}
+                        vencAtual={a.venc_contrato ?? null}
                         idCliente={id}
                         nomeCliente={cliente?.nome ?? ""}
-                        pacoteNome={ativa.pacote_contrato ?? null}
-                        planoValor={ativa.plano_valor ?? null}
+                        pacoteNome={a.pacote_contrato ?? null}
+                        planoValor={a.plano_valor ?? null}
                       />
                     </div>
                   </td>
