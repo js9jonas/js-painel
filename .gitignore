@@ -1,5 +1,18 @@
-﻿node_modules
-.next
+﻿# Node / Next
+node_modules/
+.next/
+dist/
+
+# Env
+.env
 .env.local
-.DS_Store
+
+# Logs
 *.log
+
+# TypeScript incremental build
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# OS / editor
+.DS_Store
