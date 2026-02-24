@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { updateCliente, getContatosCliente, salvarContatoV2, deletarContato, type ContatoRow } from "@/app/actions/clientes";
+import { updateCliente, getContatosCliente, salvarContato, deletarContato, type ContatoRow } from "@/app/actions/clientes";
 
 type Props = {
   idCliente: string;
@@ -58,7 +58,7 @@ export default function EditClienteModal({
 
   async function handleSalvarContato(idContato: string) {
     if (!editTelefone.trim()) return;
-    await salvarContatoV2(idCliente, { idContato, telefone: editTelefone, nome: editNome || null, referencia: editReferencia || null });
+    await salvarContato(idCliente, { idContato, telefone: editTelefone, nome: editNome || null, referencia: editReferencia || null });
     setContatos(await getContatosCliente(idCliente));
     setEditandoId(null);
   }
@@ -71,7 +71,7 @@ export default function EditClienteModal({
 
   async function handleAdicionarContato() {
     if (!novoTelefone.trim()) return;
-    await salvarContatoV2(idCliente, { telefone: novoTelefone, nome: novoNome || null, referencia: novaReferencia || null });
+    await salvarContato(idCliente, { telefone: novoTelefone, nome: novoNome || null, referencia: novaReferencia || null });
     setContatos(await getContatosCliente(idCliente));
     setNovoTelefone(""); setNovoNome(""); setNovaReferencia(""); setAdicionando(false);
   }

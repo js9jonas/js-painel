@@ -1,4 +1,4 @@
-// src/app/(dashboard)/clientes/[id]/page.tsx
+﻿// src/app/(dashboard)/clientes/[id]/page.tsx
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
@@ -13,6 +13,8 @@ import EditAssinaturaButton from "@/components/assinaturas/EditAssinaturaButton"
 import AplicativosManager from "@/components/aplicativos/AplicativosManager";
 import NovaAssinaturaButton from "../../../../components/assinaturas/NovaAssinaturaButton";
 import BuscaClienteRapida from "@/components/clientes/BuscaClienteRapida";
+import ListaIndicacoes from "@/components/clientes/ListaIndicacoes";
+import { tempoDesde } from "@/lib/tempo";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -55,21 +57,27 @@ export default async function ClienteDetalhePage({ params }: Props) {
   return (
     <div className="space-y-4">
 
-      {/* Navegação */}
+      {/* NavegaÃ§Ã£o */}
       <div className="flex items-center justify-between gap-3">
         <Link href="/clientes" className="text-sm text-zinc-600 hover:underline">
-          ← Voltar
+          â† Voltar
         </Link>
         <BuscaClienteRapida />
       </div>
 
-      {/* Cabeçalho do cliente */}
+      {/* CabeÃ§alho do cliente */}
       <div className="rounded-2xl border bg-white p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">
               {cliente?.nome ?? `Cliente #${id}`}
             </h1>
+            
+            {cliente?.criado_em && (
+              <p className="mt-1 text-xs text-zinc-400">
+                Cliente hÃ¡ {tempoDesde(cliente.criado_em)}
+              </p>
+            )}
             <div className="mt-2 grid gap-1 text-sm text-zinc-600">
               <div>
                 <span className="text-zinc-500">ID:</span>{" "}
@@ -80,15 +88,15 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 {cliente?.telefone ? (
                   <span className="font-medium text-zinc-800">{cliente.telefone}</span>
                 ) : (
-                  <span className="text-zinc-400">—</span>
+                  <span className="text-zinc-400">â€”</span>
                 )}
               </div>
               <div>
-                <span className="text-zinc-500">Observação:</span>{" "}
+                <span className="text-zinc-500">ObservaÃ§Ã£o:</span>{" "}
                 {cliente?.observacao ? (
                   <span className="text-zinc-800">{cliente.observacao}</span>
                 ) : (
-                  <span className="text-zinc-400">—</span>
+                  <span className="text-zinc-400">â€”</span>
                 )}
               </div>
             </div>
@@ -118,11 +126,18 @@ export default async function ClienteDetalhePage({ params }: Props) {
       {/* Assinatura ativa destacada */}
       {ativa && (
         <div className="rounded-2xl border bg-white overflow-hidden">
-          <div className={`px-4 py-3 border-b text-sm font-medium ${ativa.status?.toLowerCase() === "pendente"
-            ? "bg-red-50 text-red-900"
-            : "bg-emerald-50 text-emerald-900"
+          <div className={`px-4 py-3 border-b flex items-center justify-between text-sm font-medium ${ativa.status?.toLowerCase() === "pendente"
+              ? "bg-red-50 text-red-900"
+              : "bg-emerald-50 text-emerald-900"
             }`}>
-            {ativa.status?.toLowerCase() === "pendente" ? "⚠️ Assinatura pendente" : "Assinatura ativa"}
+            <span>
+              {ativa.status?.toLowerCase() === "pendente" ? "âš ï¸ Assinatura pendente" : "Assinatura ativa"}
+            </span>
+            {ativa.criado_em && (
+              <span className="text-xs font-normal opacity-60">
+                Assinatura hÃ¡ {tempoDesde(ativa.criado_em)}
+              </span>
+            )}
           </div>
           <div className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
@@ -133,13 +148,13 @@ export default async function ClienteDetalhePage({ params }: Props) {
               <div className="text-sm">
                 <div className="text-zinc-500">Venc. contrato</div>
                 <div className="font-medium text-zinc-900">
-                  {ativa.venc_contrato ? ativa.venc_contrato.split("T")[0].split("-").reverse().join("/") : "—"}
+                  {ativa.venc_contrato ? ativa.venc_contrato.split("T")[0].split("-").reverse().join("/") : "â€”"}
                 </div>
               </div>
               <div className="text-sm">
                 <div className="text-zinc-500">Venc. contas</div>
                 <div className="font-medium text-zinc-900">
-                  {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "—"}
+                  {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "â€”"}
                 </div>
               </div>
               <div className="text-sm">
@@ -154,13 +169,13 @@ export default async function ClienteDetalhePage({ params }: Props) {
               <div className="grid sm:grid-cols-2 gap-4 mb-4">
                 {ativa.identificacao && (
                   <div className="text-sm">
-                    <div className="text-zinc-500">Identificação</div>
+                    <div className="text-zinc-500">IdentificaÃ§Ã£o</div>
                     <div className="text-zinc-800">{ativa.identificacao}</div>
                   </div>
                 )}
                 {ativa.observacao && (
                   <div className="text-sm">
-                    <div className="text-zinc-500">Observação</div>
+                    <div className="text-zinc-500">ObservaÃ§Ã£o</div>
                     <div className="text-zinc-800">{ativa.observacao}</div>
                   </div>
                 )}
@@ -180,7 +195,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-zinc-400">Não informado</div>
+                  <div className="text-sm text-zinc-400">NÃ£o informado</div>
                 )}
               </div>
               <div>
@@ -190,10 +205,10 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     <div className="font-semibold text-zinc-900">{ativa.plano_tipo}</div>
                     <div className="text-zinc-600 mt-1 space-x-2">
                       {ativa.plano_meses && (
-                        <span>{ativa.plano_meses} mês{ativa.plano_meses > 1 ? "es" : ""}</span>
+                        <span>{ativa.plano_meses} mÃªs{ativa.plano_meses > 1 ? "es" : ""}</span>
                       )}
                       {ativa.plano_valor && (
-                        <span>• R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span>
+                        <span>â€¢ R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span>
                       )}
                     </div>
                     {ativa.plano_descricao && (
@@ -201,7 +216,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-zinc-400">Não informado</div>
+                  <div className="text-sm text-zinc-400">NÃ£o informado</div>
                 )}
               </div>
             </div>
@@ -258,10 +273,10 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Venc. contrato</th>
                 <th className="px-4 py-3 text-left font-medium">Venc. contas</th>
-                <th className="px-4 py-3 text-left font-medium">Identificação</th>
+                <th className="px-4 py-3 text-left font-medium">IdentificaÃ§Ã£o</th>
                 <th className="px-4 py-3 text-left font-medium">Pacote</th>
                 <th className="px-4 py-3 text-left font-medium">Plano</th>
-                <th className="px-4 py-3 text-left font-medium">Ações</th>
+                <th className="px-4 py-3 text-left font-medium">AÃ§Ãµes</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -273,25 +288,25 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       ? "bg-emerald-50 text-emerald-700"
                       : "bg-zinc-100 text-zinc-600"
                       }`}>
-                      {a.status ?? "—"}
+                      {a.status ?? "â€”"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">{a.venc_contrato ?? "—"}</td>
-                  <td className="px-4 py-3 text-zinc-700">{a.venc_contas ?? "—"}</td>
-                  <td className="px-4 py-3 text-zinc-700">{a.identificacao ?? "—"}</td>
+                  <td className="px-4 py-3 text-zinc-700">{a.venc_contrato ?? "â€”"}</td>
+                  <td className="px-4 py-3 text-zinc-700">{a.venc_contas ?? "â€”"}</td>
+                  <td className="px-4 py-3 text-zinc-700">{a.identificacao ?? "â€”"}</td>
                   <td className="px-4 py-3">
-                    {a.pacote_contrato ?? "—"}
+                    {a.pacote_contrato ?? "â€”"}
                     {a.pacote_telas ? (
-                      <span className="text-zinc-500"> • {a.pacote_telas} telas</span>
+                      <span className="text-zinc-500"> â€¢ {a.pacote_telas} telas</span>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    {a.plano_tipo ?? "—"}
+                    {a.plano_tipo ?? "â€”"}
                     {a.plano_meses ? (
-                      <span className="text-zinc-500"> • {a.plano_meses} mês(es)</span>
+                      <span className="text-zinc-500"> â€¢ {a.plano_meses} mÃªs(es)</span>
                     ) : null}
                     {a.plano_valor ? (
-                      <span className="text-zinc-500"> • R$ {parseFloat(a.plano_valor).toFixed(2)}</span>
+                      <span className="text-zinc-500"> â€¢ R$ {parseFloat(a.plano_valor).toFixed(2)}</span>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
@@ -342,6 +357,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
 
         <TabelaPagamentos pagamentos={todosPagamentos} />
       </div>
+      <ListaIndicacoes idParceiro={id} />
     </div>
   );
 }
+
