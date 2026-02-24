@@ -98,10 +98,10 @@ export default function EditClienteModal({
               <input value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} placeholder="Nome do cliente" />
             </div>
             <div>
-              <label className={labelClass}>ObservaÃ§Ã£o</label>
+              <label className={labelClass}>Observação</label>
               <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={3}
                 className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all resize-none"
-                placeholder="ObservaÃ§Ãµes sobre o cliente..." />
+                placeholder="Observação sobre o cliente..." />
             </div>
           </div>
 
