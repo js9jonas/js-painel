@@ -1,5 +1,5 @@
-﻿// src/app/actions/clientes.ts
-"use server"; // v2
+// src/app/actions/clientes.ts
+"use server";
 
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -8,7 +8,7 @@ export async function updateCliente(
   id: string,
   data: { nome: string; observacao: string | null }
 ) {
-  if (!data.nome.trim()) throw new Error("Nome Ã© obrigatÃ³rio");
+  if (!data.nome.trim()) throw new Error("Nome é obrigatório");
 
   await pool.query(
     `UPDATE public.clientes
@@ -30,7 +30,7 @@ export type ContatoRow = {
 
 export async function getContatosCliente(idCliente: string): Promise<ContatoRow[]> {
   const { rows } = await pool.query<ContatoRow>(
-    `SELECT id_contato::text, telefone, nome
+    `SELECT id_contato::text, telefone, nome, referencia
      FROM public.contatos
      WHERE id_cliente = $1::bigint
      ORDER BY criado_em ASC`,
@@ -39,22 +39,22 @@ export async function getContatosCliente(idCliente: string): Promise<ContatoRow[
   return rows;
 }
 
-export async function salvarContatoV2(
+export async function salvarContato(
   idCliente: string,
   data: { idContato?: string; telefone: string; nome: string | null; referencia: string | null }
 ): Promise<void> {
   if (data.idContato) {
     await pool.query(
       `UPDATE public.contatos
-       SET telefone = $1, nome = $2, atualizado_em = NOW()
-       WHERE id_contato = $3::bigint`,
-      [data.telefone.trim(), data.nome?.trim() || null, data.idContato]
+       SET telefone = $1, nome = $2, referencia = $3, atualizado_em = NOW()
+       WHERE id_contato = $4::bigint`,
+      [data.telefone.trim(), data.nome?.trim() || null, data.referencia?.trim() || null, data.idContato]
     );
   } else {
     await pool.query(
-      `INSERT INTO public.contatos (id_cliente, telefone, nome, criado_em, atualizado_em)
-       VALUES ($1::bigint, $2, $3, NOW(), NOW())`,
-      [idCliente, data.telefone.trim(), data.nome?.trim() || null]
+      `INSERT INTO public.contatos (id_cliente, telefone, nome, referencia, criado_em, atualizado_em)
+       VALUES ($1::bigint, $2, $3, $4, NOW(), NOW())`,
+      [idCliente, data.telefone.trim(), data.nome?.trim() || null, data.referencia?.trim() || null]
     );
   }
   revalidatePath(`/clientes/${idCliente}`);
@@ -67,4 +67,3 @@ export async function deletarContato(idContato: string, idCliente: string): Prom
   );
   revalidatePath(`/clientes/${idCliente}`);
 }
-

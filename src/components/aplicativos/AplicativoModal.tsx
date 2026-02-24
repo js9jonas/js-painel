@@ -23,44 +23,40 @@ function toDateInput(v: string | null): string {
 export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, onSaved }: Props) {
   const isEdit = !!aplicativo;
 
-  const [idApp, setIdApp]               = useState(String(aplicativo?.id_app ?? ""));
-  const [mac, setMac]                   = useState(aplicativo?.mac ?? "");
-  const [chave, setChave]               = useState(aplicativo?.chave ?? "");
-  const [validade, setValidade]         = useState(toDateInput(aplicativo?.validade ?? null));
-  const [status, setStatus]             = useState(aplicativo?.status ?? "ativa");
-  const [observacao, setObservacao]     = useState(aplicativo?.observacao ?? "");
+  const [idApp, setIdApp] = useState(String(aplicativo?.id_app ?? ""));
+  const [mac, setMac] = useState(aplicativo?.mac ?? "");
+  const [chave, setChave] = useState(aplicativo?.chave ?? "");
+  const [validade, setValidade] = useState(toDateInput(aplicativo?.validade ?? null));
+  const [status, setStatus] = useState(aplicativo?.status ?? "ativa");
+  const [observacao, setObservacao] = useState(aplicativo?.observacao ?? "");
   const [idAssinatura, setIdAssinatura] = useState(String(aplicativo?.id_assinatura ?? ""));
-  const [idConta, setIdConta]           = useState(String(aplicativo?.id_conta ?? ""));
+  const [idConta, setIdConta] = useState(String(aplicativo?.id_conta ?? ""));
   const [idDispositivo, setIdDispositivo] = useState(String(aplicativo?.id_dispositivo ?? ""));
 
   const [isPending, startTransition] = useTransition();
-  const [error, setError]            = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // App selecionado para mostrar info
   const appSelecionado = apps.find((a) => a.id_app === idApp) ?? null;
 
   function handleSave() {
     setError(null);
     const data: AplicativoData = {
-      id_cliente:     null,       // ← ADICIONAR esta linha
-      id_app:         idApp        || null,
-      mac:            mac          || null,
-      chave:          chave        || null,
-      validade:       validade     || null,
+      id_cliente: idCliente,
+      id_app: idApp || null,
+      mac: mac || null,
+      chave: chave || null,
+      validade: validade || null,
       status,
-      observacao:     observacao   || null,
-      id_assinatura:  idAssinatura || null,
-      id_conta:       idConta      || null,
+      observacao: observacao || null,
+      id_assinatura: idAssinatura || null,
+      id_conta: idConta || null,
       id_dispositivo: idDispositivo || null,
     };
 
     startTransition(async () => {
       try {
         if (isEdit && aplicativo) {
-          await updateAplicativo(aplicativo.id_app_registro, idCliente, {
-  ...data,
-  id_cliente: idCliente,
-});
+          await updateAplicativo(aplicativo.id_app_registro, idCliente, data);
         } else {
           await createAplicativo(idCliente, data);
         }

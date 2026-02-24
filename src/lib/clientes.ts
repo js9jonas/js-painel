@@ -26,6 +26,7 @@ export type GetClientesParams = {
 
 export type AssinaturaRow = {
   id_assinatura: string;
+  criado_em: string | null;
   status: string | null;
   venc_contrato: string | null;
   venc_contas: string | null;
@@ -259,6 +260,7 @@ export type ClienteDetalheRow = {
   nome: string;
   observacao: string | null;
   telefone: string | null;
+  criado_em: string | null;
 };
 
 export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaRow[]> {
@@ -266,6 +268,7 @@ export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaR
     `
     SELECT
       a.id_assinatura::text AS id_assinatura,
+      a.criado_em::text AS criado_em,
       a.status,
       a.venc_contrato::text AS venc_contrato,
       a.venc_contas::text AS venc_contas,
@@ -298,6 +301,7 @@ export async function getClienteById(id: string): Promise<ClienteDetalheRow | nu
       c.id_cliente::text AS id_cliente,
       c.nome,
       c.observacao,
+      c.criado_em::text AS criado_em,
       (
         SELECT ct.telefone::text
         FROM public.contatos ct

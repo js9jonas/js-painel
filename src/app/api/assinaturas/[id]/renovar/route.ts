@@ -6,9 +6,9 @@ type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 function mesesDoPeriodo(p: Periodo) {
   switch (p) {
     case "trimestral": return 3;
-    case "semestral":  return 6;
-    case "anual":      return 12;
-    default:           return 1;
+    case "semestral": return 6;
+    case "anual": return 12;
+    default: return 1;
   }
 }
 
@@ -36,27 +36,29 @@ export async function PUT(
       await client.query("BEGIN");
 
       const sql = `
-        UPDATE public.assinaturas
-        SET
-          venc_contrato =
-            CASE
-              WHEN $2::date IS NOT NULL THEN $2::date
-              ELSE (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
-            END,
-          venc_contas =
-            CASE
-              WHEN venc_contas IS NULL THEN
-                CASE
-                  WHEN $2::date IS NOT NULL THEN $2::date
-                  ELSE (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => 1))::date
-                END
-              ELSE (venc_contas::date + make_interval(months => 1))::date
-            END,
-          status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
-          atualizado_em = NOW()
-        WHERE id_assinatura = $1::bigint
-        RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
-      `;
+  UPDATE public.assinaturas
+  SET
+    venc_contrato =
+      CASE
+        WHEN $2::date IS NOT NULL THEN $2::date
+        WHEN venc_contas::date >= CURRENT_DATE
+          THEN (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
+        ELSE (CURRENT_DATE + make_interval(months => $3))::date
+      END,
+    venc_contas =
+      CASE
+        WHEN venc_contas IS NULL THEN
+          (CURRENT_DATE + make_interval(months => 1))::date
+        WHEN venc_contas::date >= CURRENT_DATE THEN
+          (venc_contas::date + make_interval(months => 1))::date
+        ELSE
+          (CURRENT_DATE + make_interval(months => 1))::date
+      END,
+    status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
+    atualizado_em = NOW()
+  WHERE id_assinatura = $1::bigint
+  RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
+`;
 
       const result = await client.query(sql, [idAssinatura, dataManual, meses, ativar]);
 
