@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAplicativo } from "@/app/actions/aplicativos";
 import AplicativoModal from "./AplicativoModal";
+import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import type { AplicativoRow, AppRow } from "@/lib/aplicativos";
 
 type Props = {
@@ -39,8 +40,9 @@ function isVencido(validade: string | null) {
 
 export default function AplicativosManager({ idCliente, aplicativos, apps }: Props) {
   const [modalApp, setModalApp] = useState<AplicativoRow | null | "novo">(null);
+  const [appPgto, setAppPgto] = useState<AplicativoRow | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [deletingId, setDeletingId]  = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const router = useRouter();
 
   function handleDelete(id_app_registro: number) {
@@ -55,7 +57,8 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
       }
     });
   }
-
+// logo antes do return (
+console.log("ModalRenovarAplicativo:", ModalRenovarAplicativo);
   return (
     <div className="rounded-2xl border bg-white overflow-hidden">
       {/* Header da seção */}
@@ -160,6 +163,13 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                       </button>
                       <button
                         type="button"
+                        onClick={() => setAppPgto(a)}
+                        className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        💰 pgto
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleDelete(a.id_app_registro)}
                         disabled={isPending && deletingId === a.id_app_registro}
                         className="h-8 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
@@ -175,7 +185,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal editar/criar */}
       {modalApp !== null && (
         <AplicativoModal
           idCliente={idCliente}
@@ -186,6 +196,16 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
             router.refresh();
             setModalApp(null);
           }}
+        />
+      )}
+
+      {/* Modal pgto */}
+      {appPgto !== null && (
+        <ModalRenovarAplicativo
+          id_app_registro={appPgto.id_app_registro}
+          id_cliente={Number(idCliente)}
+          nome_app={appPgto.nome_app ?? `App #${appPgto.id_app}`}
+          onClose={() => setAppPgto(null)}
         />
       )}
     </div>
