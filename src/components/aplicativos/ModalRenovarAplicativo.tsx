@@ -10,7 +10,7 @@ interface Props {
   onClose: () => void;
 }
 
-const FORMAS = ["Pix", "Dinheiro", "Cartão", "Transferência"];
+const FORMAS = ["PIX", "Dinheiro", "Cartão", "Transferência"];
 const VALOR_FIXO = 20;
 
 export default function ModalRenovarAplicativo({
@@ -20,7 +20,7 @@ export default function ModalRenovarAplicativo({
   onClose,
 }: Props) {
   const [renovarValidade, setRenovarValidade] = useState(true);
-  const [forma, setForma] = useState("Pix");
+  const [forma, setForma] = useState("PIX");
   const [detalhes, setDetalhes] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
