@@ -18,6 +18,7 @@ export type AlertaAppRow = {
     validade: string;
     mac: string | null;
     nome_app: string;
+    venc_contrato_cliente: string | null;
 };
 
 export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
@@ -40,6 +41,7 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
    AND a.venc_contrato::date > a.venc_contas::date
  ORDER BY a.venc_contas ASC`,
         [dias]
+        
     );
     return rows;
 }
@@ -52,7 +54,12 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ap.id_app_registro::text,
        ap.validade::text,
        ap.mac,
-       app.nome_app
+       app.nome_app,
+       (
+         SELECT MAX(a.venc_contrato)::text
+         FROM public.assinaturas a
+         WHERE a.id_cliente = c.id_cliente
+       ) AS venc_contrato_cliente
      FROM public.aplicativos ap
      JOIN public.clientes c ON c.id_cliente = ap.id_cliente
      JOIN public.apps app ON app.id_app = ap.id_app
@@ -62,6 +69,8 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        AND ap.validade::date >= CURRENT_DATE - 1
      ORDER BY ap.validade ASC`,
         [dias]
+        
     );
+    
     return rows;
 }

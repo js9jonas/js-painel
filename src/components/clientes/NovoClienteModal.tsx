@@ -11,30 +11,31 @@ type Props = {
   planos: PlanoRow[];
   pacotes: PacoteRow[];
   onClose: () => void;
+  onSuccess?: (id: string, nome: string) => void;
 };
 
 const STATUS_OPTIONS = ["ativo", "inativo", "cancelado", "suspenso", "pendente"];
 type Step = "cliente" | "assinatura";
 
-export default function NovoClienteModal({ planos, pacotes, onClose }: Props) {
+export default function NovoClienteModal({ planos, pacotes, onClose, onSuccess }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("cliente");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [nome, setNome]             = useState("");
+  const [nome, setNome] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [telefone, setTelefone]     = useState("");
+  const [telefone, setTelefone] = useState("");
   const [nomeContato, setNomeContato] = useState("");
 
   const [criarAssinatura, setCriarAssinatura] = useState(true);
-  const [idPacote, setIdPacote]               = useState("");
-  const [idPlano, setIdPlano]                 = useState("");
-  const [vencContrato, setVencContrato]       = useState("");
-  const [vencContas, setVencContas]           = useState("");
-  const [status, setStatus]                   = useState("ativo");
-  const [identificacao, setIdentificacao]     = useState("");
-  const [obsAssinatura, setObsAssinatura]     = useState("");
+  const [idPacote, setIdPacote] = useState("");
+  const [idPlano, setIdPlano] = useState("");
+  const [vencContrato, setVencContrato] = useState("");
+  const [vencContas, setVencContas] = useState("");
+  const [status, setStatus] = useState("ativo");
+  const [identificacao, setIdentificacao] = useState("");
+  const [obsAssinatura, setObsAssinatura] = useState("");
 
   function handleSave() {
     if (!nome.trim()) { setError("Nome é obrigatório"); return; }
@@ -44,19 +45,23 @@ export default function NovoClienteModal({ planos, pacotes, onClose }: Props) {
       try {
         const id = await criarClienteComAssinatura({
           nome,
-          observacao:            observacao || null,
-          telefone:              telefone || null,
-          nome_contato:          nomeContato || null,
+          observacao: observacao || null,
+          telefone: telefone || null,
+          nome_contato: nomeContato || null,
           criarAssinatura,
-          id_pacote:             idPacote || null,
-          id_plano:              idPlano  || null,
-          venc_contrato:         vencContrato || null,
-          venc_contas:           vencContas   || null,
+          id_pacote: idPacote || null,
+          id_plano: idPlano || null,
+          venc_contrato: vencContrato || null,
+          venc_contas: vencContas || null,
           status,
-          identificacao:         identificacao || null,
+          identificacao: identificacao || null,
           observacao_assinatura: obsAssinatura || null,
         });
-        router.push(`/clientes/${id}`);
+        if (onSuccess) {
+          onSuccess(String(id), nome); // retorna pro modal pai
+        } else {
+          router.push(`/clientes/${id}`); // comportamento original
+        }
         onClose();
       } catch (err: any) {
         if (err.code === "23505") {
@@ -68,9 +73,9 @@ export default function NovoClienteModal({ planos, pacotes, onClose }: Props) {
     });
   }
 
-  const inputClass  = "w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all";
+  const inputClass = "w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all";
   const selectClass = "w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all bg-white";
-  const labelClass  = "block text-xs font-semibold text-zinc-700 mb-1.5";
+  const labelClass = "block text-xs font-semibold text-zinc-700 mb-1.5";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
