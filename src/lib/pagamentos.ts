@@ -18,7 +18,9 @@ export type GetPagamentosParams = {
   page?: number;
   pageSize?: number;
   id_cliente?: string;
+  somentePendentes?: boolean;   // <-- adicionar
 };
+
 
 function buildWhere(params: Omit<GetPagamentosParams, "page" | "pageSize">) {
   const q = (params.q ?? "").trim();
@@ -35,6 +37,10 @@ function buildWhere(params: Omit<GetPagamentosParams, "page" | "pageSize">) {
   if (params.id_cliente) {
     values.push(params.id_cliente);
     parts.push(`p.id_cliente = $${values.length}::bigint`);
+  }
+
+  if (params.somentePendentes) {
+    parts.push(`(p.detalhes IS NULL OR p.detalhes <> 'OK')`);
   }
 
   return {

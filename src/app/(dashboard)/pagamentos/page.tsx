@@ -21,10 +21,11 @@ export default async function PagamentosPage({ searchParams }: PageProps) {
   const q = toStr(sp.q);
   const page = toInt(sp.page, 1);
   const pageSize = toInt(sp.pageSize, 50);
+  const somentePendentes = sp.pendentes === "1"; 
 
   const [total, data] = await Promise.all([
     countPagamentos({ q }),
-    getPagamentos({ q, page, pageSize }),
+    getPagamentos({ q, page, pageSize, somentePendentes }),
   ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function PagamentosPage({ searchParams }: PageProps) {
       page={page}
       pageSize={pageSize}
       q={q}
+      somentePendentes={somentePendentes}
     />
   );
 }

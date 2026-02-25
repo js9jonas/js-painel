@@ -264,3 +264,78 @@ export async function getVencimentosProximos(dias: number = 7): Promise<Vencimen
     pacote: r.pacote,
   }));
 }
+
+// Receita de hoje
+export async function getReceitaHoje(): Promise<number> {
+  const result = await pool.query(`
+    SELECT COALESCE(SUM(valor), 0)::numeric AS total
+    FROM public.pagamentos
+    WHERE DATE(data_pgto) = CURRENT_DATE
+  `);
+  return parseFloat(result.rows[0].total);
+}
+
+// Vendas dia a dia do mês atual
+export type VendaDiaria = {
+  dia: number;
+  data: string;      // "DD/MM" para exibição
+  total: number;
+  quantidade: number;
+};
+
+export async function getVendasDiariasDoMes(): Promise<VendaDiaria[]> {
+  const result = await pool.query(`
+    SELECT
+      EXTRACT(DAY FROM data_pgto)::int AS dia,
+      TO_CHAR(data_pgto, 'DD/MM') AS data,
+      COALESCE(SUM(valor), 0)::numeric AS total,
+      COUNT(*)::int AS quantidade
+    FROM public.pagamentos
+    WHERE
+      EXTRACT(MONTH FROM data_pgto) = EXTRACT(MONTH FROM CURRENT_DATE)
+      AND EXTRACT(YEAR FROM data_pgto) = EXTRACT(YEAR FROM CURRENT_DATE)
+      AND data_pgto IS NOT NULL
+    GROUP BY EXTRACT(DAY FROM data_pgto), TO_CHAR(data_pgto, 'DD/MM')
+    ORDER BY EXTRACT(DAY FROM data_pgto) ASC
+  `);
+  return result.rows.map((r) => ({
+    dia: r.dia,
+    data: r.data,
+    total: parseFloat(r.total),
+    quantidade: r.quantidade,
+  }));
+}
+
+// Vendas por dia — últimos 30 dias (substitui formas de pagamento)
+export type VendaUltimos30Dias = {
+  data: string;      // "DD/MM"
+  total: number;
+  quantidade: number;
+  ticketMedio: number;
+};
+
+export async function getVendasUltimos30Dias(): Promise<VendaUltimos30Dias[]> {
+  const result = await pool.query(`
+    SELECT
+      TO_CHAR(data_pgto, 'DD/MM') AS data,
+      data_pgto::date AS data_ord,
+      COALESCE(SUM(valor), 0)::numeric AS total,
+      COUNT(*)::int AS quantidade,
+      CASE
+        WHEN COUNT(*) > 0 THEN (COALESCE(SUM(valor), 0) / COUNT(*))::numeric
+        ELSE 0
+      END AS ticket_medio
+    FROM public.pagamentos
+    WHERE
+      data_pgto >= CURRENT_DATE - INTERVAL '30 days'
+      AND data_pgto IS NOT NULL
+    GROUP BY TO_CHAR(data_pgto, 'DD/MM'), data_pgto::date
+    ORDER BY data_pgto::date ASC
+  `);
+  return result.rows.map((r) => ({
+    data: r.data,
+    total: parseFloat(r.total),
+    quantidade: r.quantidade,
+    ticketMedio: parseFloat(r.ticket_medio),
+  }));
+}
