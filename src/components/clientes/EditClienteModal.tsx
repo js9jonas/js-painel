@@ -151,11 +151,11 @@ export default function EditClienteModal({
                       <div className="flex gap-2">
                         <button onClick={() => iniciarEdicao(c)}
                           className="text-xs border border-zinc-300 rounded-lg px-3 py-1 hover:bg-zinc-100">
-                          âœï¸
+                          Editar
                         </button>
                         <button onClick={() => handleDeletarContato(c.id_contato)}
                           className="text-xs border border-red-200 text-red-600 rounded-lg px-3 py-1 hover:bg-red-50">
-                          ðŸ—‘
+                          Remover
                         </button>
                       </div>
                     </div>
@@ -202,7 +202,7 @@ export default function EditClienteModal({
           </button>
           <button onClick={handleSaveCliente} disabled={isPending || !nome.trim()}
             className="h-10 rounded-xl bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50">
-            {isPending ? "Salvando..." : "Salvar alteraÃ§Ãµes"}
+            {isPending ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>
       </div>

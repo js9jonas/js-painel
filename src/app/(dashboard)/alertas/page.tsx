@@ -132,7 +132,7 @@ export default async function AlertasPage() {
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Cliente</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">App</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">MAC</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Validade</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Venc. Contrato</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Prazo</th>
                                 </tr>
                             </thead>
@@ -153,13 +153,16 @@ export default async function AlertasPage() {
                                             <td className="px-4 py-3 text-zinc-700">{r.nome_app}</td>
                                             <td className="px-4 py-3 font-mono text-xs text-zinc-500">{r.mac ?? "—"}</td>
                                             <td className="px-4 py-3 font-medium text-zinc-900">
-                                                {r.validade.split("T")[0].split("-").reverse().join("/")}
+                                                {r.venc_contrato_cliente
+                                                    ? r.venc_contrato_cliente.split("T")[0].split("-").reverse().join("/")
+                                                    : "—"}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
                                                     {labelDias(dias)}
                                                 </span>
                                             </td>
+                                            
                                         </tr>
                                     );
                                 })}

@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     vendas30Dias,
   ] = await Promise.all([
     getDashboardMetrics(),
-    getPagamentosPorMes(6),
+    getPagamentosPorMes(12),
     getPacotesStats(),
     getPlanosStats(),
     getVencimentosProximos(7),
@@ -114,7 +114,7 @@ export default async function DashboardPage() {
       <div className="rounded-2xl border bg-white p-6 shadow-sm">
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-zinc-900">
-            Receita dos Últimos 6 Meses
+            Receita dos Últimos 12 Meses
           </h3>
           <p className="text-sm text-zinc-600">Evolução da receita mês a mês</p>
         </div>

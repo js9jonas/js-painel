@@ -3,6 +3,9 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { adicionarIndicacao } from "@/app/actions/indicacoes";
 import type { ClienteRow } from "@/lib/clientes";
+import type { PlanoRow } from "@/lib/planos";
+import type { PacoteRow } from "@/lib/pacotes";
+import NovoClienteModal from "@/components/clientes/NovoClienteModal";
 
 type Bonificacao = "aberta" | "cortesia" | "comissao";
 
@@ -12,7 +15,13 @@ const BONIFICACAO_STYLE: Record<Bonificacao, string> = {
   comissao: "border-emerald-300 bg-emerald-50 text-emerald-700",
 };
 
-export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string }) {
+type Props = {
+  idParceiro: string;
+  planos: PlanoRow[];
+  pacotes: PacoteRow[];
+};
+
+export default function NovaIndicacaoModal({ idParceiro, planos, pacotes }: Props) {
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState("");
   const [resultados, setResultados] = useState<ClienteRow[]>([]);
@@ -20,17 +29,10 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
   const [bonificacao, setBonificacao] = useState<Bonificacao>("aberta");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const [buscando, setBuscando] = useState(false);
+  const [novoClienteOpen, setNovoClienteOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -48,11 +50,16 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
       setDropdownOpen(false);
       return;
     }
-    const res = await fetch(`/api/clientes?q=${encodeURIComponent(termo)}&limit=10`);
-    if (res.ok) {
-      const data: ClienteRow[] = await res.json();
-      setResultados(data);
-      setDropdownOpen(data.length > 0);
+    setBuscando(true);
+    try {
+      const res = await fetch(`/api/clientes?q=${encodeURIComponent(termo)}&limit=10`);
+      if (res.ok) {
+        const data: ClienteRow[] = await res.json();
+        setResultados(data);
+        setDropdownOpen(data.length > 0);
+      }
+    } finally {
+      setBuscando(false);
     }
   }
 
@@ -60,7 +67,8 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
     const v = e.target.value;
     setBusca(v);
     setSelecionado(null);
-    buscarClientes(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => buscarClientes(v), 300);
   }
 
   function handleSelecionar(c: ClienteRow) {
@@ -68,6 +76,22 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
     setBusca(c.nome ?? c.id_cliente);
     setDropdownOpen(false);
     setResultados([]);
+  }
+
+  function handleNovoClienteCriado(id: string, nome: string) {
+    const clienteFake = {
+      id_cliente: id,
+      nome,
+      telefone: null,
+      observacao: null,
+      prox_vencimento: null,
+      status_tela: "sem_assinatura" as const,
+      assinaturas_ativas: 0,
+      pacote_nome: null,
+    };
+    setSelecionado(clienteFake);
+    setBusca(nome);
+    setNovoClienteOpen(false);
   }
 
   function handleSubmit() {
@@ -87,7 +111,7 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
-        Adicionar indicação
+        Adicionar indicacao
       </button>
 
       {open && (
@@ -102,29 +126,39 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
               </svg>
             </button>
 
-            <h2 className="text-lg font-semibold text-zinc-900 mb-5">Nova indicação</h2>
+            <h2 className="text-lg font-semibold text-zinc-900 mb-5">Nova indicacao</h2>
 
             <div className="space-y-4">
-              <div ref={dropdownRef} className="relative">
+              {/* Busca */}
+              <div className="relative">
                 <label className="block text-xs font-medium text-zinc-500 uppercase mb-1.5">
                   Cliente indicado
                 </label>
                 <input
+                  ref={inputRef}
                   type="text"
                   value={busca}
                   onChange={handleBuscaChange}
-                  placeholder="Buscar por nome ou observação..."
+                  onFocus={() => resultados.length > 0 && setDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
+                  placeholder="Digite o nome do cliente..."
                   className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
                   autoComplete="off"
                 />
+                {buscando && (
+                  <div className="absolute right-3 top-9 text-zinc-400 text-xs">buscando...</div>
+                )}
                 {dropdownOpen && resultados.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg max-h-52 overflow-y-auto">
                     {resultados.map((c) => (
                       <button
                         key={c.id_cliente}
                         type="button"
-                        onClick={() => handleSelecionar(c)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-zinc-50 text-left"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelecionar(c);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-zinc-50 text-left border-b border-zinc-100 last:border-0"
                       >
                         <span className="text-zinc-400 text-xs font-mono shrink-0">#{c.id_cliente}</span>
                         <span className="text-zinc-900 truncate">{c.nome ?? "Sem nome"}</span>
@@ -137,14 +171,24 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
                 )}
                 {selecionado && (
                   <p className="mt-1 text-xs text-emerald-600">
-                    ✓ {selecionado.nome ?? `#${selecionado.id_cliente}`} selecionado
+                    Selecionado: {selecionado.nome ?? selecionado.id_cliente}
                   </p>
                 )}
+
+                {/* Botao criar novo cliente */}
+                <button
+                  type="button"
+                  onClick={() => setNovoClienteOpen(true)}
+                  className="mt-2 text-xs text-zinc-500 hover:text-zinc-800 underline"
+                >
+                  + Criar novo cliente
+                </button>
               </div>
 
+              {/* Bonificacao */}
               <div>
                 <label className="block text-xs font-medium text-zinc-500 uppercase mb-1.5">
-                  Bonificação
+                  Bonificacao
                 </label>
                 <div className="flex gap-2">
                   {(["aberta", "cortesia", "comissao"] as Bonificacao[]).map((b) => (
@@ -182,6 +226,16 @@ export default function NovaIndicacaoModal({ idParceiro }: { idParceiro: string 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de novo cliente */}
+      {novoClienteOpen && (
+        <NovoClienteModal
+          planos={planos}
+          pacotes={pacotes}
+          onClose={() => setNovoClienteOpen(false)}
+          onSuccess={handleNovoClienteCriado}
+        />
       )}
     </>
   );
