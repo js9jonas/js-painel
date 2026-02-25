@@ -13,6 +13,7 @@ type Props = {
   page: number;
   pageSize: number;
   q: string;
+  somentePendentes: boolean;
 };
 
 function formatValor(v: string | null) {
@@ -30,19 +31,19 @@ function BotaoOK({ id, onDone }: { id: number; onDone: () => void }) {
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
-  setLoading(true);
-  try {
-    const res = await fetch("/api/pagamentos/marcar-ok", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: [id] }),
-    });
-    const data = await res.json();
-    if (data.success) onDone();
-  } finally {
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/pagamentos/marcar-ok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      const data = await res.json();
+      if (data.success) onDone();
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   return (
     <button
@@ -62,6 +63,7 @@ export default function PagamentosClient({
   page,
   pageSize,
   q,
+  somentePendentes,
 }: Props) {
   const [modalPagamento, setModalPagamento] = useState<PagamentoFullRow | null>(null);
   const router = useRouter();
@@ -72,6 +74,7 @@ export default function PagamentosClient({
     if (q) p.set("q", q);
     p.set("pageSize", String(pageSize));
     p.set("page", String(page));
+    if (somentePendentes) p.set("pendentes", "1");
 
     for (const [k, v] of Object.entries(patch)) {
       if (v === undefined || v === "") p.delete(k);
@@ -116,13 +119,25 @@ export default function PagamentosClient({
             <option value="100">100 por página</option>
             <option value="200">200 por página</option>
           </select>
+          {somentePendentes && (
+            <input type="hidden" name="pendentes" value="1" />
+          )}
           <button
             type="submit"
             className="h-10 rounded-xl bg-zinc-900 px-6 text-sm font-medium text-white hover:bg-zinc-800 transition-all shadow-sm"
           >
             Aplicar filtros
           </button>
-          {q && (
+          <Link
+            href={makeHref({ pendentes: somentePendentes ? undefined : "1", page: 1 })}
+            className={`h-10 rounded-xl border px-4 text-sm font-medium flex items-center transition-all ${somentePendentes
+              ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600"
+              : "bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-50"
+              }`}
+          >
+            ⚠️ A conferir
+          </Link>
+          {(q || somentePendentes) && (
             <Link
               href="/pagamentos"
               className="h-10 rounded-xl border border-zinc-300 bg-white px-5 text-sm font-medium hover:bg-zinc-50 flex items-center transition-all"
@@ -130,6 +145,7 @@ export default function PagamentosClient({
               ✕ Limpar
             </Link>
           )}
+
         </form>
       </div>
 
@@ -248,9 +264,8 @@ export default function PagamentosClient({
               key={label}
               href={makeHref({ page: pg })}
               aria-disabled={dis}
-              className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center transition-all shadow-sm ${
-                dis ? "pointer-events-none opacity-40" : ""
-              }`}
+              className={`h-10 rounded-xl border bg-white px-4 text-sm font-medium hover:bg-zinc-50 flex items-center transition-all shadow-sm ${dis ? "pointer-events-none opacity-40" : ""
+                }`}
             >
               {label}
             </Link>

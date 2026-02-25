@@ -11,6 +11,7 @@ export type IndicacaoRow = {
   plano_tipo: string | null;
   plano_meses: number | null;
   status_assinatura: string | null;
+  venc_contrato: string | null;
 };
 
 export async function getIndicacoesByParceiroId(id_parceiro: string): Promise<IndicacaoRow[]> {
@@ -34,7 +35,12 @@ export async function getIndicacoesByParceiroId(id_parceiro: string): Promise<In
       )                               AS telefone_indicado,
       pl.tipo::text                   AS plano_tipo,
       pl.meses::int                   AS plano_meses,
-      a.status                        AS status_assinatura
+      a.status                        AS status_assinatura,
+      (
+        SELECT MAX(a3.venc_contrato)::text
+        FROM public.assinaturas a3
+        WHERE a3.id_cliente = i.id_indicado
+      )                               AS venc_contrato
     FROM public.indicacoes i
     LEFT JOIN public.clientes c ON c.id_cliente = i.id_indicado
     LEFT JOIN LATERAL (
@@ -48,9 +54,28 @@ export async function getIndicacoesByParceiroId(id_parceiro: string): Promise<In
     ) a ON true
     LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
     WHERE i.id_parceiro = $1::bigint
-    ORDER BY i.id_indicacao DESC
+    ORDER BY venc_contrato DESC
     `,
     [id_parceiro]
   );
   return rows;
+}
+
+export type IndicacoesStats = {
+  total: number;
+  abertas: number;
+};
+
+export async function getIndicacoesStatsByParceiroId(id_parceiro: string): Promise<IndicacoesStats> {
+  const { rows } = await pool.query<IndicacoesStats>(
+    `
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE bonificacao = 'aberta')::int AS abertas
+    FROM public.indicacoes
+    WHERE id_parceiro = $1::bigint
+    `,
+    [id_parceiro]
+  );
+  return rows[0] ?? { total: 0, abertas: 0 };
 }

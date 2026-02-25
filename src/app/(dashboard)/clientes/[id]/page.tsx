@@ -14,6 +14,7 @@ import NovaAssinaturaButton from "../../../../components/assinaturas/NovaAssinat
 import BuscaClienteRapida from "@/components/clientes/BuscaClienteRapida";
 import ListaIndicacoes from "@/components/clientes/ListaIndicacoes";
 import { tempoDesde } from "@/lib/tempo";
+import { getIndicacoesStatsByParceiroId } from "@/lib/indicacoes";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -23,7 +24,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
@@ -31,6 +32,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getPacotes(),
     getAplicativosByClienteId(id),
     getApps(),
+    getIndicacoesStatsByParceiroId(id),
   ]);
 
   const ativa = [...assinaturas]
@@ -115,10 +117,22 @@ export default async function ClienteDetalhePage({ params }: Props) {
           </div>
         </div>
 
-        <p className="mt-3 text-sm text-zinc-600">
-          Assinaturas encontradas:{" "}
-          <span className="font-medium text-zinc-900">{assinaturas.length}</span>
-        </p>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm text-zinc-600">
+          <p>
+            Assinaturas:{" "}
+            <span className="font-medium text-zinc-900">{assinaturas.length}</span>
+          </p>
+          <p>
+            Indicações:{" "}
+            <span className="font-medium text-zinc-900">{indicacoesStats.total}</span>
+          </p>
+          {indicacoesStats.abertas > 0 && (
+            <p>
+              Indicações abertas:{" "}
+              <span className="font-medium text-amber-600">{indicacoesStats.abertas}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Assinatura ativa destacada */}
