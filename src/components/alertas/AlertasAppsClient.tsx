@@ -65,7 +65,7 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
       nome_app: r.nome_app,
     });
     setModo("pagamento");
-    setForma("Pix");
+    setForma("PIX");
     setValor("20");
   }
 
@@ -234,7 +234,7 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
                     onChange={(e) => setForma(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
                   >
-                    <option>Pix</option>
+                    <option>PIX</option>
                     <option>Dinheiro</option>
                     <option>Cartão</option>
                     <option>Transferência</option>
