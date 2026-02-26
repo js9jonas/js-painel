@@ -1,4 +1,3 @@
-// src/components/clientes/BuscaClienteRapida.tsx
 "use client";
 
 import { useState, useRef } from "react";
@@ -84,7 +83,14 @@ export default function BuscaClienteRapida() {
                       i === itemAtivo ? "bg-zinc-900 text-white" : "hover:bg-zinc-50 text-zinc-900"
                     }`}
                   >
-                    <span className="font-medium">{c.nome}</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-medium truncate">{c.nome}</span>
+                      {c.observacao && (
+                        <span className={`text-xs truncate ${i === itemAtivo ? "text-zinc-300" : "text-zinc-400"}`}>
+                          {c.observacao}
+                        </span>
+                      )}
+                    </div>
                     <span className={`text-xs shrink-0 ${i === itemAtivo ? "text-zinc-300" : "text-zinc-400"}`}>
                       ID {c.id_cliente}
                     </span>
