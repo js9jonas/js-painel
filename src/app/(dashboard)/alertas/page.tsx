@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getAlertasContas, getAlertasApps } from "@/lib/alertas";
 import AdicionarMesContaButton from "@/components/alertas/AdicionarMesContaButton";
+import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
 
 function diasRestantes(data: string): number {
     const hoje = new Date();
@@ -111,66 +112,7 @@ export default async function AlertasPage() {
             </div>
 
             {/* Lista 2: Aplicativos */}
-            <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b bg-blue-50 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-semibold text-blue-900">📱 Aplicativos expirando</p>
-                        <p className="text-xs text-blue-700 mt-0.5">Validade ≤ 7 dias • Status ativa</p>
-                    </div>
-                    <span className="text-2xl font-bold text-blue-900">{apps.length}</span>
-                </div>
-
-                {apps.length === 0 ? (
-                    <div className="px-5 py-10 text-center text-zinc-400 text-sm">
-                        Nenhum aplicativo expirando no momento ✅
-                    </div>
-                ) : (
-                    <div className="overflow-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-zinc-50 border-b">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Cliente</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">App</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">MAC</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Venc. Contrato</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Prazo</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100">
-                                {apps.map((r) => {
-                                    const dias = diasRestantes(r.validade);
-                                    return (
-                                        <tr key={r.id_app_registro} className="hover:bg-zinc-50/50">
-                                            <td className="px-4 py-3">
-                                                <Link
-                                                    href={`/clientes/${r.id_cliente}`}
-                                                    className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
-                                                >
-                                                    {r.nome}
-                                                </Link>
-                                                <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
-                                            </td>
-                                            <td className="px-4 py-3 text-zinc-700">{r.nome_app}</td>
-                                            <td className="px-4 py-3 font-mono text-xs text-zinc-500">{r.mac ?? "—"}</td>
-                                            <td className="px-4 py-3 font-medium text-zinc-900">
-                                                {r.venc_contrato_cliente
-                                                    ? r.venc_contrato_cliente.split("T")[0].split("-").reverse().join("/")
-                                                    : "—"}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
-                                                    {labelDias(dias)}
-                                                </span>
-                                            </td>
-                                            
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+            <AlertasAppsClient apps={apps} />
         </div>
     );
 }
