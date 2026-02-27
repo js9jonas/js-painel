@@ -260,6 +260,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 idPlano={ativa.id_plano ?? null}
                 planoTipo={ativa.plano_tipo ?? null}
                 planoTelas={ativa.pacote_telas ?? null}
+                status={ativa.status ?? null}
                 planos={planos.map(p => ({
                   id_plano: String(p.id_plano),
                   tipo: p.tipo ?? "",
@@ -347,6 +348,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         nomeCliente={cliente?.nome ?? ""}
                         pacoteNome={a.pacote_contrato ?? null}
                         planoValor={a.plano_valor ?? null}
+                        status={a.status ?? null}
                       />
                     </div>
                   </td>
