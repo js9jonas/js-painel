@@ -143,7 +143,7 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         c.observacao,
         ct.telefone,
         COUNT(a.id_assinatura)::int AS assinaturas_ativas,
-        MAX(a.venc_contrato)::text AS prox_vencimento,
+        GREATEST(MAX(a.venc_contrato), MAX(ap.venc_contrato))::text AS prox_vencimento,
         (
           SELECT pac.contrato::text
           FROM public.assinaturas a2
