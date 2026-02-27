@@ -252,6 +252,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
               <RenovarAssinatura
                 idAssinatura={ativa.id_assinatura}
                 vencAtual={ativa.venc_contrato ?? null}
+                vencContasAtual={ativa.venc_contas ?? null}
                 idCliente={id}
                 nomeCliente={cliente?.nome ?? ""}
                 pacoteNome={ativa.pacote_contrato ?? null}
@@ -341,6 +342,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       <RenovarAssinatura
                         idAssinatura={a.id_assinatura}
                         vencAtual={a.venc_contrato ?? null}
+                        vencContasAtual={ativa.venc_contas ?? null}
                         idCliente={id}
                         nomeCliente={cliente?.nome ?? ""}
                         pacoteNome={a.pacote_contrato ?? null}
