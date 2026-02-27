@@ -128,6 +128,44 @@ venc_contas =
 
       const assinatura = result.rows[0];
 
+      if (registrarPagamento && pgto) {
+        const idCliente = pgto.idCliente ?? assinatura.id_cliente;
+
+        const { rows: ultPgto } = await client.query(
+          `SELECT data_pgto FROM public.pagamentos
+     WHERE id_cliente = $1::bigint
+     ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
+          [idCliente]
+        );
+
+        let detalhes = "novo";
+        if (ultPgto.length > 0 && ultPgto[0].data_pgto) {
+          const ultimo = new Date(ultPgto[0].data_pgto);
+          const hoje = new Date();
+          ultimo.setHours(0, 0, 0, 0);
+          hoje.setHours(0, 0, 0, 0);
+          const dias = Math.round((hoje.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24));
+          detalhes = `${dias} dias desde o último pagamento`;
+        }
+
+        await client.query(
+          `INSERT INTO public.pagamentos
+       (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
+     VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
+          [
+            idCliente,
+            pgto.nomeCliente ?? null,
+            pgto.pacoteNome ?? null,
+            pgto.forma ?? "PIX",
+            pgto.valor ?? 0,
+            detalhes,
+          ]
+        );
+      }
+
+      await client.query("COMMIT");
+
+
 
       await client.query("COMMIT");
       return NextResponse.json({ ok: true, assinatura });
