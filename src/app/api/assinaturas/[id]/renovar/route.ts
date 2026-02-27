@@ -39,6 +39,23 @@ export async function PUT(
 
     if (soPagamento) {
       // Só registra pagamento, sem alterar datas
+      try {
+        await client.query("BEGIN");
+
+        if (soPagamento) {
+          if (registrarPagamento && pgto) {
+            // ... código existente
+          }
+          await client.query("COMMIT");
+          return NextResponse.json({ ok: true });
+        }
+        // ... resto do código
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
       if (registrarPagamento && pgto) {
         const idCliente = pgto.idCliente;
         const { rows: ultPgto } = await client.query(
@@ -93,7 +110,7 @@ venc_contas =
   RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
 `;
 
-      const result = await client.query(sql, [idAssinatura, dataManual, meses, ativar]);
+      const result = await client.query(sql, [idAssinatura, dataManual, meses, ativar, vencContasManual]);
 
       if (result.rowCount === 0) {
         await client.query("ROLLBACK");
