@@ -6,10 +6,39 @@ import { useRouter } from "next/navigation";
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 
 const FORMAS_PGTO = ["PIX", "Nubank", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
+const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
+
+function addMeses(dataStr: string | null | undefined, meses: number): string {
+    const base = dataStr ? new Date(dataStr + "T00:00:00") : new Date();
+    base.setMonth(base.getMonth() + meses);
+    return base.toISOString().split("T")[0];
+}
+
+function calcVencContrato(vencAtual: string | null | undefined, periodo: Periodo, dataManual: string): string {
+    if (dataManual) return dataManual;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    if (vencAtual) {
+        const venc = new Date(vencAtual + "T00:00:00");
+        return addMeses(venc >= hoje ? vencAtual : undefined, MESES[periodo]);
+    }
+    return addMeses(undefined, MESES[periodo]);
+}
+
+function calcVencContas(vencContasAtual: string | null | undefined): string {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    if (vencContasAtual) {
+        const venc = new Date(vencContasAtual + "T00:00:00");
+        return addMeses(venc >= hoje ? vencContasAtual : undefined, 1);
+    }
+    return addMeses(undefined, 1);
+}
 
 export default function RenovarAssinatura({
     idAssinatura,
     vencAtual,
+    vencContasAtual,
     idCliente,
     nomeCliente,
     pacoteNome,
@@ -21,6 +50,7 @@ export default function RenovarAssinatura({
 }: {
     idAssinatura: string;
     vencAtual?: string | null;
+    vencContasAtual?: string | null;
     idCliente?: string;
     nomeCliente?: string;
     pacoteNome?: string | null;
@@ -29,19 +59,16 @@ export default function RenovarAssinatura({
     planos?: { id_plano: string; tipo: string; telas: number; meses: number; valor: string }[];
     planoTipo?: string | null;
     planoTelas?: number | null;
-
 }) {
     const router = useRouter();
-    const mesesDoPeriodo = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
+
     function valorDoPeriodo(p: Periodo): string {
         try {
             if (!planos || !planoTipo) return planoValor ? parseFloat(planoValor).toFixed(2) : "";
-            const meses = mesesDoPeriodo[p];
             const encontrado = planos.find(
-                (pl) => pl.tipo === planoTipo && pl.telas === (planoTelas ?? pl.telas) && pl.meses === meses
+                (pl) => pl.tipo === planoTipo && pl.telas === (planoTelas ?? pl.telas) && pl.meses === MESES[p]
             );
-            if (encontrado) return parseFloat(encontrado.valor).toFixed(2);
-            return planoValor ? parseFloat(planoValor).toFixed(2) : "";
+            return encontrado ? parseFloat(encontrado.valor).toFixed(2) : (planoValor ? parseFloat(planoValor).toFixed(2) : "");
         } catch {
             return planoValor ? parseFloat(planoValor).toFixed(2) : "";
         }
@@ -49,13 +76,34 @@ export default function RenovarAssinatura({
 
     const [open, setOpen] = useState(false);
     const [periodo, setPeriodo] = useState<Periodo>("mensal");
-    const [dataManual, setDataManual] = useState("");
     const [ativar, setAtivar] = useState(true);
     const [loading, setLoading] = useState(false);
-
-    // Campos de pagamento
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
+
+    // Datas editáveis — calculadas conforme período
+    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal", ""));
+    const [vencContas, setVencContas] = useState(() => calcVencContas(vencContasAtual));
+    // Controla se o usuário editou manualmente (para não sobrescrever ao trocar período)
+    const [vencContratoEditado, setVencContratoEditado] = useState(false);
+
+    function handlePeriodoChange(p: Periodo) {
+        setPeriodo(p);
+        setValor(valorDoPeriodo(p));
+        if (!vencContratoEditado) {
+            setVencContrato(calcVencContrato(vencAtual, p, ""));
+        }
+    }
+
+    function handleOpen() {
+        setPeriodo("mensal");
+        setValor(valorDoPeriodo("mensal"));
+        setVencContrato(calcVencContrato(vencAtual, "mensal", ""));
+        setVencContas(calcVencContas(vencContasAtual));
+        setVencContratoEditado(false);
+        setAtivar(true);
+        setOpen(true);
+    }
 
     async function executar(registrarPagamento: boolean) {
         if (!idAssinatura) { alert("ID da assinatura inválido."); return; }
@@ -68,23 +116,46 @@ export default function RenovarAssinatura({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 periodo,
-                dataManual: dataManual.trim() ? dataManual : null,
+                dataManual: vencContrato,
+                vencContasManual: vencContas,
                 ativar,
                 registrarPagamento,
-                pagamento: registrarPagamento ? {
-                    idCliente,
-                    nomeCliente,
-                    pacoteNome,
-                    forma,
-                    valor,
-                } : null,
+                pagamento: registrarPagamento ? { idCliente, nomeCliente, pacoteNome, forma, valor } : null,
             }),
         });
 
         const text = await resp.text();
         let j: any = {};
         try { j = JSON.parse(text); } catch { }
+        setLoading(false);
 
+        if (!resp.ok || j?.ok === false) {
+            alert(j?.error ?? text ?? `Erro HTTP ${resp.status}`);
+            return;
+        }
+
+        setOpen(false);
+        router.refresh();
+    }
+
+    // Adiciona função após a função executar:
+    async function soPagamento() {
+        if (!valor.trim()) { alert("Informe o valor do pagamento."); return; }
+        setLoading(true);
+
+        const resp = await fetch(`/api/assinaturas/${idAssinatura}/renovar`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                soPagamento: true,
+                registrarPagamento: true,  // <-- adiciona isso
+                pagamento: { idCliente, nomeCliente, pacoteNome, forma, valor },
+            }),
+        });
+
+        const text = await resp.text();
+        let j: any = {};
+        try { j = JSON.parse(text); } catch { }
         setLoading(false);
 
         if (!resp.ok || j?.ok === false) {
@@ -97,12 +168,13 @@ export default function RenovarAssinatura({
     }
 
     const inputClass = "h-9 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
+    const labelClass = "text-xs font-semibold text-zinc-700";
 
     return (
         <>
             <button
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={handleOpen}
                 className="h-8 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-800"
             >
                 Renovar
@@ -116,7 +188,7 @@ export default function RenovarAssinatura({
                             <h2 className="text-lg font-semibold text-zinc-900">Renovar assinatura</h2>
                             <p className="mt-1 text-xs text-zinc-500">
                                 Assinatura #{idAssinatura}
-                                {vencAtual ? ` • vencimento atual: ${vencAtual}` : ""}
+                                {vencAtual ? ` • vencimento atual: ${vencAtual.split("T")[0].split("-").reverse().join("/")}` : ""}
                             </p>
                         </div>
 
@@ -124,12 +196,8 @@ export default function RenovarAssinatura({
 
                             {/* Período */}
                             <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-zinc-700">Período</label>
-                                <select className={inputClass} value={periodo} onChange={(e) => {
-                                    const p = e.target.value as Periodo;
-                                    setPeriodo(p);
-                                    setValor(valorDoPeriodo(p));
-                                }}>
+                                <label className={labelClass}>Período</label>
+                                <select className={inputClass} value={periodo} onChange={(e) => handlePeriodoChange(e.target.value as Periodo)}>
                                     <option value="mensal">Mensal (1 mês)</option>
                                     <option value="trimestral">Trimestral (3 meses)</option>
                                     <option value="semestral">Semestral (6 meses)</option>
@@ -137,12 +205,33 @@ export default function RenovarAssinatura({
                                 </select>
                             </div>
 
-                            {/* Data manual */}
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-zinc-700">Ou definir data manual (prioridade)</label>
-                                <input type="date" className={inputClass} value={dataManual} onChange={(e) => setDataManual(e.target.value)} />
-                                <p className="text-xs text-zinc-400">Se preencher a data manual, ela será usada no lugar do período.</p>
+                            {/* Datas lado a lado */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className={labelClass}>Venc. contrato</label>
+                                    <input
+                                        type="date"
+                                        className={inputClass}
+                                        value={vencContrato}
+                                        onChange={(e) => {
+                                            setVencContrato(e.target.value);
+                                            setVencContratoEditado(true);
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className={labelClass}>Venc. contas</label>
+                                    <input
+                                        type="date"
+                                        className={inputClass}
+                                        value={vencContas}
+                                        onChange={(e) => setVencContas(e.target.value)}
+                                    />
+                                </div>
                             </div>
+                            <p className="text-xs text-zinc-400">
+                                Datas calculadas automaticamente pelo período. Edite se necessário.
+                            </p>
 
                             {/* Ativar */}
                             <label className="flex items-center gap-2 text-sm text-zinc-700">
@@ -150,21 +239,18 @@ export default function RenovarAssinatura({
                                 Marcar status como <b>ativo</b>
                             </label>
 
-                            {/* Separador pagamento */}
+                            {/* Pagamento */}
                             <div className="border-t pt-4 space-y-3">
                                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Dados do pagamento</p>
-
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-zinc-700">Forma</label>
+                                        <label className={labelClass}>Forma</label>
                                         <select className={inputClass} value={forma} onChange={(e) => setForma(e.target.value)}>
-                                            {FORMAS_PGTO.map((f) => (
-                                                <option key={f} value={f}>{f}</option>
-                                            ))}
+                                            {FORMAS_PGTO.map((f) => <option key={f} value={f}>{f}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-zinc-700">Valor (R$)</label>
+                                        <label className={labelClass}>Valor (R$)</label>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -183,13 +269,17 @@ export default function RenovarAssinatura({
                                 className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
                                 Cancelar
                             </button>
+                            <button type="button" onClick={soPagamento} disabled={loading}
+                                className="h-9 rounded-xl border border-blue-300 bg-blue-50 px-4 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+                                {loading ? "..." : "Só pgto"}
+                            </button>
                             <button type="button" onClick={() => executar(false)} disabled={loading}
                                 className="h-9 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50">
                                 {loading ? "..." : "Alterar"}
                             </button>
                             <button type="button" onClick={() => executar(true)} disabled={loading}
                                 className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
-                                {loading ? "Salvando..." : "✓ Renovar"}
+                                {loading ? "Salvando..." : "Renovar"}
                             </button>
                         </div>
                     </div>
