@@ -1,7 +1,15 @@
 // src/lib/clientes.ts
 import { pool } from "@/lib/db";
 
-export type ClienteStatusTela = "sem_assinatura" | "atrasado" | "ok" | "pendente";
+export type ClienteStatusTela =
+  | "sem_assinatura"
+  | "ativo"
+  | "atrasado"
+  | "vencido"
+  | "inativo"
+  | "pendente"
+  | "cancelado";
+
 export type DueFilter = "todos" | "ontem" | "hoje" | "amanha";
 
 export type ClienteRow = {
@@ -75,20 +83,20 @@ function buildBaseWhere(q: string) {
 function dueOffset(due: DueFilter) {
   switch (due) {
     case "ontem": return -1;
-    case "hoje": return 0;
+    case "hoje":  return 0;
     case "amanha": return 1;
     default: return null;
   }
 }
 
 export async function getClientes(params: GetClientesParams = {}): Promise<ClienteRow[]> {
-  const q = (params.q ?? "").trim();
-  const status = params.status ?? "todos";
-  const due = params.due ?? "todos";
-  const order = params.order ?? "vencimento";
-  const page = clamp(Number(params.page ?? 1) || 1, 1, 9999);
+  const q        = (params.q ?? "").trim();
+  const status   = params.status ?? "todos";
+  const due      = params.due ?? "todos";
+  const order    = params.order ?? "vencimento";
+  const page     = clamp(Number(params.page ?? 1) || 1, 1, 9999);
   const pageSize = clamp(Number(params.pageSize ?? 50) || 50, 10, 200);
-  const offset = (page - 1) * pageSize;
+  const offset   = (page - 1) * pageSize;
 
   const values: any[] = [];
   const whereParts: string[] = [];
@@ -138,29 +146,41 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
   const sql = `
     WITH base AS (
       SELECT
-        c.id_cliente::text AS id_cliente,
+        c.id_cliente::text                    AS id_cliente,
         c.nome,
         c.observacao,
         ct.telefone,
-        COUNT(a.id_assinatura)::int AS assinaturas_ativas,
-        GREATEST(MAX(a.venc_contrato), MAX(ap.venc_contrato))::text AS prox_vencimento,
+        -- Conta apenas assinaturas ativo/atrasado como "ativas" para exibição
+        COUNT(a.id_assinatura)
+          FILTER (WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado'))::int AS assinaturas_ativas,
+        -- Vencimento da assinatura mais recente (qualquer status)
+        MAX(a.venc_contrato)::text            AS prox_vencimento,
+        -- Pacote da assinatura mais relevante (qualquer status)
         (
           SELECT pac.contrato::text
           FROM public.assinaturas a2
           LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
           WHERE a2.id_cliente = c.id_cliente
-            AND lower(btrim(a2.status)) IN ('ativo', 'pendente')
           ORDER BY a2.venc_contrato DESC NULLS LAST
           LIMIT 1
         ) AS pacote_nome,
+        -- ✅ status_tela calculado pelo campo status real (mantido atualizado pelo job noturno)
         CASE
-          WHEN COUNT(a.id_assinatura) = 0 AND COUNT(ap.id_assinatura) = 0
+          WHEN COUNT(a.id_assinatura) = 0
             THEN 'sem_assinatura'
-          WHEN COUNT(ap.id_assinatura) > 0
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'ativo') > 0
+            THEN 'ativo'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'pendente') > 0
             THEN 'pendente'
-          WHEN MAX(a.venc_contrato) < CURRENT_DATE
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'atrasado') > 0
             THEN 'atrasado'
-          ELSE 'ok'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'vencido') > 0
+            THEN 'vencido'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'inativo') > 0
+            THEN 'inativo'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'cancelado') > 0
+            THEN 'cancelado'
+          ELSE 'sem_assinatura'
         END AS status_tela
       FROM public.clientes c
       LEFT JOIN LATERAL (
@@ -172,14 +192,8 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         ORDER BY ct.atualizado_em DESC NULLS LAST, ct.criado_em DESC NULLS LAST, ct.id_contato DESC
         LIMIT 1
       ) ct ON true
-      -- assinaturas ativas (para vencimento e contagem)
-      LEFT JOIN public.assinaturas a
-        ON a.id_cliente = c.id_cliente
-        AND lower(btrim(a.status)) = 'ativo'
-      -- assinaturas pendentes (para identificar status pendente)
-      LEFT JOIN public.assinaturas ap
-        ON ap.id_cliente = c.id_cliente
-        AND lower(btrim(ap.status)) = 'pendente'
+      -- ✅ JOIN único em todas as assinaturas — o FILTER no CASE trata cada status
+      LEFT JOIN public.assinaturas a ON a.id_cliente = c.id_cliente
       ${whereSql}
       GROUP BY c.id_cliente, c.nome, c.observacao, ct.telefone
     )
@@ -197,9 +211,9 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
 export async function countClientes(
   params: Omit<GetClientesParams, "page" | "pageSize"> = {}
 ) {
-  const q = (params.q ?? "").trim();
+  const q      = (params.q ?? "").trim();
   const status = params.status ?? "todos";
-  const due = params.due ?? "todos";
+  const due    = params.due ?? "todos";
 
   const { whereSql, values } = buildBaseWhere(q);
 
@@ -228,21 +242,24 @@ export async function countClientes(
         c.id_cliente::text AS id_cliente,
         MAX(a.venc_contrato)::text AS prox_vencimento,
         CASE
-          WHEN COUNT(a.id_assinatura) = 0 AND COUNT(ap.id_assinatura) = 0
+          WHEN COUNT(a.id_assinatura) = 0
             THEN 'sem_assinatura'
-          WHEN COUNT(ap.id_assinatura) > 0
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'ativo') > 0
+            THEN 'ativo'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'pendente') > 0
             THEN 'pendente'
-          WHEN MAX(a.venc_contrato) < CURRENT_DATE
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'atrasado') > 0
             THEN 'atrasado'
-          ELSE 'ok'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'vencido') > 0
+            THEN 'vencido'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'inativo') > 0
+            THEN 'inativo'
+          WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'cancelado') > 0
+            THEN 'cancelado'
+          ELSE 'sem_assinatura'
         END AS status_tela
       FROM public.clientes c
-      LEFT JOIN public.assinaturas a
-        ON a.id_cliente = c.id_cliente
-        AND lower(btrim(a.status)) = 'ativo'
-      LEFT JOIN public.assinaturas ap
-        ON ap.id_cliente = c.id_cliente
-        AND lower(btrim(ap.status)) = 'pendente'
+      LEFT JOIN public.assinaturas a ON a.id_cliente = c.id_cliente
       ${whereSql}
       GROUP BY c.id_cliente
     )
@@ -268,24 +285,24 @@ export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaR
     `
     SELECT
       a.id_assinatura::text AS id_assinatura,
-      a.criado_em::text AS criado_em,
+      a.criado_em::text     AS criado_em,
       a.status,
       a.venc_contrato::text AS venc_contrato,
-      a.venc_contas::text AS venc_contas,
+      a.venc_contas::text   AS venc_contas,
       a.identificacao,
       a.observacao,
-      a.id_plano::text AS id_plano,
-      a.id_pacote::text AS id_pacote,
-      p.contrato::text AS pacote_contrato,
-      p.telas::int AS pacote_telas,
-      pl.tipo::text AS plano_tipo,
-      pl.telas::int AS plano_telas,
-      pl.meses::int AS plano_meses,
-      pl.valor::text AS plano_valor,
-      pl.descricao::text AS plano_descricao
+      a.id_plano::text      AS id_plano,
+      a.id_pacote::text     AS id_pacote,
+      p.contrato::text      AS pacote_contrato,
+      p.telas::int          AS pacote_telas,
+      pl.tipo::text         AS plano_tipo,
+      pl.telas::int         AS plano_telas,
+      pl.meses::int         AS plano_meses,
+      pl.valor::text        AS plano_valor,
+      pl.descricao::text    AS plano_descricao
     FROM public.assinaturas a
-    LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
-    LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
+    LEFT JOIN public.pacote p  ON p.id_pacote = a.id_pacote
+    LEFT JOIN public.planos pl ON pl.id_plano  = a.id_plano
     WHERE a.id_cliente = $1::bigint
     ORDER BY a.atualizado_em DESC NULLS LAST, a.criado_em DESC NULLS LAST;
     `,
@@ -301,7 +318,7 @@ export async function getClienteById(id: string): Promise<ClienteDetalheRow | nu
       c.id_cliente::text AS id_cliente,
       c.nome,
       c.observacao,
-      c.criado_em::text AS criado_em,
+      c.criado_em::text  AS criado_em,
       (
         SELECT ct.telefone::text
         FROM public.contatos ct
@@ -327,7 +344,7 @@ export async function getPagamentosByClienteId(id: string, limit: number = 5): P
       id,
       data_pgto::text AS data_pgto,
       forma,
-      valor::text AS valor,
+      valor::text     AS valor,
       detalhes,
       tipo,
       compra

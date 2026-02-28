@@ -20,6 +20,43 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+// ─── helpers de status ────────────────────────────────────────────────────────
+
+/** Status que merecem destaque no card principal */
+const STATUS_DESTAQUE = ["ativo", "atrasado", "vencido", "pendente"];
+
+/** Rótulo legível do card de destaque */
+function labelDestaque(status: string | null): string {
+  switch ((status ?? "").toLowerCase().trim()) {
+    case "pendente": return "Assinatura pendente";
+    case "atrasado": return "Assinatura atrasada";
+    case "vencido":  return "Assinatura vencida";
+    default:         return "Assinatura ativa";
+  }
+}
+
+/** Classes de cor do cabeçalho do card de destaque */
+function headerDestaque(status: string | null): string {
+  switch ((status ?? "").toLowerCase().trim()) {
+    case "pendente": return "bg-red-50 text-red-900";
+    case "atrasado": return "bg-yellow-50 text-yellow-900";
+    case "vencido":  return "bg-zinc-100 text-zinc-600";
+    default:         return "bg-emerald-50 text-emerald-900";
+  }
+}
+
+/** Classes de cor do valor de status dentro do card */
+function corStatusDestaque(status: string | null): string {
+  switch ((status ?? "").toLowerCase().trim()) {
+    case "pendente": return "text-red-600";
+    case "atrasado": return "text-yellow-700";
+    case "vencido":  return "text-zinc-500";
+    default:         return "text-emerald-700";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
@@ -35,8 +72,9 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getIndicacoesStatsByParceiroId(id),
   ]);
 
+  // ✅ Inclui "atrasado" no card de destaque
   const ativa = [...assinaturas]
-    .filter((a) => ["ativo", "pendente"].includes((a.status ?? "").toLowerCase().trim()))
+    .filter((a) => STATUS_DESTAQUE.includes((a.status ?? "").toLowerCase().trim()))
     .sort((a, b) => {
       if (!a.venc_contrato) return 1;
       if (!b.venc_contrato) return -1;
@@ -135,16 +173,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
         </div>
       </div>
 
-      {/* Assinatura ativa destacada */}
+      {/* Assinatura em destaque (ativo / atrasado / pendente) */}
       {ativa && (
         <div className="rounded-2xl border bg-white overflow-hidden">
-          <div className={`px-4 py-3 border-b flex items-center justify-between text-sm font-medium ${ativa.status?.toLowerCase() === "pendente"
-              ? "bg-red-50 text-red-900"
-              : "bg-emerald-50 text-emerald-900"
-            }`}>
-            <span>
-              {ativa.status?.toLowerCase() === "pendente" ? "Assinatura pendente" : "Assinatura ativa"}
-            </span>
+          {/* ✅ Cabeçalho com cor dinâmica por status */}
+          <div className={`px-4 py-3 border-b flex items-center justify-between text-sm font-medium ${headerDestaque(ativa.status)}`}>
+            <span>{labelDestaque(ativa.status)}</span>
             {ativa.criado_em && (
               <span className="text-xs font-normal opacity-60">
                 {tempoDesde(ativa.criado_em)}
@@ -171,7 +205,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
               <div className="text-sm">
                 <div className="text-zinc-500">Status</div>
-                <div className={`font-medium ${ativa.status?.toLowerCase() === "pendente" ? "text-red-600" : "text-emerald-700"}`}>
+                {/* ✅ Cor dinâmica do valor de status */}
+                <div className={`font-medium ${corStatusDestaque(ativa.status)}`}>
                   {ativa.status}
                 </div>
               </div>
@@ -298,10 +333,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <tr key={a.id_assinatura} className="hover:bg-zinc-50">
                   <td className="px-4 py-3 font-medium text-zinc-900">{a.id_assinatura}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${a.status?.toLowerCase() === "ativo"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-zinc-100 text-zinc-600"
-                      }`}>
+                    {/* ✅ Todos os badges em cinza conforme solicitado */}
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-zinc-100 text-zinc-600">
                       {a.status ?? "--"}
                     </span>
                   </td>

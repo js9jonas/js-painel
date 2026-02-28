@@ -28,13 +28,13 @@ export default function RowActions({ idCliente, nome, telefone, observacao }: Pr
           ✏️ Editar
         </button>
 
-        <a
+{/*         <a
           href={`/clientes/${idCliente}`}
           className="h-8 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-800 inline-flex items-center transition-colors"
           title="Ver detalhes"
         >
           Ver detalhes
-        </a>
+        </a>  */}
       </div>
 
       {editOpen && (
