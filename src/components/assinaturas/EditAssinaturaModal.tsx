@@ -1,4 +1,3 @@
-// src/components/assinaturas/EditAssinaturaModal.tsx
 "use client";
 
 import { useState, useTransition } from "react";
@@ -26,7 +25,8 @@ type Props = {
   onSaved: () => void;
 };
 
-const STATUS_OPTIONS = ["ativo", "inativo", "cancelado", "suspenso", "pendente"];
+// ✅ STATUS_OPTIONS alinhado ao modelo de negócio
+const STATUS_OPTIONS = ["ativo", "atrasado", "vencido", "inativo", "pendente", "cancelado"];
 
 function toDateInput(v: string | null): string {
   if (!v) return "";

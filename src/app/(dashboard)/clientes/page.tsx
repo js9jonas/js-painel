@@ -13,29 +13,36 @@ import { getPacotes } from "@/lib/pacotes";
 import RowActions from "@/components/clientes/RowActions";
 import NovoClienteButton from "@/components/clientes/NovoClienteButton";
 
+// ✅ Cores dos badges alinhadas ao modelo de status
 function badgeClass(status: ClienteStatusTela) {
   switch (status) {
+    case "ativo":
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20";
+    case "pendente":
+      return "bg-blue-50 text-blue-700 ring-1 ring-blue-600/20";
     case "atrasado":
+      return "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20";
+    case "vencido":
+      return "bg-orange-50 text-orange-700 ring-1 ring-orange-600/20";
+    case "inativo":
+      return "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-400/20";
+    case "cancelado":
       return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
     case "sem_assinatura":
-      return "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-600/20";
-    case "pendente":
-      return "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-600/20";
-    default:
-      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20";
+      return "bg-zinc-50 text-zinc-500 ring-1 ring-zinc-400/20";
   }
 }
 
+// ✅ Rótulos dos badges
 function badgeLabel(status: ClienteStatusTela) {
   switch (status) {
-    case "atrasado":
-      return "Atrasado";
-    case "sem_assinatura":
-      return "Sem assinatura";
-    case "pendente":
-      return "Pendente";
-    default:
-      return "OK";
+    case "ativo":            return "✅ Ativo";
+    case "pendente":      return "🔵 Pendente";
+    case "atrasado":      return "🟡 Atrasado";
+    case "vencido":       return "🟠 Vencido";
+    case "inativo":       return "⚪ Inativo";
+    case "cancelado":     return "🔴 Cancelado";
+    case "sem_assinatura": return "⚠️ Sem assinatura";
   }
 }
 
@@ -61,12 +68,12 @@ function tabClass(active: boolean) {
 export default async function ClientesPage({ searchParams }: PageProps) {
   const sp = (await searchParams) ?? {};
 
-  const q = toStr(sp.q);
+  const q      = toStr(sp.q);
   const status = (toStr(sp.status) as "todos" | ClienteStatusTela) || "todos";
-  const order = (toStr(sp.order) as "nome" | "vencimento") || "vencimento";
-  const due = (toStr(sp.due) as DueFilter) || "todos";
+  const order  = (toStr(sp.order) as "nome" | "vencimento") || "vencimento";
+  const due    = (toStr(sp.due) as DueFilter) || "todos";
 
-  const page = toInt(sp.page, 1);
+  const page     = toInt(sp.page, 1);
   const pageSize = toInt(sp.pageSize, 50);
 
   const [total, data, planos, pacotes] = await Promise.all([
@@ -146,15 +153,19 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               <SearchInput defaultValue={q} />
             </div>
 
+            {/* ✅ Dropdown com todos os status do modelo */}
             <select
               name="status"
               defaultValue={status}
               className="h-10 rounded-xl border border-zinc-300 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all"
             >
               <option value="todos">Todos os status</option>
-              <option value="ok">✅ OK</option>
-              <option value="atrasado">❌ Atrasado</option>
-              <option value="pendente">⏳ Pendente</option>
+              <option value="ativo">✅ Ativo</option>
+              <option value="pendente">🔵 Pendente</option>
+              <option value="atrasado">🟡 Atrasado</option>
+              <option value="vencido">🟠 Vencido</option>
+              <option value="inativo">⚪ Inativo</option>
+              <option value="cancelado">🔴 Cancelado</option>
               <option value="sem_assinatura">⚠️ Sem assinatura</option>
             </select>
 

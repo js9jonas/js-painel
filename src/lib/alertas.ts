@@ -34,14 +34,13 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
  FROM public.assinaturas a
  JOIN public.clientes c ON c.id_cliente = a.id_cliente
  LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
- WHERE lower(btrim(a.status)) = 'ativo'
+ WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado')
    AND a.venc_contas IS NOT NULL
    AND a.venc_contrato IS NOT NULL
    AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
    AND a.venc_contrato::date > a.venc_contas::date
  ORDER BY a.venc_contas ASC`,
         [dias]
-        
     );
     return rows;
 }
@@ -69,8 +68,6 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        AND ap.validade::date >= CURRENT_DATE - 1
      ORDER BY ap.validade ASC`,
         [dias]
-        
     );
-    
     return rows;
 }

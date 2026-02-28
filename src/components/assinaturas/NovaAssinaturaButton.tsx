@@ -1,4 +1,3 @@
-// src/components/assinaturas/NovaAssinaturaButton.tsx
 "use client";
 
 import { useState, useTransition } from "react";
@@ -13,7 +12,8 @@ type Props = {
   pacotes: PacoteRow[];
 };
 
-const STATUS_OPTIONS = ["ativo", "inativo", "vencido", "desativado", "cancelado", "suspenso", "pendente"];
+// ✅ STATUS_OPTIONS alinhado ao modelo de negócio
+const STATUS_OPTIONS = ["ativo", "atrasado", "vencido", "inativo", "pendente", "cancelado"];
 
 export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Props) {
   const [open, setOpen]              = useState(false);
