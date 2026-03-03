@@ -79,3 +79,20 @@ export async function getIndicacoesStatsByParceiroId(id_parceiro: string): Promi
   );
   return rows[0] ?? { total: 0, abertas: 0 };
 }
+
+export type ParceiroRow = {
+  id_parceiro: string;
+  nome_parceiro: string | null;
+};
+
+export async function getParceiroByIndicadoId(id_indicado: string): Promise<ParceiroRow | null> {
+  const { rows } = await pool.query<ParceiroRow>(
+    `SELECT i.id_parceiro::text, c.nome AS nome_parceiro
+     FROM public.indicacoes i
+     LEFT JOIN public.clientes c ON c.id_cliente = i.id_parceiro
+     WHERE i.id_indicado = $1::bigint
+     LIMIT 1`,
+    [id_indicado]
+  );
+  return rows[0] ?? null;
+}
