@@ -32,8 +32,8 @@ function labelDestaque(status: string | null): string {
   switch ((status ?? "").toLowerCase().trim()) {
     case "pendente": return "Assinatura pendente";
     case "atrasado": return "Assinatura atrasada";
-    case "vencido":  return "Assinatura vencida";
-    default:         return "Assinatura ativa";
+    case "vencido": return "Assinatura vencida";
+    default: return "Assinatura ativa";
   }
 }
 
@@ -42,8 +42,8 @@ function headerDestaque(status: string | null): string {
   switch ((status ?? "").toLowerCase().trim()) {
     case "pendente": return "bg-red-50 text-red-900";
     case "atrasado": return "bg-yellow-50 text-yellow-900";
-    case "vencido":  return "bg-zinc-100 text-zinc-600";
-    default:         return "bg-emerald-50 text-emerald-900";
+    case "vencido": return "bg-zinc-100 text-zinc-600";
+    default: return "bg-emerald-50 text-emerald-900";
   }
 }
 
@@ -52,8 +52,8 @@ function corStatusDestaque(status: string | null): string {
   switch ((status ?? "").toLowerCase().trim()) {
     case "pendente": return "text-red-600";
     case "atrasado": return "text-yellow-700";
-    case "vencido":  return "text-zinc-500";
-    default:         return "text-emerald-700";
+    case "vencido": return "text-zinc-500";
+    default: return "text-emerald-700";
   }
 }
 
@@ -63,7 +63,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps,  indicacoesStats, parceiro] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
@@ -108,7 +108,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
       </div>
 
       {/* Cabecalho do cliente */}
-      <div className="rounded-2xl border bg-white p-6">
+      <div className="rounded-2xl border bg-white p-6 sticky top-4 z-20">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">
@@ -119,27 +119,27 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 Cliente {tempoDesde(cliente.criado_em)}
               </p>
             )}
-            <div className="mt-2 grid gap-1 text-sm text-zinc-600">
-              <div>
-                <span className="text-zinc-500">ID:</span>{" "}
-                <span className="font-medium text-zinc-800">{id}</span>
+            <div className="mt-2 text-sm text-zinc-600">
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <p>
+                  <span className="text-zinc-500">ID:</span>{" "}
+                  <span className="font-medium text-zinc-800">{id}</span>
+                </p>
+                <p>
+                  <span className="text-zinc-500">Telefone:</span>{" "}
+                  {cliente?.telefone ? (
+                    <span className="font-medium text-zinc-800">{cliente.telefone}</span>
+                  ) : (
+                    <span className="text-zinc-400">--</span>
+                  )}
+                </p>
               </div>
-              <div>
-                <span className="text-zinc-500">Telefone:</span>{" "}
-                {cliente?.telefone ? (
-                  <span className="font-medium text-zinc-800">{cliente.telefone}</span>
-                ) : (
-                  <span className="text-zinc-400">--</span>
-                )}
-              </div>
-              <div>
-                <span className="text-zinc-500">Observacao:</span>{" "}
-                {cliente?.observacao ? (
+              {cliente?.observacao && (
+                <p className="mt-1">
+                  <span className="text-zinc-500">Observacao:</span>{" "}
                   <span className="text-zinc-800">{cliente.observacao}</span>
-                ) : (
-                  <span className="text-zinc-400">--</span>
-                )}
-              </div>
+                </p>
+              )}
             </div>
           </div>
 
@@ -176,7 +176,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
         </div>
         <IndicadorInfo idCliente={id} parceiro={parceiro} />
       </div>
-
       {/* Assinatura em destaque (ativo / atrasado / pendente) */}
       {ativa && (
         <div className="rounded-2xl border bg-white overflow-hidden">
