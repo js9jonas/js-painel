@@ -15,6 +15,8 @@ import BuscaClienteRapida from "@/components/clientes/BuscaClienteRapida";
 import ListaIndicacoes from "@/components/clientes/ListaIndicacoes";
 import { tempoDesde } from "@/lib/tempo";
 import { getIndicacoesStatsByParceiroId } from "@/lib/indicacoes";
+import IndicadorInfo from "@/components/clientes/IndicadorInfo";
+import { getParceiroByIndicadoId } from "@/lib/indicacoes";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -61,7 +63,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps,  indicacoesStats, parceiro] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
@@ -70,6 +72,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getAplicativosByClienteId(id),
     getApps(),
     getIndicacoesStatsByParceiroId(id),
+    getParceiroByIndicadoId(id),
   ]);
 
   // ✅ Inclui "atrasado" no card de destaque
@@ -171,6 +174,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
             </p>
           )}
         </div>
+        <IndicadorInfo idCliente={id} parceiro={parceiro} />
       </div>
 
       {/* Assinatura em destaque (ativo / atrasado / pendente) */}

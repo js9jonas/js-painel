@@ -38,3 +38,15 @@ export async function removerIndicacao(
   );
   revalidatePath(`/clientes/${id_parceiro}`);
 }
+
+export async function definirParceiro(
+  id_indicado: string,
+  id_parceiro: string
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO public.indicacoes (id_parceiro, id_indicado, bonificacao, criado_em)
+     VALUES ($1::bigint, $2::bigint, 'aberta', NOW())`,
+    [id_parceiro, id_indicado]
+  );
+  revalidatePath(`/clientes/${id_indicado}`);
+}
