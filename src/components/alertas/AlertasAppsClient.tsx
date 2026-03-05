@@ -80,7 +80,6 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
       if (modo === "somente") {
         await renovarValidadeApp(modal.id_app_registro);
       } else {
-        // CORRETO
         await renovarAplicativo({
           id_app_registro: Number(modal.id_app_registro),
           id_cliente: Number(modal.id_cliente),
@@ -140,7 +139,7 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
             <table className="w-full text-sm">
               <thead className="bg-zinc-50 border-b">
                 <tr>
-                  {["Cliente", "App", "MAC", "Venc. Contrato", "Prazo", ""].map((h) => (
+                  {["Cliente", "Pacote", "App", "MAC / Obs.", "Venc. Contrato", "Prazo", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
                       {h}
                     </th>
@@ -152,6 +151,7 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
                   const dias = diasRestantes(r.validade);
                   return (
                     <tr key={r.id_app_registro} className="hover:bg-zinc-50/50">
+                      {/* Cliente */}
                       <td className="px-4 py-3">
                         <Link
                           href={`/clientes/${r.id_cliente}`}
@@ -161,18 +161,45 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
                         </Link>
                         <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
                       </td>
+
+                      {/* Pacote */}
+                      <td className="px-4 py-3">
+                        <span className="text-zinc-700">
+                          {r.pacote_contrato ?? <span className="text-zinc-400 italic">—</span>}
+                        </span>
+                        <div className="text-xs text-zinc-400">
+                          {r.total_apps} app{r.total_apps !== 1 ? "s" : ""}
+                        </div>
+                      </td>
+
+                      {/* App */}
                       <td className="px-4 py-3 text-zinc-700">{r.nome_app}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-500">{r.mac ?? "—"}</td>
+
+                      {/* MAC / Obs. */}
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs text-zinc-500">{r.mac ?? "—"}</span>
+                        {r.observacao && (
+                          <div className="text-xs text-zinc-400 mt-0.5 max-w-[180px] truncate" title={r.observacao}>
+                            {r.observacao}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Venc. Contrato */}
                       <td className="px-4 py-3 text-zinc-600">
                         {r.venc_contrato_cliente
                           ? r.venc_contrato_cliente.split("T")[0].split("-").reverse().join("/")
                           : <span className="text-zinc-400 italic">Sem assinatura</span>}
                       </td>
+
+                      {/* Prazo */}
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
                           {labelDias(dias)}
                         </span>
                       </td>
+
+                      {/* Ação */}
                       <td className="px-4 py-3">
                         <button
                           onClick={() => abrirModal(r)}
