@@ -75,11 +75,12 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ORDER BY a.venc_contrato DESC
        LIMIT 1
      ) ult ON true
-     -- total de aplicativos do cliente
+     -- total de aplicativos ativos do cliente
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS total_apps
        FROM public.aplicativos ap2
        WHERE ap2.id_cliente = ap.id_cliente
+         AND lower(btrim(ap2.status)) = 'ativa'
      ) cnt ON true
      WHERE lower(btrim(ap.status)) = 'ativa'
        AND ap.validade IS NOT NULL
