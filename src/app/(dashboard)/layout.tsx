@@ -1,5 +1,6 @@
 // src/app/(dashboard)/layout.tsx
 import Link from "next/link";
+import UserMenu from "@/components/auth/UserMenu";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -47,6 +48,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               🚨 Alertas
             </Link>
           </nav>
+
+          {/* Empurra o UserMenu para a direita */}
+          <div className="ml-auto">
+            <UserMenu />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-6 py-6">{children}</main>
