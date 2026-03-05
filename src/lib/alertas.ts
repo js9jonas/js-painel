@@ -17,8 +17,11 @@ export type AlertaAppRow = {
     id_app_registro: string;
     validade: string;
     mac: string | null;
+    observacao: string | null;       // sublinha do MAC
     nome_app: string;
     venc_contrato_cliente: string | null;
+    pacote_contrato: string | null;  // coluna Pacote
+    total_apps: number;              // sublinha do Pacote
 };
 
 export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
@@ -53,15 +56,31 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ap.id_app_registro::text,
        ap.validade::text,
        ap.mac,
+       ap.observacao,
        app.nome_app,
-       (
-         SELECT MAX(a.venc_contrato)::text
-         FROM public.assinaturas a
-         WHERE a.id_cliente = c.id_cliente
-       ) AS venc_contrato_cliente
+       ult.venc_contrato_cliente,
+       ult.pacote_contrato,
+       cnt.total_apps
      FROM public.aplicativos ap
      JOIN public.clientes c ON c.id_cliente = ap.id_cliente
      JOIN public.apps app ON app.id_app = ap.id_app
+     -- venc_contrato_cliente + pacote_contrato: última assinatura do cliente
+     LEFT JOIN LATERAL (
+       SELECT
+         a.venc_contrato::text AS venc_contrato_cliente,
+         p.contrato           AS pacote_contrato
+       FROM public.assinaturas a
+       LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
+       WHERE a.id_cliente = ap.id_cliente
+       ORDER BY a.venc_contrato DESC
+       LIMIT 1
+     ) ult ON true
+     -- total de aplicativos do cliente
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS total_apps
+       FROM public.aplicativos ap2
+       WHERE ap2.id_cliente = ap.id_cliente
+     ) cnt ON true
      WHERE lower(btrim(ap.status)) = 'ativa'
        AND ap.validade IS NOT NULL
        AND ap.validade::date <= CURRENT_DATE + ($1::int || ' days')::interval

@@ -100,6 +100,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
     <div className="space-y-4">
 
       {/* Navegacao */}
+      {/*para descongelar o cabeçalho = <div className="rounded-2xl border bg-white p-6"> */}
       <div className="flex items-center justify-between gap-3">
         <Link href="/clientes" className="text-sm text-zinc-600 hover:underline">
           &larr; Voltar
