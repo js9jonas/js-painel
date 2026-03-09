@@ -21,19 +21,26 @@ export type SaldoHistoricoRow = {
   criado_em: string;
 };
 
-/**
- * Retorna todos os servidores com saldo mapeado (com ou sem exibir_saldo).
- * O filtro de exibição é feito no cliente via prop `somentAtivos`.
- */
+export type PrevisaoRow = {
+  id_servidor: string;
+  data_esgotamento: string | null; // null = saldo suficiente além de 24 meses
+};
+
+export type ConsumoMensalRow = {
+  id_servidor: string;
+  creditos_mensal: number;
+};
+
+
 export async function getSaldosServidores(): Promise<SaldoServidorRow[]> {
   const { rows } = await pool.query<SaldoServidorRow>(`
     SELECT
       s.id_servidor::text,
       s.codigo_publico,
       s.nome_interno,
-      COALESCE(ss.saldo_atual, 0)        AS saldo_atual,
+      COALESCE(ss.saldo_atual, 0)               AS saldo_atual,
       COALESCE(ss.atualizado_em::text, NOW()::text) AS atualizado_em,
-      COALESCE(ss.exibir_saldo, true)    AS exibir_saldo
+      COALESCE(ss.exibir_saldo, true)           AS exibir_saldo
     FROM public.servidores s
     LEFT JOIN public.saldo_servidor ss ON ss.id_servidor = s.id_servidor
     WHERE s.ativo = true
@@ -41,6 +48,67 @@ export async function getSaldosServidores(): Promise<SaldoServidorRow[]> {
         SELECT 1 FROM public.consumo_servidor cs WHERE cs.id_servidor = s.id_servidor
       )
     ORDER BY s.codigo_publico ASC
+  `);
+  return rows;
+}
+
+/**
+ * Calcula a data estimada de esgotamento de créditos para cada servidor,
+ * usando o padrão de consumo mensal recorrente (por dia do mês).
+ */
+export async function getPrevisaoEsgotamento(): Promise<PrevisaoRow[]> {
+  const { rows } = await pool.query<PrevisaoRow>(`
+    WITH consumo_por_dia AS (
+      SELECT
+        cs.id_servidor,
+        EXTRACT(DAY FROM a.venc_contas)::int AS dia_mes,
+        SUM(cs.creditos_mensal)              AS creditos_dia
+      FROM public.assinaturas a
+      JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
+      WHERE a.status IN ('ativo', 'atrasado')
+      GROUP BY cs.id_servidor, EXTRACT(DAY FROM a.venc_contas)
+    ),
+    datas AS (
+      SELECT generate_series(
+        CURRENT_DATE,
+        CURRENT_DATE + INTERVAL '24 months',
+        INTERVAL '1 day'
+      )::date AS data
+    ),
+    projecao AS (
+      SELECT
+        c.id_servidor,
+        d.data,
+        SUM(c.creditos_dia) OVER (
+          PARTITION BY c.id_servidor
+          ORDER BY d.data
+        ) AS acumulado
+      FROM consumo_por_dia c
+      JOIN datas d ON EXTRACT(DAY FROM d.data) = c.dia_mes
+    )
+    SELECT
+      p.id_servidor::text,
+      MIN(p.data)::text AS data_esgotamento
+    FROM projecao p
+    JOIN public.saldo_servidor ss ON ss.id_servidor = p.id_servidor
+    WHERE p.acumulado > ss.saldo_atual
+    GROUP BY p.id_servidor
+  `);
+  return rows;
+}
+
+/**
+ * Retorna o consumo mensal total por servidor (soma de todas as assinaturas ativas).
+ */
+export async function getConsumoMensal(): Promise<ConsumoMensalRow[]> {
+  const { rows } = await pool.query<ConsumoMensalRow>(`
+    SELECT
+      cs.id_servidor::text,
+      SUM(cs.creditos_mensal)::int AS creditos_mensal
+    FROM public.assinaturas a
+    JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
+    WHERE a.status IN ('ativo', 'atrasado')
+    GROUP BY cs.id_servidor
   `);
   return rows;
 }
