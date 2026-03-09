@@ -38,6 +38,31 @@ export default async function AlertasPage() {
         getConsumoMensal(),
     ]);
 
+    // Servidores com previsão < 15 dias
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const saldoMap = Object.fromEntries(saldos.map((s) => [s.id_servidor, s]));
+    const servidoresCriticos = previsoes
+        .filter((p) => {
+            if (!p.data_esgotamento) return false;
+            const dias = Math.round(
+                (new Date(p.data_esgotamento + "T00:00:00").getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            return dias < 15;
+        })
+        .map((p) => {
+            const dias = Math.round(
+                (new Date(p.data_esgotamento! + "T00:00:00").getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            const [y, m, d] = p.data_esgotamento!.split("-");
+            return {
+                nome: saldoMap[p.id_servidor]?.codigo_publico ?? p.id_servidor,
+                data: `${d}/${m}/${y}`,
+                dias,
+            };
+        })
+        .sort((a, b) => a.dias - b.dias);
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -47,6 +72,34 @@ export default async function AlertasPage() {
                     Contas a vencer em até 5 dias com contrato vigente • Aplicativos expirando em até 7 dias
                 </p>
             </div>
+
+            {/* Alerta de créditos críticos */}
+            {servidoresCriticos.length > 0 && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-semibold text-red-800 shrink-0">
+                        ⚠️ Créditos críticos:
+                    </span>
+                    {servidoresCriticos.map((s) => (
+                        <span
+                            key={s.nome}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${
+                                s.dias <= 0
+                                    ? "bg-red-600 text-white"
+                                    : s.dias <= 7
+                                    ? "bg-red-100 text-red-700 ring-1 ring-red-300"
+                                    : "bg-orange-100 text-orange-700 ring-1 ring-orange-300"
+                            }`}
+                        >
+                            {s.nome}
+                            <span className="opacity-75">•</span>
+                            {s.data}
+                            <span className="opacity-60">
+                                ({s.dias <= 0 ? "vencido" : `${s.dias}d`})
+                            </span>
+                        </span>
+                    ))}
+                </div>
+            )}
 
             {/* Lista 1: Contas */}
             <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
