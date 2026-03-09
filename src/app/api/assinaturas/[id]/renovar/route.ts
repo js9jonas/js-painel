@@ -1,5 +1,7 @@
+// src/app/api/assinaturas/[id]/renovar/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { abaterCreditoRenovacao } from "@/lib/saldoServidor";
 
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 
@@ -29,19 +31,18 @@ export async function PUT(
     const ativar = body?.ativar !== false;
     const registrarPagamento = body?.registrarPagamento === true;
     const pgto = body?.pagamento ?? null;
+    const vencContasManual = typeof body?.vencContasManual === "string" && body.vencContasManual.trim()
+      ? body.vencContasManual.trim() : null;
+    const soPagamento = body?.soPagamento === true;
 
     const client = await pool.connect();
 
-    const vencContasManual = typeof body?.vencContasManual === "string" && body.vencContasManual.trim()
-      ? body.vencContasManual.trim() : null;
-
-    const soPagamento = body?.soPagamento === true;
-
+    // ── Modo soPagamento ────────────────────────────────────────────────────
+    // Não altera venc_contas → nunca abate crédito
     if (soPagamento) {
       try {
         await client.query("BEGIN");
 
-        // Muda status para ativo se ativar=true
         await client.query(
           `UPDATE public.assinaturas SET status = 'ativo', atualizado_em = NOW() WHERE id_assinatura = $1::bigint`,
           [idAssinatura]
@@ -49,12 +50,10 @@ export async function PUT(
 
         if (registrarPagamento && pgto) {
           const idCliente = pgto.idCliente;
-
-          // Busca último pagamento para calcular dias
           const { rows: ultPgto } = await client.query(
             `SELECT data_pgto FROM public.pagamentos
-           WHERE id_cliente = $1::bigint
-           ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
+             WHERE id_cliente = $1::bigint
+             ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
             [idCliente]
           );
 
@@ -71,18 +70,10 @@ export async function PUT(
           await client.query(
             `INSERT INTO public.pagamentos
              (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
-           VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
-            [
-              idCliente,
-              pgto.nomeCliente ?? null,
-              pgto.pacoteNome ?? null,
-              pgto.forma ?? "PIX",
-              pgto.valor ?? 0,
-              detalhes,
-            ]
+             VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
+            [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null, pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes]
           );
         }
-
 
         await client.query("COMMIT");
         return NextResponse.json({ ok: true });
@@ -93,31 +84,40 @@ export async function PUT(
         client.release();
       }
     }
+
+    // ── Renovação completa (altera venc_contas) ─────────────────────────────
     try {
       await client.query("BEGIN");
 
+      // Lê venc_contas atual ANTES do update para comparar depois
+      const { rows: antes } = await client.query(
+        `SELECT venc_contas::text AS venc_contas_anterior FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+        [idAssinatura]
+      );
+      const vencContasAnterior: string | null = antes[0]?.venc_contas_anterior ?? null;
+
       const sql = `
-  UPDATE public.assinaturas
-  SET
-    venc_contrato =
-  CASE
-    WHEN $2::date IS NOT NULL THEN $2::date
-    WHEN venc_contrato::date >= CURRENT_DATE
-      THEN (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
-    ELSE (CURRENT_DATE + make_interval(months => $3))::date
-  END,
-venc_contas =
-  CASE
-    WHEN $5::date IS NOT NULL THEN $5::date
-    WHEN venc_contas IS NULL THEN (CURRENT_DATE + make_interval(months => 1))::date
-    WHEN venc_contas::date >= CURRENT_DATE THEN (venc_contas::date + make_interval(months => 1))::date
-    ELSE (CURRENT_DATE + make_interval(months => 1))::date
-  END,
-    status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
-    atualizado_em = NOW()
-  WHERE id_assinatura = $1::bigint
-  RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
-`;
+        UPDATE public.assinaturas
+        SET
+          venc_contrato =
+            CASE
+              WHEN $2::date IS NOT NULL THEN $2::date
+              WHEN venc_contrato::date >= CURRENT_DATE
+                THEN (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
+              ELSE (CURRENT_DATE + make_interval(months => $3))::date
+            END,
+          venc_contas =
+            CASE
+              WHEN $5::date IS NOT NULL THEN $5::date
+              WHEN venc_contas IS NULL THEN (CURRENT_DATE + make_interval(months => 1))::date
+              WHEN venc_contas::date >= CURRENT_DATE THEN (venc_contas::date + make_interval(months => 1))::date
+              ELSE (CURRENT_DATE + make_interval(months => 1))::date
+            END,
+          status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
+          atualizado_em = NOW()
+        WHERE id_assinatura = $1::bigint
+        RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
+      `;
 
       const result = await client.query(sql, [idAssinatura, dataManual, meses, ativar, vencContasManual]);
 
@@ -127,14 +127,14 @@ venc_contas =
       }
 
       const assinatura = result.rows[0];
+      const vencContasNova: string | null = assinatura.venc_contas ?? null;
 
       if (registrarPagamento && pgto) {
         const idCliente = pgto.idCliente ?? assinatura.id_cliente;
-
         const { rows: ultPgto } = await client.query(
           `SELECT data_pgto FROM public.pagamentos
-     WHERE id_cliente = $1::bigint
-     ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
+           WHERE id_cliente = $1::bigint
+           ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
           [idCliente]
         );
 
@@ -150,33 +150,23 @@ venc_contas =
 
         await client.query(
           `INSERT INTO public.pagamentos
-       (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
-     VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
-          [
-            idCliente,
-            pgto.nomeCliente ?? null,
-            pgto.pacoteNome ?? null,
-            pgto.forma ?? "PIX",
-            pgto.valor ?? 0,
-            detalhes,
-          ]
+           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
+           VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
+          [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null, pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes]
         );
       }
 
-      await client.query("COMMIT");
-
-
+      // Abate crédito somente se nova data >= 15 dias além da anterior
+      await abaterCreditoRenovacao(client, idAssinatura, vencContasAnterior, vencContasNova);
 
       await client.query("COMMIT");
       return NextResponse.json({ ok: true, assinatura });
-
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
     } finally {
       client.release();
     }
-
   } catch (err: any) {
     console.error("Erro ao renovar assinatura:", err);
     return NextResponse.json({ ok: false, error: err?.message ?? "Erro interno" }, { status: 500 });

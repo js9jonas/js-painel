@@ -3,8 +3,10 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getAlertasContas, getAlertasApps } from "@/lib/alertas";
+import { getSaldosServidores } from "@/lib/saldoServidor";
 import AdicionarMesContaButton from "@/components/alertas/AdicionarMesContaButton";
 import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
+import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
 
 function diasRestantes(data: string): number {
     const hoje = new Date();
@@ -28,9 +30,10 @@ function labelDias(dias: number) {
 }
 
 export default async function AlertasPage() {
-    const [contas, apps] = await Promise.all([
+    const [contas, apps, saldos] = await Promise.all([
         getAlertasContas(5),
         getAlertasApps(7),
+        getSaldosServidores(),
     ]);
 
     return (
@@ -113,6 +116,9 @@ export default async function AlertasPage() {
 
             {/* Lista 2: Aplicativos */}
             <AlertasAppsClient apps={apps} />
+
+            {/* Lista 3: Saldo de servidores */}
+            <SaldoServidoresCard saldos={saldos} />
         </div>
     );
 }
