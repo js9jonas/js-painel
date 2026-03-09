@@ -37,7 +37,7 @@ function labelDias(dias: number) {
 }
 
 export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtro, setFiltro] = useState<Filtro>("com_contrato");
   const [modal, setModal] = useState<ModalData | null>(null);
   const [modo, setModo] = useState<"pagamento" | "somente">("pagamento");
   const [forma, setForma] = useState("Pix");
