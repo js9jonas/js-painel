@@ -2,10 +2,12 @@
 
 // src/components/alertas/SaldoServidoresCard.tsx
 import { useState } from "react";
-import type { SaldoServidorRow } from "@/lib/saldoServidor";
+import type { SaldoServidorRow, PrevisaoRow, ConsumoMensalRow } from "@/lib/saldoServidor";
 
 type Props = {
   saldos: SaldoServidorRow[];
+  previsoes: PrevisaoRow[];
+  consumos: ConsumoMensalRow[];
 };
 
 function badgeSaldo(saldo: number) {
@@ -13,6 +15,27 @@ function badgeSaldo(saldo: number) {
   if (saldo <= 30) return "bg-orange-100 text-orange-700";
   if (saldo <= 80) return "bg-yellow-100 text-yellow-700";
   return "bg-emerald-100 text-emerald-700";
+}
+
+function badgePrevisao(dataStr: string | null): string {
+  if (!dataStr) return "bg-emerald-100 text-emerald-700";
+  const dias = Math.round(
+    (new Date(dataStr).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24)
+  );
+  if (dias <= 0) return "bg-red-100 text-red-700";
+  if (dias <= 7) return "bg-red-100 text-red-700";
+  if (dias <= 15) return "bg-orange-100 text-orange-700";
+  if (dias <= 30) return "bg-yellow-100 text-yellow-700";
+  return "bg-blue-50 text-blue-700";
+}
+
+function formatPrevisao(dataStr: string | null): string {
+  if (!dataStr) return "Além de 24 meses";
+  const [y, m, d] = dataStr.split("-");
+  const dias = Math.round(
+    (new Date(dataStr).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24)
+  );
+  return `${d}/${m}/${y} (${dias}d)`;
 }
 
 type ModalState = {
@@ -32,7 +55,7 @@ type HistoricoRow = {
   criado_em: string;
 };
 
-export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
+export default function SaldoServidoresCard({ saldos: initialSaldos, previsoes, consumos }: Props) {
   const [saldos, setSaldos] = useState(initialSaldos);
   const [filtro, setFiltro] = useState<"ativos" | "todos">("ativos");
   const [modal, setModal] = useState<ModalState>(null);
@@ -45,26 +68,38 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [erro, setErro] = useState("");
 
-  const saldosFiltrados = filtro === "ativos"
+  const previsaoMap = Object.fromEntries(
+    previsoes.map((p) => [p.id_servidor, p.data_esgotamento])
+  );
+
+  const consumoMap = Object.fromEntries(
+    consumos.map((c) => [c.id_servidor, c.creditos_mensal])
+  );
+
+  const saldosFiltrados = (filtro === "ativos"
     ? saldos.filter((s) => s.exibir_saldo)
-    : saldos;
+    : saldos
+  ).slice().sort((a, b) => {
+    const pa = previsaoMap[a.id_servidor] ?? null;
+    const pb = previsaoMap[b.id_servidor] ?? null;
+    if (!pa && !pb) return 0;
+    if (!pa) return 1;  // sem previsão (>24 meses) vai pro final
+    if (!pb) return -1;
+    return pa.localeCompare(pb);
+  });
 
   async function toggleExibir(s: SaldoServidorRow) {
     setTogglingId(s.id_servidor);
     const novoValor = !s.exibir_saldo;
-
     const res = await fetch("/api/servidores/saldo", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id_servidor: s.id_servidor, exibir_saldo: novoValor }),
     });
-
     if (res.ok) {
       setSaldos((prev) =>
         prev.map((item) =>
-          item.id_servidor === s.id_servidor
-            ? { ...item, exibir_saldo: novoValor }
-            : item
+          item.id_servidor === s.id_servidor ? { ...item, exibir_saldo: novoValor } : item
         )
       );
     }
@@ -78,7 +113,6 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
     setObservacao("");
     setErro("");
     setLoadingHistorico(true);
-
     const res = await fetch(`/api/servidores/saldo/historico?id_servidor=${s.id_servidor}&limite=15`);
     if (res.ok) {
       const data = await res.json();
@@ -91,10 +125,8 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
     if (!modal) return;
     const qtd = Number(quantidade);
     if (!qtd || isNaN(qtd)) { setErro("Informe uma quantidade válida."); return; }
-
     setSalvando(true);
     setErro("");
-
     const res = await fetch("/api/servidores/saldo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -105,15 +137,11 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
         observacao: observacao || null,
       }),
     });
-
     const data = await res.json();
     if (!data.ok) { setErro(data.error ?? "Erro ao salvar."); setSalvando(false); return; }
-
     setSaldos((prev) =>
       prev.map((s) =>
-        s.id_servidor === modal.id_servidor
-          ? { ...s, saldo_atual: data.saldo_novo }
-          : s
+        s.id_servidor === modal.id_servidor ? { ...s, saldo_atual: data.saldo_novo } : s
       )
     );
     setModal(null);
@@ -143,22 +171,18 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
   return (
     <>
       <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-        {/* Cabeçalho com filtro */}
         <div className="px-5 py-4 border-b bg-indigo-50 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-indigo-900">🖥️ Saldo de créditos por servidor</p>
             <p className="text-xs text-indigo-700 mt-0.5">Atualizado a cada renovação • Clique para ajustar</p>
           </div>
-          {/* Filtro de exibição */}
           <div className="flex gap-1 bg-white border border-indigo-200 rounded-lg p-0.5">
             {(["ativos", "todos"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFiltro(f)}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition ${
-                  filtro === f
-                    ? "bg-indigo-600 text-white"
-                    : "text-indigo-600 hover:bg-indigo-50"
+                  filtro === f ? "bg-indigo-600 text-white" : "text-indigo-600 hover:bg-indigo-50"
                 }`}
               >
                 {f === "ativos" ? "Somente ativos" : "Todos"}
@@ -173,9 +197,9 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Exibir</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Servidor</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Interno</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Saldo atual</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Atualizado em</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Consumo mensal</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Previsão de consumo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Ação</th>
               </tr>
             </thead>
@@ -187,54 +211,60 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
                   </td>
                 </tr>
               ) : (
-                saldosFiltrados.map((s) => (
-                  <tr key={s.id_servidor} className={`hover:bg-zinc-50/50 ${!s.exibir_saldo ? "opacity-50" : ""}`}>
-                    {/* Checkbox exibir */}
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => toggleExibir(s)}
-                        disabled={togglingId === s.id_servidor}
-                        className="flex items-center justify-center w-5 h-5 rounded border transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                        style={{
-                          backgroundColor: s.exibir_saldo ? "#4f46e5" : "#fff",
-                          borderColor: s.exibir_saldo ? "#4f46e5" : "#d1d5db",
-                        }}
-                        title={s.exibir_saldo ? "Ocultar servidor" : "Exibir servidor"}
-                      >
-                        {s.exibir_saldo && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12">
-                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-zinc-900">{s.codigo_publico}</td>
-                    <td className="px-4 py-3 text-zinc-500 text-xs">{s.nome_interno}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${badgeSaldo(s.saldo_atual)}`}>
-                        {s.saldo_atual} créditos
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-400 text-xs">
-                      {formatData(s.atualizado_em)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => abrirModal(s)}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium transition"
-                      >
-                        Atualizar saldo
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                saldosFiltrados.map((s) => {
+                  const previsao = previsaoMap[s.id_servidor] ?? null;
+                  return (
+                    <tr key={s.id_servidor} className={`hover:bg-zinc-50/50 ${!s.exibir_saldo ? "opacity-50" : ""}`}>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => toggleExibir(s)}
+                          disabled={togglingId === s.id_servidor}
+                          className="flex items-center justify-center w-5 h-5 rounded border transition focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          style={{
+                            backgroundColor: s.exibir_saldo ? "#4f46e5" : "#fff",
+                            borderColor: s.exibir_saldo ? "#4f46e5" : "#d1d5db",
+                          }}
+                          title={s.exibir_saldo ? "Ocultar servidor" : "Exibir servidor"}
+                        >
+                          {s.exibir_saldo && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12">
+                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-zinc-900">{s.codigo_publico}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${badgeSaldo(s.saldo_atual)}`}>
+                          {s.saldo_atual} créditos
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600 text-xs font-medium">
+                        {consumoMap[s.id_servidor] ?? "—"} / mês
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgePrevisao(previsao)}`}>
+                          {formatPrevisao(previsao)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => abrirModal(s)}
+                          className="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium transition"
+                        >
+                          Atualizar saldo
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal de atualização de saldo */}
+      {/* Modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
@@ -290,10 +320,7 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
               {erro && <p className="text-xs text-red-500">{erro}</p>}
 
               <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => setModal(null)}
-                  className="flex-1 py-2 rounded-lg border border-zinc-300 text-sm hover:bg-zinc-50 transition"
-                >
+                <button onClick={() => setModal(null)} className="flex-1 py-2 rounded-lg border border-zinc-300 text-sm hover:bg-zinc-50 transition">
                   Cancelar
                 </button>
                 <button
@@ -306,7 +333,6 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
               </div>
             </div>
 
-            {/* Histórico */}
             <div className="px-5 pb-5">
               <p className="text-xs font-semibold text-zinc-500 uppercase mb-2">Histórico recente</p>
               {loadingHistorico ? (
@@ -320,9 +346,7 @@ export default function SaldoServidoresCard({ saldos: initialSaldos }: Props) {
                       <div className="flex items-center gap-2">
                         <span className={`font-medium ${corTipo(h.tipo)}`}>{labelTipo(h.tipo)}</span>
                         <span className="text-zinc-400">{h.observacao ?? "—"}</span>
-                        {h.id_assinatura && (
-                          <span className="text-zinc-300">· assin. #{h.id_assinatura}</span>
-                        )}
+                        {h.id_assinatura && <span className="text-zinc-300">· assin. #{h.id_assinatura}</span>}
                       </div>
                       <div className="flex items-center gap-3 text-right shrink-0">
                         <span className={h.quantidade < 0 ? "text-red-600 font-semibold" : "text-emerald-600 font-semibold"}>
