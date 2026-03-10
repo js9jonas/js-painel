@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
+type StatusFinal = "ativo" | "pendente";
 
 const FORMAS_PGTO = ["PIX", "Nubank", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
@@ -78,7 +79,7 @@ export default function RenovarAssinatura({
 
     const [open, setOpen] = useState(false);
     const [periodo, setPeriodo] = useState<Periodo>("mensal");
-    const [ativar, setAtivar] = useState(true);
+    const [statusFinal, setStatusFinal] = useState<StatusFinal>("ativo");
     const [loading, setLoading] = useState(false);
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
@@ -100,7 +101,7 @@ export default function RenovarAssinatura({
         setVencContrato(calcVencContrato(vencAtual, "mensal"));
         setVencContas(calcVencContas(vencContasAtual));
         setVencContratoEditado(false);
-        setAtivar(true);
+        setStatusFinal("ativo");
         setOpen(true);
     }
 
@@ -114,7 +115,7 @@ export default function RenovarAssinatura({
             body: JSON.stringify({
                 soPagamento: true,
                 registrarPagamento: true,
-                ativar: true,
+                statusFinal: "ativo",
                 pagamento: { idCliente, nomeCliente, pacoteNome, forma, valor },
             }),
         });
@@ -135,7 +136,10 @@ export default function RenovarAssinatura({
 
     async function executar(registrarPagamento: boolean) {
         if (!idAssinatura) { alert("ID da assinatura inválido."); return; }
-        if (registrarPagamento && !valor.trim()) { alert("Informe o valor do pagamento."); return; }
+        if (registrarPagamento && statusFinal === "ativo" && !valor.trim()) {
+            alert("Informe o valor do pagamento.");
+            return;
+        }
 
         setLoading(true);
 
@@ -146,9 +150,11 @@ export default function RenovarAssinatura({
                 periodo,
                 dataManual: vencContrato,
                 vencContasManual: vencContas,
-                ativar,
-                registrarPagamento,
-                pagamento: registrarPagamento ? { idCliente, nomeCliente, pacoteNome, forma, valor } : null,
+                statusFinal: registrarPagamento ? statusFinal : null, // null = manter status ao clicar "Alterar"
+                registrarPagamento: registrarPagamento && statusFinal === "ativo",
+                pagamento: (registrarPagamento && statusFinal === "ativo")
+                    ? { idCliente, nomeCliente, pacoteNome, forma, valor }
+                    : null,
             }),
         });
 
@@ -191,7 +197,7 @@ export default function RenovarAssinatura({
                             </p>
                             {isPendente && (
                                 <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                                    Assinatura pendente — o pagamento ativara a assinatura sem alterar as datas.
+                                    Assinatura pendente — o pagamento ativará a assinatura sem alterar as datas.
                                 </div>
                             )}
                         </div>
@@ -238,10 +244,35 @@ export default function RenovarAssinatura({
                                         Datas calculadas automaticamente pelo periodo. Edite se necessario.
                                     </p>
 
-                                    <label className="flex items-center gap-2 text-sm text-zinc-700">
-                                        <input type="checkbox" checked={ativar} onChange={(e) => setAtivar(e.target.checked)} />
-                                        Marcar status como <b>ativo</b>
-                                    </label>
+                                    {/* Seleção de status */}
+                                    <div className="space-y-1.5">
+                                        <label className={labelClass}>Marcar status como</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setStatusFinal("ativo")}
+                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${
+                                                    statusFinal === "ativo"
+                                                        ? "bg-emerald-600 border-emerald-600 text-white"
+                                                        : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
+                                                }`}
+                                            >
+                                                ✓ Ativo
+                                                {statusFinal === "ativo" && <span className="ml-1.5 text-xs opacity-75">(padrão)</span>}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setStatusFinal("pendente")}
+                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${
+                                                    statusFinal === "pendente"
+                                                        ? "bg-amber-500 border-amber-500 text-white"
+                                                        : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
+                                                }`}
+                                            >
+                                                ⏳ Pendente
+                                            </button>
+                                        </div>
+                                    </div>
                                 </>
                             )}
 
@@ -269,31 +300,40 @@ export default function RenovarAssinatura({
                                 </div>
                             )}
 
-                            {/* Pagamento — sempre visível */}
-                            <div className={isPendente ? "" : "border-t pt-4"}>
-                                {!isPendente && (
-                                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Dados do pagamento</p>
-                                )}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className={labelClass}>Forma</label>
-                                        <select className={inputClass} value={forma} onChange={(e) => setForma(e.target.value)}>
-                                            {FORMAS_PGTO.map((f) => <option key={f} value={f}>{f}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className={labelClass}>Valor (R$)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            className={inputClass}
-                                            value={valor}
-                                            onChange={(e) => setValor(e.target.value)}
-                                            placeholder="0.00"
-                                        />
+                            {/* Pagamento — visível somente se status = ativo */}
+                            {(isPendente || statusFinal === "ativo") && (
+                                <div className={isPendente ? "" : "border-t pt-4"}>
+                                    {!isPendente && (
+                                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Dados do pagamento</p>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className={labelClass}>Forma</label>
+                                            <select className={inputClass} value={forma} onChange={(e) => setForma(e.target.value)}>
+                                                {FORMAS_PGTO.map((f) => <option key={f} value={f}>{f}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className={labelClass}>Valor (R$)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                className={inputClass}
+                                                value={valor}
+                                                onChange={(e) => setValor(e.target.value)}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Aviso quando pendente selecionado */}
+                            {!isPendente && statusFinal === "pendente" && (
+                                <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                                    As datas serão atualizadas normalmente, mas nenhum pagamento será registrado e o status ficará como <b>pendente</b>.
+                                </div>
+                            )}
                         </div>
 
                         <div className="px-6 py-4 border-t flex justify-end gap-2">
@@ -314,8 +354,12 @@ export default function RenovarAssinatura({
                                         {loading ? "..." : "Alterar"}
                                     </button>
                                     <button type="button" onClick={() => executar(true)} disabled={loading}
-                                        className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
-                                        {loading ? "Salvando..." : "Renovar"}
+                                        className={`h-9 rounded-xl px-4 text-sm text-white font-medium disabled:opacity-50 transition-colors ${
+                                            statusFinal === "pendente"
+                                                ? "bg-amber-500 hover:bg-amber-600"
+                                                : "bg-emerald-600 hover:bg-emerald-700"
+                                        }`}>
+                                        {loading ? "Salvando..." : statusFinal === "pendente" ? "Salvar como pendente" : "Renovar"}
                                     </button>
                                 </>
                             )}

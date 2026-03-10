@@ -28,17 +28,18 @@ export async function PUT(
     const meses = mesesDoPeriodo(periodo);
     const dataManual = typeof body?.dataManual === "string" && body.dataManual.trim()
       ? body.dataManual.trim() : null;
-    const ativar = body?.ativar !== false;
     const registrarPagamento = body?.registrarPagamento === true;
     const pgto = body?.pagamento ?? null;
     const vencContasManual = typeof body?.vencContasManual === "string" && body.vencContasManual.trim()
       ? body.vencContasManual.trim() : null;
     const soPagamento = body?.soPagamento === true;
 
+    // statusFinal: "ativo" | "pendente" | null (null = manter status atual)
+    const statusFinal: "ativo" | "pendente" | null = body?.statusFinal ?? null;
+
     const client = await pool.connect();
 
-    // ── Modo soPagamento ────────────────────────────────────────────────────
-    // Não altera venc_contas → nunca abate crédito
+    // Modo soPagamento (assinatura já pendente — só registra pagamento e ativa)
     if (soPagamento) {
       try {
         await client.query("BEGIN");
@@ -85,17 +86,17 @@ export async function PUT(
       }
     }
 
-    // ── Renovação completa (altera venc_contas) ─────────────────────────────
+    // Renovação completa (altera datas)
     try {
       await client.query("BEGIN");
 
-      // Lê venc_contas atual ANTES do update para comparar depois
       const { rows: antes } = await client.query(
         `SELECT venc_contas::text AS venc_contas_anterior FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
         [idAssinatura]
       );
       const vencContasAnterior: string | null = antes[0]?.venc_contas_anterior ?? null;
 
+      // statusFinal null = manter status; caso contrário seta o valor recebido
       const sql = `
         UPDATE public.assinaturas
         SET
@@ -113,13 +114,16 @@ export async function PUT(
               WHEN venc_contas::date >= CURRENT_DATE THEN (venc_contas::date + make_interval(months => 1))::date
               ELSE (CURRENT_DATE + make_interval(months => 1))::date
             END,
-          status = CASE WHEN $4::boolean THEN 'ativo' ELSE status END,
+          status = CASE
+            WHEN $4::text IS NOT NULL THEN $4::text
+            ELSE status
+          END,
           atualizado_em = NOW()
         WHERE id_assinatura = $1::bigint
         RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
       `;
 
-      const result = await client.query(sql, [idAssinatura, dataManual, meses, ativar, vencContasManual]);
+      const result = await client.query(sql, [idAssinatura, dataManual, meses, statusFinal, vencContasManual]);
 
       if (result.rowCount === 0) {
         await client.query("ROLLBACK");
@@ -129,7 +133,8 @@ export async function PUT(
       const assinatura = result.rows[0];
       const vencContasNova: string | null = assinatura.venc_contas ?? null;
 
-      if (registrarPagamento && pgto) {
+      // Registra pagamento somente se status = ativo
+      if (registrarPagamento && pgto && statusFinal !== "pendente") {
         const idCliente = pgto.idCliente ?? assinatura.id_cliente;
         const { rows: ultPgto } = await client.query(
           `SELECT data_pgto FROM public.pagamentos
@@ -156,7 +161,7 @@ export async function PUT(
         );
       }
 
-      // Abate crédito somente se nova data >= 15 dias além da anterior
+      // Abate crédito em ambos os casos (ativo e pendente) — datas foram atualizadas
       await abaterCreditoRenovacao(client, idAssinatura, vencContasAnterior, vencContasNova);
 
       await client.query("COMMIT");
