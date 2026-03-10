@@ -1,9 +1,8 @@
 // src/components/alertas/AdicionarMesContaButton.tsx
 "use client";
-
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adicionarMesConta } from "@/app/actions/renovarConta";
+import { adicionarMesConta } from "@/app/actions/adicionarMesConta";
 
 export default function AdicionarMesContaButton({ idAssinatura }: { idAssinatura: string }) {
   const [isPending, startTransition] = useTransition();
