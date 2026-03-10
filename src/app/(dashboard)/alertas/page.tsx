@@ -7,6 +7,7 @@ import { getSaldosServidores, getPrevisaoEsgotamento, getConsumoMensal } from "@
 import AdicionarMesContaButton from "@/components/alertas/AdicionarMesContaButton";
 import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
 import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
+import SecaoRecolhivel from "@/components/alertas/SecaoRecolhivel";
 
 function diasRestantes(data: string): number {
     const hoje = new Date();
@@ -102,15 +103,17 @@ export default async function AlertasPage() {
             )}
 
             {/* Lista 1: Contas */}
-            <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b bg-amber-50 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-semibold text-amber-900">💳 Contas a renovar</p>
-                        <p className="text-xs text-amber-700 mt-0.5">Venc. conta ≤ 5 dias • Contrato ainda vigente</p>
+            <SecaoRecolhivel
+                header={
+                    <div className="px-5 py-4 bg-amber-50 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-semibold text-amber-900">💳 Contas a renovar</p>
+                            <p className="text-xs text-amber-700 mt-0.5">Venc. conta ≤ 5 dias • Contrato ainda vigente</p>
+                        </div>
+                        <span className="text-2xl font-bold text-amber-900 mr-3">{contas.length}</span>
                     </div>
-                    <span className="text-2xl font-bold text-amber-900">{contas.length}</span>
-                </div>
-
+                }
+            >
                 {contas.length === 0 ? (
                     <div className="px-5 py-10 text-center text-zinc-400 text-sm">
                         Nenhuma conta a renovar no momento ✅
@@ -167,13 +170,13 @@ export default async function AlertasPage() {
                         </table>
                     </div>
                 )}
-            </div>
+            </SecaoRecolhivel>
 
             {/* Lista 2: Aplicativos */}
-            <AlertasAppsClient apps={apps} />
+            <AlertasAppsClient apps={apps} recolhivel />
 
             {/* Lista 3: Saldo de servidores */}
-            <SaldoServidoresCard saldos={saldos} previsoes={previsoes} consumos={consumos} />
+            <SaldoServidoresCard saldos={saldos} previsoes={previsoes} consumos={consumos} recolhivel />
         </div>
     );
 }

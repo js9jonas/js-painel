@@ -8,6 +8,7 @@ type Props = {
   saldos: SaldoServidorRow[];
   previsoes: PrevisaoRow[];
   consumos: ConsumoMensalRow[];
+  recolhivel?: boolean;
 };
 
 function badgeSaldo(saldo: number) {
@@ -55,8 +56,9 @@ type HistoricoRow = {
   criado_em: string;
 };
 
-export default function SaldoServidoresCard({ saldos: initialSaldos, previsoes, consumos }: Props) {
+export default function SaldoServidoresCard({ saldos: initialSaldos, previsoes, consumos, recolhivel }: Props) {
   const [saldos, setSaldos] = useState(initialSaldos);
+  const [aberto, setAberto] = useState(true);
   const [filtro, setFiltro] = useState<"ativos" | "todos">("ativos");
   const [modal, setModal] = useState<ModalState>(null);
   const [historico, setHistorico] = useState<HistoricoRow[]>([]);
@@ -176,22 +178,35 @@ export default function SaldoServidoresCard({ saldos: initialSaldos, previsoes, 
             <p className="text-sm font-semibold text-indigo-900">🖥️ Saldo de créditos por servidor</p>
             <p className="text-xs text-indigo-700 mt-0.5">Atualizado a cada renovação • Clique para ajustar</p>
           </div>
-          <div className="flex gap-1 bg-white border border-indigo-200 rounded-lg p-0.5">
-            {(["ativos", "todos"] as const).map((f) => (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 bg-white border border-indigo-200 rounded-lg p-0.5">
+              {(["ativos", "todos"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFiltro(f)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition ${
+                    filtro === f ? "bg-indigo-600 text-white" : "text-indigo-600 hover:bg-indigo-50"
+                  }`}
+                >
+                  {f === "ativos" ? "Somente ativos" : "Todos"}
+                </button>
+              ))}
+            </div>
+            {recolhivel && (
               <button
-                key={f}
-                onClick={() => setFiltro(f)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition ${
-                  filtro === f ? "bg-indigo-600 text-white" : "text-indigo-600 hover:bg-indigo-50"
-                }`}
+                onClick={() => setAberto((v) => !v)}
+                className="text-indigo-400 hover:text-indigo-600 transition"
+                title={aberto ? "Recolher" : "Expandir"}
               >
-                {f === "ativos" ? "Somente ativos" : "Todos"}
+                <svg className={`w-4 h-4 transition-transform duration-200 ${aberto ? "rotate-0" : "-rotate-90"}`} fill="none" viewBox="0 0 16 16">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
-            ))}
+            )}
           </div>
         </div>
 
-        <div className="overflow-auto">
+        {aberto && <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-zinc-50 border-b">
               <tr>
@@ -261,7 +276,7 @@ export default function SaldoServidoresCard({ saldos: initialSaldos, previsoes, 
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
       </div>
 
       {/* Modal */}

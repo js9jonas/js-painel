@@ -36,7 +36,14 @@ function labelDias(dias: number) {
   return `Em ${dias}d`;
 }
 
-export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
+export default function AlertasAppsClient({
+  apps,
+  recolhivel,
+}: {
+  apps: AlertaAppRow[];
+  recolhivel?: boolean;
+}) {
+  const [aberto, setAberto] = useState(true);
   const [filtro, setFiltro] = useState<Filtro>("com_contrato");
   const [modal, setModal] = useState<ModalData | null>(null);
   const [modo, setModo] = useState<"pagamento" | "somente">("pagamento");
@@ -106,114 +113,121 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
             <p className="text-sm font-semibold text-blue-900">📱 Aplicativos expirando</p>
             <p className="text-xs text-blue-700 mt-0.5">Validade ≤ 7 dias • Status ativa</p>
           </div>
-          <span className="text-2xl font-bold text-blue-900">{filtrados.length}</span>
-        </div>
-
-        {/* Filtros */}
-        <div className="px-5 py-3 border-b bg-zinc-50 flex items-center gap-2">
-          <span className="text-xs text-zinc-500 mr-1">Filtrar:</span>
-          {(
-            [
-              { key: "todos", label: "Todos" },
-              { key: "com_contrato", label: "Venc. contrato > ontem" },
-              { key: "sem_assinatura", label: "Sem assinatura" },
-            ] as { key: Filtro; label: string }[]
-          ).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFiltro(key)}
-              className={`${btBase} ${filtro === key ? btAtivo : btInativo}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Tabela */}
-        {filtrados.length === 0 ? (
-          <div className="px-5 py-10 text-center text-zinc-400 text-sm">
-            Nenhum aplicativo encontrado para este filtro ✅
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-bold text-blue-900">{filtrados.length}</span>
+            {recolhivel && (
+              <button
+                onClick={() => setAberto((v) => !v)}
+                className="text-blue-400 hover:text-blue-600 transition"
+                title={aberto ? "Recolher" : "Expandir"}
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${aberto ? "rotate-0" : "-rotate-90"}`}
+                  fill="none" viewBox="0 0 16 16"
+                >
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-50 border-b">
-                <tr>
-                  {["Cliente", "Pacote", "App", "MAC / Obs.", "Venc. Contrato", "Prazo", ""].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filtrados.map((r) => {
-                  const dias = diasRestantes(r.validade);
-                  return (
-                    <tr key={r.id_app_registro} className="hover:bg-zinc-50/50">
-                      {/* Cliente */}
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/clientes/${r.id_cliente}`}
-                          className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
-                        >
-                          {r.nome}
-                        </Link>
-                        <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
-                      </td>
+        </div>
 
-                      {/* Pacote */}
-                      <td className="px-4 py-3">
-                        <span className="text-zinc-700">
-                          {r.pacote_contrato ?? <span className="text-zinc-400 italic">—</span>}
-                        </span>
-                        <div className="text-xs text-zinc-400">
-                          {r.total_apps} app{r.total_apps !== 1 ? "s" : ""}
-                        </div>
-                      </td>
+        {aberto && (
+          <>
+            {/* Filtros */}
+            <div className="px-5 py-3 border-b bg-zinc-50 flex items-center gap-2">
+              <span className="text-xs text-zinc-500 mr-1">Filtrar:</span>
+              {(
+                [
+                  { key: "todos", label: "Todos" },
+                  { key: "com_contrato", label: "Venc. contrato > ontem" },
+                  { key: "sem_assinatura", label: "Sem assinatura" },
+                ] as { key: Filtro; label: string }[]
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFiltro(key)}
+                  className={`${btBase} ${filtro === key ? btAtivo : btInativo}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-                      {/* App */}
-                      <td className="px-4 py-3 text-zinc-700">{r.nome_app}</td>
-
-                      {/* MAC / Obs. */}
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-xs text-zinc-500">{r.mac ?? "—"}</span>
-                        {r.observacao && (
-                          <div className="text-xs text-zinc-400 mt-0.5 max-w-[180px] truncate" title={r.observacao}>
-                            {r.observacao}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Venc. Contrato */}
-                      <td className="px-4 py-3 text-zinc-600">
-                        {r.venc_contrato_cliente
-                          ? r.venc_contrato_cliente.split("T")[0].split("-").reverse().join("/")
-                          : <span className="text-zinc-400 italic">Sem assinatura</span>}
-                      </td>
-
-                      {/* Prazo */}
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
-                          {labelDias(dias)}
-                        </span>
-                      </td>
-
-                      {/* Ação */}
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => abrirModal(r)}
-                          className="h-7 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
-                        >
-                          +1 ano
-                        </button>
-                      </td>
+            {/* Tabela */}
+            {filtrados.length === 0 ? (
+              <div className="px-5 py-10 text-center text-zinc-400 text-sm">
+                Nenhum aplicativo encontrado para este filtro ✅
+              </div>
+            ) : (
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-zinc-50 border-b">
+                    <tr>
+                      {["Cliente", "Pacote", "App", "MAC / Obs.", "Venc. Contrato", "Prazo", ""].map((h) => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {filtrados.map((r) => {
+                      const dias = diasRestantes(r.validade);
+                      return (
+                        <tr key={r.id_app_registro} className="hover:bg-zinc-50/50">
+                          <td className="px-4 py-3">
+                            <Link
+                              href={`/clientes/${r.id_cliente}`}
+                              className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
+                            >
+                              {r.nome}
+                            </Link>
+                            <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-zinc-700">
+                              {r.pacote_contrato ?? <span className="text-zinc-400 italic">—</span>}
+                            </span>
+                            <div className="text-xs text-zinc-400">
+                              {r.total_apps} app{r.total_apps !== 1 ? "s" : ""}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-700">{r.nome_app}</td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-zinc-500">{r.mac ?? "—"}</span>
+                            {r.observacao && (
+                              <div className="text-xs text-zinc-400 mt-0.5 max-w-[180px] truncate" title={r.observacao}>
+                                {r.observacao}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600">
+                            {r.venc_contrato_cliente
+                              ? r.venc_contrato_cliente.split("T")[0].split("-").reverse().join("/")
+                              : <span className="text-zinc-400 italic">Sem assinatura</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
+                              {labelDias(dias)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => abrirModal(r)}
+                              className="h-7 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
+                            >
+                              +1 ano
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -221,37 +235,30 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-6 space-y-5">
-            {/* Título */}
             <div>
               <p className="text-base font-semibold text-zinc-900">Renovar aplicativo</p>
               <p className="text-xs text-zinc-500 mt-0.5">
                 {modal.nome} — {modal.nome_app}
               </p>
             </div>
-
-            {/* Opção */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setModo("pagamento")}
                 className={`rounded-xl border py-3 text-xs font-medium transition-colors ${modo === "pagamento"
-                    ? "border-zinc-900 bg-zinc-900 text-white"
-                    : "border-zinc-200 text-zinc-600 hover:border-zinc-400"
-                  }`}
+                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`}
               >
                 💳 Com pagamento
               </button>
               <button
                 onClick={() => setModo("somente")}
                 className={`rounded-xl border py-3 text-xs font-medium transition-colors ${modo === "somente"
-                    ? "border-zinc-900 bg-zinc-900 text-white"
-                    : "border-zinc-200 text-zinc-600 hover:border-zinc-400"
-                  }`}
+                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`}
               >
                 🔄 Só renovar
               </button>
             </div>
-
-            {/* Campos pagamento */}
             {modo === "pagamento" && (
               <div className="space-y-3">
                 <div>
@@ -281,8 +288,6 @@ export default function AlertasAppsClient({ apps }: { apps: AlertaAppRow[] }) {
                 </div>
               </div>
             )}
-
-            {/* Ações */}
             <div className="flex gap-2 pt-1">
               <button
                 onClick={fecharModal}
