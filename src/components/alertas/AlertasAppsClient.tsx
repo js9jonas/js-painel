@@ -197,7 +197,7 @@ export default function AlertasAppsClient({
                           <td className="px-4 py-3">
                             <span className="font-mono text-xs text-zinc-500">{r.mac ?? "—"}</span>
                             {r.observacao && (
-                              <div className="text-xs text-zinc-400 mt-0.5 max-w-[180px] truncate" title={r.observacao}>
+                              <div className="text-xs text-zinc-400 mt-0.5 max-w-45 truncate" title={r.observacao}>
                                 {r.observacao}
                               </div>
                             )}
