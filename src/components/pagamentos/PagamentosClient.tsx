@@ -57,6 +57,34 @@ function BotaoOK({ id, onDone }: { id: number; onDone: () => void }) {
   );
 }
 
+function BotaoExcluir({ id, onDone }: { id: number; onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleClick() {
+    if (!confirm("Excluir este pagamento? Esta ação não pode ser desfeita.")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/pagamentos/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.ok) onDone();
+      else alert(data.error ?? "Erro ao excluir");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className="h-8 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-40 transition-colors"
+    >
+      {loading ? "..." : "🗑️"}
+    </button>
+  );
+}
+
 export default function PagamentosClient({
   data,
   total,
@@ -145,7 +173,6 @@ export default function PagamentosClient({
               ✕ Limpar
             </Link>
           )}
-
         </form>
       </div>
 
@@ -220,6 +247,9 @@ export default function PagamentosClient({
                         >
                           ✏️ Editar
                         </button>
+                        {isPendente && (
+                          <BotaoExcluir id={p.id} onDone={() => router.refresh()} />
+                        )}
                       </div>
                     </td>
                   </tr>
