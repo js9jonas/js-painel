@@ -74,6 +74,7 @@ interface Lista {
   total_geral: number | null
   snapshot_em: string | null
   uptime_24h: number | null
+  stream_teste_id: string | null
 }
 
 interface FormData {
@@ -167,6 +168,115 @@ function tempoAtras(iso: string | null) {
   return `${Math.floor(diff / 86400)}d atrás`
 }
 
+
+// ─── Componente: Modal de Canal de Teste ──────────────────────────────────────
+
+function ModalCanalTeste({
+  lista,
+  onFechar,
+  onSalvar,
+}: {
+  lista: Lista
+  onFechar: () => void
+  onSalvar: (streamId: string, nome: string) => Promise<void>
+}) {
+  const [busca, setBusca] = useState('')
+  const [canais, setCanais] = useState<{ stream_id: number; nome: string; categoria: string }[]>([])
+  const [buscando, setBuscando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const buscarCanais = useCallback(async (termo: string) => {
+    setBuscando(true)
+    setErro(null)
+    try {
+      const res = await fetch(`/api/m3u-listas/${lista.id}/canais?busca=${encodeURIComponent(termo)}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setCanais(data)
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao buscar canais')
+    } finally {
+      setBuscando(false)
+    }
+  }, [lista.id])
+
+  useEffect(() => {
+    buscarCanais('telecine')
+  }, [buscarCanais])
+
+  async function handleSelecionarCanal(streamId: number, nome: string) {
+    setSalvando(true)
+    try {
+      await onSalvar(String(streamId), nome)
+      onFechar()
+    } catch {
+      setErro('Erro ao salvar canal')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={e => e.target === e.currentTarget && onFechar()}>
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Canal de teste</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{lista.nome}</p>
+          </div>
+          <button onClick={onFechar} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+        </div>
+
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex gap-2">
+            <input
+              className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Buscar canal..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && buscarCanais(busca)}
+            />
+            <button
+              onClick={() => buscarCanais(busca)}
+              disabled={buscando}
+              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {buscando ? '...' : 'Buscar'}
+            </button>
+          </div>
+          {lista.stream_teste_id && (
+            <p className="text-xs text-gray-400 mt-2">
+              Atual: ID {lista.stream_teste_id}
+            </p>
+          )}
+        </div>
+
+        <div className="max-h-72 overflow-y-auto">
+          {erro && (
+            <p className="text-sm text-red-500 px-4 py-3">{erro}</p>
+          )}
+          {canais.length === 0 && !buscando && !erro && (
+            <p className="text-sm text-gray-400 px-4 py-3">Nenhum canal encontrado</p>
+          )}
+          {canais.map(canal => (
+            <button
+              key={canal.stream_id}
+              onClick={() => handleSelecionarCanal(canal.stream_id, canal.nome)}
+              disabled={salvando}
+              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-100 dark:border-gray-800 last:border-0 disabled:opacity-50"
+            >
+              <p className="text-sm text-gray-800 dark:text-gray-200">{canal.nome}</p>
+              <p className="text-xs text-gray-400">ID: {canal.stream_id} {canal.categoria && `· ${canal.categoria}`}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 //  Componente: Card de Lista 
 
 function CardLista({
@@ -177,6 +287,7 @@ function CardLista({
   onExcluir,
   onTestarRapido,
   onTestarCompleto,
+  onSalvarCanalTeste,
 }: {
   lista: Lista
   testandoRapido: boolean
@@ -185,7 +296,9 @@ function CardLista({
   onExcluir: (id: number, nome: string) => void
   onTestarRapido: (id: number) => void
   onTestarCompleto: (id: number) => void
+  onSalvarCanalTeste: (id: number, streamId: string, nome: string) => Promise<void>
 }) {
+  const [modalCanalAberto, setModalCanalAberto] = useState(false)
   const cfg = statusConfig(lista.ultimo_status)
   const score = scoreQualidade(lista)
   const testando = testandoRapido || testandoCompleto
@@ -312,6 +425,19 @@ function CardLista({
             )}
           </button>
 
+          {/* Canal de teste */}
+          <button
+            onClick={() => setModalCanalAberto(true)}
+            title={lista.stream_teste_id ? `Canal teste: ID ${lista.stream_teste_id}` : 'Configurar canal de teste'}
+            className={`p-1.5 rounded-lg transition-colors text-sm ${
+              lista.stream_teste_id
+                ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+                : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600'
+            }`}
+          >
+            🎯
+          </button>
+
           {/* Toggle ativo */}
           <button
             onClick={() => onToggleAtivo(lista.id, !lista.ativo)}
@@ -346,6 +472,14 @@ function CardLista({
             style={{ width: `${lista.uptime_24h}%` }}
           />
         </div>
+      )}
+
+      {modalCanalAberto && (
+        <ModalCanalTeste
+          lista={lista}
+          onFechar={() => setModalCanalAberto(false)}
+          onSalvar={(streamId, nome) => onSalvarCanalTeste(lista.id, streamId, nome)}
+        />
       )}
     </div>
   )
@@ -603,6 +737,16 @@ export default function TesteListasPage() {
     }
   }
 
+  async function handleSalvarCanalTeste(id: number, streamId: string, nome: string) {
+    await fetch(`/api/m3u-listas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stream_teste_id: streamId }),
+    })
+    console.log(`Canal teste configurado para lista ${id}: ${nome} (ID: ${streamId})`)
+    await carregar()
+  }
+
   async function handleTestarRapido(id: number) {
     setTestandoRapidoIds(prev => new Set(prev).add(id))
     try {
@@ -783,6 +927,7 @@ export default function TesteListasPage() {
               onExcluir={handleExcluir}
               onTestarRapido={handleTestarRapido}
               onTestarCompleto={handleTestarCompleto}
+              onSalvarCanalTeste={handleSalvarCanalTeste}
             />
           ))}
         </div>

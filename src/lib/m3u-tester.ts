@@ -16,6 +16,13 @@ export interface ResultadoTeste {
   tamanho_lista_kb: number | null
   tempo_download_ms: number | null
   erro_mensagem: string | null
+  // Teste de stream
+  stream_canal_nome: string | null
+  stream_ttfb_ms: number | null
+  stream_throughput_kbps: number | null
+  stream_consistencia_pct: number | null
+  stream_duracao_s: number | null
+  stream_status: 'ok' | 'lento' | 'falhou' | 'sem_canal' | null
 }
 
 interface EntradaM3U {
@@ -169,12 +176,12 @@ function parsearEntradas(conteudo: string): EntradaM3U[] {
     if (!linha.startsWith('#EXTINF')) continue
 
     const duracaoMatch = linha.match(/^#EXTINF:\s*(-?\d+)/)
-    const duracao      = duracaoMatch ? parseInt(duracaoMatch[1]) : -1
-    const tvgId        = linha.match(/tvg-id="([^"]*)"/)?.[1]?.trim()     ?? ''
-    const tvgName      = linha.match(/tvg-name="([^"]*)"/)?.[1]?.trim()   ?? ''
-    const grupo        = linha.match(/group-title="([^"]*)"/)?.[1]?.trim() ?? 'Sem grupo'
-    const logo         = linha.match(/tvg-logo="([^"]*)"/)?.[1]?.trim()   ?? ''
-    const nomeRaw      = tvgName || (linha.split(',').pop()?.trim() ?? '')
+    const duracao = duracaoMatch ? parseInt(duracaoMatch[1]) : -1
+    const tvgId = linha.match(/tvg-id="([^"]*)"/)?.[1]?.trim() ?? ''
+    const tvgName = linha.match(/tvg-name="([^"]*)"/)?.[1]?.trim() ?? ''
+    const grupo = linha.match(/group-title="([^"]*)"/)?.[1]?.trim() ?? 'Sem grupo'
+    const logo = linha.match(/tvg-logo="([^"]*)"/)?.[1]?.trim() ?? ''
+    const nomeRaw = tvgName || (linha.split(',').pop()?.trim() ?? '')
 
     const tipo = classificarTipo(duracao, tvgId, grupo)
 
@@ -341,19 +348,13 @@ async function salvarSnapshotEConteudo(
 
   const hashMudou = ultimos.length === 0 || ultimos[0].hash_md5 !== hash
 
-  const { rows: conteudoExiste } = await pool.query(
-    'SELECT 1 FROM m3u_conteudo WHERE lista_id = $1 LIMIT 1',
-    [listaId]
-  )
-  const conteudoVazio = conteudoExiste.length === 0
-
   // Tenta buscar counts exatos via API Xtream (mais preciso que parsear M3U)
   // Prioridade: creds externas (tipo xtream com host/usuario/senha) > extrair da URL
   const creds = credsExternas ?? extrairCredenciaisXtream(urlM3u)
   const countsXtream = creds ? await buscarCountsXtream(creds) : null
 
-  // Parseia M3U: necessario para indexacao OU para contagens quando nao ha API Xtream
-  const precisaParsear = (indexarConteudo && (hashMudou || conteudoVazio)) || !countsXtream
+  // Parseia M3U apenas se nao houver API Xtream disponivel para contagens
+  const precisaParsear = !countsXtream
   const entradas = precisaParsear ? parsearEntradas(conteudo) : []
 
   // Usa counts da API Xtream se disponivel, senao usa contagens do M3U parseado
@@ -366,7 +367,7 @@ async function salvarSnapshotEConteudo(
       canais: contagens.total_canais - (prev.total_canais || 0),
       filmes: contagens.total_filmes - (prev.total_filmes || 0),
       series: contagens.total_series - (prev.total_series || 0),
-      total:  contagens.total_geral  - (prev.total_geral  || 0),
+      total: contagens.total_geral - (prev.total_geral || 0),
     }
   }
 
@@ -386,32 +387,40 @@ async function salvarSnapshotEConteudo(
 
   const snapshotId = novoSnapshot[0].id
 
-  if (indexarConteudo && (hashMudou || conteudoVazio)) {
+  // Indexacao inteligente: apenas grupos unicos por tipo, nao episodios individuais
+  if (indexarConteudo && hashMudou) {
     await pool.query('UPDATE m3u_conteudo SET ativo = false WHERE lista_id = $1', [listaId])
 
+    // Agrupa por (grupo, tipo) — dedup de episodios
+    const gruposUnicos = new Map<string, { tipo: string; grupo: string; nome: string }>()
+    for (const e of entradas) {
+      const chave = `${e.tipo}::${e.grupo}`
+      if (!gruposUnicos.has(chave)) {
+        gruposUnicos.set(chave, { tipo: e.tipo, grupo: e.grupo, nome: e.grupo })
+      }
+    }
+
+    const grupos = Array.from(gruposUnicos.values())
     const LOTE = 500
-    for (let i = 0; i < entradas.length; i += LOTE) {
-      const lote = entradas.slice(i, i + LOTE)
+    for (let i = 0; i < grupos.length; i += LOTE) {
+      const lote = grupos.slice(i, i + LOTE)
       const valores: unknown[] = []
-      const placeholders = lote.map((e, idx) => {
-        const base = idx * 9
-        valores.push(
-          listaId, snapshotId, e.tipo, e.nome, e.grupo,
-          e.tvg_id || null, e.logo_url || null, e.duracao, true
-        )
-        return `($${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9})`
+      const placeholders = lote.map((g, idx) => {
+        const base = idx * 6
+        valores.push(listaId, snapshotId, g.tipo, g.nome, g.grupo, true)
+        return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6})`
       })
 
       await pool.query(
         `INSERT INTO m3u_conteudo
-          (lista_id, snapshot_id, tipo, nome, grupo, tvg_id, logo_url, duracao, ativo)
+          (lista_id, snapshot_id, tipo, nome, grupo, ativo)
          VALUES ${placeholders.join(',')}
          ON CONFLICT DO NOTHING`,
         valores
       )
     }
 
-    console.log(`[m3u-tester] Lista ${listaId}: ${entradas.length} entradas indexadas no snapshot ${snapshotId}`)
+    console.log(`[m3u-tester] Lista ${listaId}: ${grupos.length} grupos indexados no snapshot ${snapshotId}`)
   }
 }
 
@@ -487,6 +496,12 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
     tamanho_lista_kb: null,
     tempo_download_ms: null,
     erro_mensagem,
+    stream_canal_nome: null,
+    stream_ttfb_ms: null,
+    stream_throughput_kbps: null,
+    stream_consistencia_pct: null,
+    stream_duracao_s: null,
+    stream_status: null,
   }
 
   await pool.query(
@@ -505,6 +520,104 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
   await pool.query('UPDATE m3u_listas SET ultimo_teste_em = NOW() WHERE id = $1', [listaId])
 
   return resultado
+}
+
+// ─── Teste de Stream ──────────────────────────────────────────────────────────
+
+async function buscarStreamCanal(
+  creds: XtreamCredentials,
+  termoBusca: string
+): Promise<{ stream_id: number; nome: string } | null> {
+  try {
+    const url = `${creds.host}/player_api.php?username=${creds.username}&password=${creds.password}&action=get_live_streams`
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    if (!res.ok) return null
+    const canais = await res.json() as Array<{ stream_id: number; name: string }>
+    const termo = termoBusca.toLowerCase()
+    const encontrado = canais.find(c => c.name.toLowerCase().includes(termo))
+    return encontrado ? { stream_id: encontrado.stream_id, nome: encontrado.name } : null
+  } catch {
+    return null
+  }
+}
+
+async function testarStream(
+  creds: XtreamCredentials,
+  streamId: number,
+  duracaoS = 20
+): Promise<{
+  ttfb_ms: number | null
+  throughput_kbps: number | null
+  consistencia_pct: number | null
+  status: 'ok' | 'lento' | 'falhou'
+}> {
+  const url = `${creds.host}/live/${creds.username}/${creds.password}/${streamId}.ts`
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), (duracaoS + 10) * 1000)
+
+  try {
+    const inicio = Date.now()
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IPTV-Monitor/1.0)' },
+    })
+
+    if (!res.ok || !res.body) {
+      return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
+    }
+
+    const ttfb_ms = Date.now() - inicio
+
+    // Lê o stream por duracaoS segundos medindo throughput em janelas de 2s
+    const reader = res.body.getReader()
+    const fimLeitura = Date.now() + duracaoS * 1000
+    const janelas: number[] = [] // kbps por janela de 2s
+    let bytesJanela = 0
+    let inicioJanela = Date.now()
+
+    while (Date.now() < fimLeitura) {
+      const { done, value } = await reader.read()
+      if (done) break
+      bytesJanela += value.byteLength
+
+      const agora = Date.now()
+      if (agora - inicioJanela >= 2000) {
+        const kbps = (bytesJanela * 8) / ((agora - inicioJanela)) // kbps
+        janelas.push(kbps)
+        bytesJanela = 0
+        inicioJanela = agora
+      }
+    }
+
+    reader.cancel()
+
+    if (janelas.length === 0) {
+      return { ttfb_ms, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
+    }
+
+    const throughputMedio = janelas.reduce((a, b) => a + b, 0) / janelas.length
+    const throughputMin = Math.min(...janelas)
+    // Consistência: razão entre o pior momento e a média (100% = sempre igual)
+    const consistencia_pct = Math.round((throughputMin / throughputMedio) * 100)
+
+    // Classifica: canal SD precisa ~1500kbps, HD ~4000kbps
+    const status = throughputMedio < 500
+      ? 'lento'
+      : consistencia_pct < 40
+        ? 'lento'
+        : 'ok'
+
+    return {
+      ttfb_ms,
+      throughput_kbps: Math.round(throughputMedio),
+      consistencia_pct,
+      status,
+    }
+  } catch {
+    return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // Teste completo: ping + download M3U + API Xtream para counts
@@ -536,6 +649,36 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
     status = 'online'
   }
 
+  // Teste de stream (somente se online e tiver credenciais Xtream)
+  const credsParaStream: XtreamCredentials | null =
+    status === 'online'
+      ? (lista.tipo === 'xtream' && lista.host && lista.usuario && lista.senha
+        ? { host: lista.host, username: lista.usuario, password: lista.senha }
+        : extrairCredenciaisXtream(lista.url_m3u))
+      : null
+
+  let streamCanalNome: string | null = null
+  let streamTtfb: number | null = null
+  let streamThroughput: number | null = null
+  let streamConsistencia: number | null = null
+  let streamDuracao: number | null = null
+  let streamStatus: ResultadoTeste['stream_status'] = null
+
+  if (credsParaStream) {
+    const canal = await buscarStreamCanal(credsParaStream, 'telecine')
+    if (canal) {
+      streamCanalNome = canal.nome
+      streamDuracao = 20
+      const streamResult = await testarStream(credsParaStream, canal.stream_id, 20)
+      streamTtfb = streamResult.ttfb_ms
+      streamThroughput = streamResult.throughput_kbps
+      streamConsistencia = streamResult.consistencia_pct
+      streamStatus = streamResult.status
+    } else {
+      streamStatus = 'sem_canal'
+    }
+  }
+
   const resultado: ResultadoTeste = {
     lista_id: listaId,
     status,
@@ -548,19 +691,30 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
     tamanho_lista_kb: downloadResult.tamanho_lista_kb,
     tempo_download_ms: downloadResult.tempo_download_ms,
     erro_mensagem: downloadResult.erro_mensagem,
+    stream_canal_nome: streamCanalNome,
+    stream_ttfb_ms: streamTtfb,
+    stream_throughput_kbps: streamThroughput,
+    stream_consistencia_pct: streamConsistencia,
+    stream_duracao_s: streamDuracao,
+    stream_status: streamStatus,
   }
 
   await pool.query(
     `INSERT INTO m3u_testes
       (lista_id, status, ping_ms, jitter_ms, perda_pacotes_pct,
        http_status, ttfb_ms, velocidade_kbps, tamanho_lista_kb,
-       tempo_download_ms, erro_mensagem)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+       tempo_download_ms, erro_mensagem,
+       stream_canal_nome, stream_ttfb_ms, stream_throughput_kbps,
+       stream_consistencia_pct, stream_duracao_s, stream_status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [
       resultado.lista_id, resultado.status, resultado.ping_ms,
       resultado.jitter_ms, resultado.perda_pacotes_pct, resultado.http_status,
       resultado.ttfb_ms, resultado.velocidade_kbps, resultado.tamanho_lista_kb,
       resultado.tempo_download_ms, resultado.erro_mensagem,
+      resultado.stream_canal_nome, resultado.stream_ttfb_ms,
+      resultado.stream_throughput_kbps, resultado.stream_consistencia_pct,
+      resultado.stream_duracao_s, resultado.stream_status,
     ]
   )
 
