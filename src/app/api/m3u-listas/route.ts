@@ -18,6 +18,7 @@ export async function GET() {
         l.ativo,
         l.indexar_conteudo,
         l.intervalo_teste_min,
+        l.stream_teste_id,
         l.criado_em,
         l.ultimo_teste_em,
         t.status           AS ultimo_status,
@@ -55,7 +56,7 @@ export async function GET() {
       LEFT JOIN m3u_testes t24
         ON t24.lista_id = l.id
         AND t24.testado_em >= NOW() - INTERVAL '24 hours'
-      GROUP BY l.id, t.status, t.ping_ms, t.jitter_ms, t.perda_pacotes_pct,
+      GROUP BY l.id, l.stream_teste_id, t.status, t.ping_ms, t.jitter_ms, t.perda_pacotes_pct,
                t.ttfb_ms, t.velocidade_kbps, t.tempo_download_ms,
                t.tamanho_lista_kb, t.http_status, t.erro_mensagem,
                s.total_canais, s.total_filmes, s.total_series,

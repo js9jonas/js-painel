@@ -15,6 +15,7 @@ export async function PATCH(
     const permitidos = [
       'nome', 'url_m3u', 'tipo', 'host', 'usuario', 'senha',
       'porta', 'ativo', 'indexar_conteudo', 'intervalo_teste_min',
+      'stream_teste_id',
     ]
 
     const campos: string[] = []
