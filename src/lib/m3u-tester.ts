@@ -2,6 +2,10 @@
 import { pool } from '@/lib/db'
 import crypto from 'crypto'
 
+// ─── User-Agent padrão ────────────────────────────────────────────────────────
+// Lavf/58.76.100 (ffmpeg) é reconhecido por todos os servidores IPTV
+const IPTV_USER_AGENT = 'Lavf/58.76.100'
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface ResultadoTeste {
@@ -79,7 +83,7 @@ async function buscarCountsXtream(creds: XtreamCredentials): Promise<{
         const res = await fetch(`${base}&action=${action}`, {
           signal: controller.signal,
           cache: 'no-store',
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IPTV-Monitor/1.0)' },
+          headers: { 'User-Agent': IPTV_USER_AGENT },
         })
         if (!res.ok) return null
         return await res.json()
@@ -110,24 +114,13 @@ async function buscarCountsXtream(creds: XtreamCredentials): Promise<{
 
 // ─── Classificador ────────────────────────────────────────────────────────────
 
-// Muitos servidores IPTV usam duracao=-1 em tudo (inclusive VOD),
-// entao duracao nao pode ser criterio exclusivo.
-//
-// Hierarquia:
-//   1. Prefixo explicito no grupo  -> define tipo direto
-//   2. Grupo reconhecido como VOD  -> serie ou filme
-//   3. Grupo ambiguo: duracao=-1   -> canal, duracao>0 -> serie
-
 function classificarTipo(duracao: number, _tvgId: string, grupo: string): 'canal' | 'filme' | 'serie' {
   const g = grupo.toLowerCase()
 
-  // 1. Prefixos explicitos
   if (g.startsWith('canais |') || g.startsWith('canais|')) return 'canal'
   if (g.startsWith('filmes |') || g.startsWith('filmes/') || g.startsWith('filmes|')) return 'filme'
   if (g.startsWith('series |') || g.startsWith('series|')) return 'serie'
-  if (g.startsWith('series |') || g.startsWith('series|')) return 'serie'
 
-  // 2a. Plataformas de streaming -> serie
   const plataformas = [
     'netflix', 'globoplay', 'amazon prime', 'hbo max', 'hbomax',
     'disney+', 'star+', 'star plus', 'paramount+', 'apple tv', 'appletv+',
@@ -136,7 +129,6 @@ function classificarTipo(duracao: number, _tvgId: string, grupo: string): 'canal
   ]
   if (plataformas.some(p => g.includes(p))) return 'serie'
 
-  // 2b. Termos de serie/novela/conteudo gravado -> serie
   const termsSerie = [
     'serie', 'novela', 'dorama', 'anime', 'temporada',
     'season', 'episod', 'tvshow', 'reelshort',
@@ -151,7 +143,6 @@ function classificarTipo(duracao: number, _tvgId: string, grupo: string): 'canal
   ]
   if (termsSerie.some(t => g.includes(t))) return 'serie'
 
-  // 2c. Generos de filme -> filme
   const termsFilme = [
     'terror', 'suspense', 'romance', 'faroeste', 'guerra',
     'fantasia', 'aventura', 'documentar', 'animacao',
@@ -160,7 +151,6 @@ function classificarTipo(duracao: number, _tvgId: string, grupo: string): 'canal
   ]
   if (termsFilme.some(t => g.includes(t))) return 'filme'
 
-  // 3. Grupo ambiguo: duracao como tiebreaker
   if (duracao === -1) return 'canal'
   return 'serie'
 }
@@ -231,7 +221,12 @@ async function medirLatencia(url: string, timeoutMs = 5000): Promise<number | nu
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   const inicio = Date.now()
   try {
-    await fetch(url, { method: 'HEAD', signal: controller.signal, cache: 'no-store' })
+    await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: { 'User-Agent': IPTV_USER_AGENT },
+    })
     return Date.now() - inicio
   } catch {
     return null
@@ -263,8 +258,8 @@ async function medirPing(urlHost: string, repeticoes = 5, timeoutMs = 5000) {
 
 // ─── Rede: download ───────────────────────────────────────────────────────────
 
-async function medirDownload(urlM3u: string, userAgent?: string) {
-  const TIMEOUT_TTFB = 15_000
+async function medirDownload(urlM3u: string) {
+  const TIMEOUT_TTFB = 20_000
   const TIMEOUT_BODY = 120_000
 
   const controller = new AbortController()
@@ -285,7 +280,7 @@ async function medirDownload(urlM3u: string, userAgent?: string) {
     const response = await fetch(urlM3u, {
       signal: controller.signal,
       cache: 'no-store',
-      headers: { 'User-Agent': userAgent ?? 'Mozilla/5.0 (compatible; IPTV-Monitor/1.0)' },
+      headers: { 'User-Agent': IPTV_USER_AGENT },
     })
 
     clearTimeout(timerTtfb)
@@ -328,7 +323,26 @@ async function medirDownload(urlM3u: string, userAgent?: string) {
   return resultado
 }
 
-// ─── Snapshot + catalogo ──────────────────────────────────────────────────────
+// ─── Determina status final ───────────────────────────────────────────────────
+// 401 = credenciais inválidas mas servidor online
+// 403 = acesso bloqueado mas servidor online
+// >= 400 exceto 401/403 = offline
+
+function determinarStatus(
+  erroMensagem: string | null,
+  httpStatus: number | null,
+  perdaPacotes: number | null
+): ResultadoTeste['status'] {
+  if (erroMensagem?.includes('Timeout')) return 'timeout'
+  if (erroMensagem) return 'erro'
+  if (!httpStatus) return 'offline'
+  if (httpStatus === 401 || httpStatus === 403) return 'online' // servidor respondeu, só bloqueou
+  if (httpStatus >= 400) return 'offline'
+  if ((perdaPacotes ?? 0) >= 80) return 'offline'
+  return 'online'
+}
+
+// ─── Snapshot + catálogo ──────────────────────────────────────────────────────
 
 async function salvarSnapshotEConteudo(
   listaId: number,
@@ -348,16 +362,12 @@ async function salvarSnapshotEConteudo(
 
   const hashMudou = ultimos.length === 0 || ultimos[0].hash_md5 !== hash
 
-  // Tenta buscar counts exatos via API Xtream (mais preciso que parsear M3U)
-  // Prioridade: creds externas (tipo xtream com host/usuario/senha) > extrair da URL
   const creds = credsExternas ?? extrairCredenciaisXtream(urlM3u)
   const countsXtream = creds ? await buscarCountsXtream(creds) : null
 
-  // Parseia M3U apenas se nao houver API Xtream disponivel para contagens
   const precisaParsear = !countsXtream
   const entradas = precisaParsear ? parsearEntradas(conteudo) : []
 
-  // Usa counts da API Xtream se disponivel, senao usa contagens do M3U parseado
   const contagens = countsXtream ?? gerarContagens(entradas)
 
   let diffAnterior = null
@@ -387,11 +397,9 @@ async function salvarSnapshotEConteudo(
 
   const snapshotId = novoSnapshot[0].id
 
-  // Indexacao inteligente: apenas grupos unicos por tipo, nao episodios individuais
   if (indexarConteudo && hashMudou) {
     await pool.query('UPDATE m3u_conteudo SET ativo = false WHERE lista_id = $1', [listaId])
 
-    // Agrupa por (grupo, tipo) — dedup de episodios
     const gruposUnicos = new Map<string, { tipo: string; grupo: string; nome: string }>()
     for (const e of entradas) {
       const chave = `${e.tipo}::${e.grupo}`
@@ -424,10 +432,8 @@ async function salvarSnapshotEConteudo(
   }
 }
 
-// ─── Funcao principal ─────────────────────────────────────────────────────────
+// ─── Teste rápido ─────────────────────────────────────────────────────────────
 
-// Teste rapido: apenas HEAD request + ping (1-2s)
-// Nao baixa o M3U, nao atualiza counts/snapshot
 export async function testarListaRapido(listaId: number): Promise<ResultadoTeste> {
   const { rows } = await pool.query(
     'SELECT id, url_m3u FROM m3u_listas WHERE id = $1',
@@ -438,13 +444,10 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
   const lista = rows[0]
   const urlHost = extrairHost(lista.url_m3u)
 
-  // Apenas 3 pings para ser mais rapido
   const pingResult = await medirPing(urlHost, 3, 5000)
 
-  // GET com abort imediato apos receber status (sem baixar corpo)
-  // Mais compativel que HEAD — alguns servidores retornam 404/405 para HEAD
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
+  const timer = setTimeout(() => controller.abort(), 15000)
   let http_status: number | null = null
   let ttfb_ms: number | null = null
   let erro_mensagem: string | null = null
@@ -455,34 +458,22 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
       method: 'GET',
       signal: controller.signal,
       cache: 'no-store',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IPTV-Monitor/1.0)' },
+      headers: { 'User-Agent': IPTV_USER_AGENT },
     })
     ttfb_ms = Date.now() - inicio
     http_status = res.status
-    // Aborta imediatamente apos receber o status — nao baixa o corpo
+    console.log(`[teste-rapido] lista ${listaId} → HTTP ${http_status} (ttfb: ${ttfb_ms}ms, host: ${urlHost})`)
     controller.abort()
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido'
-    // Abort intencional nao e erro
     if (!msg.includes('abort') || http_status === null) {
-      erro_mensagem = ttfb_ms === null ? 'Timeout: sem resposta em 10s' : msg
+      erro_mensagem = ttfb_ms === null ? 'Timeout: sem resposta em 15s' : msg
     }
   } finally {
     clearTimeout(timer)
   }
 
-  let status: ResultadoTeste['status']
-  if (erro_mensagem?.includes('Timeout')) {
-    status = 'timeout'
-  } else if (erro_mensagem) {
-    status = 'erro'
-  } else if (!http_status || http_status >= 400) {
-    status = 'offline'
-  } else if ((pingResult.perda_pacotes_pct ?? 0) >= 80) {
-    status = 'offline'
-  } else {
-    status = 'online'
-  }
+  const status = determinarStatus(erro_mensagem, http_status, pingResult.perda_pacotes_pct ?? null)
 
   const resultado: ResultadoTeste = {
     lista_id: listaId,
@@ -530,7 +521,10 @@ async function buscarStreamCanal(
 ): Promise<{ stream_id: number; nome: string } | null> {
   try {
     const url = `${creds.host}/player_api.php?username=${creds.username}&password=${creds.password}&action=get_live_streams`
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': IPTV_USER_AGENT },
+    })
     if (!res.ok) return null
     const canais = await res.json() as Array<{ stream_id: number; name: string }>
     const termo = termoBusca.toLowerCase()
@@ -559,7 +553,7 @@ async function testarStream(
     const inicio = Date.now()
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IPTV-Monitor/1.0)' },
+      headers: { 'User-Agent': IPTV_USER_AGENT },
     })
 
     if (!res.ok || !res.body) {
@@ -568,10 +562,9 @@ async function testarStream(
 
     const ttfb_ms = Date.now() - inicio
 
-    // Lê o stream por duracaoS segundos medindo throughput em janelas de 2s
     const reader = res.body.getReader()
     const fimLeitura = Date.now() + duracaoS * 1000
-    const janelas: number[] = [] // kbps por janela de 2s
+    const janelas: number[] = []
     let bytesJanela = 0
     let inicioJanela = Date.now()
 
@@ -582,7 +575,7 @@ async function testarStream(
 
       const agora = Date.now()
       if (agora - inicioJanela >= 2000) {
-        const kbps = (bytesJanela * 8) / ((agora - inicioJanela)) // kbps
+        const kbps = (bytesJanela * 8) / ((agora - inicioJanela))
         janelas.push(kbps)
         bytesJanela = 0
         inicioJanela = agora
@@ -597,10 +590,8 @@ async function testarStream(
 
     const throughputMedio = janelas.reduce((a, b) => a + b, 0) / janelas.length
     const throughputMin = Math.min(...janelas)
-    // Consistência: razão entre o pior momento e a média (100% = sempre igual)
     const consistencia_pct = Math.round((throughputMin / throughputMedio) * 100)
 
-    // Classifica: canal SD precisa ~1500kbps, HD ~4000kbps
     const status = throughputMedio < 500
       ? 'lento'
       : consistencia_pct < 40
@@ -620,7 +611,8 @@ async function testarStream(
   }
 }
 
-// Teste completo: ping + download M3U + API Xtream para counts
+// ─── Teste completo ───────────────────────────────────────────────────────────
+
 export async function testarLista(listaId: number): Promise<ResultadoTeste> {
   const { rows } = await pool.query(
     'SELECT id, url_m3u, tipo, host, usuario, senha, indexar_conteudo FROM m3u_listas WHERE id = $1',
@@ -636,18 +628,13 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
     medirDownload(lista.url_m3u),
   ])
 
-  let status: ResultadoTeste['status']
-  if (downloadResult.erro_mensagem?.includes('Timeout')) {
-    status = 'timeout'
-  } else if (downloadResult.erro_mensagem) {
-    status = 'erro'
-  } else if (!downloadResult.http_status || downloadResult.http_status >= 400) {
-    status = 'offline'
-  } else if ((pingResult.perda_pacotes_pct ?? 0) >= 80) {
-    status = 'offline'
-  } else {
-    status = 'online'
-  }
+  console.log(`[teste-completo] lista ${listaId} → HTTP ${downloadResult.http_status} (ttfb: ${downloadResult.ttfb_ms}ms, host: ${urlHost})`)
+
+  const status = determinarStatus(
+    downloadResult.erro_mensagem,
+    downloadResult.http_status,
+    pingResult.perda_pacotes_pct ?? null
+  )
 
   // Teste de stream (somente se online e tiver credenciais Xtream)
   const credsParaStream: XtreamCredentials | null =
