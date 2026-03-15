@@ -104,9 +104,10 @@ const FORM_INICIAL: FormData = {
 }
 
 const PERIODOS = [
-  { horas: 6,   label: '6h' },
-  { horas: 24,  label: '24h' },
-  { horas: 48,  label: '2d' },
+  { horas: 0, label: 'Último teste' },
+  { horas: 1, label: '1h' },
+  { horas: 6, label: '6h' },
+  { horas: 24, label: '24h' },
   { horas: 168, label: '7d' },
 ]
 
@@ -145,14 +146,14 @@ function statusConfig(status: StatusLista) {
 
 // Calcula score a partir de médias históricas ou fallback para último teste
 function scoreQualidade(lista: Lista, mediasHistorico: HistoricoMedias | null): number | null {
-  const ping   = mediasHistorico?.ping_medio   ?? lista.ping_ms   ?? null
+  const ping = mediasHistorico?.ping_medio ?? lista.ping_ms ?? null
   const jitter = mediasHistorico?.jitter_medio ?? lista.jitter_ms ?? null
-  const uptime = mediasHistorico?.uptime_pct   ?? lista.uptime_24h ?? null
+  const uptime = mediasHistorico?.uptime_pct ?? lista.uptime_24h ?? null
 
   if (ping === null && uptime === null) return null
 
-  const scorePing   = Math.max(0, 100 - (ping   ?? 999) / 10)
-  const scoreJitter = Math.max(0, 100 - (jitter ?? 0)   / 5)
+  const scorePing = Math.max(0, 100 - (ping ?? 999) / 10)
+  const scoreJitter = Math.max(0, 100 - (jitter ?? 0) / 5)
   const scoreUptime = uptime ?? 0
   return Math.round((scorePing * 0.35 + scoreUptime * 0.45 + scoreJitter * 0.20)) / 10
 }
@@ -181,19 +182,19 @@ function tempoAtras(iso: string | null, agora: number) {
 // ─── Radar de qualidade ───────────────────────────────────────────────────────
 
 function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
-  const maxPing   = Math.max(...medias.map(m => m.ping_medio   ?? 0), 1)
+  const maxPing = Math.max(...medias.map(m => m.ping_medio ?? 0), 1)
   const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
-  const maxTtfb   = Math.max(...medias.map(m => m.ttfb_medio   ?? 0), 1)
-  const maxVel    = Math.max(...medias.map(m => m.velocidade_media ?? 0), 1)
+  const maxTtfb = Math.max(...medias.map(m => m.ttfb_medio ?? 0), 1)
+  const maxVel = Math.max(...medias.map(m => m.velocidade_media ?? 0), 1)
 
   const dadosRadar = medias.map((m, i) => ({
     nome: m.nome,
     cor: CORES_SERVIDOR[i % CORES_SERVIDOR.length],
     data: [
-      { eixo: 'Uptime',     valor: m.uptime_pct ?? 0 },
-      { eixo: 'Ping',       valor: Math.max(0, 100 - ((m.ping_medio   ?? maxPing)   / maxPing)   * 100) },
-      { eixo: 'Jitter',     valor: Math.max(0, 100 - ((m.jitter_medio ?? maxJitter) / maxJitter) * 100) },
-      { eixo: 'TTFB',       valor: Math.max(0, 100 - ((m.ttfb_medio   ?? maxTtfb)   / maxTtfb)   * 100) },
+      { eixo: 'Uptime', valor: m.uptime_pct ?? 0 },
+      { eixo: 'Ping', valor: Math.max(0, 100 - ((m.ping_medio ?? maxPing) / maxPing) * 100) },
+      { eixo: 'Jitter', valor: Math.max(0, 100 - ((m.jitter_medio ?? maxJitter) / maxJitter) * 100) },
+      { eixo: 'TTFB', valor: Math.max(0, 100 - ((m.ttfb_medio ?? maxTtfb) / maxTtfb) * 100) },
       { eixo: 'Velocidade', valor: maxVel > 0 ? ((m.velocidade_media ?? 0) / maxVel) * 100 : 0 },
     ],
   }))
@@ -230,10 +231,10 @@ function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
 
 function GraficoLatencias({ medias }: { medias: HistoricoMedias[] }) {
   const data = medias.map(m => ({
-    nome:   m.nome,
-    Ping:   m.ping_medio   ?? 0,
+    nome: m.nome,
+    Ping: m.ping_medio ?? 0,
     Jitter: m.jitter_medio ?? 0,
-    TTFB:   m.ttfb_medio   ?? 0,
+    TTFB: m.ttfb_medio ?? 0,
   }))
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -243,9 +244,9 @@ function GraficoLatencias({ medias }: { medias: HistoricoMedias[] }) {
         <YAxis tick={{ fontSize: 11 }} unit="ms" />
         <Tooltip formatter={(v, name) => [`${v}ms`, name]} contentStyle={{ fontSize: 12 }} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-        <Bar dataKey="Ping"   fill="#3b82f6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="Ping" fill="#3b82f6" radius={[3, 3, 0, 0]} />
         <Bar dataKey="Jitter" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-        <Bar dataKey="TTFB"   fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="TTFB" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -343,9 +344,9 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
     )
   }
 
-  const maxPing   = Math.max(...medias.map(m => m.ping_medio   ?? 0), 1)
+  const maxPing = Math.max(...medias.map(m => m.ping_medio ?? 0), 1)
   const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
-  const maxTtfb   = Math.max(...medias.map(m => m.ttfb_medio   ?? 0), 1)
+  const maxTtfb = Math.max(...medias.map(m => m.ttfb_medio ?? 0), 1)
 
   return (
     <div className="overflow-x-auto">
@@ -363,10 +364,10 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
         </thead>
         <tbody>
           {sorted.map((m, i) => {
-            const cor    = CORES_SERVIDOR[servidores.indexOf(m.nome) % CORES_SERVIDOR.length]
+            const cor = CORES_SERVIDOR[servidores.indexOf(m.nome) % CORES_SERVIDOR.length]
             const uptime = m.uptime_pct ?? 0
-            const scorePing   = Math.max(0, 100 - (m.ping_medio   ?? 999) / 10)
-            const scoreJitter = Math.max(0, 100 - (m.jitter_medio ?? 0)   / 5)
+            const scorePing = Math.max(0, 100 - (m.ping_medio ?? 999) / 10)
+            const scoreJitter = Math.max(0, 100 - (m.jitter_medio ?? 0) / 5)
             const score = Math.round((scorePing * 0.35 + uptime * 0.45 + scoreJitter * 0.20)) / 10
 
             return (
@@ -377,9 +378,9 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
                     <span className="font-medium text-gray-800 dark:text-gray-200 text-xs truncate max-w-[90px]">{m.nome}</span>
                   </div>
                 </td>
-                <td className="px-4 py-2.5">{barinha(m.ping_medio   ?? 0, maxPing,   '#3b82f6')}</td>
+                <td className="px-4 py-2.5">{barinha(m.ping_medio ?? 0, maxPing, '#3b82f6')}</td>
                 <td className="px-4 py-2.5">{barinha(m.jitter_medio ?? 0, maxJitter, '#f59e0b')}</td>
-                <td className="px-4 py-2.5">{barinha(m.ttfb_medio   ?? 0, maxTtfb,   '#8b5cf6')}</td>
+                <td className="px-4 py-2.5">{barinha(m.ttfb_medio ?? 0, maxTtfb, '#8b5cf6')}</td>
                 <td className="px-4 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <div className="w-12 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -388,19 +389,17 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
                         backgroundColor: uptime >= 90 ? '#10b981' : uptime >= 70 ? '#f59e0b' : '#ef4444',
                       }} />
                     </div>
-                    <span className={`text-xs font-semibold tabular-nums ${
-                      uptime >= 90 ? 'text-green-600 dark:text-green-400'
+                    <span className={`text-xs font-semibold tabular-nums ${uptime >= 90 ? 'text-green-600 dark:text-green-400'
                       : uptime >= 70 ? 'text-yellow-600 dark:text-yellow-400'
-                      : 'text-red-600 dark:text-red-400'
-                    }`}>{uptime}%</span>
+                        : 'text-red-600 dark:text-red-400'
+                      }`}>{uptime}%</span>
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  <span className={`text-sm font-bold ${
-                    score >= 8 ? 'text-green-600 dark:text-green-400'
+                  <span className={`text-sm font-bold ${score >= 8 ? 'text-green-600 dark:text-green-400'
                     : score >= 6 ? 'text-yellow-600 dark:text-yellow-400'
-                    : 'text-red-600 dark:text-red-400'
-                  }`}>{score}</span>
+                      : 'text-red-600 dark:text-red-400'
+                    }`}>{score}</span>
                 </td>
                 <td className="px-4 py-2.5 text-right text-gray-400 text-xs tabular-nums">{m.total_testes}</td>
               </tr>
@@ -513,15 +512,15 @@ function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido
   onSalvarCanalTeste: (id: number, streamId: string, nome: string) => Promise<void>
 }) {
   const [modalCanalAberto, setModalCanalAberto] = useState(false)
-  const cfg      = statusConfig(lista.ultimo_status)
-  const score    = scoreQualidade(lista, mediasHistorico)
+  const cfg = statusConfig(lista.ultimo_status)
+  const score = scoreQualidade(lista, mediasHistorico)
   const testando = testandoRapido || testandoCompleto
 
   // Usa médias do período se disponível, senão usa último teste
-  const pingExibido   = mediasHistorico?.ping_medio   ?? lista.ping_ms
+  const pingExibido = mediasHistorico?.ping_medio ?? lista.ping_ms
   const jitterExibido = mediasHistorico?.jitter_medio ?? lista.jitter_ms
-  const ttfbExibido   = mediasHistorico?.ttfb_medio   ?? lista.ttfb_ms
-  const uptimeExibido = mediasHistorico?.uptime_pct   ?? lista.uptime_24h
+  const ttfbExibido = mediasHistorico?.ttfb_medio ?? lista.ttfb_ms
+  const uptimeExibido = mediasHistorico?.uptime_pct ?? lista.uptime_24h
 
   const labelPeriodo = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
 
@@ -557,9 +556,9 @@ function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido
       {/* Métricas — baseadas no período selecionado */}
       <div className="grid grid-cols-4 gap-0 border-t border-b border-gray-100 dark:border-gray-800">
         {[
-          { label: 'Ping',   value: formatNum(pingExibido,   'ms') },
+          { label: 'Ping', value: formatNum(pingExibido, 'ms') },
           { label: 'Jitter', value: formatNum(jitterExibido, 'ms') },
-          { label: 'TTFB',   value: ttfbExibido != null ? formatNum(ttfbExibido, 'ms') : '—' },
+          { label: 'TTFB', value: ttfbExibido != null ? formatNum(ttfbExibido, 'ms') : '—' },
           { label: 'Uptime', value: formatNum(uptimeExibido, '%') },
         ].map(({ label, value }) => (
           <div key={label} className="py-2 px-1 text-center">
@@ -801,11 +800,12 @@ export default function TesteListasPage() {
   // Muda período — atualiza cards e gráficos juntos
   function handleMudarPeriodo(horas: number) {
     setPeriodoHoras(horas)
-    carregarHistorico(horas)
+    if (horas > 0) carregarHistorico(horas)
   }
 
   // Busca médias do histórico para uma lista pelo nome
   function getMediasLista(lista: Lista): HistoricoMedias | null {
+    if (periodoHoras === 0) return null  // força último teste
     return historico?.medias.find(m => m.nome === lista.nome) ?? null
   }
 
@@ -895,8 +895,8 @@ export default function TesteListasPage() {
     finally { setTestandoCompletoIds(prev => { const next = new Set(prev); next.delete(id); return next }) }
   }
 
-  const online   = listas.filter(l => l.ultimo_status === 'online').length
-  const offline  = listas.filter(l => l.ultimo_status && l.ultimo_status !== 'online').length
+  const online = listas.filter(l => l.ultimo_status === 'online').length
+  const offline = listas.filter(l => l.ultimo_status && l.ultimo_status !== 'online').length
   const semDados = listas.filter(l => !l.ultimo_status).length
 
   const listasFiltradas = listas.filter(l => {
@@ -906,12 +906,12 @@ export default function TesteListasPage() {
   })
 
   const ABAS = [
-    { id: 'radar',      label: '🕸 Radar' },
-    { id: 'latencias',  label: '📶 Latências' },
-    { id: 'uptime',     label: '✅ Uptime' },
-    { id: 'ping',       label: '📈 Ping/Tempo' },
+    { id: 'radar', label: '🕸 Radar' },
+    { id: 'latencias', label: '📶 Latências' },
+    { id: 'uptime', label: '✅ Uptime' },
+    { id: 'ping', label: '📈 Ping/Tempo' },
     { id: 'velocidade', label: '⚡ Velocidade' },
-    { id: 'catalogo',   label: '📦 Catálogo' },
+    { id: 'catalogo', label: '📦 Catálogo' },
   ] as const
 
   const labelPeriodoAtual = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
@@ -991,10 +991,10 @@ export default function TesteListasPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Total',     valor: listas.length, cor: 'text-gray-900 dark:text-gray-100', filtroVal: 'todas'   as const },
-          { label: 'Online',    valor: online,        cor: 'text-green-600 dark:text-green-400', filtroVal: 'online' as const },
-          { label: 'Offline',   valor: offline,       cor: 'text-red-600 dark:text-red-400',   filtroVal: 'offline' as const },
-          { label: 'Sem dados', valor: semDados,      cor: 'text-gray-400',                    filtroVal: 'todas'   as const },
+          { label: 'Total', valor: listas.length, cor: 'text-gray-900 dark:text-gray-100', filtroVal: 'todas' as const },
+          { label: 'Online', valor: online, cor: 'text-green-600 dark:text-green-400', filtroVal: 'online' as const },
+          { label: 'Offline', valor: offline, cor: 'text-red-600 dark:text-red-400', filtroVal: 'offline' as const },
+          { label: 'Sem dados', valor: semDados, cor: 'text-gray-400', filtroVal: 'todas' as const },
         ].map(({ label, valor, cor, filtroVal }) => (
           <button key={label} onClick={() => setFiltro(filtroVal)}
             className={`text-left p-4 rounded-xl border transition-all ${filtro === filtroVal && filtroVal !== 'todas' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300'}`}>
