@@ -30,12 +30,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               📱 Aplicativos
             </Link>
             <Link
-              href="/planos"
-              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
-            >
-              📋 Planos
-            </Link>
-            <Link
               href="/pagamentos"
               className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
             >
@@ -47,9 +41,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               🚨 Alertas
             </Link>
+            <Link
+              href="/teste-listas"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              📡 Servidores
+            </Link>
+            <Link
+              href="/planos"
+              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
+            >
+              📋 Planos
+            </Link>
           </nav>
-
-          {/* Empurra o UserMenu para a direita */}
           <div className="ml-auto">
             <UserMenu />
           </div>
