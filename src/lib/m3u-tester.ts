@@ -331,12 +331,15 @@ async function medirDownload(urlM3u: string) {
 function determinarStatus(
   erroMensagem: string | null,
   httpStatus: number | null,
-  perdaPacotes: number | null
+  perdaPacotes: number | null,
+  ttfbMs: number | null
 ): ResultadoTeste['status'] {
   if (erroMensagem?.includes('Timeout')) return 'timeout'
   if (erroMensagem) return 'erro'
   if (!httpStatus) return 'offline'
-  if (httpStatus === 401 || httpStatus === 403) return 'online' // servidor respondeu, só bloqueou
+  if (httpStatus === 401 || httpStatus === 403) return 'online'
+  // 404 com TTFB baixo = servidor respondeu mas bloqueou (não é offline real)
+  if (httpStatus === 404 && ttfbMs !== null && ttfbMs < 800) return 'online'
   if (httpStatus >= 400) return 'offline'
   if ((perdaPacotes ?? 0) >= 80) return 'offline'
   return 'online'
