@@ -172,13 +172,14 @@ function formatNum(n: number | null, sufixo = '') {
 
 function tempoAtras(iso: string | null, agora: number) {
   if (!iso) return '—'
-  const diff = Math.floor((agora - new Date(iso).getTime()) / 1000)
+  // Força UTC — PostgreSQL retorna sem fuso, navegador interpretaria como local
+  const data = new Date(iso.endsWith('Z') ? iso : iso + 'Z')
+  const diff = Math.floor((agora - data.getTime()) / 1000)
   if (diff < 60) return `${diff}s atrás`
   if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`
   return `${Math.floor(diff / 86400)}d atrás`
 }
-
 // ─── Radar de qualidade ───────────────────────────────────────────────────────
 
 function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
