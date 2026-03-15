@@ -42,9 +42,33 @@ export async function GET() {
         ) AS uptime_24h
       FROM m3u_listas l
       LEFT JOIN LATERAL (
-        SELECT * FROM m3u_testes
-        WHERE lista_id = l.id
-        ORDER BY testado_em DESC
+        SELECT
+          t1.ping_ms,
+          t1.jitter_ms,
+          t1.perda_pacotes_pct,
+          t1.ttfb_ms,
+          t1.velocidade_kbps,
+          t1.tempo_download_ms,
+          t1.tamanho_lista_kb,
+          t1.http_status,
+          t1.erro_mensagem,
+          -- Só marca como falha se os 2 últimos testes falharam
+          -- Se o último falhou mas o anterior foi online = instabilidade momentânea → mantém online
+          CASE
+            WHEN t1.status = 'online' THEN 'online'
+            WHEN t2.status IS NULL    THEN t1.status
+            WHEN t2.status != 'online' THEN t1.status
+            ELSE 'online'
+          END AS status
+        FROM m3u_testes t1
+        LEFT JOIN LATERAL (
+          SELECT status FROM m3u_testes
+          WHERE lista_id = l.id
+          ORDER BY testado_em DESC
+          LIMIT 1 OFFSET 1
+        ) t2 ON true
+        WHERE t1.lista_id = l.id
+        ORDER BY t1.testado_em DESC
         LIMIT 1
       ) t ON true
       LEFT JOIN LATERAL (
@@ -102,7 +126,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // monta a URL do M3U para xtream automaticamente
     const url_final =
       tipo === 'xtream'
         ? `${host}/get.php?username=${usuario}&password=${senha}&type=m3u_plus&output=ts`
