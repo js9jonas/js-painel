@@ -476,7 +476,7 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
     clearTimeout(timer)
   }
 
-  const status = determinarStatus(erro_mensagem, http_status, pingResult.perda_pacotes_pct ?? null)
+  const status = determinarStatus(erro_mensagem, http_status, pingResult.perda_pacotes_pct ?? null, ttfb_ms)
 
   const resultado: ResultadoTeste = {
     lista_id: listaId,
@@ -636,7 +636,8 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
   const status = determinarStatus(
     downloadResult.erro_mensagem,
     downloadResult.http_status,
-    pingResult.perda_pacotes_pct ?? null
+    pingResult.perda_pacotes_pct ?? null,
+    downloadResult.ttfb_ms
   )
 
   // Teste de stream (somente se online e tiver credenciais Xtream)
