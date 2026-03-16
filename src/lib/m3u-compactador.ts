@@ -338,7 +338,7 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
         dadosSemana.uptime_pct, dadosSemana.total_online, dadosSemana.total_offline,
         dadosSemana.total_timeouts, dadosSemana.total_erros, maiorSequencia,
         dadosSemana.ping_medio, dadosSemana.ping_min, dadosSemana.ping_max,
-        dadosSemana.jitter_medio, dadosSemana.ttfb_edio,
+        dadosSemana.jitter_medio, dadosSemana.ttfb_medio,
         dadosSemana.total_testes_stream, dadosSemana.stream_ok_pct,
         dadosSemana.stream_lento_pct, dadosSemana.stream_falhou_pct,
         dadosSemana.stream_throughput_medio, dadosSemana.stream_throughput_min,
