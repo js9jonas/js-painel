@@ -83,20 +83,20 @@ function buildBaseWhere(q: string) {
 function dueOffset(due: DueFilter) {
   switch (due) {
     case "ontem": return -1;
-    case "hoje":  return 0;
+    case "hoje": return 0;
     case "amanha": return 1;
     default: return null;
   }
 }
 
 export async function getClientes(params: GetClientesParams = {}): Promise<ClienteRow[]> {
-  const q        = (params.q ?? "").trim();
-  const status   = params.status ?? "todos";
-  const due      = params.due ?? "todos";
-  const order    = params.order ?? "vencimento";
-  const page     = clamp(Number(params.page ?? 1) || 1, 1, 9999);
+  const q = (params.q ?? "").trim();
+  const status = params.status ?? "todos";
+  const due = params.due ?? "todos";
+  const order = params.order ?? "vencimento";
+  const page = clamp(Number(params.page ?? 1) || 1, 1, 9999);
   const pageSize = clamp(Number(params.pageSize ?? 50) || 50, 10, 200);
-  const offset   = (page - 1) * pageSize;
+  const offset = (page - 1) * pageSize;
 
   const values: any[] = [];
   const whereParts: string[] = [];
@@ -171,7 +171,12 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'ativo') > 0
             THEN 'ativo'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'pendente') > 0
-            THEN 'pendente'
+  OR EXISTS (
+    SELECT 1 FROM public.aplicativos ap2
+    WHERE ap2.id_cliente = c.id_cliente
+      AND lower(btrim(ap2.status)) = 'pendente'
+  )
+  THEN 'pendente'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'atrasado') > 0
             THEN 'atrasado'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'vencido') > 0
@@ -211,9 +216,9 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
 export async function countClientes(
   params: Omit<GetClientesParams, "page" | "pageSize"> = {}
 ) {
-  const q      = (params.q ?? "").trim();
+  const q = (params.q ?? "").trim();
   const status = params.status ?? "todos";
-  const due    = params.due ?? "todos";
+  const due = params.due ?? "todos";
 
   const { whereSql, values } = buildBaseWhere(q);
 
@@ -247,7 +252,12 @@ export async function countClientes(
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'ativo') > 0
             THEN 'ativo'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'pendente') > 0
-            THEN 'pendente'
+  OR EXISTS (
+    SELECT 1 FROM public.aplicativos ap2
+    WHERE ap2.id_cliente = c.id_cliente
+      AND lower(btrim(ap2.status)) = 'pendente'
+  )
+  THEN 'pendente'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'atrasado') > 0
             THEN 'atrasado'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'vencido') > 0

@@ -1,4 +1,3 @@
-// src/components/aplicativos/AplicativosManager.tsx
 "use client";
 
 import { useState, useTransition } from "react";
@@ -16,8 +15,11 @@ type Props = {
 
 function statusBadge(status: string | null) {
   switch ((status ?? "").toLowerCase()) {
+    case "ativa":
     case "ativo":
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20";
+    case "pendente":
+      return "bg-amber-50 text-amber-700 ring-1 ring-amber-600/20";
     case "inativo":
     case "expirado":
       return "bg-red-50 text-red-700 ring-1 ring-red-600/20";
@@ -57,8 +59,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
       }
     });
   }
-// logo antes do return (
-console.log("ModalRenovarAplicativo:", ModalRenovarAplicativo);
+
   return (
     <div className="rounded-2xl border bg-white overflow-hidden">
       {/* Header da seção */}
@@ -166,7 +167,7 @@ console.log("ModalRenovarAplicativo:", ModalRenovarAplicativo);
                         onClick={() => setAppPgto(a)}
                         className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
                       >
-                        💰 pgto
+                        ⚙️ Gerenciar
                       </button>
                       <button
                         type="button"
@@ -199,13 +200,17 @@ console.log("ModalRenovarAplicativo:", ModalRenovarAplicativo);
         />
       )}
 
-      {/* Modal pgto */}
+      {/* Modal gerenciar */}
       {appPgto !== null && (
         <ModalRenovarAplicativo
           id_app_registro={appPgto.id_app_registro}
           id_cliente={Number(idCliente)}
           nome_app={appPgto.nome_app ?? `App #${appPgto.id_app}`}
-          onClose={() => setAppPgto(null)}
+          validadeAtual={appPgto.validade ?? null}
+          onClose={() => {
+            setAppPgto(null);
+            router.refresh();
+          }}
         />
       )}
     </div>
