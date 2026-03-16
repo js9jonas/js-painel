@@ -10,9 +10,18 @@ type Props = {
   nome: string;
   telefone?: string | null;
   observacao?: string | null;
+  observacaoAssinatura?: string | null;
+  idAssinaturaPrincipal?: string | null;
 };
 
-export default function RowActions({ idCliente, nome, telefone, observacao }: Props) {
+export default function RowActions({
+  idCliente,
+  nome,
+  telefone,
+  observacao,
+  observacaoAssinatura,
+  idAssinaturaPrincipal,
+}: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const router = useRouter();
 
@@ -27,14 +36,6 @@ export default function RowActions({ idCliente, nome, telefone, observacao }: Pr
         >
           ✏️ Editar
         </button>
-
-{/*         <a
-          href={`/clientes/${idCliente}`}
-          className="h-8 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-800 inline-flex items-center transition-colors"
-          title="Ver detalhes"
-        >
-          Ver detalhes
-        </a>  */}
       </div>
 
       {editOpen && (
@@ -42,6 +43,8 @@ export default function RowActions({ idCliente, nome, telefone, observacao }: Pr
           idCliente={idCliente}
           nomeAtual={nome}
           observacaoAtual={observacao ?? null}
+          observacaoAssinaturaAtual={observacaoAssinatura ?? null}
+          idAssinaturaPrincipal={idAssinaturaPrincipal ?? null}
           onClose={() => setEditOpen(false)}
           onSaved={() => router.refresh()}
         />

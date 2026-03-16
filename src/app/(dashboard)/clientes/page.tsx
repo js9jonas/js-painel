@@ -36,12 +36,12 @@ function badgeClass(status: ClienteStatusTela) {
 // ✅ Rótulos dos badges
 function badgeLabel(status: ClienteStatusTela) {
   switch (status) {
-    case "ativo":            return "✅ Ativo";
-    case "pendente":      return "🔵 Pendente";
-    case "atrasado":      return "🟡 Atrasado";
-    case "vencido":       return "🟠 Vencido";
-    case "inativo":       return "⚪ Inativo";
-    case "cancelado":     return "🔴 Cancelado";
+    case "ativo": return "✅ Ativo";
+    case "pendente": return "🔵 Pendente";
+    case "atrasado": return "🟡 Atrasado";
+    case "vencido": return "🟠 Vencido";
+    case "inativo": return "⚪ Inativo";
+    case "cancelado": return "🔴 Cancelado";
     case "sem_assinatura": return "⚠️ Sem assinatura";
   }
 }
@@ -68,12 +68,12 @@ function tabClass(active: boolean) {
 export default async function ClientesPage({ searchParams }: PageProps) {
   const sp = (await searchParams) ?? {};
 
-  const q      = toStr(sp.q);
+  const q = toStr(sp.q);
   const status = (toStr(sp.status) as "todos" | ClienteStatusTela) || "todos";
-  const order  = (toStr(sp.order) as "nome" | "vencimento") || "vencimento";
-  const due    = (toStr(sp.due) as DueFilter) || "todos";
+  const order = (toStr(sp.order) as "nome" | "vencimento") || "vencimento";
+  const due = (toStr(sp.due) as DueFilter) || "todos";
 
-  const page     = toInt(sp.page, 1);
+  const page = toInt(sp.page, 1);
   const pageSize = toInt(sp.pageSize, 50);
 
   const [total, data, planos, pacotes] = await Promise.all([
@@ -275,9 +275,10 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   </td>
 
                   <td className="px-6 py-4 max-w-xs">
-                    {c.observacao ? (
-                      <div className="text-sm text-zinc-600 truncate" title={c.observacao}>
-                        {c.observacao}
+                    {(c.observacao || c.observacao_assinatura) ? (
+                      <div className="text-sm text-zinc-600 truncate"
+                        title={[c.observacao, c.observacao_assinatura].filter(Boolean).join(" • ")}>
+                        {[c.observacao, c.observacao_assinatura].filter(Boolean).join(" • ")}
                       </div>
                     ) : (
                       <span className="text-zinc-400 text-xs">—</span>
@@ -290,6 +291,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                       nome={c.nome}
                       telefone={c.telefone ?? null}
                       observacao={c.observacao ?? null}
+                      observacaoAssinatura={c.observacao_assinatura ?? null}
+                      idAssinaturaPrincipal={c.id_assinatura_principal ?? null}
                     />
                   </td>
                 </tr>

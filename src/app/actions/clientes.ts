@@ -1,4 +1,3 @@
-// src/app/actions/clientes.ts
 "use server";
 
 import { pool } from "@/lib/db";
@@ -6,7 +5,12 @@ import { revalidatePath } from "next/cache";
 
 export async function updateCliente(
   id: string,
-  data: { nome: string; observacao: string | null }
+  data: {
+    nome: string;
+    observacao: string | null;
+    observacao_assinatura?: string | null;
+    id_assinatura?: string | null;
+  }
 ) {
   if (!data.nome.trim()) throw new Error("Nome é obrigatório");
 
@@ -16,6 +20,16 @@ export async function updateCliente(
      WHERE id_cliente = $3::bigint`,
     [data.nome.trim(), data.observacao?.trim() || null, id]
   );
+
+  // Atualiza observação da assinatura principal se fornecida
+  if (data.id_assinatura) {
+    await pool.query(
+      `UPDATE public.assinaturas
+       SET observacao = $1, atualizado_em = NOW()
+       WHERE id_assinatura = $2::bigint`,
+      [data.observacao_assinatura?.trim() || null, data.id_assinatura]
+    );
+  }
 
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${id}`);

@@ -21,6 +21,8 @@ export type ClienteRow = {
   assinaturas_ativas: number;
   telefone: string | null;
   pacote_nome: string | null;
+  observacao_assinatura: string | null;   // ← adicionar
+  id_assinatura_principal: string | null; // ← adicionar
 };
 
 export type GetClientesParams = {
@@ -164,6 +166,22 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
           ORDER BY a2.venc_contrato DESC NULLS LAST
           LIMIT 1
         ) AS pacote_nome,
+         (
+          SELECT a2.observacao
+          FROM public.assinaturas a2
+          WHERE a2.id_cliente = c.id_cliente
+            AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+          ORDER BY a2.venc_contrato DESC NULLS LAST
+          LIMIT 1
+        ) AS observacao_assinatura,
+        (
+          SELECT a2.id_assinatura::text
+          FROM public.assinaturas a2
+          WHERE a2.id_cliente = c.id_cliente
+            AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+          ORDER BY a2.venc_contrato DESC NULLS LAST
+          LIMIT 1
+        ) AS id_assinatura_principal,
         -- ✅ status_tela calculado pelo campo status real (mantido atualizado pelo job noturno)
         CASE
           WHEN COUNT(a.id_assinatura) = 0

@@ -8,27 +8,28 @@ type Props = {
   idCliente: string;
   nomeAtual: string;
   observacaoAtual: string | null;
+  observacaoAssinaturaAtual: string | null;
+  idAssinaturaPrincipal: string | null;
   onClose: () => void;
   onSaved: () => void;
 };
 
 export default function EditClienteModal({
-  idCliente, nomeAtual, observacaoAtual, onClose, onSaved,
+  idCliente, nomeAtual, observacaoAtual, observacaoAssinaturaAtual, idAssinaturaPrincipal, onClose, onSaved,
 }: Props) {
   const [nome, setNome] = useState(nomeAtual);
   const [observacao, setObservacao] = useState(observacaoAtual ?? "");
+  const [observacaoAssinatura, setObservacaoAssinatura] = useState(observacaoAssinaturaAtual ?? "");
   const [contatos, setContatos] = useState<ContatoRow[]>([]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editReferencia, setEditReferencia] = useState("");
   const [novaReferencia, setNovaReferencia] = useState("");
 
-  // Contato em ediÃ§Ã£o inline
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editTelefone, setEditTelefone] = useState("");
   const [editNome, setEditNome] = useState("");
 
-  // Novo contato
   const [novoTelefone, setNovoTelefone] = useState("");
   const [novoNome, setNovoNome] = useState("");
   const [adicionando, setAdicionando] = useState(false);
@@ -38,11 +39,16 @@ export default function EditClienteModal({
   }, [idCliente]);
 
   function handleSaveCliente() {
-    if (!nome.trim()) { setError("Nome Ã© obrigatÃ³rio"); return; }
+    if (!nome.trim()) { setError("Nome é obrigatório"); return; }
     setError(null);
     startTransition(async () => {
       try {
-        await updateCliente(idCliente, { nome: nome.trim(), observacao: observacao.trim() || null });
+        await updateCliente(idCliente, {
+          nome: nome.trim(),
+          observacao: observacao.trim() || null,
+          observacao_assinatura: observacaoAssinatura.trim() || null,
+          id_assinatura: idAssinaturaPrincipal,
+        });
         onSaved();
         onClose();
       } catch { setError("Erro ao salvar. Tente novamente."); }
@@ -98,10 +104,25 @@ export default function EditClienteModal({
               <input value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} placeholder="Nome do cliente" />
             </div>
             <div>
-              <label className={labelClass}>Observação</label>
-              <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={3}
+              <label className={labelClass}>Observação do cliente</label>
+              <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={2}
                 className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all resize-none"
                 placeholder="Observação sobre o cliente..." />
+            </div>
+            <div>
+              <label className={labelClass}>
+                Observação da assinatura
+                {!idAssinaturaPrincipal && (
+                  <span className="ml-2 text-zinc-400 font-normal">(sem assinatura ativa)</span>
+                )}
+              </label>
+              <textarea
+                value={observacaoAssinatura}
+                onChange={(e) => setObservacaoAssinatura(e.target.value)}
+                rows={2}
+                disabled={!idAssinaturaPrincipal}
+                className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all resize-none disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
+                placeholder={idAssinaturaPrincipal ? "Observação da assinatura..." : "Sem assinatura ativa"} />
             </div>
           </div>
 
@@ -209,5 +230,3 @@ export default function EditClienteModal({
     </div>
   );
 }
-
-
