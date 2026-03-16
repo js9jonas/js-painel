@@ -10,7 +10,7 @@ import NovoClienteModal from "@/components/clientes/NovoClienteModal";
 type Bonificacao = "aberta" | "cortesia" | "comissao";
 
 const BONIFICACAO_STYLE: Record<Bonificacao, string> = {
-  aberta:   "border-amber-300 bg-amber-50 text-amber-700",
+  aberta: "border-amber-300 bg-amber-50 text-amber-700",
   cortesia: "border-blue-300 bg-blue-50 text-blue-700",
   comissao: "border-emerald-300 bg-emerald-50 text-emerald-700",
 };
@@ -88,6 +88,8 @@ export default function NovaIndicacaoModal({ idParceiro, planos, pacotes }: Prop
       status_tela: "sem_assinatura" as const,
       assinaturas_ativas: 0,
       pacote_nome: null,
+      observacao_assinatura: null,
+      id_assinatura_principal: null,
     };
     setSelecionado(clienteFake);
     setBusca(nome);
@@ -196,11 +198,10 @@ export default function NovaIndicacaoModal({ idParceiro, planos, pacotes }: Prop
                       key={b}
                       type="button"
                       onClick={() => setBonificacao(b)}
-                      className={`flex-1 rounded-lg border py-2 text-xs font-medium capitalize transition-colors ${
-                        bonificacao === b
+                      className={`flex-1 rounded-lg border py-2 text-xs font-medium capitalize transition-colors ${bonificacao === b
                           ? BONIFICACAO_STYLE[b]
                           : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
-                      }`}
+                        }`}
                     >
                       {b}
                     </button>
