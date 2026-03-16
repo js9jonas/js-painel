@@ -20,6 +20,8 @@ interface HistoricoMedias {
   velocidade_media: number | null
   uptime_pct: number | null
   total_testes: number
+  stream_ok_pct: number | null        // adiciona
+  stream_consistencia_media: number | null  // adiciona
 }
 
 interface HistoricoContagem {
@@ -104,10 +106,10 @@ const FORM_INICIAL: FormData = {
 }
 
 const PERIODOS = [
-  { horas: 0,   label: 'Último teste' },
-  { horas: 1,   label: '1h' },
-  { horas: 6,   label: '6h' },
-  { horas: 24,  label: '24h' },
+  { horas: 0, label: 'Último teste' },
+  { horas: 1, label: '1h' },
+  { horas: 6, label: '6h' },
+  { horas: 24, label: '24h' },
   { horas: 168, label: '7d' },
 ]
 
@@ -145,14 +147,28 @@ function statusConfig(status: StatusLista) {
 }
 
 function scoreQualidade(lista: Lista, mediasHistorico: HistoricoMedias | null): number | null {
-  const ping   = mediasHistorico?.ping_medio   ?? lista.ping_ms   ?? null
+  const ping = mediasHistorico?.ping_medio ?? lista.ping_ms ?? null
   const jitter = mediasHistorico?.jitter_medio ?? lista.jitter_ms ?? null
-  const uptime = mediasHistorico?.uptime_pct   ?? lista.uptime_24h ?? null
+  const uptime = mediasHistorico?.uptime_pct ?? lista.uptime_24h ?? null
+  const streamOk = mediasHistorico?.stream_ok_pct ?? null
+  const consistencia = mediasHistorico?.stream_consistencia_media ?? null
+
   if (ping === null && uptime === null) return null
-  const scorePing   = Math.max(0, 100 - (ping   ?? 999) / 10)
-  const scoreJitter = Math.max(0, 100 - (jitter ?? 0)   / 5)
+
   const scoreUptime = uptime ?? 0
-  return Math.round((scorePing * 0.35 + scoreUptime * 0.45 + scoreJitter * 0.20)) / 10
+  const scoreStreamOk = streamOk ?? 0
+  const scorePing = Math.max(0, 100 - (ping ?? 999) / 10)
+  const scoreConsistencia = consistencia ?? 0
+  const scoreJitter = Math.max(0, 100 - (jitter ?? 0) / 5)
+
+  const total =
+    scoreUptime * 0.35 +
+    scoreStreamOk * 0.25 +
+    scorePing * 0.20 +
+    scoreConsistencia * 0.12 +
+    scoreJitter * 0.08
+
+  return Math.round(total) / 10
 }
 
 function corScore(score: number | null) {
@@ -180,19 +196,19 @@ function tempoAtras(iso: string | null, agora: number) {
 // ─── Radar de qualidade ───────────────────────────────────────────────────────
 
 function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
-  const maxPing   = Math.max(...medias.map(m => m.ping_medio   ?? 0), 1)
+  const maxPing = Math.max(...medias.map(m => m.ping_medio ?? 0), 1)
   const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
-  const maxTtfb   = Math.max(...medias.map(m => m.ttfb_medio   ?? 0), 1)
-  const maxVel    = Math.max(...medias.map(m => m.velocidade_media ?? 0), 1)
+  const maxTtfb = Math.max(...medias.map(m => m.ttfb_medio ?? 0), 1)
+  const maxVel = Math.max(...medias.map(m => m.velocidade_media ?? 0), 1)
 
   const dadosRadar = medias.map((m, i) => ({
     nome: m.nome,
     cor: CORES_SERVIDOR[i % CORES_SERVIDOR.length],
     data: [
-      { eixo: 'Uptime',     valor: m.uptime_pct ?? 0 },
-      { eixo: 'Ping',       valor: Math.max(0, 100 - ((m.ping_medio   ?? maxPing)   / maxPing)   * 100) },
-      { eixo: 'Jitter',     valor: Math.max(0, 100 - ((m.jitter_medio ?? maxJitter) / maxJitter) * 100) },
-      { eixo: 'TTFB',       valor: Math.max(0, 100 - ((m.ttfb_medio   ?? maxTtfb)   / maxTtfb)   * 100) },
+      { eixo: 'Uptime', valor: m.uptime_pct ?? 0 },
+      { eixo: 'Ping', valor: Math.max(0, 100 - ((m.ping_medio ?? maxPing) / maxPing) * 100) },
+      { eixo: 'Jitter', valor: Math.max(0, 100 - ((m.jitter_medio ?? maxJitter) / maxJitter) * 100) },
+      { eixo: 'TTFB', valor: Math.max(0, 100 - ((m.ttfb_medio ?? maxTtfb) / maxTtfb) * 100) },
       { eixo: 'Velocidade', valor: maxVel > 0 ? ((m.velocidade_media ?? 0) / maxVel) * 100 : 0 },
     ],
   }))
@@ -235,9 +251,9 @@ function GraficoLatencias({ medias }: { medias: HistoricoMedias[] }) {
         <YAxis tick={{ fontSize: 11 }} unit="ms" />
         <Tooltip formatter={(v, name) => [`${v}ms`, name]} contentStyle={{ fontSize: 12 }} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-        <Bar dataKey="Ping"   fill="#3b82f6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="Ping" fill="#3b82f6" radius={[3, 3, 0, 0]} />
         <Bar dataKey="Jitter" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-        <Bar dataKey="TTFB"   fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="TTFB" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -311,10 +327,26 @@ function GraficoPingTempo({ serie, servidores }: { serie: Record<string, number>
 // ─── Tabela comparativa ───────────────────────────────────────────────────────
 
 function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; servidores: string[] }) {
-  const sorted = [...medias].sort((a, b) => (b.uptime_pct ?? 0) - (a.uptime_pct ?? 0))
-  const maxPing   = Math.max(...medias.map(m => m.ping_medio   ?? 0), 1)
+  const sorted = [...medias].sort((a, b) => {
+    const scoreA = Math.round((
+      (a.uptime_pct ?? 0) * 0.35 +
+      (a.stream_ok_pct ?? 0) * 0.25 +
+      Math.max(0, 100 - (a.ping_medio ?? 999) / 10) * 0.20 +
+      (a.stream_consistencia_media ?? 0) * 0.12 +
+      Math.max(0, 100 - (a.jitter_medio ?? 0) / 5) * 0.08
+    )) / 10
+    const scoreB = Math.round((
+      (b.uptime_pct ?? 0) * 0.35 +
+      (b.stream_ok_pct ?? 0) * 0.25 +
+      Math.max(0, 100 - (b.ping_medio ?? 999) / 10) * 0.20 +
+      (b.stream_consistencia_media ?? 0) * 0.12 +
+      Math.max(0, 100 - (b.jitter_medio ?? 0) / 5) * 0.08
+    )) / 10
+    return scoreB - scoreA
+  })
+  const maxPing = Math.max(...medias.map(m => m.ping_medio ?? 0), 1)
   const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
-  const maxTtfb   = Math.max(...medias.map(m => m.ttfb_medio   ?? 0), 1)
+  const maxTtfb = Math.max(...medias.map(m => m.ttfb_medio ?? 0), 1)
 
   function barinha(valor: number, max: number, cor: string) {
     const pct = Math.min(100, (valor / max) * 100)
@@ -346,11 +378,19 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
         </thead>
         <tbody>
           {sorted.map((m, i) => {
-            const cor    = CORES_SERVIDOR[servidores.indexOf(m.nome) % CORES_SERVIDOR.length]
+            const cor = CORES_SERVIDOR[servidores.indexOf(m.nome) % CORES_SERVIDOR.length]
             const uptime = m.uptime_pct ?? 0
-            const scorePing   = Math.max(0, 100 - (m.ping_medio   ?? 999) / 10)
-            const scoreJitter = Math.max(0, 100 - (m.jitter_medio ?? 0)   / 5)
-            const score = Math.round((scorePing * 0.35 + uptime * 0.45 + scoreJitter * 0.20)) / 10
+            const scorePing = Math.max(0, 100 - (m.ping_medio ?? 999) / 10)
+            const scoreJitter = Math.max(0, 100 - (m.jitter_medio ?? 0) / 5)
+            const scoreStreamOk = m.stream_ok_pct ?? 0
+            const scoreConsistencia = m.stream_consistencia_media ?? 0
+            const score = Math.round((
+              uptime * 0.35 +
+              scoreStreamOk * 0.25 +
+              scorePing * 0.20 +
+              scoreConsistencia * 0.12 +
+              scoreJitter * 0.08
+            )) / 10
             return (
               <tr key={m.id} className={i % 2 === 0 ? 'bg-gray-50 dark:bg-gray-800/50' : ''}>
                 <td className="px-4 py-3">
@@ -359,9 +399,9 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
                     <span className="font-medium text-gray-800 dark:text-gray-200 text-xs truncate max-w-[90px]">{m.nome}</span>
                   </div>
                 </td>
-                <td className="px-4 py-2.5">{barinha(m.ping_medio   ?? 0, maxPing,   '#3b82f6')}</td>
+                <td className="px-4 py-2.5">{barinha(m.ping_medio ?? 0, maxPing, '#3b82f6')}</td>
                 <td className="px-4 py-2.5">{barinha(m.jitter_medio ?? 0, maxJitter, '#f59e0b')}</td>
-                <td className="px-4 py-2.5">{barinha(m.ttfb_medio   ?? 0, maxTtfb,   '#8b5cf6')}</td>
+                <td className="px-4 py-2.5">{barinha(m.ttfb_medio ?? 0, maxTtfb, '#8b5cf6')}</td>
                 <td className="px-4 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <div className="w-12 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -596,15 +636,15 @@ function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido
   const [modalCanalAberto, setModalCanalAberto] = useState(false)
   const [modalEditarAberto, setModalEditarAberto] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  const cfg      = statusConfig(lista.ultimo_status)
-  const score    = scoreQualidade(lista, mediasHistorico)
+  const cfg = statusConfig(lista.ultimo_status)
+  const score = scoreQualidade(lista, mediasHistorico)
   const testando = testandoRapido || testandoCompleto
 
-  const pingExibido   = mediasHistorico?.ping_medio   ?? lista.ping_ms
+  const pingExibido = mediasHistorico?.ping_medio ?? lista.ping_ms
   const jitterExibido = mediasHistorico?.jitter_medio ?? lista.jitter_ms
-  const ttfbExibido   = mediasHistorico?.ttfb_medio   ?? lista.ttfb_ms
-  const uptimeExibido = mediasHistorico?.uptime_pct   ?? lista.uptime_24h
-  const labelPeriodo  = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
+  const ttfbExibido = mediasHistorico?.ttfb_medio ?? lista.ttfb_ms
+  const uptimeExibido = mediasHistorico?.uptime_pct ?? lista.uptime_24h
+  const labelPeriodo = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
 
   // Monta form inicial para edição pré-preenchido
   const formInicial: FormData = {
@@ -651,9 +691,9 @@ function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido
 
       <div className="grid grid-cols-4 gap-0 border-t border-b border-gray-100 dark:border-gray-800">
         {[
-          { label: 'Ping',   value: formatNum(pingExibido,   'ms') },
+          { label: 'Ping', value: formatNum(pingExibido, 'ms') },
           { label: 'Jitter', value: formatNum(jitterExibido, 'ms') },
-          { label: 'TTFB',   value: ttfbExibido != null ? formatNum(ttfbExibido, 'ms') : '—' },
+          { label: 'TTFB', value: ttfbExibido != null ? formatNum(ttfbExibido, 'ms') : '—' },
           { label: 'Uptime', value: formatNum(uptimeExibido, '%') },
         ].map(({ label, value }) => (
           <div key={label} className="py-2 px-1 text-center">
@@ -858,7 +898,7 @@ export default function TesteListasPage() {
     if (form.tipo === 'url') {
       body.url_m3u = form.url_m3u
     } else {
-      body.host    = form.host
+      body.host = form.host
       body.usuario = form.usuario
       if (form.senha) body.senha = form.senha  // só envia senha se preenchida
       if (form.porta) body.porta = parseInt(form.porta)
@@ -915,23 +955,31 @@ export default function TesteListasPage() {
     finally { setTestandoCompletoIds(prev => { const next = new Set(prev); next.delete(id); return next }) }
   }
 
-  const online   = listas.filter(l => l.ultimo_status === 'online').length
-  const offline  = listas.filter(l => l.ultimo_status && l.ultimo_status !== 'online').length
+  const online = listas.filter(l => l.ultimo_status === 'online').length
+  const offline = listas.filter(l => l.ultimo_status && l.ultimo_status !== 'online').length
   const semDados = listas.filter(l => !l.ultimo_status).length
 
-  const listasFiltradas = listas.filter(l => {
-    if (filtro === 'online') return l.ultimo_status === 'online'
-    if (filtro === 'offline') return l.ultimo_status && l.ultimo_status !== 'online'
-    return true
-  })
+  const listasFiltradas = listas
+    .filter(l => {
+      if (filtro === 'online') return l.ultimo_status === 'online'
+      if (filtro === 'offline') return l.ultimo_status && l.ultimo_status !== 'online'
+      return true
+    })
+    .sort((a, b) => {
+      const mA = getMediasLista(a)
+      const mB = getMediasLista(b)
+      const sA = scoreQualidade(a, mA) ?? -1
+      const sB = scoreQualidade(b, mB) ?? -1
+      return sB - sA
+    })
 
   const ABAS = [
-    { id: 'radar',      label: '🕸 Radar' },
-    { id: 'latencias',  label: '📶 Latências' },
-    { id: 'uptime',     label: '✅ Uptime' },
-    { id: 'ping',       label: '📈 Ping/Tempo' },
+    { id: 'radar', label: '🕸 Radar' },
+    { id: 'latencias', label: '📶 Latências' },
+    { id: 'uptime', label: '✅ Uptime' },
+    { id: 'ping', label: '📈 Ping/Tempo' },
     { id: 'velocidade', label: '⚡ Velocidade' },
-    { id: 'catalogo',   label: '📦 Catálogo' },
+    { id: 'catalogo', label: '📦 Catálogo' },
   ] as const
 
   const labelPeriodoAtual = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
@@ -1013,10 +1061,10 @@ export default function TesteListasPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Total',     valor: listas.length, cor: 'text-gray-900 dark:text-gray-100', filtroVal: 'todas'   as const },
-          { label: 'Online',    valor: online,        cor: 'text-green-600 dark:text-green-400', filtroVal: 'online' as const },
-          { label: 'Offline',   valor: offline,       cor: 'text-red-600 dark:text-red-400',   filtroVal: 'offline' as const },
-          { label: 'Sem dados', valor: semDados,      cor: 'text-gray-400',                    filtroVal: 'todas'   as const },
+          { label: 'Total', valor: listas.length, cor: 'text-gray-900 dark:text-gray-100', filtroVal: 'todas' as const },
+          { label: 'Online', valor: online, cor: 'text-green-600 dark:text-green-400', filtroVal: 'online' as const },
+          { label: 'Offline', valor: offline, cor: 'text-red-600 dark:text-red-400', filtroVal: 'offline' as const },
+          { label: 'Sem dados', valor: semDados, cor: 'text-gray-400', filtroVal: 'todas' as const },
         ].map(({ label, valor, cor, filtroVal }) => (
           <button key={label} onClick={() => setFiltro(filtroVal)}
             className={`text-left p-4 rounded-xl border transition-all ${filtro === filtroVal && filtroVal !== 'todas' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300'}`}>
@@ -1075,78 +1123,96 @@ export default function TesteListasPage() {
             </p>
           </div>
 
-          <div className="flex gap-1 flex-wrap border-b border-gray-200 dark:border-gray-800">
-            {ABAS.map(aba => (
-              <button key={aba.id} onClick={() => setAbaGrafico(aba.id)}
-                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${abaGrafico === aba.id ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                {aba.label}
-              </button>
-            ))}
-          </div>
+          {/* Ordena medias por score decrescente */}
+          {(() => {
+            const mediasOrdenadas = [...historico.medias].sort((a, b) => {
+              const calc = (m: HistoricoMedias) => Math.round((
+                (m.uptime_pct ?? 0)               * 0.35 +
+                (m.stream_ok_pct ?? 0)             * 0.25 +
+                Math.max(0, 100 - (m.ping_medio ?? 999) / 10) * 0.20 +
+                (m.stream_consistencia_media ?? 0) * 0.12 +
+                Math.max(0, 100 - (m.jitter_medio ?? 0) / 5)  * 0.08
+              )) / 10
+              return calc(b) - calc(a)
+            })
 
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            {abaGrafico === 'radar' && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Score por dimensão (0–100, maior = melhor)</h3>
-                <RadarQualidade medias={historico.medias} />
-              </div>
-            )}
-            {abaGrafico === 'latencias' && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ping · Jitter · TTFB médios (ms)</h3>
-                <p className="text-xs text-gray-400 mb-4">Menores valores indicam melhor desempenho</p>
-                <GraficoLatencias medias={historico.medias} />
-              </div>
-            )}
-            {abaGrafico === 'uptime' && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Uptime ao longo do tempo (%)</h3>
-                <p className="text-xs text-gray-400 mb-4">Disponibilidade de cada servidor no período</p>
-                <GraficoUptimeTempo serie={historico.serie} servidores={historico.servidores} />
-              </div>
-            )}
-            {abaGrafico === 'ping' && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ping ao longo do tempo (ms)</h3>
-                <p className="text-xs text-gray-400 mb-4">Variação de latência de cada servidor</p>
-                <GraficoPingTempo serie={historico.serie} servidores={historico.servidores} />
-              </div>
-            )}
-            {abaGrafico === 'velocidade' && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Velocidade de download média (Mb/s)</h3>
-                <p className="text-xs text-gray-400 mb-4">Disponível apenas após testes completos</p>
-                <GraficoVelocidade medias={historico.medias} />
-              </div>
-            )}
-            {abaGrafico === 'catalogo' && historico.contagens && historico.contagens.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Catálogo por servidor</h3>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={historico.contagens} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="nome" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-                    <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v, name) => [Number(v).toLocaleString('pt-BR'), name]} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="total_canais" name="Canais" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="total_filmes" name="Filmes" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="total_series" name="Séries" fill="#ec4899" radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+            return (
+              <>
+                <div className="flex gap-1 flex-wrap border-b border-gray-200 dark:border-gray-800">
+                  {ABAS.map(aba => (
+                    <button key={aba.id} onClick={() => setAbaGrafico(aba.id)}
+                      className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${abaGrafico === aba.id ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                      {aba.label}
+                    </button>
+                  ))}
+                </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Resumo comparativo</h3>
-            </div>
-            <TabelaComparativa medias={historico.medias} servidores={historico.servidores} />
-          </div>
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+                  {abaGrafico === 'radar' && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Score por dimensão (0–100, maior = melhor)</h3>
+                      <RadarQualidade medias={mediasOrdenadas} />
+                    </div>
+                  )}
+                  {abaGrafico === 'latencias' && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ping · Jitter · TTFB médios (ms)</h3>
+                      <p className="text-xs text-gray-400 mb-4">Menores valores indicam melhor desempenho</p>
+                      <GraficoLatencias medias={mediasOrdenadas} />
+                    </div>
+                  )}
+                  {abaGrafico === 'uptime' && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Uptime ao longo do tempo (%)</h3>
+                      <p className="text-xs text-gray-400 mb-4">Disponibilidade de cada servidor no período</p>
+                      <GraficoUptimeTempo serie={historico.serie} servidores={historico.servidores} />
+                    </div>
+                  )}
+                  {abaGrafico === 'ping' && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ping ao longo do tempo (ms)</h3>
+                      <p className="text-xs text-gray-400 mb-4">Variação de latência de cada servidor</p>
+                      <GraficoPingTempo serie={historico.serie} servidores={historico.servidores} />
+                    </div>
+                  )}
+                  {abaGrafico === 'velocidade' && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Velocidade de download média (Mb/s)</h3>
+                      <p className="text-xs text-gray-400 mb-4">Disponível apenas após testes completos</p>
+                      <GraficoVelocidade medias={mediasOrdenadas} />
+                    </div>
+                  )}
+                  {abaGrafico === 'catalogo' && historico.contagens && historico.contagens.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Catálogo por servidor</h3>
+                      <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={historico.contagens} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="nome" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                          <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v, name) => [Number(v).toLocaleString('pt-BR'), name]} />
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                          <Bar dataKey="total_canais" name="Canais" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="total_filmes" name="Filmes" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="total_series" name="Séries" fill="#ec4899" radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Resumo comparativo</h3>
+                  </div>
+                  <TabelaComparativa medias={mediasOrdenadas} servidores={historico.servidores} />
+                </div>
+              </>
+            )
+          })()}
         </div>
       )}
-
+      
       {modalAberto && (
         <ModalLista
           titulo="Nova lista M3U"

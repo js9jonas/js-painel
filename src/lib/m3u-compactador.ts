@@ -63,12 +63,28 @@ function classificarPorRegras(dados: DadosSemana): 'excelente' | 'bom' | 'instav
 }
 
 // ─── Score calculado ──────────────────────────────────────────────────────────
+// Pesos:
+//   Uptime              35% — disponibilidade do servidor
+//   Stream OK %         25% — qualidade real do vídeo entregue
+//   Ping                20% — latência de conexão
+//   Stream consistência 12% — estabilidade do throughput
+//   Jitter               8% — variação do ping
 
 function calcularScore(dados: DadosSemana): number {
-  const scorePing   = Math.max(0, 100 - (dados.ping_medio   ?? 999) / 10)
-  const scoreJitter = Math.max(0, 100 - (dados.jitter_medio ?? 0)   / 5)
-  const scoreUptime = dados.uptime_pct
-  return Math.round((scorePing * 0.35 + scoreUptime * 0.45 + scoreJitter * 0.20)) / 10
+  const scoreUptime      = dados.uptime_pct
+  const scoreStreamOk    = dados.stream_ok_pct ?? 0
+  const scorePing        = Math.max(0, 100 - (dados.ping_medio ?? 999) / 10)
+  const scoreConsistencia = dados.stream_consistencia_media ?? 0
+  const scoreJitter      = Math.max(0, 100 - (dados.jitter_medio ?? 0) / 5)
+
+  const total =
+    scoreUptime       * 0.35 +
+    scoreStreamOk     * 0.25 +
+    scorePing         * 0.20 +
+    scoreConsistencia * 0.12 +
+    scoreJitter       * 0.08
+
+  return Math.round(total) / 10
 }
 
 // ─── Análise por IA ───────────────────────────────────────────────────────────
@@ -134,7 +150,6 @@ ${contexto}`
     }
   } catch (err) {
     console.error('[compactador] Erro na análise IA:', err)
-    // Fallback por regras
     return {
       classificacao: classificarPorRegras(dados),
       pontos_atencao: [`Uptime de ${dados.uptime_pct}% na semana`],
@@ -174,13 +189,11 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
   erros: number
   detalhes: { lista: string; status: string }[]
 }> {
-  // Se não informada, usa a semana passada (segunda a domingo)
   const hoje = new Date()
   const inicio = semanaInicio ?? (() => {
     const d = new Date(hoje)
     d.setDate(d.getDate() - 7)
     d.setHours(0, 0, 0, 0)
-    // Volta para segunda-feira da semana passada
     const diaSemana = d.getDay()
     const diasAteLast = diaSemana === 0 ? 6 : diaSemana - 1
     d.setDate(d.getDate() - diasAteLast)
@@ -195,7 +208,6 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
 
   console.log(`[compactador] Processando semana ${semanaInicioStr} → ${semanaFimStr}`)
 
-  // Busca todas as listas ativas
   const { rows: listas } = await pool.query(
     'SELECT id, nome FROM m3u_listas ORDER BY nome'
   )
@@ -206,7 +218,6 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
 
   for (const lista of listas) {
     try {
-      // Verifica se já existe resumo para essa semana
       const { rows: existente } = await pool.query(
         'SELECT id FROM m3u_resumos_semanais WHERE lista_id = $1 AND semana_inicio = $2',
         [lista.id, semanaInicioStr]
@@ -216,7 +227,6 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
         continue
       }
 
-      // Agrega dados da semana
       const { rows: agg } = await pool.query(`
         SELECT
           COUNT(*)                                                    AS total_testes,
@@ -256,10 +266,8 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
         continue
       }
 
-      // Maior sequência de falhas
       const maiorSequencia = await calcularMaiorSequenciaOffline(lista.id, inicio, fim)
 
-      // Resumo anterior para comparação
       const { rows: anterior } = await pool.query(`
         SELECT uptime_pct, ping_medio, score_medio
         FROM m3u_resumos_semanais
@@ -269,7 +277,6 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
       `, [lista.id])
       const resumoAnterior: ResumoAnterior | null = anterior[0] ?? null
 
-      // Monta objeto de dados para IA
       const dadosSemana: DadosSemana = {
         lista_id:                lista.id,
         nome:                    lista.nome,
@@ -301,7 +308,6 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
 
       const score = calcularScore(dadosSemana)
 
-      // Variações em relação à semana anterior
       const uptimeVariacao = resumoAnterior?.uptime_pct != null
         ? Number((dadosSemana.uptime_pct - resumoAnterior.uptime_pct).toFixed(1))
         : null
@@ -312,10 +318,8 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
         ? Number((score - Number(resumoAnterior.score_medio)).toFixed(1))
         : null
 
-      // Análise por IA
       const analise = await analisarComIA(dadosSemana, resumoAnterior)
 
-      // Grava resumo
       await pool.query(`
         INSERT INTO m3u_resumos_semanais (
           lista_id, semana_inicio, semana_fim,
@@ -348,7 +352,6 @@ export async function compactarSemana(semanaInicio?: Date): Promise<{
         uptimeVariacao, pingVariacao, scoreVariacao,
       ])
 
-      // Deleta os testes da semana compactada
       const { rowCount } = await pool.query(`
         DELETE FROM m3u_testes
         WHERE lista_id = $1
