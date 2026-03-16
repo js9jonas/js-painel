@@ -13,6 +13,7 @@ type ModalData = {
   id_cliente: string;
   nome: string;
   nome_app: string;
+  validade: string | null;
 };
 
 function diasRestantes(data: string): number {
@@ -70,6 +71,7 @@ export default function AlertasAppsClient({
       id_cliente: r.id_cliente,
       nome: r.nome,
       nome_app: r.nome_app,
+      validade: r.validade ?? null,
     });
     setModo("pagamento");
     setForma("PIX");
@@ -87,13 +89,21 @@ export default function AlertasAppsClient({
       if (modo === "somente") {
         await renovarValidadeApp(modal.id_app_registro);
       } else {
+        // Calcula novaValidade: vencido = hoje + 1 ano, vigente = validade + 1 ano
+        const base = modal.validade ? new Date(modal.validade + "T00:00:00") : new Date();
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        const ref = base < hoje ? hoje : base;
+        ref.setFullYear(ref.getFullYear() + 1);
+        const novaValidade = ref.toISOString().split("T")[0];
+
         await renovarAplicativo({
           id_app_registro: Number(modal.id_app_registro),
           id_cliente: Number(modal.id_cliente),
-          renovarValidade: true,
+          novaValidade,
+          modo: "pagamento",
           valor: parseFloat(valor) || 0,
           forma,
-          detalhes: "",
         });
       }
       setModal(null);
