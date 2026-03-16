@@ -104,10 +104,10 @@ const FORM_INICIAL: FormData = {
 }
 
 const PERIODOS = [
-  { horas: 0, label: 'Último teste' },
-  { horas: 1, label: '1h' },
-  { horas: 6, label: '6h' },
-  { horas: 24, label: '24h' },
+  { horas: 0,   label: 'Último teste' },
+  { horas: 1,   label: '1h' },
+  { horas: 6,   label: '6h' },
+  { horas: 24,  label: '24h' },
   { horas: 168, label: '7d' },
 ]
 
@@ -144,16 +144,13 @@ function statusConfig(status: StatusLista) {
   }
 }
 
-// Calcula score a partir de médias históricas ou fallback para último teste
 function scoreQualidade(lista: Lista, mediasHistorico: HistoricoMedias | null): number | null {
-  const ping = mediasHistorico?.ping_medio ?? lista.ping_ms ?? null
+  const ping   = mediasHistorico?.ping_medio   ?? lista.ping_ms   ?? null
   const jitter = mediasHistorico?.jitter_medio ?? lista.jitter_ms ?? null
-  const uptime = mediasHistorico?.uptime_pct ?? lista.uptime_24h ?? null
-
+  const uptime = mediasHistorico?.uptime_pct   ?? lista.uptime_24h ?? null
   if (ping === null && uptime === null) return null
-
-  const scorePing = Math.max(0, 100 - (ping ?? 999) / 10)
-  const scoreJitter = Math.max(0, 100 - (jitter ?? 0) / 5)
+  const scorePing   = Math.max(0, 100 - (ping   ?? 999) / 10)
+  const scoreJitter = Math.max(0, 100 - (jitter ?? 0)   / 5)
   const scoreUptime = uptime ?? 0
   return Math.round((scorePing * 0.35 + scoreUptime * 0.45 + scoreJitter * 0.20)) / 10
 }
@@ -172,7 +169,6 @@ function formatNum(n: number | null, sufixo = '') {
 
 function tempoAtras(iso: string | null, agora: number) {
   if (!iso) return '—'
-  // Força UTC — PostgreSQL retorna sem fuso, navegador interpretaria como local
   const data = new Date(iso.endsWith('Z') ? iso : iso + 'Z')
   const diff = Math.floor((agora - data.getTime()) / 1000)
   if (diff < 60) return `${diff}s atrás`
@@ -180,22 +176,23 @@ function tempoAtras(iso: string | null, agora: number) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`
   return `${Math.floor(diff / 86400)}d atrás`
 }
+
 // ─── Radar de qualidade ───────────────────────────────────────────────────────
 
 function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
-  const maxPing = Math.max(...medias.map(m => m.ping_medio ?? 0), 1)
+  const maxPing   = Math.max(...medias.map(m => m.ping_medio   ?? 0), 1)
   const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
-  const maxTtfb = Math.max(...medias.map(m => m.ttfb_medio ?? 0), 1)
-  const maxVel = Math.max(...medias.map(m => m.velocidade_media ?? 0), 1)
+  const maxTtfb   = Math.max(...medias.map(m => m.ttfb_medio   ?? 0), 1)
+  const maxVel    = Math.max(...medias.map(m => m.velocidade_media ?? 0), 1)
 
   const dadosRadar = medias.map((m, i) => ({
     nome: m.nome,
     cor: CORES_SERVIDOR[i % CORES_SERVIDOR.length],
     data: [
-      { eixo: 'Uptime', valor: m.uptime_pct ?? 0 },
-      { eixo: 'Ping', valor: Math.max(0, 100 - ((m.ping_medio ?? maxPing) / maxPing) * 100) },
-      { eixo: 'Jitter', valor: Math.max(0, 100 - ((m.jitter_medio ?? maxJitter) / maxJitter) * 100) },
-      { eixo: 'TTFB', valor: Math.max(0, 100 - ((m.ttfb_medio ?? maxTtfb) / maxTtfb) * 100) },
+      { eixo: 'Uptime',     valor: m.uptime_pct ?? 0 },
+      { eixo: 'Ping',       valor: Math.max(0, 100 - ((m.ping_medio   ?? maxPing)   / maxPing)   * 100) },
+      { eixo: 'Jitter',     valor: Math.max(0, 100 - ((m.jitter_medio ?? maxJitter) / maxJitter) * 100) },
+      { eixo: 'TTFB',       valor: Math.max(0, 100 - ((m.ttfb_medio   ?? maxTtfb)   / maxTtfb)   * 100) },
       { eixo: 'Velocidade', valor: maxVel > 0 ? ((m.velocidade_media ?? 0) / maxVel) * 100 : 0 },
     ],
   }))
@@ -204,9 +201,7 @@ function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {dadosRadar.map(servidor => (
         <div key={servidor.nome} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
-          <p className="text-xs font-semibold text-center mb-1 truncate" style={{ color: servidor.cor }}>
-            {servidor.nome}
-          </p>
+          <p className="text-xs font-semibold text-center mb-1 truncate" style={{ color: servidor.cor }}>{servidor.nome}</p>
           <ResponsiveContainer width="100%" height={160}>
             <RadarChart data={servidor.data} margin={{ top: 0, right: 16, bottom: 0, left: 16 }}>
               <PolarGrid stroke="#e5e7eb" />
@@ -231,12 +226,7 @@ function RadarQualidade({ medias }: { medias: HistoricoMedias[] }) {
 // ─── Gráfico latências ────────────────────────────────────────────────────────
 
 function GraficoLatencias({ medias }: { medias: HistoricoMedias[] }) {
-  const data = medias.map(m => ({
-    nome: m.nome,
-    Ping: m.ping_medio ?? 0,
-    Jitter: m.jitter_medio ?? 0,
-    TTFB: m.ttfb_medio ?? 0,
-  }))
+  const data = medias.map(m => ({ nome: m.nome, Ping: m.ping_medio ?? 0, Jitter: m.jitter_medio ?? 0, TTFB: m.ttfb_medio ?? 0 }))
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }} barCategoryGap="20%">
@@ -245,9 +235,9 @@ function GraficoLatencias({ medias }: { medias: HistoricoMedias[] }) {
         <YAxis tick={{ fontSize: 11 }} unit="ms" />
         <Tooltip formatter={(v, name) => [`${v}ms`, name]} contentStyle={{ fontSize: 12 }} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-        <Bar dataKey="Ping" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="Ping"   fill="#3b82f6" radius={[3, 3, 0, 0]} />
         <Bar dataKey="Jitter" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-        <Bar dataKey="TTFB" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="TTFB"   fill="#8b5cf6" radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -256,19 +246,11 @@ function GraficoLatencias({ medias }: { medias: HistoricoMedias[] }) {
 // ─── Gráfico velocidade ───────────────────────────────────────────────────────
 
 function GraficoVelocidade({ medias }: { medias: HistoricoMedias[] }) {
-  const data = medias
-    .filter(m => m.velocidade_media !== null && m.velocidade_media > 0)
-    .map(m => ({
-      nome: m.nome,
-      velocidade: Math.round((m.velocidade_media ?? 0) / 1000 * 10) / 10,
-    }))
-
+  const data = medias.filter(m => m.velocidade_media !== null && m.velocidade_media > 0)
+    .map(m => ({ nome: m.nome, velocidade: Math.round((m.velocidade_media ?? 0) / 1000 * 10) / 10 }))
   if (data.length === 0) return (
-    <div className="flex items-center justify-center h-32 text-xs text-gray-400">
-      Dados disponíveis após teste completo
-    </div>
+    <div className="flex items-center justify-center h-32 text-xs text-gray-400">Dados disponíveis após teste completo</div>
   )
-
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
@@ -330,6 +312,9 @@ function GraficoPingTempo({ serie, servidores }: { serie: Record<string, number>
 
 function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; servidores: string[] }) {
   const sorted = [...medias].sort((a, b) => (b.uptime_pct ?? 0) - (a.uptime_pct ?? 0))
+  const maxPing   = Math.max(...medias.map(m => m.ping_medio   ?? 0), 1)
+  const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
+  const maxTtfb   = Math.max(...medias.map(m => m.ttfb_medio   ?? 0), 1)
 
   function barinha(valor: number, max: number, cor: string) {
     const pct = Math.min(100, (valor / max) * 100)
@@ -344,10 +329,6 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
       </div>
     )
   }
-
-  const maxPing = Math.max(...medias.map(m => m.ping_medio ?? 0), 1)
-  const maxJitter = Math.max(...medias.map(m => m.jitter_medio ?? 0), 1)
-  const maxTtfb = Math.max(...medias.map(m => m.ttfb_medio ?? 0), 1)
 
   return (
     <div className="overflow-x-auto">
@@ -365,12 +346,11 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
         </thead>
         <tbody>
           {sorted.map((m, i) => {
-            const cor = CORES_SERVIDOR[servidores.indexOf(m.nome) % CORES_SERVIDOR.length]
+            const cor    = CORES_SERVIDOR[servidores.indexOf(m.nome) % CORES_SERVIDOR.length]
             const uptime = m.uptime_pct ?? 0
-            const scorePing = Math.max(0, 100 - (m.ping_medio ?? 999) / 10)
-            const scoreJitter = Math.max(0, 100 - (m.jitter_medio ?? 0) / 5)
+            const scorePing   = Math.max(0, 100 - (m.ping_medio   ?? 999) / 10)
+            const scoreJitter = Math.max(0, 100 - (m.jitter_medio ?? 0)   / 5)
             const score = Math.round((scorePing * 0.35 + uptime * 0.45 + scoreJitter * 0.20)) / 10
-
             return (
               <tr key={m.id} className={i % 2 === 0 ? 'bg-gray-50 dark:bg-gray-800/50' : ''}>
                 <td className="px-4 py-3">
@@ -379,28 +359,19 @@ function TabelaComparativa({ medias, servidores }: { medias: HistoricoMedias[]; 
                     <span className="font-medium text-gray-800 dark:text-gray-200 text-xs truncate max-w-[90px]">{m.nome}</span>
                   </div>
                 </td>
-                <td className="px-4 py-2.5">{barinha(m.ping_medio ?? 0, maxPing, '#3b82f6')}</td>
+                <td className="px-4 py-2.5">{barinha(m.ping_medio   ?? 0, maxPing,   '#3b82f6')}</td>
                 <td className="px-4 py-2.5">{barinha(m.jitter_medio ?? 0, maxJitter, '#f59e0b')}</td>
-                <td className="px-4 py-2.5">{barinha(m.ttfb_medio ?? 0, maxTtfb, '#8b5cf6')}</td>
+                <td className="px-4 py-2.5">{barinha(m.ttfb_medio   ?? 0, maxTtfb,   '#8b5cf6')}</td>
                 <td className="px-4 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1.5">
                     <div className="w-12 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{
-                        width: `${uptime}%`,
-                        backgroundColor: uptime >= 90 ? '#10b981' : uptime >= 70 ? '#f59e0b' : '#ef4444',
-                      }} />
+                      <div className="h-full rounded-full" style={{ width: `${uptime}%`, backgroundColor: uptime >= 90 ? '#10b981' : uptime >= 70 ? '#f59e0b' : '#ef4444' }} />
                     </div>
-                    <span className={`text-xs font-semibold tabular-nums ${uptime >= 90 ? 'text-green-600 dark:text-green-400'
-                      : uptime >= 70 ? 'text-yellow-600 dark:text-yellow-400'
-                        : 'text-red-600 dark:text-red-400'
-                      }`}>{uptime}%</span>
+                    <span className={`text-xs font-semibold tabular-nums ${uptime >= 90 ? 'text-green-600 dark:text-green-400' : uptime >= 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{uptime}%</span>
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-right">
-                  <span className={`text-sm font-bold ${score >= 8 ? 'text-green-600 dark:text-green-400'
-                    : score >= 6 ? 'text-yellow-600 dark:text-yellow-400'
-                      : 'text-red-600 dark:text-red-400'
-                    }`}>{score}</span>
+                  <span className={`text-sm font-bold ${score >= 8 ? 'text-green-600 dark:text-green-400' : score >= 6 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{score}</span>
                 </td>
                 <td className="px-4 py-2.5 text-right text-gray-400 text-xs tabular-nums">{m.total_testes}</td>
               </tr>
@@ -462,27 +433,20 @@ function ModalCanalTeste({ lista, onFechar, onSalvar }: {
         </div>
         <div className="p-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex gap-2">
-            <input
-              className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Buscar canal..."
-              value={busca}
+            <input className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Buscar canal..." value={busca}
               onChange={e => setBusca(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && buscarCanais(busca)}
-            />
+              onKeyDown={e => e.key === 'Enter' && buscarCanais(busca)} />
             <button onClick={() => buscarCanais(busca)} disabled={buscando}
               className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
               {buscando ? '...' : 'Buscar'}
             </button>
           </div>
-          {lista.stream_teste_id && (
-            <p className="text-xs text-gray-400 mt-2">Atual: ID {lista.stream_teste_id}</p>
-          )}
+          {lista.stream_teste_id && <p className="text-xs text-gray-400 mt-2">Atual: ID {lista.stream_teste_id}</p>}
         </div>
         <div className="max-h-72 overflow-y-auto">
           {erro && <p className="text-sm text-red-500 px-4 py-3">{erro}</p>}
-          {canais.length === 0 && !buscando && !erro && (
-            <p className="text-sm text-gray-400 px-4 py-3">Nenhum canal encontrado</p>
-          )}
+          {canais.length === 0 && !buscando && !erro && <p className="text-sm text-gray-400 px-4 py-3">Nenhum canal encontrado</p>}
           {canais.map(canal => (
             <button key={canal.stream_id} onClick={() => handleSelecionarCanal(canal.stream_id, canal.nome)}
               disabled={salvando}
@@ -497,157 +461,20 @@ function ModalCanalTeste({ lista, onFechar, onSalvar }: {
   )
 }
 
-// ─── Card de Lista ────────────────────────────────────────────────────────────
+// ─── Modal Editar / Nova Lista ────────────────────────────────────────────────
 
-function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido, testandoCompleto, onToggleAtivo, onExcluir, onTestarRapido, onTestarCompleto, onSalvarCanalTeste }: {
-  lista: Lista
-  agora: number
-  mediasHistorico: HistoricoMedias | null
-  periodoHoras: number
-  testandoRapido: boolean
-  testandoCompleto: boolean
-  onToggleAtivo: (id: number, ativo: boolean) => void
-  onExcluir: (id: number, nome: string) => void
-  onTestarRapido: (id: number) => void
-  onTestarCompleto: (id: number) => void
-  onSalvarCanalTeste: (id: number, streamId: string, nome: string) => Promise<void>
-}) {
-  const [modalCanalAberto, setModalCanalAberto] = useState(false)
-  const cfg = statusConfig(lista.ultimo_status)
-  const score = scoreQualidade(lista, mediasHistorico)
-  const testando = testandoRapido || testandoCompleto
-
-  // Usa médias do período se disponível, senão usa último teste
-  const pingExibido = mediasHistorico?.ping_medio ?? lista.ping_ms
-  const jitterExibido = mediasHistorico?.jitter_medio ?? lista.jitter_ms
-  const ttfbExibido = mediasHistorico?.ttfb_medio ?? lista.ttfb_ms
-  const uptimeExibido = mediasHistorico?.uptime_pct ?? lista.uptime_24h
-
-  const labelPeriodo = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
-
-  return (
-    <div className={`relative bg-white dark:bg-gray-900 rounded-xl border-2 ${cfg.cor} transition-all duration-300 overflow-hidden ${!lista.ativo ? 'opacity-60' : ''}`}>
-      <div className="flex items-start justify-between p-4 pb-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex-shrink-0">
-            <div className={`w-3 h-3 rounded-full ${cfg.bg}`} />
-            {lista.ultimo_status === 'online' && (
-              <div className={`absolute inset-0 rounded-full ${cfg.bg} opacity-40 animate-ping`} />
-            )}
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">{lista.nome}</h3>
-            <p className="text-xs text-gray-400 truncate mt-0.5">
-              {lista.tipo === 'xtream' ? `Xtream · ${lista.host}` : lista.url_m3u}
-            </p>
-          </div>
-        </div>
-        <div className="flex-shrink-0 text-right ml-2">
-          {score !== null ? (
-            <>
-              <span className={`text-xl font-bold ${corScore(score)}`}>{score}</span>
-              <p className="text-xs text-gray-400 leading-none">/ 10</p>
-            </>
-          ) : (
-            <span className="text-xs text-gray-400">s/ dados</span>
-          )}
-        </div>
-      </div>
-
-      {/* Métricas — baseadas no período selecionado */}
-      <div className="grid grid-cols-4 gap-0 border-t border-b border-gray-100 dark:border-gray-800">
-        {[
-          { label: 'Ping', value: formatNum(pingExibido, 'ms') },
-          { label: 'Jitter', value: formatNum(jitterExibido, 'ms') },
-          { label: 'TTFB', value: ttfbExibido != null ? formatNum(ttfbExibido, 'ms') : '—' },
-          { label: 'Uptime', value: formatNum(uptimeExibido, '%') },
-        ].map(({ label, value }) => (
-          <div key={label} className="py-2 px-1 text-center">
-            <p className="text-xs text-gray-400 leading-none">{label}</p>
-            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-0.5">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Badge indicando período das médias */}
-      {mediasHistorico && (
-        <div className="px-4 py-1 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20">
-          <p className="text-[10px] text-blue-500 dark:text-blue-400">
-            📊 Médias dos últimos {labelPeriodo} · {mediasHistorico.total_testes} testes
-          </p>
-        </div>
-      )}
-
-      {lista.total_geral ? (
-        <div className="grid grid-cols-3 border-b border-gray-100 dark:border-gray-800">
-          {[
-            { label: 'Canais', valor: lista.total_canais, cor: 'text-blue-600 dark:text-blue-400' },
-            { label: 'Filmes', valor: lista.total_filmes, cor: 'text-purple-600 dark:text-purple-400' },
-            { label: 'Séries', valor: lista.total_series, cor: 'text-pink-600 dark:text-pink-400' },
-          ].map(({ label, valor, cor }) => (
-            <div key={label} className="py-2 px-1 text-center">
-              <p className="text-xs text-gray-400 leading-none">{label}</p>
-              <p className={`text-sm font-semibold mt-0.5 ${cor}`}>{(valor ?? 0).toLocaleString('pt-BR')}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">
-          Contagens disponíveis após 1º download completo
-        </div>
-      )}
-
-      <div className="flex items-center justify-between px-4 py-2">
-        <div className="flex items-center gap-2">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeCor}`}>{cfg.label}</span>
-          <span className="text-xs text-gray-400">{tempoAtras(lista.ultimo_teste_em, agora)}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => onTestarRapido(lista.id)} disabled={testando} title="Teste rápido"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 hover:text-blue-500 disabled:opacity-40 transition-colors text-xs">
-            {testandoRapido ? <span className="inline-block animate-spin text-sm">↻</span> : <><span className="text-sm">⚡</span><span className="hidden sm:inline">Rápido</span></>}
-          </button>
-          <button onClick={() => onTestarCompleto(lista.id)} disabled={testando} title="Teste completo"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 text-gray-400 hover:text-purple-500 disabled:opacity-40 transition-colors text-xs">
-            {testandoCompleto ? <span className="inline-block animate-spin text-sm">↻</span> : <><span className="text-sm">▷</span><span className="hidden sm:inline">Completo</span></>}
-          </button>
-          <button onClick={() => setModalCanalAberto(true)} title="Canal de teste"
-            className={`p-1.5 rounded-lg transition-colors text-sm ${lista.stream_teste_id ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-            🎯
-          </button>
-          <button onClick={() => onToggleAtivo(lista.id, !lista.ativo)} title={lista.ativo ? 'Desativar' : 'Ativar'}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 transition-colors text-sm">
-            {lista.ativo ? '⏸' : '▶'}
-          </button>
-          <button onClick={() => onExcluir(lista.id, lista.nome)} title="Excluir"
-            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors text-sm">
-            🗑
-          </button>
-        </div>
-      </div>
-
-      {uptimeExibido !== null && (
-        <div className="h-0.5 bg-gray-100 dark:bg-gray-800">
-          <div className={`h-full transition-all duration-500 ${uptimeExibido >= 90 ? 'bg-green-500' : uptimeExibido >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
-            style={{ width: `${uptimeExibido}%` }} />
-        </div>
-      )}
-
-      {modalCanalAberto && (
-        <ModalCanalTeste lista={lista} onFechar={() => setModalCanalAberto(false)}
-          onSalvar={(streamId, nome) => onSalvarCanalTeste(lista.id, streamId, nome)} />
-      )}
-    </div>
-  )
-}
-
-// ─── Modal Nova Lista ─────────────────────────────────────────────────────────
-
-function ModalNovaLista({ onFechar, onSalvar }: {
+function ModalLista({
+  titulo,
+  inicial,
+  onFechar,
+  onSalvar,
+}: {
+  titulo: string
+  inicial: FormData
   onFechar: () => void
   onSalvar: (data: FormData) => Promise<void>
 }) {
-  const [form, setForm] = useState<FormData>(FORM_INICIAL)
+  const [form, setForm] = useState<FormData>(inicial)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -671,7 +498,7 @@ function ModalNovaLista({ onFechar, onSalvar }: {
       onClick={e => e.target === e.currentTarget && onFechar()}>
       <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Nova lista M3U</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">{titulo}</h2>
           <button onClick={onFechar} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
         </div>
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -742,10 +569,183 @@ function ModalNovaLista({ onFechar, onSalvar }: {
           <button onClick={onFechar} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
           <button onClick={handleSubmit} disabled={salvando}
             className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {salvando ? 'Salvando...' : 'Salvar lista'}
+            {salvando ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Card de Lista ────────────────────────────────────────────────────────────
+
+function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido, testandoCompleto, onToggleAtivo, onExcluir, onTestarRapido, onTestarCompleto, onSalvarCanalTeste, onEditar }: {
+  lista: Lista
+  agora: number
+  mediasHistorico: HistoricoMedias | null
+  periodoHoras: number
+  testandoRapido: boolean
+  testandoCompleto: boolean
+  onToggleAtivo: (id: number, ativo: boolean) => void
+  onExcluir: (id: number, nome: string) => void
+  onTestarRapido: (id: number) => void
+  onTestarCompleto: (id: number) => void
+  onSalvarCanalTeste: (id: number, streamId: string, nome: string) => Promise<void>
+  onEditar: (id: number, form: FormData) => Promise<void>
+}) {
+  const [modalCanalAberto, setModalCanalAberto] = useState(false)
+  const [modalEditarAberto, setModalEditarAberto] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const cfg      = statusConfig(lista.ultimo_status)
+  const score    = scoreQualidade(lista, mediasHistorico)
+  const testando = testandoRapido || testandoCompleto
+
+  const pingExibido   = mediasHistorico?.ping_medio   ?? lista.ping_ms
+  const jitterExibido = mediasHistorico?.jitter_medio ?? lista.jitter_ms
+  const ttfbExibido   = mediasHistorico?.ttfb_medio   ?? lista.ttfb_ms
+  const uptimeExibido = mediasHistorico?.uptime_pct   ?? lista.uptime_24h
+  const labelPeriodo  = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
+
+  // Monta form inicial para edição pré-preenchido
+  const formInicial: FormData = {
+    nome: lista.nome,
+    tipo: lista.tipo,
+    url_m3u: lista.url_m3u ?? '',
+    host: lista.host ?? '',
+    usuario: lista.usuario ?? '',
+    senha: '',  // senha não é retornada pela API por segurança
+    porta: lista.porta ? String(lista.porta) : '',
+    intervalo_teste_min: String(lista.intervalo_teste_min),
+    indexar_conteudo: lista.indexar_conteudo,
+    ativo: lista.ativo,
+  }
+
+  return (
+    <div className={`relative bg-white dark:bg-gray-900 rounded-xl border-2 ${cfg.cor} transition-all duration-300 overflow-hidden ${!lista.ativo ? 'opacity-60' : ''}`}>
+      <div className="flex items-start justify-between p-4 pb-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative flex-shrink-0">
+            <div className={`w-3 h-3 rounded-full ${cfg.bg}`} />
+            {lista.ultimo_status === 'online' && (
+              <div className={`absolute inset-0 rounded-full ${cfg.bg} opacity-40 animate-ping`} />
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">{lista.nome}</h3>
+            <p className="text-xs text-gray-400 truncate mt-0.5">
+              {lista.tipo === 'xtream' ? `Xtream · ${lista.host}` : lista.url_m3u}
+            </p>
+          </div>
+        </div>
+        <div className="flex-shrink-0 text-right ml-2">
+          {score !== null ? (
+            <>
+              <span className={`text-xl font-bold ${corScore(score)}`}>{score}</span>
+              <p className="text-xs text-gray-400 leading-none">/ 10</p>
+            </>
+          ) : (
+            <span className="text-xs text-gray-400">s/ dados</span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-0 border-t border-b border-gray-100 dark:border-gray-800">
+        {[
+          { label: 'Ping',   value: formatNum(pingExibido,   'ms') },
+          { label: 'Jitter', value: formatNum(jitterExibido, 'ms') },
+          { label: 'TTFB',   value: ttfbExibido != null ? formatNum(ttfbExibido, 'ms') : '—' },
+          { label: 'Uptime', value: formatNum(uptimeExibido, '%') },
+        ].map(({ label, value }) => (
+          <div key={label} className="py-2 px-1 text-center">
+            <p className="text-xs text-gray-400 leading-none">{label}</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-0.5">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {mediasHistorico && (
+        <div className="px-4 py-1 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20">
+          <p className="text-[10px] text-blue-500 dark:text-blue-400">
+            📊 {periodoHoras === 0 ? 'Último teste' : `Médias dos últimos ${labelPeriodo}`} · {mediasHistorico.total_testes} teste{mediasHistorico.total_testes !== 1 ? 's' : ''}
+          </p>
+        </div>
+      )}
+
+      {lista.total_geral ? (
+        <div className="grid grid-cols-3 border-b border-gray-100 dark:border-gray-800">
+          {[
+            { label: 'Canais', valor: lista.total_canais, cor: 'text-blue-600 dark:text-blue-400' },
+            { label: 'Filmes', valor: lista.total_filmes, cor: 'text-purple-600 dark:text-purple-400' },
+            { label: 'Séries', valor: lista.total_series, cor: 'text-pink-600 dark:text-pink-400' },
+          ].map(({ label, valor, cor }) => (
+            <div key={label} className="py-2 px-1 text-center">
+              <p className="text-xs text-gray-400 leading-none">{label}</p>
+              <p className={`text-sm font-semibold mt-0.5 ${cor}`}>{(valor ?? 0).toLocaleString('pt-BR')}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">
+          Contagens disponíveis após 1º download completo
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeCor}`}>{cfg.label}</span>
+          <span className="text-xs text-gray-400">{tempoAtras(lista.ultimo_teste_em, agora)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => onTestarRapido(lista.id)} disabled={testando} title="Teste rápido"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 hover:text-blue-500 disabled:opacity-40 transition-colors text-xs">
+            {testandoRapido ? <span className="inline-block animate-spin text-sm">↻</span> : <><span className="text-sm">⚡</span><span className="hidden sm:inline">Rápido</span></>}
+          </button>
+          <button onClick={() => onTestarCompleto(lista.id)} disabled={testando} title="Teste completo"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 text-gray-400 hover:text-purple-500 disabled:opacity-40 transition-colors text-xs">
+            {testandoCompleto ? <span className="inline-block animate-spin text-sm">↻</span> : <><span className="text-sm">▷</span><span className="hidden sm:inline">Completo</span></>}
+          </button>
+          <button onClick={() => setModalCanalAberto(true)} title="Canal de teste"
+            className={`p-1.5 rounded-lg transition-colors text-sm ${lista.stream_teste_id ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+            🎯
+          </button>
+          <button onClick={() => setModalEditarAberto(true)} title="Editar lista"
+            className="p-1.5 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/20 text-gray-400 hover:text-yellow-500 transition-colors text-sm">
+            ✏️
+          </button>
+          <button onClick={() => onToggleAtivo(lista.id, !lista.ativo)} title={lista.ativo ? 'Desativar' : 'Ativar'}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 transition-colors text-sm">
+            {lista.ativo ? '⏸' : '▶'}
+          </button>
+          <button
+            onClick={() => { if (!confirm) { setConfirm(true); return } onExcluir(lista.id, lista.nome) }}
+            onMouseLeave={() => setConfirm(false)}
+            title={confirm ? 'Clique para confirmar' : 'Excluir'}
+            className={`p-1.5 rounded-lg transition-colors text-sm ${confirm ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : 'text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500'}`}>
+            🗑
+          </button>
+        </div>
+      </div>
+
+      {uptimeExibido !== null && (
+        <div className="h-0.5 bg-gray-100 dark:bg-gray-800">
+          <div className={`h-full transition-all duration-500 ${uptimeExibido >= 90 ? 'bg-green-500' : uptimeExibido >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+            style={{ width: `${uptimeExibido}%` }} />
+        </div>
+      )}
+
+      {modalCanalAberto && (
+        <ModalCanalTeste lista={lista} onFechar={() => setModalCanalAberto(false)}
+          onSalvar={(streamId, nome) => onSalvarCanalTeste(lista.id, streamId, nome)} />
+      )}
+
+      {modalEditarAberto && (
+        <ModalLista
+          titulo={`Editar · ${lista.nome}`}
+          inicial={formInicial}
+          onFechar={() => setModalEditarAberto(false)}
+          onSalvar={(form) => onEditar(lista.id, form)}
+        />
+      )}
     </div>
   )
 }
@@ -767,7 +767,6 @@ export default function TesteListasPage() {
   const [periodoHoras, setPeriodoHoras] = useState(24)
   const [abaGrafico, setAbaGrafico] = useState<'radar' | 'latencias' | 'uptime' | 'ping' | 'velocidade' | 'catalogo'>('radar')
 
-  // Tick a cada 15s para atualizar "X min atrás" nos cards
   const [agora, setAgora] = useState(Date.now())
   useEffect(() => {
     const t = setInterval(() => setAgora(Date.now()), 15_000)
@@ -798,15 +797,12 @@ export default function TesteListasPage() {
     return () => clearInterval(interval)
   }, [carregar, carregarHistorico, periodoHoras])
 
-  // Muda período — atualiza cards e gráficos juntos
   function handleMudarPeriodo(horas: number) {
     setPeriodoHoras(horas)
-    if (horas > 0) carregarHistorico(horas)
+    carregarHistorico(horas)
   }
 
-  // Busca médias do histórico para uma lista pelo nome
   function getMediasLista(lista: Lista): HistoricoMedias | null {
-    if (periodoHoras === 0) return null  // força último teste
     return historico?.medias.find(m => m.nome === lista.nome) ?? null
   }
 
@@ -817,11 +813,7 @@ export default function TesteListasPage() {
     for (const id of ids) {
       setTestandoRapidoIds(prev => new Set(prev).add(id))
       try {
-        await fetch('/api/m3u-testes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lista_id: id, rapido: true }),
-        })
+        await fetch('/api/m3u-testes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lista_id: id, rapido: true }) })
         await carregar()
         setAgora(Date.now())
       } catch { console.error('Erro ao testar lista', id) }
@@ -852,6 +844,33 @@ export default function TesteListasPage() {
       body: JSON.stringify({ ...form, porta: form.porta ? parseInt(form.porta) : null, intervalo_teste_min: parseInt(form.intervalo_teste_min) }),
     })
     if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro ao salvar') }
+    await carregar()
+  }
+
+  async function handleEditar(id: number, form: FormData) {
+    const body: Record<string, unknown> = {
+      nome: form.nome,
+      tipo: form.tipo,
+      ativo: form.ativo,
+      indexar_conteudo: form.indexar_conteudo,
+      intervalo_teste_min: parseInt(form.intervalo_teste_min),
+    }
+    if (form.tipo === 'url') {
+      body.url_m3u = form.url_m3u
+    } else {
+      body.host    = form.host
+      body.usuario = form.usuario
+      if (form.senha) body.senha = form.senha  // só envia senha se preenchida
+      if (form.porta) body.porta = parseInt(form.porta)
+      // Reconstrói a url_m3u para tipo xtream
+      body.url_m3u = `${form.host}/get.php?username=${form.usuario}&password=${form.senha || ''}&type=m3u_plus&output=ts`
+    }
+    const res = await fetch(`/api/m3u-listas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro ao editar') }
     await carregar()
   }
 
@@ -896,8 +915,8 @@ export default function TesteListasPage() {
     finally { setTestandoCompletoIds(prev => { const next = new Set(prev); next.delete(id); return next }) }
   }
 
-  const online = listas.filter(l => l.ultimo_status === 'online').length
-  const offline = listas.filter(l => l.ultimo_status && l.ultimo_status !== 'online').length
+  const online   = listas.filter(l => l.ultimo_status === 'online').length
+  const offline  = listas.filter(l => l.ultimo_status && l.ultimo_status !== 'online').length
   const semDados = listas.filter(l => !l.ultimo_status).length
 
   const listasFiltradas = listas.filter(l => {
@@ -907,12 +926,12 @@ export default function TesteListasPage() {
   })
 
   const ABAS = [
-    { id: 'radar', label: '🕸 Radar' },
-    { id: 'latencias', label: '📶 Latências' },
-    { id: 'uptime', label: '✅ Uptime' },
-    { id: 'ping', label: '📈 Ping/Tempo' },
+    { id: 'radar',      label: '🕸 Radar' },
+    { id: 'latencias',  label: '📶 Latências' },
+    { id: 'uptime',     label: '✅ Uptime' },
+    { id: 'ping',       label: '📈 Ping/Tempo' },
     { id: 'velocidade', label: '⚡ Velocidade' },
-    { id: 'catalogo', label: '📦 Catálogo' },
+    { id: 'catalogo',   label: '📦 Catálogo' },
   ] as const
 
   const labelPeriodoAtual = PERIODOS.find(p => p.horas === periodoHoras)?.label ?? '24h'
@@ -975,7 +994,7 @@ export default function TesteListasPage() {
         </div>
       )}
 
-      {/* Seletor de período — compartilhado entre cards e gráficos */}
+      {/* Seletor de período */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Período de análise:</span>
         <div className="flex gap-1">
@@ -986,16 +1005,18 @@ export default function TesteListasPage() {
             </button>
           ))}
         </div>
-        <span className="text-xs text-gray-400">Score e métricas baseados em médias de {labelPeriodoAtual}</span>
+        <span className="text-xs text-gray-400">
+          {periodoHoras === 0 ? 'Métricas do último teste' : `Score e métricas baseados em médias de ${labelPeriodoAtual}`}
+        </span>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Total', valor: listas.length, cor: 'text-gray-900 dark:text-gray-100', filtroVal: 'todas' as const },
-          { label: 'Online', valor: online, cor: 'text-green-600 dark:text-green-400', filtroVal: 'online' as const },
-          { label: 'Offline', valor: offline, cor: 'text-red-600 dark:text-red-400', filtroVal: 'offline' as const },
-          { label: 'Sem dados', valor: semDados, cor: 'text-gray-400', filtroVal: 'todas' as const },
+          { label: 'Total',     valor: listas.length, cor: 'text-gray-900 dark:text-gray-100', filtroVal: 'todas'   as const },
+          { label: 'Online',    valor: online,        cor: 'text-green-600 dark:text-green-400', filtroVal: 'online' as const },
+          { label: 'Offline',   valor: offline,       cor: 'text-red-600 dark:text-red-400',   filtroVal: 'offline' as const },
+          { label: 'Sem dados', valor: semDados,      cor: 'text-gray-400',                    filtroVal: 'todas'   as const },
         ].map(({ label, valor, cor, filtroVal }) => (
           <button key={label} onClick={() => setFiltro(filtroVal)}
             className={`text-left p-4 rounded-xl border transition-all ${filtro === filtroVal && filtroVal !== 'todas' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300'}`}>
@@ -1038,6 +1059,7 @@ export default function TesteListasPage() {
               onTestarRapido={handleTestarRapido}
               onTestarCompleto={handleTestarCompleto}
               onSalvarCanalTeste={handleSalvarCanalTeste}
+              onEditar={handleEditar}
             />
           ))}
         </div>
@@ -1048,7 +1070,9 @@ export default function TesteListasPage() {
         <div className="mt-10 space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Análise comparativa</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Período: últimos {labelPeriodoAtual}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {periodoHoras === 0 ? 'Último teste de cada servidor' : `Período: últimos ${labelPeriodoAtual}`}
+            </p>
           </div>
 
           <div className="flex gap-1 flex-wrap border-b border-gray-200 dark:border-gray-800">
@@ -1123,7 +1147,14 @@ export default function TesteListasPage() {
         </div>
       )}
 
-      {modalAberto && <ModalNovaLista onFechar={() => setModalAberto(false)} onSalvar={handleSalvar} />}
+      {modalAberto && (
+        <ModalLista
+          titulo="Nova lista M3U"
+          inicial={FORM_INICIAL}
+          onFechar={() => setModalAberto(false)}
+          onSalvar={handleSalvar}
+        />
+      )}
     </div>
   )
 }
