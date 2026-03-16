@@ -316,7 +316,7 @@ async function medirDownload(urlM3u: string) {
     clearTimeout(timerTtfb)
     const msg = err instanceof Error ? err.message : 'Erro desconhecido'
     resultado.erro_mensagem = msg.includes('abort')
-      ? 'Timeout: servidor nao respondeu em 15s'
+      ? 'Timeout: servidor nao respondeu em 20s'
       : msg
   }
 
@@ -324,9 +324,6 @@ async function medirDownload(urlM3u: string) {
 }
 
 // ─── Determina status final ───────────────────────────────────────────────────
-// 401 = credenciais inválidas mas servidor online
-// 403 = acesso bloqueado mas servidor online
-// >= 400 exceto 401/403 = offline
 
 function determinarStatus(
   erroMensagem: string | null,
@@ -338,11 +335,101 @@ function determinarStatus(
   if (erroMensagem) return 'erro'
   if (!httpStatus) return 'offline'
   if (httpStatus === 401 || httpStatus === 403) return 'online'
-  // 404 com TTFB baixo = servidor respondeu mas bloqueou (não é offline real)
   if (httpStatus === 404 && ttfbMs !== null && ttfbMs < 800) return 'online'
   if (httpStatus >= 400) return 'offline'
   if ((perdaPacotes ?? 0) >= 80) return 'offline'
   return 'online'
+}
+
+// ─── Teste de stream direto via URL ──────────────────────────────────────────
+// Conecta direto no .ts sem precisar baixar lista M3U
+
+async function testarStreamDireto(
+  urlStream: string,
+  duracaoS = 20
+): Promise<{
+  ttfb_ms: number | null
+  throughput_kbps: number | null
+  consistencia_pct: number | null
+  status: 'ok' | 'lento' | 'falhou'
+}> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), (duracaoS + 10) * 1000)
+
+  try {
+    const inicio = Date.now()
+    const res = await fetch(urlStream, {
+      signal: controller.signal,
+      headers: { 'User-Agent': IPTV_USER_AGENT },
+    })
+
+    if (!res.ok || !res.body) {
+      return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
+    }
+
+    const ttfb_ms = Date.now() - inicio
+    const reader = res.body.getReader()
+    const fimLeitura = Date.now() + duracaoS * 1000
+    const janelas: number[] = []
+    let bytesJanela = 0
+    let inicioJanela = Date.now()
+
+    while (Date.now() < fimLeitura) {
+      const { done, value } = await reader.read()
+      if (done) break
+      bytesJanela += value.byteLength
+
+      const agora = Date.now()
+      if (agora - inicioJanela >= 2000) {
+        const kbps = (bytesJanela * 8) / (agora - inicioJanela)
+        janelas.push(kbps)
+        bytesJanela = 0
+        inicioJanela = agora
+      }
+    }
+
+    reader.cancel()
+
+    if (janelas.length === 0) {
+      return { ttfb_ms, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
+    }
+
+    const throughputMedio = janelas.reduce((a, b) => a + b, 0) / janelas.length
+    const throughputMin = Math.min(...janelas)
+    const consistencia_pct = Math.round((throughputMin / throughputMedio) * 100)
+    const status = throughputMedio < 500 ? 'lento' : consistencia_pct < 40 ? 'lento' : 'ok'
+
+    return {
+      ttfb_ms,
+      throughput_kbps: Math.round(throughputMedio),
+      consistencia_pct,
+      status,
+    }
+  } catch {
+    return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function buscarStreamCanal(
+  creds: XtreamCredentials,
+  termoBusca: string
+): Promise<{ stream_id: number; nome: string } | null> {
+  try {
+    const url = `${creds.host}/player_api.php?username=${creds.username}&password=${creds.password}&action=get_live_streams`
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': IPTV_USER_AGENT },
+    })
+    if (!res.ok) return null
+    const canais = await res.json() as Array<{ stream_id: number; name: string }>
+    const termo = termoBusca.toLowerCase()
+    const encontrado = canais.find(c => c.name.toLowerCase().includes(termo))
+    return encontrado ? { stream_id: encontrado.stream_id, nome: encontrado.name } : null
+  } catch {
+    return null
+  }
 }
 
 // ─── Snapshot + catálogo ──────────────────────────────────────────────────────
@@ -370,7 +457,6 @@ async function salvarSnapshotEConteudo(
 
   const precisaParsear = !countsXtream
   const entradas = precisaParsear ? parsearEntradas(conteudo) : []
-
   const contagens = countsXtream ?? gerarContagens(entradas)
 
   let diffAnterior = null
@@ -436,10 +522,12 @@ async function salvarSnapshotEConteudo(
 }
 
 // ─── Teste rápido ─────────────────────────────────────────────────────────────
+// Faz: ping + HEAD/GET abortado + teste de stream direto (se stream_teste_id configurado)
+// Não baixa a lista M3U completa — muito mais leve para o cron
 
 export async function testarListaRapido(listaId: number): Promise<ResultadoTeste> {
   const { rows } = await pool.query(
-    'SELECT id, url_m3u FROM m3u_listas WHERE id = $1',
+    'SELECT id, url_m3u, tipo, host, usuario, senha, stream_teste_id FROM m3u_listas WHERE id = $1',
     [listaId]
   )
   if (rows.length === 0) throw new Error(`Lista ${listaId} nao encontrada`)
@@ -450,7 +538,7 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
   const pingResult = await medirPing(urlHost, 3, 5000)
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 15000)
+  const timer = setTimeout(() => controller.abort(), 20000)
   let http_status: number | null = null
   let ttfb_ms: number | null = null
   let erro_mensagem: string | null = null
@@ -470,7 +558,7 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erro desconhecido'
     if (!msg.includes('abort') || http_status === null) {
-      erro_mensagem = ttfb_ms === null ? 'Timeout: sem resposta em 15s' : msg
+      erro_mensagem = ttfb_ms === null ? 'Timeout: sem resposta em 20s' : msg
     }
   } finally {
     clearTimeout(timer)
@@ -478,6 +566,36 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
 
   const status = determinarStatus(erro_mensagem, http_status, pingResult.perda_pacotes_pct ?? null, ttfb_ms)
 
+  // ─── Teste de stream direto ───────────────────────────────────────────────
+  // Condições: servidor online + xtream + host/usuario/senha + stream_teste_id salvo
+  let streamCanalNome: string | null = null
+  let streamTtfb: number | null = null
+  let streamThroughput: number | null = null
+  let streamConsistencia: number | null = null
+  let streamDuracao: number | null = null
+  let streamStatus: ResultadoTeste['stream_status'] = null
+
+  // Monta credenciais para o stream
+  const credsRapido: XtreamCredentials | null =
+    lista.tipo === 'xtream' && lista.host && lista.usuario && lista.senha
+      ? { host: lista.host, username: lista.usuario, password: lista.senha }
+      : extrairCredenciaisXtream(lista.url_m3u)
+
+  if (status === 'online' && credsRapido && lista.stream_teste_id) {
+    const urlStream = `${credsRapido.host}/live/${credsRapido.username}/${credsRapido.password}/${lista.stream_teste_id}.ts`
+    console.log(`[teste-rapido] stream direto → ${urlStream}`)
+
+    streamCanalNome = `ID ${lista.stream_teste_id}`
+    streamDuracao = 20
+
+    const streamResult = await testarStreamDireto(urlStream, 20)
+    streamTtfb = streamResult.ttfb_ms
+    streamThroughput = streamResult.throughput_kbps
+    streamConsistencia = streamResult.consistencia_pct
+    streamStatus = streamResult.status
+
+    console.log(`[teste-rapido] stream → ${streamStatus} | ${streamThroughput}kbps | consistencia ${streamConsistencia}%`)
+  }
   const resultado: ResultadoTeste = {
     lista_id: listaId,
     status,
@@ -490,24 +608,29 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
     tamanho_lista_kb: null,
     tempo_download_ms: null,
     erro_mensagem,
-    stream_canal_nome: null,
-    stream_ttfb_ms: null,
-    stream_throughput_kbps: null,
-    stream_consistencia_pct: null,
-    stream_duracao_s: null,
-    stream_status: null,
+    stream_canal_nome: streamCanalNome,
+    stream_ttfb_ms: streamTtfb,
+    stream_throughput_kbps: streamThroughput,
+    stream_consistencia_pct: streamConsistencia,
+    stream_duracao_s: streamDuracao,
+    stream_status: streamStatus,
   }
 
   await pool.query(
     `INSERT INTO m3u_testes
       (lista_id, status, ping_ms, jitter_ms, perda_pacotes_pct,
        http_status, ttfb_ms, velocidade_kbps, tamanho_lista_kb,
-       tempo_download_ms, erro_mensagem)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+       tempo_download_ms, erro_mensagem,
+       stream_canal_nome, stream_ttfb_ms, stream_throughput_kbps,
+       stream_consistencia_pct, stream_duracao_s, stream_status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [
       resultado.lista_id, resultado.status, resultado.ping_ms,
       resultado.jitter_ms, resultado.perda_pacotes_pct, resultado.http_status,
       resultado.ttfb_ms, null, null, null, resultado.erro_mensagem,
+      resultado.stream_canal_nome, resultado.stream_ttfb_ms,
+      resultado.stream_throughput_kbps, resultado.stream_consistencia_pct,
+      resultado.stream_duracao_s, resultado.stream_status,
     ]
   )
 
@@ -516,109 +639,13 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
   return resultado
 }
 
-// ─── Teste de Stream ──────────────────────────────────────────────────────────
-
-async function buscarStreamCanal(
-  creds: XtreamCredentials,
-  termoBusca: string
-): Promise<{ stream_id: number; nome: string } | null> {
-  try {
-    const url = `${creds.host}/player_api.php?username=${creds.username}&password=${creds.password}&action=get_live_streams`
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: { 'User-Agent': IPTV_USER_AGENT },
-    })
-    if (!res.ok) return null
-    const canais = await res.json() as Array<{ stream_id: number; name: string }>
-    const termo = termoBusca.toLowerCase()
-    const encontrado = canais.find(c => c.name.toLowerCase().includes(termo))
-    return encontrado ? { stream_id: encontrado.stream_id, nome: encontrado.name } : null
-  } catch {
-    return null
-  }
-}
-
-async function testarStream(
-  creds: XtreamCredentials,
-  streamId: number,
-  duracaoS = 20
-): Promise<{
-  ttfb_ms: number | null
-  throughput_kbps: number | null
-  consistencia_pct: number | null
-  status: 'ok' | 'lento' | 'falhou'
-}> {
-  const url = `${creds.host}/live/${creds.username}/${creds.password}/${streamId}.ts`
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), (duracaoS + 10) * 1000)
-
-  try {
-    const inicio = Date.now()
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': IPTV_USER_AGENT },
-    })
-
-    if (!res.ok || !res.body) {
-      return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
-    }
-
-    const ttfb_ms = Date.now() - inicio
-
-    const reader = res.body.getReader()
-    const fimLeitura = Date.now() + duracaoS * 1000
-    const janelas: number[] = []
-    let bytesJanela = 0
-    let inicioJanela = Date.now()
-
-    while (Date.now() < fimLeitura) {
-      const { done, value } = await reader.read()
-      if (done) break
-      bytesJanela += value.byteLength
-
-      const agora = Date.now()
-      if (agora - inicioJanela >= 2000) {
-        const kbps = (bytesJanela * 8) / ((agora - inicioJanela))
-        janelas.push(kbps)
-        bytesJanela = 0
-        inicioJanela = agora
-      }
-    }
-
-    reader.cancel()
-
-    if (janelas.length === 0) {
-      return { ttfb_ms, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
-    }
-
-    const throughputMedio = janelas.reduce((a, b) => a + b, 0) / janelas.length
-    const throughputMin = Math.min(...janelas)
-    const consistencia_pct = Math.round((throughputMin / throughputMedio) * 100)
-
-    const status = throughputMedio < 500
-      ? 'lento'
-      : consistencia_pct < 40
-        ? 'lento'
-        : 'ok'
-
-    return {
-      ttfb_ms,
-      throughput_kbps: Math.round(throughputMedio),
-      consistencia_pct,
-      status,
-    }
-  } catch {
-    return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 // ─── Teste completo ───────────────────────────────────────────────────────────
+// Faz: ping + download lista M3U + contagens + snapshot + teste de stream
+// Prioridade stream: stream_teste_id salvo → fallback busca "telecine" na API
 
 export async function testarLista(listaId: number): Promise<ResultadoTeste> {
   const { rows } = await pool.query(
-    'SELECT id, url_m3u, tipo, host, usuario, senha, indexar_conteudo FROM m3u_listas WHERE id = $1',
+    'SELECT id, url_m3u, tipo, host, usuario, senha, indexar_conteudo, stream_teste_id FROM m3u_listas WHERE id = $1',
     [listaId]
   )
   if (rows.length === 0) throw new Error(`Lista ${listaId} nao encontrada`)
@@ -640,14 +667,7 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
     downloadResult.ttfb_ms
   )
 
-  // Teste de stream (somente se online e tiver credenciais Xtream)
-  const credsParaStream: XtreamCredentials | null =
-    status === 'online'
-      ? (lista.tipo === 'xtream' && lista.host && lista.usuario && lista.senha
-        ? { host: lista.host, username: lista.usuario, password: lista.senha }
-        : extrairCredenciaisXtream(lista.url_m3u))
-      : null
-
+  // ─── Teste de stream ──────────────────────────────────────────────────────
   let streamCanalNome: string | null = null
   let streamTtfb: number | null = null
   let streamThroughput: number | null = null
@@ -655,18 +675,39 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
   let streamDuracao: number | null = null
   let streamStatus: ResultadoTeste['stream_status'] = null
 
+  const credsParaStream: XtreamCredentials | null =
+    status === 'online'
+      ? (lista.tipo === 'xtream' && lista.host && lista.usuario && lista.senha
+        ? { host: lista.host, username: lista.usuario, password: lista.senha }
+        : extrairCredenciaisXtream(lista.url_m3u))
+      : null
+
   if (credsParaStream) {
-    const canal = await buscarStreamCanal(credsParaStream, 'telecine')
-    if (canal) {
-      streamCanalNome = canal.nome
+    if (lista.stream_teste_id) {
+      // Usa stream_id salvo — sem precisar buscar na API
+      const urlStream = `${credsParaStream.host}/live/${credsParaStream.username}/${credsParaStream.password}/${lista.stream_teste_id}.ts`
+      streamCanalNome = `ID ${lista.stream_teste_id}`
       streamDuracao = 20
-      const streamResult = await testarStream(credsParaStream, canal.stream_id, 20)
+      const streamResult = await testarStreamDireto(urlStream, 20)
       streamTtfb = streamResult.ttfb_ms
       streamThroughput = streamResult.throughput_kbps
       streamConsistencia = streamResult.consistencia_pct
       streamStatus = streamResult.status
     } else {
-      streamStatus = 'sem_canal'
+      // Fallback: busca canal "telecine" via API Xtream
+      const canal = await buscarStreamCanal(credsParaStream, 'telecine')
+      if (canal) {
+        streamCanalNome = canal.nome
+        streamDuracao = 20
+        const urlStream = `${credsParaStream.host}/live/${credsParaStream.username}/${credsParaStream.password}/${canal.stream_id}.ts`
+        const streamResult = await testarStreamDireto(urlStream, 20)
+        streamTtfb = streamResult.ttfb_ms
+        streamThroughput = streamResult.throughput_kbps
+        streamConsistencia = streamResult.consistencia_pct
+        streamStatus = streamResult.status
+      } else {
+        streamStatus = 'sem_canal'
+      }
     }
   }
 
