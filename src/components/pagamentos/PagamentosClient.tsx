@@ -85,6 +85,65 @@ function BotaoExcluir({ id, onDone }: { id: number; onDone: () => void }) {
   );
 }
 
+const FORMAS = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
+
+function FormaCell({ id, forma, onDone }: { id: number; forma: string | null; onDone: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(forma ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function salvar(novaForma: string) {
+    if (novaForma === (forma ?? "")) { setEditando(false); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pagamentos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forma: novaForma }),
+      });
+      const data = await res.json();
+      if (data.ok) onDone();
+      else alert(data.error ?? "Erro ao salvar");
+    } finally {
+      setSaving(false);
+      setEditando(false);
+    }
+  }
+
+  if (editando) {
+    return (
+      <select
+        autoFocus
+        value={valor}
+        disabled={saving}
+        onChange={(e) => setValor(e.target.value)}
+        onBlur={() => salvar(valor)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") salvar(valor);
+          if (e.key === "Escape") setEditando(false);
+        }}
+        className="h-7 rounded-lg border border-blue-400 bg-white px-2 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+      >
+        {FORMAS.map((f) => <option key={f} value={f}>{f}</option>)}
+      </select>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => { setValor(forma ?? ""); setEditando(true); }}
+      title="Clique para editar"
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20 hover:bg-blue-100 transition-colors group"
+    >
+      {forma ?? <span className="text-zinc-400">—</span>}
+      <svg className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" fill="none" viewBox="0 0 12 12">
+        <path d="M8 2l2 2-6 6H2V8l6-6z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
+  );
+}
+
 export default function PagamentosClient({
   data,
   total,
@@ -213,13 +272,7 @@ export default function PagamentosClient({
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {p.forma ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">
-                          {p.forma}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-400 text-xs">—</span>
-                      )}
+                      <FormaCell id={p.id} forma={p.forma} onDone={() => router.refresh()} />
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-semibold text-emerald-700">

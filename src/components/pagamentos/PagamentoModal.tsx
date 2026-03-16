@@ -232,12 +232,16 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Forma</label>
-              <input
+              <select
                 value={forma}
                 onChange={(e) => setForma(e.target.value)}
                 className={inputClass}
-                placeholder="PIX, Dinheiro..."
-              />
+              >
+                <option value="">— Selecione —</option>
+                {["PIX", "Nubank", "Nu PJ", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"].map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Tipo</label>
