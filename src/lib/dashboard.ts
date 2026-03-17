@@ -74,6 +74,7 @@ export type VendaUltimos30Dias = {
 
 export type ClientesNovosMes = {
   mes: string;       // "Jan", "Fev" etc
+  mes_num: number;   // ← adicionar
   ano: number;
   quantidade: number;
 };
@@ -96,6 +97,7 @@ export type ServidorUso = {
 
 export type NaoRenovadosMes = {
   mes: string;
+  mes_num: number;   // ← adicionar
   ano: number;
   quantidade: number;
 };
@@ -103,7 +105,7 @@ export type NaoRenovadosMes = {
 export type MetricasQuantitativas = {
   clientesAtivos: number;
   novosMes: number;
-  assinaturasAtivas: number;
+  renovadasHoje: number;
   pendentes: number;           // assinaturas pendentes
   appsPendentes: number;       // aplicativos com status pendente
   vencendo7dias: number;
@@ -167,7 +169,7 @@ export async function getPagamentosPorMes(meses: number = 6): Promise<Pagamentos
     ORDER BY TO_CHAR(data_pgto, 'YYYY-MM') ASC;
   `;
   const { rows } = await pool.query(sql);
-  return rows.map((r) => ({ mes: r.mes, ano: r.ano, total: parseFloat(r.total || "0"), quantidade: r.quantidade || 0 }));
+  return rows.map((r) => ({ mes: r.mes, mes_num: r.mes_num, ano: r.ano, total: parseFloat(r.total || "0"), quantidade: r.quantidade || 0 }));
 }
 
 export async function getPacotesStats(): Promise<PacoteStats[]> {
@@ -261,9 +263,9 @@ export async function getMetricasQuantitativas(): Promise<MetricasQuantitativas>
        WHERE EXTRACT(MONTH FROM criado_em) = EXTRACT(MONTH FROM CURRENT_DATE)
          AND EXTRACT(YEAR FROM criado_em) = EXTRACT(YEAR FROM CURRENT_DATE))::int AS novos_mes,
 
-      -- Assinaturas ativas
-      (SELECT COUNT(*) FROM public.assinaturas
-       WHERE lower(btrim(status)) IN ('ativo','atrasado'))::int AS assinaturas_ativas,
+      (SELECT COUNT(*) FROM public.pagamentos
+ WHERE DATE(data_pgto) = CURRENT_DATE
+   AND tipo = 'Assinatura tv')::int AS renovadas_hoje,
 
       -- Assinaturas pendentes
       (SELECT COUNT(*) FROM public.assinaturas
@@ -286,13 +288,13 @@ export async function getMetricasQuantitativas(): Promise<MetricasQuantitativas>
   `);
   const r = rows[0] || {};
   return {
-    clientesAtivos:    r.clientes_ativos    || 0,
-    novosMes:          r.novos_mes          || 0,
-    assinaturasAtivas: r.assinaturas_ativas || 0,
-    pendentes:         r.pendentes          || 0,
-    appsPendentes:     r.apps_pendentes     || 0,
-    vencendo7dias:     r.vencendo_7dias     || 0,
-    naoRenovadosMes:   r.nao_renovados_mes  || 0,
+    clientesAtivos: r.clientes_ativos || 0,
+    novosMes: r.novos_mes || 0,
+    renovadasHoje: r.renovadas_hoje || 0,
+    pendentes: r.pendentes || 0,
+    appsPendentes: r.apps_pendentes || 0,
+    vencendo7dias: r.vencendo_7dias || 0,
+    naoRenovadosMes: r.nao_renovados_mes || 0,
   };
 }
 
@@ -302,13 +304,14 @@ export async function getClientesNovosPorMes(): Promise<ClientesNovosMes[]> {
     SELECT
       TO_CHAR(DATE_TRUNC('month', criado_em), 'Mon') AS mes,
       EXTRACT(YEAR FROM criado_em)::int AS ano,
+      EXTRACT(MONTH FROM criado_em)::int AS mes_num,
       COUNT(*)::int AS quantidade
     FROM public.clientes
     WHERE criado_em >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
-    GROUP BY DATE_TRUNC('month', criado_em), EXTRACT(YEAR FROM criado_em)
+    GROUP BY DATE_TRUNC('month', criado_em), EXTRACT(YEAR FROM criado_em), EXTRACT(MONTH FROM criado_em)
     ORDER BY DATE_TRUNC('month', criado_em) ASC
   `);
-  return rows.map((r) => ({ mes: r.mes, ano: r.ano, quantidade: r.quantidade }));
+  return rows.map((r) => ({ mes: r.mes, mes_num: r.mes_num, ano: r.ano, quantidade: r.quantidade }));
 }
 
 /** Assinaturas não renovadas por mês — últimos 6 meses */
@@ -317,15 +320,16 @@ export async function getNaoRenovadosPorMes(): Promise<NaoRenovadosMes[]> {
     SELECT
   TO_CHAR(DATE_TRUNC('month', venc_contas), 'Mon') AS mes,
   EXTRACT(YEAR FROM venc_contas)::int AS ano,
+  EXTRACT(MONTH FROM venc_contas)::int AS mes_num,
   COUNT(*)::int AS quantidade
 FROM public.assinaturas
 WHERE lower(btrim(status)) IN ('vencido','cancelado','inativo')
   AND venc_contas >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
   AND venc_contas < CURRENT_DATE
-GROUP BY DATE_TRUNC('month', venc_contas), EXTRACT(YEAR FROM venc_contas)
+GROUP BY DATE_TRUNC('month', venc_contas), EXTRACT(YEAR FROM venc_contas), EXTRACT(MONTH FROM venc_contas)
 ORDER BY DATE_TRUNC('month', venc_contas) ASC
   `);
-  return rows.map((r) => ({ mes: r.mes, ano: r.ano, quantidade: r.quantidade }));
+  return rows.map((r) => ({ mes: r.mes, mes_num: r.mes_num, ano: r.ano, quantidade: r.quantidade }));
 }
 
 /** Uso real por servidor baseado em consumo_servidor + assinaturas ativas */
@@ -348,13 +352,13 @@ export async function getServidoresUso(): Promise<ServidorUso[]> {
     ORDER BY creditos_mensal DESC
   `);
   return rows.map((r) => ({
-    id_servidor:     r.id_servidor,
-    codigo_publico:  r.codigo_publico,
-    nome_interno:    r.nome_interno,
+    id_servidor: r.id_servidor,
+    codigo_publico: r.codigo_publico,
+    nome_interno: r.nome_interno,
     qtd_assinaturas: r.qtd_assinaturas,
     creditos_mensal: r.creditos_mensal,
-    saldo_atual:     r.saldo_atual,
-    data_esgotamento: null, 
+    saldo_atual: r.saldo_atual,
+    data_esgotamento: null,
   }));
 }
 

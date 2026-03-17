@@ -28,12 +28,12 @@ function StatCard({
   href?: string;
 }) {
   const cores = {
-    green:  { bg: "bg-emerald-50",  text: "text-emerald-700",  border: "border-emerald-200",  val: "text-emerald-800" },
-    blue:   { bg: "bg-blue-50",     text: "text-blue-700",     border: "border-blue-200",     val: "text-blue-800" },
-    yellow: { bg: "bg-yellow-50",   text: "text-yellow-700",   border: "border-yellow-200",   val: "text-yellow-800" },
-    red:    { bg: "bg-red-50",      text: "text-red-700",      border: "border-red-200",      val: "text-red-800" },
-    purple: { bg: "bg-purple-50",   text: "text-purple-700",   border: "border-purple-200",   val: "text-purple-800" },
-    zinc:   { bg: "bg-zinc-50",     text: "text-zinc-700",     border: "border-zinc-200",     val: "text-zinc-800" },
+    green: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", val: "text-emerald-800" },
+    blue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", val: "text-blue-800" },
+    yellow: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200", val: "text-yellow-800" },
+    red: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", val: "text-red-800" },
+    purple: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", val: "text-purple-800" },
+    zinc: { bg: "bg-zinc-50", text: "text-zinc-700", border: "border-zinc-200", val: "text-zinc-800" },
   };
   const c = cores[cor];
 
@@ -112,10 +112,11 @@ export default async function DashboardPage() {
           href="/clientes"
         />
         <StatCard
-          title="Assinaturas ativas"
-          value={metricas.assinaturasAtivas}
-          subtitle="Ativo + Atrasado"
-          icon="📋" cor="purple"
+          title="Renovadas hoje"
+          value={metricas.renovadasHoje}
+          subtitle="Atualizadas hoje"
+          icon="🔄" cor="purple"
+          href="/pagamentos"
         />
         <StatCard
           title="Pendentes"
