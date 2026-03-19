@@ -156,16 +156,24 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         COUNT(a.id_assinatura)
           FILTER (WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado'))::int AS assinaturas_ativas,
         -- Vencimento da assinatura mais recente (qualquer status)
-        MAX(a.venc_contrato)::text            AS prox_vencimento,
+        (
+  SELECT a2.venc_contrato::text
+  FROM public.assinaturas a2
+  WHERE a2.id_cliente = c.id_cliente
+    AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+  ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
+  LIMIT 1
+) AS prox_vencimento,
         -- Pacote da assinatura mais relevante (qualquer status)
         (
-          SELECT pac.contrato::text
-          FROM public.assinaturas a2
-          LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
-          WHERE a2.id_cliente = c.id_cliente
-          ORDER BY a2.venc_contrato DESC NULLS LAST
-          LIMIT 1
-        ) AS pacote_nome,
+  SELECT pac.contrato::text
+  FROM public.assinaturas a2
+  LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
+  WHERE a2.id_cliente = c.id_cliente
+    AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+  ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
+  LIMIT 1
+) AS pacote_nome,
          (
           SELECT a2.observacao
           FROM public.assinaturas a2

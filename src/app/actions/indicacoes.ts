@@ -50,3 +50,32 @@ export async function definirParceiro(
   );
   revalidatePath(`/clientes/${id_indicado}`);
 }
+
+export async function marcarIndicacoesCortesia(
+  ids_indicacao: string[],
+  id_parceiro: string
+): Promise<void> {
+  if (ids_indicacao.length === 0) return;
+  await pool.query(
+    `UPDATE public.indicacoes
+     SET bonificacao = 'cortesia'
+     WHERE id_indicacao = ANY($1::bigint[])`,
+    [ids_indicacao]
+  );
+  revalidatePath(`/clientes/${id_parceiro}`);
+  revalidatePath(`/clientes`);
+}
+
+export async function atualizarBonificacoes(
+  atualizacoes: { id_indicacao: string; bonificacao: "aberta" | "cortesia" | "comissao" }[],
+  id_parceiro: string
+): Promise<void> {
+  if (atualizacoes.length === 0) return;
+  for (const { id_indicacao, bonificacao } of atualizacoes) {
+    await pool.query(
+      `UPDATE public.indicacoes SET bonificacao = $1 WHERE id_indicacao = $2::bigint`,
+      [bonificacao, id_indicacao]
+    );
+  }
+  revalidatePath(`/clientes/${id_parceiro}`);
+}

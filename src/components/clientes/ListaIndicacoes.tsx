@@ -7,6 +7,7 @@ import { getPlanos } from "@/lib/planos";
 import { getPacotes } from "@/lib/pacotes";
 import type { PlanoRow } from "@/lib/planos";
 import type { PacoteRow } from "@/lib/pacotes";
+import DefinirIndicacoesModal from "@/components/clientes/DefinirIndicacoesModal";
 
 const STATUS_STYLE: Record<string, string> = {
   ativo: "bg-emerald-50 text-emerald-700",
@@ -28,19 +29,19 @@ export default async function ListaIndicacoes({ idParceiro }: { idParceiro: stri
       getPacotes(),
     ]);
   } catch (err) {
-  console.error("ERRO ListaIndicacoes:", err);
-  return (
-    <div className="rounded-2xl border bg-white p-4 text-sm text-red-500">
-      Erro ao carregar indicações: {String(err)}
-    </div>
-  );
-}
+    console.error("ERRO ListaIndicacoes:", err);
+    return (
+      <div className="rounded-2xl border bg-white p-4 text-sm text-red-500">
+        Erro ao carregar indicações: {String(err)}
+      </div>
+    );
+  }
   try {
     [indicacoes, planos, pacotes] = await Promise.all([
-  getIndicacoesByParceiroId(idParceiro),
-  getPlanos(),
-  getPacotes(),
-]);
+      getIndicacoesByParceiroId(idParceiro),
+      getPlanos(),
+      getPacotes(),
+    ]);
 
   } catch (err) {
     console.error("ERRO ListaIndicacoes:", err);
@@ -63,7 +64,12 @@ export default async function ListaIndicacoes({ idParceiro }: { idParceiro: stri
             </span>
           )}
         </div>
-        <NovaIndicacaoModal idParceiro={idParceiro} planos={planos} pacotes={pacotes} />
+        <div className="flex items-center gap-2">
+          {indicacoes.length > 0 && (
+            <DefinirIndicacoesModal idParceiro={idParceiro} indicacoes={indicacoes} />
+          )}
+          <NovaIndicacaoModal idParceiro={idParceiro} planos={planos} pacotes={pacotes} />
+        </div>
       </div>
 
       {/* Tabela */}

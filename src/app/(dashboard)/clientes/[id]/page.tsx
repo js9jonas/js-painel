@@ -165,13 +165,19 @@ export default async function ClienteDetalhePage({ params }: Props) {
             <span className="font-medium text-zinc-900">{assinaturas.length}</span>
           </p>
           <p>
-            Indicações:{" "}
+            Indicacoes:{" "}
             <span className="font-medium text-zinc-900">{indicacoesStats.total}</span>
           </p>
           {indicacoesStats.abertas > 0 && (
             <p>
-              Indicações abertas:{" "}
+              Abertas:{" "}
               <span className="font-medium text-amber-600">{indicacoesStats.abertas}</span>
+            </p>
+          )}
+          {indicacoesStats.comissao > 0 && (
+            <p>
+              Comissoes:{" "}
+              <span className="font-medium text-emerald-600">{indicacoesStats.comissao}</span>
             </p>
           )}
         </div>
