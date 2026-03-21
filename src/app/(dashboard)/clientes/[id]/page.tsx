@@ -17,6 +17,7 @@ import { tempoDesde } from "@/lib/tempo";
 import { getIndicacoesStatsByParceiroId } from "@/lib/indicacoes";
 import IndicadorInfo from "@/components/clientes/IndicadorInfo";
 import { getParceiroByIndicadoId } from "@/lib/indicacoes";
+import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -115,6 +116,10 @@ export default async function ClienteDetalhePage({ params }: Props) {
             <h1 className="text-2xl font-semibold">
               {cliente?.nome ?? `Cliente #${id}`}
             </h1>
+            <ScoreFidelidade
+              score={cliente?.score_fidelidade ?? null}
+              calculadoEm={cliente?.score_calculado_em ?? null}
+            />
             {cliente?.criado_em && (
               <p className="mt-1 text-xs text-zinc-400">
                 Cliente {tempoDesde(cliente.criado_em)}

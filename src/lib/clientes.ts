@@ -360,6 +360,8 @@ export type ClienteDetalheRow = {
   observacao: string | null;
   telefone: string | null;
   criado_em: string | null;
+  score_fidelidade: number | null;
+  score_calculado_em: string | null;
 };
 
 export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaRow[]> {
@@ -401,6 +403,8 @@ export async function getClienteById(id: string): Promise<ClienteDetalheRow | nu
       c.nome,
       c.observacao,
       c.criado_em::text  AS criado_em,
+      c.score_fidelidade,
+      c.score_calculado_em::text AS score_calculado_em,
       (
         SELECT ct.telefone::text
         FROM public.contatos ct
