@@ -9,6 +9,7 @@ export type AlertaContaRow = {
     venc_contrato: string;
     pacote_contrato: string | null;
     pacote_telas: number | null;
+    status: string | null;
 };
 
 export type AlertaAppRow = {
@@ -32,6 +33,7 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
    a.id_assinatura::text,
    a.venc_contas::text,
    a.venc_contrato::text,
+   a.status,
    p.contrato::text AS pacote_contrato,
    p.telas::int AS pacote_telas
  FROM public.assinaturas a

@@ -83,13 +83,12 @@ export default async function AlertasPage() {
                     {servidoresCriticos.map((s) => (
                         <span
                             key={s.nome}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${
-                                s.dias <= 0
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${s.dias <= 0
                                     ? "bg-red-600 text-white"
                                     : s.dias <= 7
-                                    ? "bg-red-100 text-red-700 ring-1 ring-red-300"
-                                    : "bg-orange-100 text-orange-700 ring-1 ring-orange-300"
-                            }`}
+                                        ? "bg-red-100 text-red-700 ring-1 ring-red-300"
+                                        : "bg-orange-100 text-orange-700 ring-1 ring-orange-300"
+                                }`}
                         >
                             {s.nome}
                             <span className="opacity-75">•</span>
@@ -148,6 +147,17 @@ export default async function AlertasPage() {
                                             <td className="px-4 py-3 text-zinc-600">
                                                 {r.pacote_contrato ?? "—"}
                                                 {r.pacote_telas ? <span className="text-zinc-400"> • {r.pacote_telas} tela{r.pacote_telas !== 1 ? "s" : ""}</span> : null}
+                                                {r.status && (
+                                                    <div className="text-xs mt-0.5">
+                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize ${r.status.toLowerCase() === "ativo" ? "bg-emerald-50 text-emerald-700" :
+                                                                r.status.toLowerCase() === "pendente" ? "bg-blue-50 text-blue-700" :
+                                                                    r.status.toLowerCase() === "atrasado" ? "bg-yellow-50 text-yellow-700" :
+                                                                        "bg-zinc-100 text-zinc-500"
+                                                            }`}>
+                                                            {r.status}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-zinc-900">
                                                 {r.venc_contas.split("T")[0].split("-").reverse().join("/")}

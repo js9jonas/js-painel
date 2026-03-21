@@ -21,8 +21,8 @@ export type ClienteRow = {
   assinaturas_ativas: number;
   telefone: string | null;
   pacote_nome: string | null;
-  observacao_assinatura: string | null;   // ← adicionar
-  id_assinatura_principal: string | null; // ← adicionar
+  observacao_assinatura: string | null;
+  id_assinatura_principal: string | null;
 };
 
 export type GetClientesParams = {
@@ -148,33 +148,49 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
   const sql = `
     WITH base AS (
       SELECT
-        c.id_cliente::text                    AS id_cliente,
+        c.id_cliente::text AS id_cliente,
         c.nome,
         c.observacao,
         ct.telefone,
-        -- Conta apenas assinaturas ativo/atrasado como "ativas" para exibição
         COUNT(a.id_assinatura)
           FILTER (WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado'))::int AS assinaturas_ativas,
-        -- Vencimento da assinatura mais recente (qualquer status)
+        COALESCE(
+          (
+            SELECT a2.venc_contrato::text
+            FROM public.assinaturas a2
+            WHERE a2.id_cliente = c.id_cliente
+              AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+            ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
+            LIMIT 1
+          ),
+          (
+            SELECT ap.validade::text
+            FROM public.aplicativos ap
+            WHERE ap.id_cliente = c.id_cliente
+              AND lower(btrim(ap.status)) = 'pendente'
+            LIMIT 1
+          )
+        ) AS prox_vencimento,
+        COALESCE(
+          (
+            SELECT pac.contrato::text
+            FROM public.assinaturas a2
+            LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
+            WHERE a2.id_cliente = c.id_cliente
+              AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+            ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
+            LIMIT 1
+          ),
+          (
+            SELECT app.nome_app
+            FROM public.aplicativos ap
+            JOIN public.apps app ON app.id_app = ap.id_app
+            WHERE ap.id_cliente = c.id_cliente
+              AND lower(btrim(ap.status)) = 'pendente'
+            LIMIT 1
+          )
+        ) AS pacote_nome,
         (
-  SELECT a2.venc_contrato::text
-  FROM public.assinaturas a2
-  WHERE a2.id_cliente = c.id_cliente
-    AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
-  ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
-  LIMIT 1
-) AS prox_vencimento,
-        -- Pacote da assinatura mais relevante (qualquer status)
-        (
-  SELECT pac.contrato::text
-  FROM public.assinaturas a2
-  LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
-  WHERE a2.id_cliente = c.id_cliente
-    AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
-  ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
-  LIMIT 1
-) AS pacote_nome,
-         (
           SELECT a2.observacao
           FROM public.assinaturas a2
           WHERE a2.id_cliente = c.id_cliente
@@ -190,19 +206,26 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
           ORDER BY a2.venc_contrato DESC NULLS LAST
           LIMIT 1
         ) AS id_assinatura_principal,
-        -- ✅ status_tela calculado pelo campo status real (mantido atualizado pelo job noturno)
         CASE
           WHEN COUNT(a.id_assinatura) = 0
-            THEN 'sem_assinatura'
+            THEN CASE
+              WHEN EXISTS (
+                SELECT 1 FROM public.aplicativos ap2
+                WHERE ap2.id_cliente = c.id_cliente
+                  AND lower(btrim(ap2.status)) = 'pendente'
+              ) THEN 'pendente'
+              ELSE 'sem_assinatura'
+            END
+          WHEN EXISTS (
+            SELECT 1 FROM public.aplicativos ap2
+            WHERE ap2.id_cliente = c.id_cliente
+              AND lower(btrim(ap2.status)) = 'pendente'
+          )
+            THEN 'pendente'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'ativo') > 0
             THEN 'ativo'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'pendente') > 0
-  OR EXISTS (
-    SELECT 1 FROM public.aplicativos ap2
-    WHERE ap2.id_cliente = c.id_cliente
-      AND lower(btrim(ap2.status)) = 'pendente'
-  )
-  THEN 'pendente'
+            THEN 'pendente'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'atrasado') > 0
             THEN 'atrasado'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'vencido') > 0
@@ -223,7 +246,6 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         ORDER BY ct.atualizado_em DESC NULLS LAST, ct.criado_em DESC NULLS LAST, ct.id_contato DESC
         LIMIT 1
       ) ct ON true
-      -- ✅ JOIN único em todas as assinaturas — o FILTER no CASE trata cada status
       LEFT JOIN public.assinaturas a ON a.id_cliente = c.id_cliente
       ${whereSql}
       GROUP BY c.id_cliente, c.nome, c.observacao, ct.telefone
@@ -271,19 +293,43 @@ export async function countClientes(
     WITH base AS (
       SELECT
         c.id_cliente::text AS id_cliente,
-        MAX(a.venc_contrato)::text AS prox_vencimento,
+        COALESCE(
+          (
+            SELECT a2.venc_contrato::text
+            FROM public.assinaturas a2
+            WHERE a2.id_cliente = c.id_cliente
+              AND lower(btrim(a2.status)) IN ('ativo','atrasado','pendente')
+            ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC
+            LIMIT 1
+          ),
+          (
+            SELECT ap.validade::text
+            FROM public.aplicativos ap
+            WHERE ap.id_cliente = c.id_cliente
+              AND lower(btrim(ap.status)) = 'pendente'
+            LIMIT 1
+          )
+        ) AS prox_vencimento,
         CASE
           WHEN COUNT(a.id_assinatura) = 0
-            THEN 'sem_assinatura'
+            THEN CASE
+              WHEN EXISTS (
+                SELECT 1 FROM public.aplicativos ap2
+                WHERE ap2.id_cliente = c.id_cliente
+                  AND lower(btrim(ap2.status)) = 'pendente'
+              ) THEN 'pendente'
+              ELSE 'sem_assinatura'
+            END
+          WHEN EXISTS (
+            SELECT 1 FROM public.aplicativos ap2
+            WHERE ap2.id_cliente = c.id_cliente
+              AND lower(btrim(ap2.status)) = 'pendente'
+          )
+            THEN 'pendente'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'ativo') > 0
             THEN 'ativo'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'pendente') > 0
-  OR EXISTS (
-    SELECT 1 FROM public.aplicativos ap2
-    WHERE ap2.id_cliente = c.id_cliente
-      AND lower(btrim(ap2.status)) = 'pendente'
-  )
-  THEN 'pendente'
+            THEN 'pendente'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'atrasado') > 0
             THEN 'atrasado'
           WHEN COUNT(a.id_assinatura) FILTER (WHERE lower(btrim(a.status)) = 'vencido') > 0
