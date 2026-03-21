@@ -19,7 +19,7 @@ const LABEL_STATUS: Record<string, string> = {
   atrasado:  "Atrasado",
   pendente:  "Pendente",
   vencido:   "Vencido",
-  inativo:   "Inativo",
+  inativo:   "Inativo últimos 6 meses",
   cancelado: "Cancelado",
 };
 

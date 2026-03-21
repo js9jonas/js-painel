@@ -38,19 +38,13 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
  JOIN public.clientes c ON c.id_cliente = a.id_cliente
  LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
  LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
- WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado')
+WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado', 'pendente')
    AND a.venc_contas IS NOT NULL
    AND a.venc_contrato IS NOT NULL
    AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
-   AND (
-     -- assinaturas normais: contrato ainda vigente
-     (lower(btrim(pl.tipo)) != 'cortesia' AND a.venc_contrato::date > a.venc_contas::date)
-     OR
-     -- assinaturas cortesia: inclui sempre dentro do prazo
-     lower(btrim(pl.tipo)) = 'cortesia'
-   )
+   AND a.venc_contrato::date > a.venc_contas::date
  ORDER BY a.venc_contas ASC`,
-        [dias]
+         [dias]
     );
     return rows;
 }
