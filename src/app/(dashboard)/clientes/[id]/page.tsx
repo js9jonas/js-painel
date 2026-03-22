@@ -117,6 +117,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
               {cliente?.nome ?? `Cliente #${id}`}
             </h1>
             <ScoreFidelidade
+              idCliente={id}
               score={cliente?.score_fidelidade ?? null}
               calculadoEm={cliente?.score_calculado_em ?? null}
             />
