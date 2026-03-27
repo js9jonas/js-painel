@@ -15,12 +15,30 @@ function addMeses(dataStr: string | null | undefined, meses: number): string {
     return base.toISOString().split("T")[0];
 }
 
-function calcVencContrato(vencAtual: string | null | undefined, periodo: Periodo): string {
+// DEPOIS
+function calcVencContrato(
+    vencAtual: string | null | undefined,
+    periodo: Periodo,
+    vencContasAtual?: string | null   // ← novo parâmetro
+): string {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     if (vencAtual) {
         const venc = new Date(vencAtual + "T00:00:00");
-        return addMeses(venc >= hoje ? vencAtual : undefined, MESES[periodo]);
+        if (venc >= hoje) {
+            // Contrato ainda válido → estende a partir dele
+            return addMeses(vencAtual, MESES[periodo]);
+        }
+        // Contrato vencido — verifica contas antes de usar hoje como base
+        if (vencContasAtual) {
+            const vencContas = new Date(vencContasAtual + "T00:00:00");
+            if (vencContas >= hoje) {
+                // Contas ainda no prazo → estende contrato a partir de vencAtual mesmo assim
+                return addMeses(vencAtual, MESES[periodo]);
+            }
+        }
+        // Ambos vencidos → base é hoje
+        return addMeses(undefined, MESES[periodo]);
     }
     return addMeses(undefined, MESES[periodo]);
 }
@@ -83,7 +101,7 @@ export default function RenovarAssinatura({
     const [loading, setLoading] = useState(false);
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
-    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal"));
+    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal", vencContasAtual));
     const [vencContas, setVencContas] = useState(() => calcVencContas(vencContasAtual));
     const [vencContratoEditado, setVencContratoEditado] = useState(false);
 
@@ -91,14 +109,14 @@ export default function RenovarAssinatura({
         setPeriodo(p);
         setValor(valorDoPeriodo(p));
         if (!vencContratoEditado) {
-            setVencContrato(calcVencContrato(vencAtual, p));
+            setVencContrato(calcVencContrato(vencAtual, p, vencContasAtual));
         }
     }
 
     function handleOpen() {
         setPeriodo("mensal");
         setValor(valorDoPeriodo("mensal"));
-        setVencContrato(calcVencContrato(vencAtual, "mensal"));
+        setVencContrato(calcVencContrato(vencAtual, "mensal", vencContasAtual));
         setVencContas(calcVencContas(vencContasAtual));
         setVencContratoEditado(false);
         setStatusFinal("ativo");
