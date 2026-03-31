@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN!
 
 // GET — verificação do webhook pela Meta
