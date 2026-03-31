@@ -5,6 +5,10 @@ import { NextResponse } from "next/server"
 export default auth((req) => {
   const { pathname } = req.nextUrl
 
+  if (pathname.startsWith('/api/whatsapp/webhook')) {
+    return NextResponse.next()
+  }
+
   // Libera rotas internas da API com token secreto (ex: n8n, cron)
   const internalToken = req.headers.get('x-internal-token')
   if (
