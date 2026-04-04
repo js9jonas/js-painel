@@ -96,7 +96,11 @@ export default function RenovarAssinatura({
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
     const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal", vencContasAtual));
-    const [vencContas, setVencContas] = useState(vencContasAtual?.split("T")[0] ?? "");
+    const [vencContas, setVencContas] = useState(() =>
+        contasVencida
+            ? addMeses(undefined, 1)
+            : (vencContasAtual?.split("T")[0] ?? "")
+    );
     const [vencContratoEditado, setVencContratoEditado] = useState(false);
 
     function handlePeriodoChange(p: Periodo) {
@@ -112,7 +116,7 @@ export default function RenovarAssinatura({
         setValor(valorDoPeriodo("mensal"));
         setVencContrato(calcVencContrato(vencAtual, "mensal", vencContasAtual));
         setVencContratoEditado(false);
-        setVencContas(vencContasAtual?.split("T")[0] ?? "");
+        setVencContas(contasVencida ? addMeses(undefined, 1) : (vencContasAtual?.split("T")[0] ?? ""));
         setStatusFinal("ativo");
         setOpen(true);
     }
@@ -262,11 +266,10 @@ export default function RenovarAssinatura({
                                         <div className="space-y-1.5">
                                             <label className={`${labelClass} flex items-center gap-1.5`}>
                                                 Venc. contas
-                                                <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${
-                                                    contasVencida
+                                                <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${contasVencida
                                                         ? "bg-red-100 text-red-600"
                                                         : "bg-zinc-100 text-zinc-400"
-                                                }`}>
+                                                    }`}>
                                                     {contasVencida ? "⚠️ vencida" : "não alterada"}
                                                 </span>
                                             </label>
@@ -289,11 +292,10 @@ export default function RenovarAssinatura({
                                             <button
                                                 type="button"
                                                 onClick={() => setStatusFinal("ativo")}
-                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${
-                                                    statusFinal === "ativo"
+                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${statusFinal === "ativo"
                                                         ? "bg-emerald-600 border-emerald-600 text-white"
                                                         : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
-                                                }`}
+                                                    }`}
                                             >
                                                 ✓ Ativo
                                                 {statusFinal === "ativo" && <span className="ml-1.5 text-xs opacity-75">(padrão)</span>}
@@ -301,11 +303,10 @@ export default function RenovarAssinatura({
                                             <button
                                                 type="button"
                                                 onClick={() => setStatusFinal("pendente")}
-                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${
-                                                    statusFinal === "pendente"
+                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${statusFinal === "pendente"
                                                         ? "bg-amber-500 border-amber-500 text-white"
                                                         : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
-                                                }`}
+                                                    }`}
                                             >
                                                 ⏳ Pendente
                                             </button>
@@ -392,11 +393,10 @@ export default function RenovarAssinatura({
                                         {loading ? "..." : "Alterar"}
                                     </button>
                                     <button type="button" onClick={() => executar(true)} disabled={loading}
-                                        className={`h-9 rounded-xl px-4 text-sm text-white font-medium disabled:opacity-50 transition-colors ${
-                                            statusFinal === "pendente"
+                                        className={`h-9 rounded-xl px-4 text-sm text-white font-medium disabled:opacity-50 transition-colors ${statusFinal === "pendente"
                                                 ? "bg-amber-500 hover:bg-amber-600"
                                                 : "bg-emerald-600 hover:bg-emerald-700"
-                                        }`}>
+                                            }`}>
                                         {loading ? "Salvando..." : statusFinal === "pendente" ? "Salvar como pendente" : "Renovar"}
                                     </button>
                                 </>
