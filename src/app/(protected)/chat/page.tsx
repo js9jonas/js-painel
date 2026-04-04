@@ -1,8 +1,7 @@
 'use client'
 
+import React from 'react'
 import { useEffect, useRef, useState, useCallback } from 'react'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Conversa {
   telefone: string
@@ -43,8 +42,6 @@ interface Cliente {
   valor: number | null
   servidor: string | null
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatTel(tel: string) {
   const d = tel.replace(/\D/g, '')
@@ -93,7 +90,19 @@ function nomeInicial(nome: string | null, tel: string) {
   return n.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase()
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '7px 0', borderBottom: '1px solid #1f2c34'
+    }}>
+      <span style={{ color: '#8696a0', fontSize: 13 }}>{label}</span>
+      <span style={{ color: '#d1d7db', fontSize: 13, fontWeight: 500, textAlign: 'right' }}>
+        {value}
+      </span>
+    </div>
+  )
+}
 
 export default function ChatPage() {
   const [conversas, setConversas] = useState<Conversa[]>([])
@@ -109,7 +118,6 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Carrega lista de conversas
   const carregarConversas = useCallback(async () => {
     const res = await fetch('/api/whatsapp/conversas')
     if (res.ok) setConversas(await res.json())
@@ -121,7 +129,6 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [carregarConversas])
 
-  // Carrega mensagens da conversa selecionada
   const carregarMensagens = useCallback(async (tel: string) => {
     setLoadingMsgs(true)
     const res = await fetch(`/api/whatsapp/mensagens?telefone=${tel}`)
@@ -140,12 +147,10 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [selecionado, carregarMensagens])
 
-  // Scroll para o fim
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensagens])
 
-  // Gera sugestão de IA
   async function gerarSugestao() {
     if (!selecionado || mensagens.length === 0) return
     setLoadingSugestao(true)
@@ -154,7 +159,6 @@ export default function ChatPage() {
       const historico = mensagens.slice(-10).map(m =>
         `${m.origem === 'cliente' ? 'Cliente' : 'Jonas'}: ${m.conteudo ?? '[mídia]'}`
       ).join('\n')
-
       const res = await fetch('/api/ia/sugestao-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,7 +182,6 @@ export default function ChatPage() {
     }
   }
 
-  // Envia mensagem
   async function enviar(usouSugestao = false) {
     if (!texto.trim() || !selecionado || enviando) return
     setEnviando(true)
@@ -221,7 +224,7 @@ export default function ChatPage() {
       fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden'
     }}>
 
-      {/* ── Painel esquerdo: lista de conversas ── */}
+      {/* ── Painel esquerdo ── */}
       <div style={{
         width: 360, minWidth: 300, display: 'flex', flexDirection: 'column',
         borderRight: '1px solid #2a3942', background: '#111b21'
@@ -240,8 +243,16 @@ export default function ChatPage() {
             }}>JS</div>
             <span style={{ color: '#e9edef', fontWeight: 600, fontSize: 16 }}>Atendimento</span>
           </div>
-          <div style={{ color: '#8696a0', fontSize: 12 }}>
-            {conversas.length} conv.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: '#8696a0', fontSize: 12 }}>{conversas.length} conv.</span>
+            <a
+              href="/dashboard"
+              style={{
+                color: '#8696a0', fontSize: 12, textDecoration: 'none',
+                background: '#2a3942', borderRadius: 6, padding: '4px 8px',
+                border: '1px solid #374151'
+              }}
+            >← Voltar</a>
           </div>
         </div>
 
@@ -413,18 +424,10 @@ export default function ChatPage() {
                             {msg.conteudo}
                           </div>
                         )}
-                        {msg.tipo === 'audio' && (
-                          <div style={{ color: '#8696a0', fontSize: 13 }}>🎵 Áudio</div>
-                        )}
-                        {msg.tipo === 'image' && (
-                          <div style={{ color: '#8696a0', fontSize: 13 }}>📷 Imagem</div>
-                        )}
-                        {msg.tipo === 'document' && (
-                          <div style={{ color: '#8696a0', fontSize: 13 }}>📄 Documento</div>
-                        )}
-                        {msg.tipo === 'video' && (
-                          <div style={{ color: '#8696a0', fontSize: 13 }}>🎥 Vídeo</div>
-                        )}
+                        {msg.tipo === 'audio' && <div style={{ color: '#8696a0', fontSize: 13 }}>🎵 Áudio</div>}
+                        {msg.tipo === 'image' && <div style={{ color: '#8696a0', fontSize: 13 }}>📷 Imagem</div>}
+                        {msg.tipo === 'document' && <div style={{ color: '#8696a0', fontSize: 13 }}>📄 Documento</div>}
+                        {msg.tipo === 'video' && <div style={{ color: '#8696a0', fontSize: 13 }}>🎥 Vídeo</div>}
 
                         <div style={{
                           display: 'flex', justifyContent: 'flex-end',
@@ -525,7 +528,8 @@ export default function ChatPage() {
                 style={{
                   background: texto.trim() ? '#00a884' : '#374151',
                   border: 'none', color: '#fff', borderRadius: 8,
-                  padding: '10px 16px', fontSize: 16, cursor: texto.trim() ? 'pointer' : 'default',
+                  padding: '10px 16px', fontSize: 16,
+                  cursor: texto.trim() ? 'pointer' : 'default',
                   flexShrink: 0, transition: 'background 0.2s'
                 }}
               >
@@ -569,7 +573,10 @@ export default function ChatPage() {
           {/* Assinatura */}
           {cliente ? (
             <div style={{ padding: '16px 20px' }}>
-              <div style={{ color: '#8696a0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+              <div style={{
+                color: '#8696a0', fontSize: 11, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12
+              }}>
                 Assinatura
               </div>
 
@@ -579,11 +586,8 @@ export default function ChatPage() {
               <InfoRow
                 label="Status"
                 value={
-                  <span style={{
-                    color: statusColor(cliente.status),
-                    fontWeight: 700, textTransform: 'capitalize'
-                  }}>
-                    ● {cliente.status ?? '—'}
+                  <span style={{ color: statusColor(cliente.status), fontWeight: 700 }}>
+                    ● {(cliente.status ?? '—')}
                   </span>
                 }
               />
@@ -592,7 +596,10 @@ export default function ChatPage() {
 
               {cliente.observacao && (
                 <div style={{ marginTop: 16 }}>
-                  <div style={{ color: '#8696a0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                  <div style={{
+                    color: '#8696a0', fontSize: 11, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6
+                  }}>
                     Observação
                   </div>
                   <div style={{
@@ -604,7 +611,7 @@ export default function ChatPage() {
                 </div>
               )}
 
-              <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ marginTop: 20 }}>
                 <a
                   href={`/clientes/${cliente.id_cliente}`}
                   style={{
@@ -621,15 +628,16 @@ export default function ChatPage() {
             <div style={{ padding: 24, textAlign: 'center', color: '#8696a0', fontSize: 13 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
               <div>Cliente não vinculado</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>
-                {formatTel(selecionado)}
-              </div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>{formatTel(selecionado)}</div>
             </div>
           )}
 
-          {/* Histórico resumido */}
+          {/* Resumo */}
           <div style={{ padding: '0 20px 20px', marginTop: 8 }}>
-            <div style={{ color: '#8696a0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+            <div style={{
+              color: '#8696a0', fontSize: 11, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10
+            }}>
               Resumo
             </div>
             <InfoRow label="Total mensagens" value={String(mensagens.length)} />
@@ -640,22 +648,6 @@ export default function ChatPage() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── Sub-component ────────────────────────────────────────────────────────────
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '7px 0', borderBottom: '1px solid #1f2c34'
-    }}>
-      <span style={{ color: '#8696a0', fontSize: 13 }}>{label}</span>
-      <span style={{ color: '#d1d7db', fontSize: 13, fontWeight: 500, textAlign: 'right' }}>
-        {value}
-      </span>
     </div>
   )
 }
