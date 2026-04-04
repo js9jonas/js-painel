@@ -60,7 +60,7 @@ export async function renovarAplicativo({
         `INSERT INTO public.pagamentos
            (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
          VALUES ($1, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Licenças', NOW())`,
-        [id_cliente, cliente, nome_app, forma, valor, detalhes || "OK"]
+        [id_cliente, cliente, nome_app, forma, valor, detalhes || "PAGO"]
       );
     }
 
