@@ -98,30 +98,27 @@ export async function PUT(
 
       // statusFinal null = manter status; caso contrário seta o valor recebido
       const sql = `
-        UPDATE public.assinaturas
-        SET
-          venc_contrato =
-            CASE
-              WHEN $2::date IS NOT NULL THEN $2::date
-              WHEN venc_contrato::date >= CURRENT_DATE
-                THEN (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
-              ELSE (CURRENT_DATE + make_interval(months => $3))::date
-            END,
-          venc_contas =
-            CASE
-              WHEN $5::date IS NOT NULL THEN $5::date
-              WHEN venc_contas IS NULL THEN (CURRENT_DATE + make_interval(months => 1))::date
-              WHEN venc_contas::date >= CURRENT_DATE THEN (venc_contas::date + make_interval(months => 1))::date
-              ELSE (CURRENT_DATE + make_interval(months => 1))::date
-            END,
-          status = CASE
-            WHEN $4::text IS NOT NULL THEN $4::text
-            ELSE status
-          END,
-          atualizado_em = NOW()
-        WHERE id_assinatura = $1::bigint
-        RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
-      `;
+  UPDATE public.assinaturas
+  SET
+    venc_contrato =
+      CASE
+        WHEN $2::date IS NOT NULL THEN $2::date
+        WHEN venc_contrato::date >= CURRENT_DATE
+          THEN (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => $3))::date
+        ELSE (CURRENT_DATE + make_interval(months => $3))::date
+      END,
+    venc_contas = CASE
+      WHEN $5::date IS NOT NULL THEN $5::date
+      ELSE venc_contas
+    END,
+    status = CASE
+      WHEN $4::text IS NOT NULL THEN $4::text
+      ELSE status
+    END,
+    atualizado_em = NOW()
+  WHERE id_assinatura = $1::bigint
+  RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
+`;
 
       const result = await client.query(sql, [idAssinatura, dataManual, meses, statusFinal, vencContasManual]);
 

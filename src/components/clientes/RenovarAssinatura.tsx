@@ -15,42 +15,35 @@ function addMeses(dataStr: string | null | undefined, meses: number): string {
     return base.toISOString().split("T")[0];
 }
 
-// DEPOIS
 function calcVencContrato(
     vencAtual: string | null | undefined,
     periodo: Periodo,
-    vencContasAtual?: string | null   // ← novo parâmetro
+    vencContasAtual?: string | null
 ): string {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     if (vencAtual) {
         const venc = new Date(vencAtual + "T00:00:00");
         if (venc >= hoje) {
-            // Contrato ainda válido → estende a partir dele
             return addMeses(vencAtual, MESES[periodo]);
         }
-        // Contrato vencido — verifica contas antes de usar hoje como base
         if (vencContasAtual) {
             const vencContas = new Date(vencContasAtual + "T00:00:00");
             if (vencContas >= hoje) {
-                // Contas ainda no prazo → estende contrato a partir de vencAtual mesmo assim
                 return addMeses(vencAtual, MESES[periodo]);
             }
         }
-        // Ambos vencidos → base é hoje
         return addMeses(undefined, MESES[periodo]);
     }
     return addMeses(undefined, MESES[periodo]);
 }
 
-function calcVencContas(vencContasAtual: string | null | undefined): string {
+function vencContasVencida(vencContasAtual: string | null | undefined): boolean {
+    if (!vencContasAtual) return false;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    if (vencContasAtual) {
-        const venc = new Date(vencContasAtual + "T00:00:00");
-        return addMeses(venc >= hoje ? vencContasAtual : undefined, 1);
-    }
-    return addMeses(undefined, 1);
+    const venc = new Date(vencContasAtual.split("T")[0] + "T00:00:00");
+    return venc <= hoje;
 }
 
 export default function RenovarAssinatura({
@@ -82,6 +75,7 @@ export default function RenovarAssinatura({
 }) {
     const router = useRouter();
     const isPendente = (status ?? "").toLowerCase().trim() === "pendente";
+    const contasVencida = vencContasVencida(vencContasAtual);
 
     function valorDoPeriodo(p: Periodo): string {
         try {
@@ -102,7 +96,7 @@ export default function RenovarAssinatura({
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
     const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal", vencContasAtual));
-    const [vencContas, setVencContas] = useState(() => calcVencContas(vencContasAtual));
+    const [vencContas, setVencContas] = useState(vencContasAtual?.split("T")[0] ?? "");
     const [vencContratoEditado, setVencContratoEditado] = useState(false);
 
     function handlePeriodoChange(p: Periodo) {
@@ -117,8 +111,8 @@ export default function RenovarAssinatura({
         setPeriodo("mensal");
         setValor(valorDoPeriodo("mensal"));
         setVencContrato(calcVencContrato(vencAtual, "mensal", vencContasAtual));
-        setVencContas(calcVencContas(vencContasAtual));
         setVencContratoEditado(false);
+        setVencContas(vencContasAtual?.split("T")[0] ?? "");
         setStatusFinal("ativo");
         setOpen(true);
     }
@@ -167,8 +161,8 @@ export default function RenovarAssinatura({
             body: JSON.stringify({
                 periodo,
                 dataManual: vencContrato,
-                vencContasManual: vencContas,
-                statusFinal: registrarPagamento ? statusFinal : null, // null = manter status ao clicar "Alterar"
+                vencContasManual: vencContas || null,
+                statusFinal: registrarPagamento ? statusFinal : null,
                 registrarPagamento: registrarPagamento && statusFinal === "ativo",
                 pagamento: (registrarPagamento && statusFinal === "ativo")
                     ? { idCliente, nomeCliente, pacoteNome, forma, valor }
@@ -225,6 +219,23 @@ export default function RenovarAssinatura({
                             {/* Modo normal: mostra período e datas */}
                             {!isPendente && (
                                 <>
+                                    {/* Alerta de urgência em venc_contas */}
+                                    {contasVencida && (
+                                        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-start gap-3">
+                                            <span className="text-red-500 text-base mt-0.5">⚠️</span>
+                                            <div>
+                                                <p className="text-sm font-semibold text-red-800">Renovação urgente necessária</p>
+                                                <p className="text-xs text-red-600 mt-0.5">
+                                                    O vencimento de contas (
+                                                    <span className="font-medium">
+                                                        {vencContasAtual!.split("T")[0].split("-").reverse().join("/")}
+                                                    </span>
+                                                    ) já passou. O cliente pode estar sem acesso. Faça a renovação no painel do servidor o quanto antes.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-1.5">
                                         <label className={labelClass}>Periodo</label>
                                         <select className={inputClass} value={periodo} onChange={(e) => handlePeriodoChange(e.target.value as Periodo)}>
@@ -249,17 +260,26 @@ export default function RenovarAssinatura({
                                             />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className={labelClass}>Venc. contas</label>
+                                            <label className={`${labelClass} flex items-center gap-1.5`}>
+                                                Venc. contas
+                                                <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${
+                                                    contasVencida
+                                                        ? "bg-red-100 text-red-600"
+                                                        : "bg-zinc-100 text-zinc-400"
+                                                }`}>
+                                                    {contasVencida ? "⚠️ vencida" : "não alterada"}
+                                                </span>
+                                            </label>
                                             <input
                                                 type="date"
-                                                className={inputClass}
+                                                className={`${inputClass} ${contasVencida ? "border-red-300 focus:ring-red-400" : ""}`}
                                                 value={vencContas}
                                                 onChange={(e) => setVencContas(e.target.value)}
                                             />
                                         </div>
                                     </div>
                                     <p className="text-xs text-zinc-400">
-                                        Datas calculadas automaticamente pelo periodo. Edite se necessario.
+                                        Apenas o vencimento do contrato é ajustado aqui. A renovação do acesso é feita pela página de Alertas.
                                     </p>
 
                                     {/* Seleção de status */}

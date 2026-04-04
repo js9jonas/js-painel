@@ -8,6 +8,7 @@ import AdicionarMesContaButton from "@/components/alertas/AdicionarMesContaButto
 import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
 import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
 import SecaoRecolhivel from "@/components/alertas/SecaoRecolhivel";
+import DefinirDataContaButton from "@/components/alertas/DefinirDataContaButton";
 
 function diasRestantes(data: string): number {
     const hoje = new Date();
@@ -84,10 +85,10 @@ export default async function AlertasPage() {
                         <span
                             key={s.nome}
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${s.dias <= 0
-                                    ? "bg-red-600 text-white"
-                                    : s.dias <= 7
-                                        ? "bg-red-100 text-red-700 ring-1 ring-red-300"
-                                        : "bg-orange-100 text-orange-700 ring-1 ring-orange-300"
+                                ? "bg-red-600 text-white"
+                                : s.dias <= 7
+                                    ? "bg-red-100 text-red-700 ring-1 ring-red-300"
+                                    : "bg-orange-100 text-orange-700 ring-1 ring-orange-300"
                                 }`}
                         >
                             {s.nome}
@@ -150,9 +151,9 @@ export default async function AlertasPage() {
                                                 {r.status && (
                                                     <div className="text-xs mt-0.5">
                                                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize ${r.status.toLowerCase() === "ativo" ? "bg-emerald-50 text-emerald-700" :
-                                                                r.status.toLowerCase() === "pendente" ? "bg-blue-50 text-blue-700" :
-                                                                    r.status.toLowerCase() === "atrasado" ? "bg-yellow-50 text-yellow-700" :
-                                                                        "bg-zinc-100 text-zinc-500"
+                                                            r.status.toLowerCase() === "pendente" ? "bg-blue-50 text-blue-700" :
+                                                                r.status.toLowerCase() === "atrasado" ? "bg-yellow-50 text-yellow-700" :
+                                                                    "bg-zinc-100 text-zinc-500"
                                                             }`}>
                                                             {r.status}
                                                         </span>
@@ -171,7 +172,13 @@ export default async function AlertasPage() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
+                                                <div className="flex items-center gap-2">
+                                                    <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
+                                                    <DefinirDataContaButton
+                                                        idAssinatura={r.id_assinatura}
+                                                        vencContas={r.venc_contas.split("T")[0]}
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     );
