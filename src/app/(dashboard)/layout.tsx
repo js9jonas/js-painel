@@ -27,6 +27,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               href="/aplicativos"
               className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
             >
+              <Link
+                href="/chat"
+                className="rounded-lg px-3 py-2 text-green-600 hover:bg-green-50 hover:text-green-700 font-medium transition-all"
+              >
+                💬 Chat
+              </Link>
+
               📱 Aplicativos
             </Link>
             <Link
