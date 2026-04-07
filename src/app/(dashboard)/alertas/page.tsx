@@ -9,6 +9,7 @@ import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
 import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
 import SecaoRecolhivel from "@/components/alertas/SecaoRecolhivel";
 import DefinirDataContaButton from "@/components/alertas/DefinirDataContaButton";
+import AutoRefresh from "@/components/AutoRefresh";
 
 function diasRestantes(data: string): number {
     const hoje = new Date();
@@ -67,6 +68,7 @@ export default async function AlertasPage() {
 
     return (
         <div className="space-y-6">
+            <AutoRefresh interval={5000} />
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-bold text-zinc-900">🚨 Alertas</h1>

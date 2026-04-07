@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { getPagamentos, countPagamentos } from "@/lib/pagamentos";
 import PagamentosClient from "@/components/pagamentos/PagamentosClient";
+import AutoRefresh from "@/components/AutoRefresh";
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -21,7 +22,7 @@ export default async function PagamentosPage({ searchParams }: PageProps) {
   const q = toStr(sp.q);
   const page = toInt(sp.page, 1);
   const pageSize = toInt(sp.pageSize, 50);
-  const somentePendentes = sp.pendentes === "1"; 
+  const somentePendentes = sp.pendentes === "1";
 
   const [total, data] = await Promise.all([
     countPagamentos({ q }),
@@ -29,13 +30,16 @@ export default async function PagamentosPage({ searchParams }: PageProps) {
   ]);
 
   return (
-    <PagamentosClient
-      data={data}
-      total={total}
-      page={page}
-      pageSize={pageSize}
-      q={q}
-      somentePendentes={somentePendentes}
-    />
+    <>
+      <AutoRefresh interval={3000} />
+      <PagamentosClient
+        data={data}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        q={q}
+        somentePendentes={somentePendentes}
+      />
+    </>
   );
 }
