@@ -85,7 +85,7 @@ function BotaoExcluir({ id, onDone }: { id: number; onDone: () => void }) {
   );
 }
 
-const FORMAS = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
+const FORMAS = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 
 function FormaCell({ id, forma, onDone }: { id: number; forma: string | null; onDone: () => void }) {
   const [editando, setEditando] = useState(false);

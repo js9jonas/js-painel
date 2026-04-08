@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 type StatusFinal = "ativo" | "pendente";
 
-const FORMAS_PGTO = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
+const FORMAS_PGTO = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
 
 function addMeses(dataStr: string | null | undefined, meses: number): string {

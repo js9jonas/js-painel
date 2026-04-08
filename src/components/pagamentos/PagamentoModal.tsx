@@ -238,7 +238,7 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
                 className={inputClass}
               >
                 <option value="">— Selecione —</option>
-                {["PIX", "Nubank", "Nu PJ", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"].map((f) => (
+                {["PIX", "Nubank", "Nu PJ", "Lotérica", "Cortesia","Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"].map((f) => (
                   <option key={f} value={f}>{f}</option>
                 ))}
               </select>
