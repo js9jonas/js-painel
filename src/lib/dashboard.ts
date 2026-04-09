@@ -42,6 +42,12 @@ export type PacoteStats = {
   percentual: number;
 };
 
+export type ServidorContasStats = {
+  servidor: string;
+  quantidade: number;
+  percentual: number;
+};
+
 export type PlanoStats = {
   plano: string;
   quantidade: number;
@@ -185,6 +191,34 @@ export async function getPacotesStats(): Promise<PacoteStats[]> {
   `;
   const { rows } = await pool.query(sql);
   return rows.map((r) => ({ pacote: r.pacote, quantidade: r.quantidade || 0, percentual: parseFloat(r.percentual || "0") }));
+}
+
+export async function getContasAtivasPorServidor(): Promise<ServidorContasStats[]> {
+  const sql = `
+    WITH total AS (
+      SELECT COUNT(DISTINCT a.id_assinatura)::numeric AS total
+      FROM public.assinaturas a
+      JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
+      WHERE lower(btrim(a.status)) IN ('ativo','atrasado')
+    )
+    SELECT
+      COALESCE(s.codigo_publico, s.nome_interno, 'Sem servidor') AS servidor,
+      COUNT(DISTINCT a.id_assinatura)::int AS quantidade,
+      ROUND((COUNT(DISTINCT a.id_assinatura)::numeric / t.total * 100), 1)::numeric AS percentual
+    FROM public.assinaturas a
+    JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
+    JOIN public.servidores s ON s.id_servidor = cs.id_servidor
+    CROSS JOIN total t
+    WHERE lower(btrim(a.status)) IN ('ativo','atrasado')
+    GROUP BY s.id_servidor, s.codigo_publico, s.nome_interno, t.total
+    ORDER BY quantidade DESC;
+  `;
+  const { rows } = await pool.query(sql);
+  return rows.map((r) => ({
+    servidor: r.servidor,
+    quantidade: r.quantidade || 0,
+    percentual: parseFloat(r.percentual || "0"),
+  }));
 }
 
 export async function getPlanosStats(): Promise<PlanoStats[]> {

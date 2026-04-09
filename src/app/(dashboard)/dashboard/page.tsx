@@ -7,7 +7,7 @@ import {
   getNaoRenovadosPorMes,
   getServidoresUsoComPrevisao,
   getStatusAssinaturas,
-  getPacotesStats,
+  getContasAtivasPorServidor,
   getVencimentosProximos,
 } from "@/lib/dashboard";
 import ClientesNovosChart from "@/components/dashboard/ClientesNovosChart";
@@ -61,7 +61,7 @@ export default async function DashboardPage() {
     naoRenovados,
     servidores,
     statusAssinaturas,
-    pacotes,
+    contasPorServidor,
     vencimentos,
   ] = await Promise.all([
     getMetricasQuantitativas(),
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
     getNaoRenovadosPorMes(),
     getServidoresUsoComPrevisao(),
     getStatusAssinaturas(),
-    getPacotesStats(),
+    getContasAtivasPorServidor(),
     getVencimentosProximos(7),
   ]);
 
@@ -162,10 +162,10 @@ export default async function DashboardPage() {
 
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-zinc-900">Pacotes ativos</h3>
-            <p className="text-sm text-zinc-500 mt-0.5">Distribuição por pacote</p>
+            <h3 className="text-base font-semibold text-zinc-900">Contas ativas por servidor</h3>
+            <p className="text-sm text-zinc-500 mt-0.5">Distribuição de assinaturas ativas por servidor</p>
           </div>
-          <PacotesChart data={pacotes} />
+          <PacotesChart data={contasPorServidor} labelKey="servidor" />
         </div>
       </div>
 
