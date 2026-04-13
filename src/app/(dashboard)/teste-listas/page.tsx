@@ -77,6 +77,11 @@ interface Lista {
   snapshot_em: string | null
   uptime_24h: number | null
   stream_teste_id: string | null
+  stream_ttfb_ms: number | null
+  stream_throughput_kbps: number | null
+  stream_consistencia_pct: number | null
+  ultimo_stream_status: 'ok' | 'lento' | 'falhou' | 'sem_canal' | null
+  stream_canal_nome: string | null
 }
 
 interface FormData {
@@ -702,6 +707,31 @@ function CardLista({ lista, agora, mediasHistorico, periodoHoras, testandoRapido
           </div>
         ))}
       </div>
+
+      {/* Stream HLS metrics */}
+      {lista.stream_teste_id && (lista.ultimo_stream_status || lista.stream_throughput_kbps !== null) && (() => {
+        const st = lista.ultimo_stream_status
+        const segsOk = lista.stream_consistencia_pct !== null ? Math.round(lista.stream_consistencia_pct / 100 * 3) : null
+        const streamIcon = st === 'ok' ? '✅' : st === 'lento' ? '⚠️' : st === 'falhou' ? '❌' : '—'
+        const throughput = lista.stream_throughput_kbps
+        const ttfb = lista.stream_ttfb_ms
+        return (
+          <div className="flex items-center gap-3 px-4 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 text-xs text-gray-500 dark:text-gray-400">
+            <span className="font-medium">{streamIcon} HLS</span>
+            {ttfb !== null && <span>TTFB <span className="font-medium text-gray-700 dark:text-gray-300">{ttfb}ms</span></span>}
+            {throughput !== null && (
+              <span>
+                {throughput >= 1000
+                  ? <><span className="font-medium text-gray-700 dark:text-gray-300">{(throughput / 1000).toFixed(1)}</span> Mbps</>
+                  : <><span className="font-medium text-gray-700 dark:text-gray-300">{throughput}</span> kbps</>}
+              </span>
+            )}
+            {segsOk !== null && (
+              <span>Segs <span className={`font-semibold ${segsOk === 3 ? 'text-green-600 dark:text-green-400' : segsOk >= 1 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{segsOk}/3</span></span>
+            )}
+          </div>
+        )
+      })()}
 
       {mediasHistorico && (
         <div className="px-4 py-1 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20">

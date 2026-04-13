@@ -5,7 +5,11 @@ import { NextResponse } from "next/server"
 export default auth((req) => {
   const { pathname } = req.nextUrl
 
-  if (pathname.startsWith('/api/whatsapp/webhook')) {
+  if (
+    pathname.startsWith('/api/stream-proxy') ||
+    pathname.startsWith('/api/proxy-test') ||
+    pathname.startsWith('/api/whatsapp/webhook')
+  ) {
     return NextResponse.next()
   }
 

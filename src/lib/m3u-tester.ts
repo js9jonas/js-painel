@@ -341,75 +341,228 @@ function determinarStatus(
   return 'online'
 }
 
-// ─── Teste de stream direto via URL ──────────────────────────────────────────
-// Conecta direto no .ts sem precisar baixar lista M3U
+// ─── Teste de stream simulando hls.js ────────────────────────────────────────
+// 1. Busca a playlist M3U8 → mede TTFB
+// 2. Parseia e pega até 3 segmentos .ts
+// 3. Faz fetch de cada segmento → mede TTFB, tamanho, throughput
+// 4. Compara throughput com bitrate declarado no M3U8
+// Campos mapeados para o schema existente:
+//   stream_ttfb_ms          → média do TTFB dos segmentos
+//   stream_throughput_kbps  → throughput médio dos segmentos
+//   stream_consistencia_pct → (segmentos_ok / tentados) * 100
+//   stream_duracao_s        → duração total do teste em segundos
 
-async function testarStreamDireto(
-  urlStream: string,
-  duracaoS = 20
-): Promise<{
+interface SegmentoM3U8 {
+  url: string
+  duration: number
+}
+
+function m3u8IsMaster(content: string): boolean {
+  return content.includes('#EXT-X-STREAM-INF')
+}
+
+function m3u8ResolveUrl(raw: string, base: string): string {
+  try {
+    return raw.startsWith('http://') || raw.startsWith('https://')
+      ? raw
+      : new URL(raw, base).href
+  } catch {
+    return raw
+  }
+}
+
+function m3u8ParseMasterVariant(content: string, baseUrl: string): { url: string; bandwidth: number } | null {
+  const lines = content.split('\n')
+  const variants: { url: string; bandwidth: number }[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line.startsWith('#EXT-X-STREAM-INF')) continue
+    const bwMatch = line.match(/BANDWIDTH=(\d+)/)
+    const bandwidth = bwMatch ? parseInt(bwMatch[1]) : 0
+    const nextLine = lines[i + 1]?.trim()
+    if (nextLine && !nextLine.startsWith('#')) {
+      variants.push({ url: m3u8ResolveUrl(nextLine, baseUrl), bandwidth })
+      i++
+    }
+  }
+
+  // Preferir maior bitrate (simula escolha do hls.js por padrão)
+  return variants.sort((a, b) => b.bandwidth - a.bandwidth)[0] ?? null
+}
+
+function m3u8ParseSegmentos(content: string, baseUrl: string): { segmentos: SegmentoM3U8[]; bandwidth: number | null } {
+  const segmentos: SegmentoM3U8[] = []
+  const lines = content.split('\n')
+  let bandwidth: number | null = null
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+
+    // Bandwidth pode vir de variantes inline
+    if (!bandwidth) {
+      const bwMatch = line.match(/BANDWIDTH=(\d+)/)
+      if (bwMatch) bandwidth = parseInt(bwMatch[1])
+    }
+
+    if (!line.startsWith('#EXTINF')) continue
+    const durMatch = line.match(/:([\d.]+)/)
+    const duration = durMatch ? parseFloat(durMatch[1]) : 0
+    const nextLine = lines[i + 1]?.trim()
+    if (nextLine && !nextLine.startsWith('#')) {
+      segmentos.push({ url: m3u8ResolveUrl(nextLine, baseUrl), duration })
+      i++
+    }
+  }
+
+  return { segmentos, bandwidth }
+}
+
+async function testarStreamHLS(urlM3u8: string): Promise<{
   ttfb_ms: number | null
   throughput_kbps: number | null
   consistencia_pct: number | null
+  duracao_s: number
   status: 'ok' | 'lento' | 'falhou'
 }> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), (duracaoS + 10) * 1000)
+  const TIMEOUT_PLAYLIST = 12_000
+  const TIMEOUT_SEGMENTO = 20_000
+  const SEGMENTOS_ALVO = 3
+  const inicioTeste = Date.now()
+
+  const falhou = (duracao_s: number) => ({
+    ttfb_ms: null,
+    throughput_kbps: null,
+    consistencia_pct: null,
+    duracao_s,
+    status: 'falhou' as const,
+  })
+
+  // ── Passo 1: busca a playlist M3U8 ─────────────────────────────────────────
+  let playlistContent: string
+  let playlistUrl = urlM3u8
 
   try {
-    const inicio = Date.now()
-    const res = await fetch(urlStream, {
-      signal: controller.signal,
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_PLAYLIST)
+    const res = await fetch(urlM3u8, {
+      signal: ctrl.signal,
+      cache: 'no-store',
       headers: { 'User-Agent': IPTV_USER_AGENT },
     })
-
-    if (!res.ok || !res.body) {
-      return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
-    }
-
-    const ttfb_ms = Date.now() - inicio
-    const reader = res.body.getReader()
-    const fimLeitura = Date.now() + duracaoS * 1000
-    const janelas: number[] = []
-    let bytesJanela = 0
-    let inicioJanela = Date.now()
-
-    while (Date.now() < fimLeitura) {
-      const { done, value } = await reader.read()
-      if (done) break
-      bytesJanela += value.byteLength
-
-      const agora = Date.now()
-      if (agora - inicioJanela >= 2000) {
-        const kbps = (bytesJanela * 8) / (agora - inicioJanela)
-        janelas.push(kbps)
-        bytesJanela = 0
-        inicioJanela = agora
-      }
-    }
-
-    reader.cancel()
-
-    if (janelas.length === 0) {
-      return { ttfb_ms, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
-    }
-
-    const throughputMedio = janelas.reduce((a, b) => a + b, 0) / janelas.length
-    const throughputMin = Math.min(...janelas)
-    const consistencia_pct = Math.round((throughputMin / throughputMedio) * 100)
-    const status = throughputMedio < 500 ? 'lento' : consistencia_pct < 40 ? 'lento' : 'ok'
-
-    return {
-      ttfb_ms,
-      throughput_kbps: Math.round(throughputMedio),
-      consistencia_pct,
-      status,
-    }
+    clearTimeout(t)
+    if (!res.ok) return falhou(Math.round((Date.now() - inicioTeste) / 1000))
+    playlistContent = await res.text()
   } catch {
-    return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: null, status: 'falhou' }
-  } finally {
-    clearTimeout(timer)
+    return falhou(Math.round((Date.now() - inicioTeste) / 1000))
   }
+
+  // ── Passo 2: resolve master playlist → media playlist ──────────────────────
+  let bitrateDeclaradoKbps: number | null = null
+
+  if (m3u8IsMaster(playlistContent)) {
+    const variant = m3u8ParseMasterVariant(playlistContent, playlistUrl)
+    if (!variant) return falhou(Math.round((Date.now() - inicioTeste) / 1000))
+
+    bitrateDeclaradoKbps = Math.round(variant.bandwidth / 1000)
+    playlistUrl = variant.url
+
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), TIMEOUT_PLAYLIST)
+      const res = await fetch(variant.url, {
+        signal: ctrl.signal,
+        cache: 'no-store',
+        headers: { 'User-Agent': IPTV_USER_AGENT },
+      })
+      clearTimeout(t)
+      if (!res.ok) return falhou(Math.round((Date.now() - inicioTeste) / 1000))
+      playlistContent = await res.text()
+    } catch {
+      return falhou(Math.round((Date.now() - inicioTeste) / 1000))
+    }
+  }
+
+  // ── Passo 3: parseia segmentos ─────────────────────────────────────────────
+  const { segmentos, bandwidth } = m3u8ParseSegmentos(playlistContent, playlistUrl)
+
+  if (bitrateDeclaradoKbps === null && bandwidth !== null) {
+    bitrateDeclaradoKbps = Math.round(bandwidth / 1000)
+  }
+
+  if (segmentos.length === 0) {
+    return falhou(Math.round((Date.now() - inicioTeste) / 1000))
+  }
+
+  // ── Passo 4: fetch dos primeiros N segmentos ───────────────────────────────
+  const alvo = segmentos.slice(0, SEGMENTOS_ALVO)
+  const resultados: { ttfb_ms: number; throughput_kbps: number }[] = []
+
+  for (const seg of alvo) {
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), TIMEOUT_SEGMENTO)
+
+      const inicio = Date.now()
+      const res = await fetch(seg.url, {
+        signal: ctrl.signal,
+        headers: { 'User-Agent': IPTV_USER_AGENT },
+      })
+      const ttfb = Date.now() - inicio
+
+      if (!res.ok) { clearTimeout(t); continue }
+
+      const buffer = await res.arrayBuffer()
+      clearTimeout(t)
+
+      const total_ms = Date.now() - inicio
+      const bytes = buffer.byteLength
+      if (bytes > 0 && total_ms > 0) {
+        const kbps = Math.round((bytes * 8) / (total_ms / 1000) / 1000)
+        resultados.push({ ttfb_ms: ttfb, throughput_kbps: kbps })
+      }
+    } catch {
+      // segmento falhou — continua
+    }
+  }
+
+  const duracao_s = Math.round((Date.now() - inicioTeste) / 1000)
+
+  if (resultados.length === 0) {
+    return { ttfb_ms: null, throughput_kbps: null, consistencia_pct: 0, duracao_s, status: 'falhou' }
+  }
+
+  // ── Passo 5: calcula métricas agregadas ────────────────────────────────────
+  const avgTtfb = Math.round(resultados.reduce((a, b) => a + b.ttfb_ms, 0) / resultados.length)
+  const avgThroughput = Math.round(resultados.reduce((a, b) => a + b.throughput_kbps, 0) / resultados.length)
+  const consistencia_pct = Math.round((resultados.length / alvo.length) * 100)
+
+  let status: 'ok' | 'lento' | 'falhou'
+
+  if (bitrateDeclaradoKbps !== null && bitrateDeclaradoKbps > 0) {
+    // Compara com bitrate declarado no M3U8
+    if (avgThroughput >= bitrateDeclaradoKbps * 1.5 && consistencia_pct === 100) {
+      status = 'ok'
+    } else if (avgThroughput >= bitrateDeclaradoKbps) {
+      status = 'lento'
+    } else {
+      status = 'falhou'
+    }
+  } else {
+    // Sem bitrate de referência: threshold absoluto
+    if (avgThroughput >= 3000 && consistencia_pct === 100) {
+      status = 'ok'
+    } else if (avgThroughput >= 500) {
+      status = 'lento'
+    } else {
+      status = 'falhou'
+    }
+  }
+
+  // Se algum segmento falhou → no máximo 'lento'
+  if (consistencia_pct < 100 && status === 'ok') status = 'lento'
+
+  return { ttfb_ms: avgTtfb, throughput_kbps: avgThroughput, consistencia_pct, duracao_s, status }
 }
 
 async function buscarStreamCanal(
@@ -582,19 +735,19 @@ export async function testarListaRapido(listaId: number): Promise<ResultadoTeste
       : extrairCredenciaisXtream(lista.url_m3u)
 
   if (status === 'online' && credsRapido && lista.stream_teste_id) {
-    const urlStream = `${credsRapido.host}/live/${credsRapido.username}/${credsRapido.password}/${lista.stream_teste_id}.ts`
-    console.log(`[teste-rapido] stream direto → ${urlStream}`)
+    const urlM3u8 = `${credsRapido.host}/live/${credsRapido.username}/${credsRapido.password}/${lista.stream_teste_id}/index.m3u8`
+    console.log(`[teste-rapido] stream HLS → ${urlM3u8}`)
 
     streamCanalNome = `ID ${lista.stream_teste_id}`
-    streamDuracao = 20
 
-    const streamResult = await testarStreamDireto(urlStream, 20)
+    const streamResult = await testarStreamHLS(urlM3u8)
     streamTtfb = streamResult.ttfb_ms
     streamThroughput = streamResult.throughput_kbps
     streamConsistencia = streamResult.consistencia_pct
+    streamDuracao = streamResult.duracao_s
     streamStatus = streamResult.status
 
-    console.log(`[teste-rapido] stream → ${streamStatus} | ${streamThroughput}kbps | consistencia ${streamConsistencia}%`)
+    console.log(`[teste-rapido] HLS → ${streamStatus} | ${streamThroughput}kbps | segs ${streamConsistencia}%`)
   }
   const resultado: ResultadoTeste = {
     lista_id: listaId,
@@ -685,25 +838,25 @@ export async function testarLista(listaId: number): Promise<ResultadoTeste> {
   if (credsParaStream) {
     if (lista.stream_teste_id) {
       // Usa stream_id salvo — sem precisar buscar na API
-      const urlStream = `${credsParaStream.host}/live/${credsParaStream.username}/${credsParaStream.password}/${lista.stream_teste_id}.ts`
+      const urlM3u8 = `${credsParaStream.host}/live/${credsParaStream.username}/${credsParaStream.password}/${lista.stream_teste_id}/index.m3u8`
       streamCanalNome = `ID ${lista.stream_teste_id}`
-      streamDuracao = 20
-      const streamResult = await testarStreamDireto(urlStream, 20)
+      const streamResult = await testarStreamHLS(urlM3u8)
       streamTtfb = streamResult.ttfb_ms
       streamThroughput = streamResult.throughput_kbps
       streamConsistencia = streamResult.consistencia_pct
+      streamDuracao = streamResult.duracao_s
       streamStatus = streamResult.status
     } else {
       // Fallback: busca canal "telecine" via API Xtream
       const canal = await buscarStreamCanal(credsParaStream, 'telecine')
       if (canal) {
         streamCanalNome = canal.nome
-        streamDuracao = 20
-        const urlStream = `${credsParaStream.host}/live/${credsParaStream.username}/${credsParaStream.password}/${canal.stream_id}.ts`
-        const streamResult = await testarStreamDireto(urlStream, 20)
+        const urlM3u8 = `${credsParaStream.host}/live/${credsParaStream.username}/${credsParaStream.password}/${canal.stream_id}/index.m3u8`
+        const streamResult = await testarStreamHLS(urlM3u8)
         streamTtfb = streamResult.ttfb_ms
         streamThroughput = streamResult.throughput_kbps
         streamConsistencia = streamResult.consistencia_pct
+        streamDuracao = streamResult.duracao_s
         streamStatus = streamResult.status
       } else {
         streamStatus = 'sem_canal'

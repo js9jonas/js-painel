@@ -36,6 +36,11 @@ export async function GET() {
         s.total_series,
         s.total_geral,
         s.capturado_em     AS snapshot_em,
+        ts.stream_ttfb_ms,
+        ts.stream_throughput_kbps,
+        ts.stream_consistencia_pct,
+        ts.stream_status    AS ultimo_stream_status,
+        ts.stream_canal_nome,
         ROUND(
           100.0 * COUNT(t24.id) FILTER (WHERE t24.status = 'online')
                / NULLIF(COUNT(t24.id), 0), 1
@@ -71,6 +76,19 @@ export async function GET() {
         ORDER BY t1.testado_em DESC
         LIMIT 1
       ) t ON true
+      -- agrega métricas de stream do último teste que tenha stream_status
+      LEFT JOIN LATERAL (
+        SELECT
+          stream_ttfb_ms,
+          stream_throughput_kbps,
+          stream_consistencia_pct,
+          stream_status,
+          stream_canal_nome
+        FROM m3u_testes
+        WHERE lista_id = l.id AND stream_status IS NOT NULL
+        ORDER BY testado_em DESC
+        LIMIT 1
+      ) ts ON true
       LEFT JOIN LATERAL (
         SELECT * FROM m3u_snapshots
         WHERE lista_id = l.id
@@ -84,7 +102,9 @@ export async function GET() {
                t.ttfb_ms, t.velocidade_kbps, t.tempo_download_ms,
                t.tamanho_lista_kb, t.http_status, t.erro_mensagem,
                s.total_canais, s.total_filmes, s.total_series,
-               s.total_geral, s.capturado_em
+               s.total_geral, s.capturado_em,
+               ts.stream_ttfb_ms, ts.stream_throughput_kbps, ts.stream_consistencia_pct,
+               ts.stream_status, ts.stream_canal_nome
       ORDER BY l.ativo DESC, l.nome ASC
     `)
 

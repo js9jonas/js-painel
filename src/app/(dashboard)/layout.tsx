@@ -1,6 +1,7 @@
 // src/app/(dashboard)/layout.tsx
 import Link from "next/link";
 import UserMenu from "@/components/auth/UserMenu";
+import NavDropdown from "@/components/NavDropdown";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -46,18 +47,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               🚨 Alertas
             </Link>
-            <Link
-              href="/teste-listas"
-              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
-            >
-              📡 Servidores
-            </Link>
-            <Link
-              href="/planos"
-              className="rounded-lg px-3 py-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-all"
-            >
-              📋 Planos e Pacotes
-            </Link>
+            <NavDropdown
+              label="📡 IPTV"
+              items={[
+                { href: '/teste-listas', label: '📡 Servidores' },
+                { href: '/planos', label: '📋 Planos e Pacotes' },
+                { href: '/player', label: '▶ Player' },
+              ]}
+            />
           </nav>
           <div className="ml-auto">
             <UserMenu />
