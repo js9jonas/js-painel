@@ -692,7 +692,8 @@ function PlayerContent() {
           maxBufferLength: 30,
           // Loader customizado: modifica context.url antes do XHR abrir.
           // xhrSetup não funciona para mudar URLs (context.url sobrescreve).
-          loader: viaProxy ? criarProxyLoader(Hls.DefaultConfig.loader) : Hls.DefaultConfig.loader,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          loader: (viaProxy ? criarProxyLoader(Hls.DefaultConfig.loader) : Hls.DefaultConfig.loader) as any,
         })
         hlsRef.current = hls
 
