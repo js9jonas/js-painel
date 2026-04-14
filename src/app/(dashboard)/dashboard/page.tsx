@@ -92,6 +92,10 @@ export default async function DashboardPage() {
             className="h-9 rounded-xl border border-amber-200 bg-amber-50 px-4 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors flex items-center gap-1.5">
             🚨 Alertas
           </Link>
+          <Link href="/agente"
+            className="h-9 rounded-xl border border-indigo-200 bg-indigo-50 px-4 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1.5">
+            🤖 Agente IA
+          </Link>
         </div>
       </div>
 
