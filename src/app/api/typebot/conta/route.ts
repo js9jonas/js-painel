@@ -57,8 +57,11 @@ export async function GET(req: NextRequest) {
 
     const linhas = assinaturas
       .map((a, i) => `${i + 1}. ${a.plano} — vence ${a.vencimento}`)
-      .join("\n")
-    const mensagem = `📋 *${nome}*, suas assinaturas ativas:\n\n${linhas}`
+      .join(`
+`)
+    const mensagem = `📋 *${nome}*, suas assinaturas ativas:
+
+${linhas}`
 
     return NextResponse.json({ encontrado: true, nome, assinaturas, mensagem })
   } catch (err: unknown) {
