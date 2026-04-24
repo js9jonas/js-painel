@@ -29,15 +29,18 @@ export async function GET(req: NextRequest) {
     }>(
       `SELECT
          cl.nome,
-         COALESCE(p.descricao, p.tipo) AS plano,
+         ap.nome_app AS plano,
          a.status,
-         TO_CHAR(a.venc_contas, 'DD/MM/YYYY') AS vencimento
+         TO_CHAR(a.validade, 'DD/MM/YYYY') AS vencimento
        FROM public.contatos co
-       JOIN public.clientes   cl ON cl.id_cliente = co.id_cliente
-       JOIN public.assinaturas a ON a.id_cliente  = co.id_cliente
-       LEFT JOIN public.planos p ON p.id_plano    = a.id_plano
+       JOIN public.clientes    cl ON cl.id_cliente = co.id_cliente
+       JOIN public.aplicativos a  ON a.id_cliente  = co.id_cliente
+       LEFT JOIN public.apps   ap ON ap.id_app     = a.id_app
        WHERE co.telefone = $1
-       ORDER BY a.status = 'ativo' DESC, a.venc_contas DESC`,
+         AND a.status    = 'ativa'
+         AND a.validade >= CURRENT_DATE
+       ORDER BY a.validade ASC
+       LIMIT 5`,
       [telefone]
     )
 
@@ -45,15 +48,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ encontrado: false })
     }
 
-    return NextResponse.json({
-      encontrado: true,
-      nome: rows[0].nome,
-      assinaturas: rows.map((r) => ({
-        plano: r.plano ?? "—",
-        status: r.status,
-        vencimento: r.vencimento ?? "—",
-      })),
-    })
+    const nome = rows[0].nome
+    const assinaturas = rows.map((r) => ({
+      plano: r.plano ?? "—",
+      status: "ativa",
+      vencimento: r.vencimento ?? "—",
+    }))
+
+    const linhas = assinaturas
+      .map((a, i) => `${i + 1}. ${a.plano} — vence ${a.vencimento}`)
+      .join("\n")
+    const mensagem = `📋 *${nome}*, suas assinaturas ativas:\n\n${linhas}`
+
+    return NextResponse.json({ encontrado: true, nome, assinaturas, mensagem })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro interno"
     console.error("[typebot/conta] Erro:", err)
