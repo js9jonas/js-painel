@@ -8,7 +8,8 @@ export default auth((req) => {
   if (
     pathname.startsWith('/api/stream-proxy') ||
     pathname.startsWith('/api/proxy-test') ||
-    pathname.startsWith('/api/whatsapp/webhook')
+    pathname.startsWith('/api/whatsapp/webhook') ||
+    pathname.startsWith('/api/typebot/')
   ) {
     return NextResponse.next()
   }
