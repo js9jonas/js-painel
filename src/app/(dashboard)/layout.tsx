@@ -51,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               label="📡 IPTV"
               items={[
                 { href: '/teste-listas', label: '📡 Servidores' },
+                { href: '/servidores/vinculacao', label: '🔗 Vinculação' },
                 { href: '/planos', label: '📋 Planos e Pacotes' },
                 { href: '/player', label: '▶ Player' },
               ]}
