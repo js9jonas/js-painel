@@ -5,9 +5,10 @@ import { pool } from "@/lib/db";
 import { getAdapter } from "@/lib/painel-adapters";
 
 // Sincroniza contas do painel externo → tabela contas do banco
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const idServidor = Number(params.id);
+    const { id } = await params;
+    const idServidor = Number(id);
     const adapter = await getAdapter(idServidor);
     const contas = await adapter.listarContas();
 

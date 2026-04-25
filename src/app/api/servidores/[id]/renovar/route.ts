@@ -3,9 +3,10 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdapter } from "@/lib/painel-adapters";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const idServidor = Number(params.id);
+    const { id } = await params;
+    const idServidor = Number(id);
     const { usuario, meses = 1 } = await req.json();
 
     if (!usuario) {

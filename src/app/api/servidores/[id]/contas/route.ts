@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 
 // Lista contas do banco para um servidor (com filtro opcional de vencimento)
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const idServidor = Number(params.id);
+    const { id } = await params;
+    const idServidor = Number(id);
     const { searchParams } = new URL(req.url);
     const dias = searchParams.get("vence_em_dias");
     const q = searchParams.get("q");
