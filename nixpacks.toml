@@ -1,2 +1,5 @@
-﻿[phases.setup]
-nixPkgs = ['nodejs_20']
+[phases.setup]
+nixPkgs = ['nodejs_20', 'python311', 'python311Packages.pip']
+
+[phases.install]
+cmds = ['npm ci --legacy-peer-deps', 'pip3 install curl-cffi --break-system-packages']

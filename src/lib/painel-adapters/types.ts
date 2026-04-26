@@ -24,4 +24,6 @@ export interface ServidorCredenciais {
   painel_tipo: string;
   session_cookie: string | null;
   session_expiry: Date | null;
+  api_token: string | null;
+  api_secret: string | null;
 }

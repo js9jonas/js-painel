@@ -14,7 +14,7 @@ function formatDate(d: string | null) {
   return d.split("-").reverse().join("/");
 }
 
-function useClienteSearch() {
+function useClienteSearch(onSelect?: (clienteId: number) => void) {
   const [busca, setBusca] = useState("");
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [clienteNome, setClienteNome] = useState("");
@@ -36,13 +36,15 @@ function useClienteSearch() {
   }, []);
 
   const selecionar = useCallback((c: ClienteBuscaRow) => {
-    setClienteId(Number(c.id_cliente));
+    const id = Number(c.id_cliente);
+    setClienteId(id);
     setClienteNome(c.nome);
     setBusca(c.nome);
     setResultados([]);
     setAberto(false);
     setActiveIdx(-1);
-  }, []);
+    onSelect?.(id);
+  }, [onSelect]);
 
   const limpar = useCallback(() => {
     setClienteId(null);
@@ -64,16 +66,16 @@ function useClienteSearch() {
 }
 
 function VincularInline({ conta, onDone }: { conta: ContaVinculacao; onDone: () => void }) {
-  const search = useClienteSearch();
   const [isPending, startTransition] = useTransition();
 
-  function salvar() {
-    if (!search.clienteId) return;
+  const salvar = useCallback((clienteId: number) => {
     startTransition(async () => {
-      await vincularConta(conta.id_conta, search.clienteId!);
+      await vincularConta(conta.id_conta, clienteId);
       onDone();
     });
-  }
+  }, [conta.id_conta, onDone]);
+
+  const search = useClienteSearch(salvar);
 
   return (
     <div className="flex items-start gap-2">
@@ -86,6 +88,7 @@ function VincularInline({ conta, onDone }: { conta: ContaVinculacao; onDone: () 
           className={inputClass}
           placeholder="Buscar cliente..."
           autoFocus
+          disabled={isPending}
         />
         {search.aberto && search.resultados.length > 0 && (
           <div className="absolute z-20 mt-1 w-full rounded-xl border border-zinc-200 bg-white shadow-lg overflow-hidden">
@@ -106,18 +109,11 @@ function VincularInline({ conta, onDone }: { conta: ContaVinculacao; onDone: () 
         )}
       </div>
       <button
-        onClick={salvar}
-        disabled={!search.clienteId || isPending}
-        className="h-9 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40 whitespace-nowrap"
-      >
-        {isPending ? "Salvando..." : "Vincular"}
-      </button>
-      <button
         onClick={onDone}
         disabled={isPending}
         className="h-9 rounded-lg border border-zinc-300 px-3 text-sm hover:bg-zinc-50 disabled:opacity-40"
       >
-        ✕
+        {isPending ? "..." : "✕"}
       </button>
     </div>
   );
