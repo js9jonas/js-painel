@@ -65,6 +65,26 @@ function useClienteSearch(onSelect?: (clienteId: number) => void) {
   return { busca, clienteId, clienteNome, resultados, aberto, activeIdx, handleChange, selecionar, limpar, handleKeyDown, setAberto };
 }
 
+function PlanoAtual({ contrato, status, nomeServidor }: { contrato: string | null; status: string | null; nomeServidor: string }) {
+  if (!contrato) return <span className="text-zinc-300 text-xs">—</span>;
+
+  const servidorNorm = nomeServidor.toLowerCase();
+  const contratoNorm = contrato.toLowerCase();
+  const bate = contratoNorm.includes(servidorNorm) || servidorNorm.includes(contratoNorm);
+
+  const statusColor =
+    status === "ativo" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+    status === "atrasado" ? "bg-orange-50 text-orange-700 border-orange-200" :
+    "bg-zinc-50 text-zinc-500 border-zinc-200";
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor} ${!bate ? "ring-1 ring-red-300" : ""}`}>
+      {contrato}
+      {!bate && <span className="text-red-400" title="Servidor diferente do plano atual">⚠</span>}
+    </span>
+  );
+}
+
 function SugestaoInline({ conta, onDone, onEditar }: { conta: ContaVinculacao; onDone: () => void; onEditar: () => void }) {
   const [isPending, startTransition] = useTransition();
 
@@ -221,7 +241,7 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
               <table className="w-full text-sm">
                 <thead className="border-b bg-zinc-50/50">
                   <tr>
-                    {["Usuário", "Rótulo (painel)", "Vencimento", "Cliente vinculado", ""].map((h) => (
+                    {["Usuário", "Rótulo (painel)", "Vencimento", "Cliente vinculado", "Plano atual", ""].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wide">
                         {h}
                       </th>
@@ -252,6 +272,9 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                         ) : (
                           <span className="text-zinc-400 text-xs italic">não vinculado</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PlanoAtual contrato={c.plano_contrato} status={c.plano_status} nomeServidor={c.nome_servidor} />
                       </td>
                       <td className="px-4 py-3">
                         {vinculandoId !== c.id_conta && !c.sugestao_id_cliente && (

@@ -16,6 +16,8 @@ export type ContaVinculacao = {
   nome_cliente: string | null;
   sugestao_id_cliente: number | null;
   sugestao_nome_cliente: string | null;
+  plano_contrato: string | null;
+  plano_status: string | null;
 };
 
 async function getContasParaVincular(): Promise<ContaVinculacao[]> {
@@ -31,7 +33,9 @@ async function getContasParaVincular(): Promise<ContaVinculacao[]> {
       a.id_cliente,
       cl.nome AS nome_cliente,
       sc.id_cliente AS sugestao_id_cliente,
-      sc.nome AS sugestao_nome_cliente
+      sc.nome AS sugestao_nome_cliente,
+      asn.contrato AS plano_contrato,
+      asn.status AS plano_status
     FROM public.contas c
     JOIN public.servidores s ON s.id_servidor = c.id_servidor
     LEFT JOIN public.aplicativos a ON a.id_conta = c.id_conta
@@ -43,6 +47,16 @@ async function getContasParaVincular(): Promise<ContaVinculacao[]> {
         AND (SELECT COUNT(*) FROM public.clientes cl3 WHERE lower(cl3.nome) = lower(c.rotulo)) = 1
       LIMIT 1
     ) sc ON a.id_cliente IS NULL AND c.rotulo IS NOT NULL AND c.rotulo != ''
+    LEFT JOIN LATERAL (
+      SELECT pk.contrato, asn2.status
+      FROM public.assinaturas asn2
+      LEFT JOIN public.pacote pk ON pk.id_pacote = asn2.id_pacote
+      WHERE asn2.id_cliente = a.id_cliente
+        AND asn2.status IN ('ativo', 'atrasado', 'pendente')
+      ORDER BY CASE asn2.status WHEN 'ativo' THEN 1 WHEN 'atrasado' THEN 2 WHEN 'pendente' THEN 3 END,
+               asn2.venc_contrato DESC
+      LIMIT 1
+    ) asn ON a.id_cliente IS NOT NULL
     WHERE s.painel_tipo IS NOT NULL
     ORDER BY
       (a.id_cliente IS NOT NULL) ASC,
