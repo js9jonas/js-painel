@@ -241,7 +241,7 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
               <table className="w-full text-sm">
                 <thead className="border-b bg-zinc-50/50">
                   <tr>
-                    {["Usuário", "Rótulo (painel)", "Vencimento", "Cliente vinculado", "Pacote atual", ""].map((h) => (
+                    {["Usuário", "Rótulo (painel)", "Servidor", "Vencimento", "Cliente vinculado", "Pacote atual", ""].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wide">
                         {h}
                       </th>
@@ -253,6 +253,7 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                     <tr key={c.id_conta} className="hover:bg-zinc-50/50">
                       <td className="px-4 py-3 font-mono text-xs text-zinc-700">{c.usuario}</td>
                       <td className="px-4 py-3 text-zinc-800">{c.rotulo || <span className="text-zinc-400 italic">sem rótulo</span>}</td>
+                      <td className="px-4 py-3 text-zinc-600 text-xs">{c.nome_servidor}</td>
                       <td className="px-4 py-3 text-zinc-600 text-xs">{formatDate(c.vencimento_real_painel)}</td>
                       <td className="px-4 py-3 min-w-64">
                         {vinculandoId === c.id_conta ? (
