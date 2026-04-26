@@ -21,6 +21,12 @@ export async function desvincularConta(idConta: number) {
   revalidatePath("/servidores/vinculacao");
 }
 
+export async function excluirConta(idConta: number) {
+  await pool.query(`DELETE FROM public.aplicativos WHERE id_conta = $1`, [idConta]);
+  await pool.query(`DELETE FROM public.contas WHERE id_conta = $1`, [idConta]);
+  revalidatePath("/servidores/vinculacao");
+}
+
 export async function autoVincularSugeridos(): Promise<{ vinculados: number }> {
   const { rowCount } = await pool.query(`
     INSERT INTO public.aplicativos (id_cliente, id_conta, status)

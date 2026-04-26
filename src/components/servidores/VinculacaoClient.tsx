@@ -3,7 +3,7 @@
 import { useState, useRef, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { buscarClientes, type ClienteBuscaRow } from "@/app/actions/buscarClientes";
-import { vincularConta, desvincularConta } from "@/app/actions/vincularConta";
+import { vincularConta, desvincularConta, excluirConta } from "@/app/actions/vincularConta";
 import type { ContaVinculacao } from "@/app/(dashboard)/servidores/vinculacao/page";
 
 const inputClass =
@@ -199,6 +199,14 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
     });
   }
 
+  function handleExcluir(idConta: number, usuario: string) {
+    if (!confirm(`Excluir permanentemente a conta "${usuario}" do banco de dados?`)) return;
+    startTransition(async () => {
+      await excluirConta(idConta);
+      router.refresh();
+    });
+  }
+
   const servidores = [...new Set(contas.map((c) => c.nome_servidor))];
 
   return (
@@ -254,7 +262,9 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                       <td className="px-4 py-3 font-mono text-xs text-zinc-700">{c.usuario}</td>
                       <td className="px-4 py-3 text-zinc-800">{c.rotulo || <span className="text-zinc-400 italic">sem rótulo</span>}</td>
                       <td className="px-4 py-3 text-zinc-600 text-xs">{c.nome_servidor}</td>
-                      <td className="px-4 py-3 text-zinc-600 text-xs">{formatDate(c.vencimento_real_painel)}</td>
+                      <td className={`px-4 py-3 text-xs font-medium ${c.vencimento_real_painel && c.vencimento_real_painel < new Date().toISOString().slice(0, 10) ? "text-red-600" : "text-zinc-600"}`}>
+                        {formatDate(c.vencimento_real_painel)}
+                      </td>
                       <td className="px-4 py-3 min-w-64">
                         {vinculandoId === c.id_conta ? (
                           <VincularInline
@@ -296,6 +306,14 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                                 Vincular
                               </button>
                             )}
+                            <button
+                              onClick={() => handleExcluir(c.id_conta, c.usuario)}
+                              disabled={isPending}
+                              className="h-7 rounded-md border border-zinc-200 px-2.5 text-xs text-zinc-400 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                              title="Excluir do banco"
+                            >
+                              🗑
+                            </button>
                           </div>
                         )}
                       </td>
