@@ -29,7 +29,7 @@ async function getContasParaVincular(): Promise<ContaVinculacao[]> {
       c.vencimento_real_painel::text,
       c.status_conta,
       c.id_servidor,
-      s.nome_interno AS nome_servidor,
+      s.codigo_publico AS nome_servidor,
       a.id_cliente,
       cl.nome AS nome_cliente,
       sc.id_cliente AS sugestao_id_cliente,
@@ -51,17 +51,17 @@ async function getContasParaVincular(): Promise<ContaVinculacao[]> {
       SELECT pk.contrato, asn2.status
       FROM public.assinaturas asn2
       LEFT JOIN public.pacote pk ON pk.id_pacote = asn2.id_pacote
-      WHERE asn2.id_cliente = a.id_cliente
+      WHERE asn2.id_cliente = COALESCE(a.id_cliente, sc.id_cliente)
         AND asn2.status IN ('ativo', 'atrasado', 'pendente')
       ORDER BY CASE asn2.status WHEN 'ativo' THEN 1 WHEN 'atrasado' THEN 2 WHEN 'pendente' THEN 3 END,
                asn2.venc_contrato DESC
       LIMIT 1
-    ) asn ON a.id_cliente IS NOT NULL
+    ) asn ON COALESCE(a.id_cliente, sc.id_cliente) IS NOT NULL
     WHERE s.painel_tipo IS NOT NULL
     ORDER BY
       (a.id_cliente IS NOT NULL) ASC,
       (sc.id_cliente IS NOT NULL) DESC,
-      s.nome_interno ASC,
+      s.codigo_publico ASC,
       c.rotulo ASC
   `);
   return rows;
