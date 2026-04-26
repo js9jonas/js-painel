@@ -288,9 +288,9 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                         <PlanoAtual contrato={c.pacote_contrato} status={c.pacote_status} nomeServidor={c.nome_servidor} />
                       </td>
                       <td className="px-4 py-3">
-                        {vinculandoId !== c.id_conta && !c.sugestao_id_cliente && (
-                          <div className="flex gap-2 justify-end">
-                            {c.id_cliente ? (
+                        <div className="flex gap-2 justify-end">
+                          {vinculandoId !== c.id_conta && !c.sugestao_id_cliente && (
+                            c.id_cliente ? (
                               <button
                                 onClick={() => handleDesvincular(c.id_conta)}
                                 disabled={isPending}
@@ -305,17 +305,17 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                               >
                                 Vincular
                               </button>
-                            )}
-                            <button
-                              onClick={() => handleExcluir(c.id_conta, c.usuario)}
-                              disabled={isPending}
-                              className="h-7 rounded-md border border-zinc-200 px-2.5 text-xs text-zinc-400 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
-                              title="Excluir do banco"
-                            >
-                              🗑
-                            </button>
-                          </div>
-                        )}
+                            )
+                          )}
+                          <button
+                            onClick={() => handleExcluir(c.id_conta, c.usuario)}
+                            disabled={isPending}
+                            className="h-7 rounded-md border border-zinc-200 px-2.5 text-xs text-zinc-400 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                            title="Excluir do banco"
+                          >
+                            🗑
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
