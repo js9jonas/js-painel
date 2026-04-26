@@ -241,7 +241,7 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
               <table className="w-full text-sm">
                 <thead className="border-b bg-zinc-50/50">
                   <tr>
-                    {["Usuário", "Rótulo (painel)", "Vencimento", "Cliente vinculado", "Plano atual", ""].map((h) => (
+                    {["Usuário", "Rótulo (painel)", "Vencimento", "Cliente vinculado", "Pacote atual", ""].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wide">
                         {h}
                       </th>
@@ -274,7 +274,7 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <PlanoAtual contrato={c.plano_contrato} status={c.plano_status} nomeServidor={c.nome_servidor} />
+                        <PlanoAtual contrato={c.pacote_contrato} status={c.pacote_status} nomeServidor={c.nome_servidor} />
                       </td>
                       <td className="px-4 py-3">
                         {vinculandoId !== c.id_conta && !c.sugestao_id_cliente && (

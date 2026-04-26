@@ -16,8 +16,8 @@ export type ContaVinculacao = {
   nome_cliente: string | null;
   sugestao_id_cliente: number | null;
   sugestao_nome_cliente: string | null;
-  plano_contrato: string | null;
-  plano_status: string | null;
+  pacote_contrato: string | null;
+  pacote_status: string | null;
 };
 
 async function getContasParaVincular(): Promise<ContaVinculacao[]> {
@@ -34,8 +34,8 @@ async function getContasParaVincular(): Promise<ContaVinculacao[]> {
       cl.nome AS nome_cliente,
       sc.id_cliente AS sugestao_id_cliente,
       sc.nome AS sugestao_nome_cliente,
-      asn.contrato AS plano_contrato,
-      asn.status AS plano_status
+      asn.contrato AS pacote_contrato,
+      asn.status AS pacote_status
     FROM public.contas c
     JOIN public.servidores s ON s.id_servidor = c.id_servidor
     LEFT JOIN public.aplicativos a ON a.id_conta = c.id_conta
