@@ -65,6 +65,37 @@ function useClienteSearch(onSelect?: (clienteId: number) => void) {
   return { busca, clienteId, clienteNome, resultados, aberto, activeIdx, handleChange, selecionar, limpar, handleKeyDown, setAberto };
 }
 
+function SugestaoInline({ conta, onDone, onEditar }: { conta: ContaVinculacao; onDone: () => void; onEditar: () => void }) {
+  const [isPending, startTransition] = useTransition();
+
+  function confirmar() {
+    startTransition(async () => {
+      await vincularConta(conta.id_conta, conta.sugestao_id_cliente!);
+      onDone();
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium text-blue-700">{conta.sugestao_nome_cliente}</span>
+      <button
+        onClick={confirmar}
+        disabled={isPending}
+        className="h-6 rounded-md bg-blue-600 px-2.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40 whitespace-nowrap"
+      >
+        {isPending ? "..." : "Confirmar"}
+      </button>
+      <button
+        onClick={onEditar}
+        disabled={isPending}
+        className="h-6 rounded-md border border-zinc-200 px-2 text-xs text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"
+      >
+        Trocar
+      </button>
+    </div>
+  );
+}
+
 function VincularInline({ conta, onDone }: { conta: ContaVinculacao; onDone: () => void }) {
   const [isPending, startTransition] = useTransition();
 
@@ -216,12 +247,14 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                           >
                             {c.nome_cliente}
                           </a>
+                        ) : c.sugestao_id_cliente ? (
+                          <SugestaoInline conta={c} onDone={() => router.refresh()} onEditar={() => setVinculandoId(c.id_conta)} />
                         ) : (
                           <span className="text-zinc-400 text-xs italic">não vinculado</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {vinculandoId !== c.id_conta && (
+                        {vinculandoId !== c.id_conta && !c.sugestao_id_cliente && (
                           <div className="flex gap-2 justify-end">
                             {c.id_cliente ? (
                               <button

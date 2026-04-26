@@ -52,7 +52,8 @@ async function callUnitvApi(session: UnitvSession, action: string, bodyObj: obje
 
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync("python3", [PYTHON_SCRIPT], { input, timeout: 35_000 }));
+    const result = await execFileAsync("python3", [PYTHON_SCRIPT], { input, timeout: 35_000, encoding: "utf8" } as any);
+    stdout = result.stdout as unknown as string;
   } catch (err: any) {
     throw new Error(`UNITV python3 falhou: ${err.stderr ?? err.message}`);
   }
