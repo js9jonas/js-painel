@@ -3,22 +3,29 @@ export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 
-// Limpa "5551984683468@s.whatsapp.net" → "51984683468"
+// Normaliza para apenas dígitos e remove código do país 55
 function cleanPhone(raw: string): string {
-  return raw.replace(/@.*$/, "").replace(/^55/, "")
+  const digits = raw.replace(/@.*$/, "").replace(/\D/g, "")
+  // Remove 55 inicial (código Brasil) se tiver 12+ dígitos
+  if (digits.length >= 12 && digits.startsWith("55")) return digits.slice(2)
+  return digits
 }
 
 export async function GET(req: NextRequest) {
-  const phone = req.nextUrl.searchParams.get("phone")
+  const phone = req.nextUrl.searchParams.get("phone") ?? ""
 
-  if (!phone) {
-    return NextResponse.json(
-      { error: "Parâmetro 'phone' é obrigatório" },
-      { status: 400 }
-    )
+  if (!phone.trim()) {
+    return NextResponse.json({
+      encontrado: false,
+      nome: "",
+      assinaturas: [],
+      mensagem: "Número de telefone não identificado. Tente novamente.",
+    })
   }
 
   const telefone = cleanPhone(phone)
+  // Também tenta sem o DDD (últimos 9 dígitos) para cobrir cadastros incompletos
+  const telefoneSemDDD = telefone.length > 9 ? telefone.slice(-9) : telefone
 
   try {
     const { rows } = await pool.query<{
@@ -28,7 +35,7 @@ export async function GET(req: NextRequest) {
       valor: string | null
       vencimento: string | null
     }>(
-      `SELECT
+      `SELECT DISTINCT ON (a.id_aplicativo)
          cl.nome,
          ap.nome_app                          AS app,
          pac.contrato                         AS pacote,
@@ -40,12 +47,16 @@ export async function GET(req: NextRequest) {
        LEFT JOIN public.apps   ap  ON ap.id_app      = a.id_app
        LEFT JOIN public.pacote pac ON pac.id_pacote  = a.id_pacote
        LEFT JOIN public.planos pl  ON pl.id_plano    = a.id_plano
-       WHERE co.telefone = $1
+       WHERE (
+         co.telefone = $1
+         OR co.telefone = $2
+         OR RIGHT(co.telefone, 9) = $2
+       )
          AND a.status    = 'ativa'
          AND a.validade >= CURRENT_DATE
-       ORDER BY a.validade ASC
+       ORDER BY a.id_aplicativo, a.validade ASC
        LIMIT 5`,
-      [telefone]
+      [telefone, telefoneSemDDD]
     )
 
     if (rows.length === 0) {
@@ -77,6 +88,11 @@ export async function GET(req: NextRequest) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro interno"
     console.error("[typebot/conta] Erro:", err)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({
+      encontrado: false,
+      nome: "",
+      assinaturas: [],
+      mensagem: "Erro ao consultar os dados. Tente novamente.",
+    })
   }
 }

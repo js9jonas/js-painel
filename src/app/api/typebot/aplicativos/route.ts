@@ -4,20 +4,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 
 function cleanPhone(raw: string): string {
-  return raw.replace(/@.*$/, "").replace(/^55/, "")
+  const digits = raw.replace(/@.*$/, "").replace(/\D/g, "")
+  if (digits.length >= 12 && digits.startsWith("55")) return digits.slice(2)
+  return digits
 }
 
 export async function GET(req: NextRequest) {
-  const phone = req.nextUrl.searchParams.get("phone")
+  const phone = req.nextUrl.searchParams.get("phone") ?? ""
 
-  if (!phone) {
-    return NextResponse.json(
-      { error: "Parâmetro 'phone' é obrigatório" },
-      { status: 400 }
-    )
+  if (!phone.trim()) {
+    return NextResponse.json({
+      encontrado: false,
+      nome: "",
+      mensagem: "Número de telefone não identificado. Tente novamente.",
+    })
   }
 
   const telefone = cleanPhone(phone)
+  const telefoneSemDDD = telefone.length > 9 ? telefone.slice(-9) : telefone
 
   try {
     const { rows } = await pool.query<{
@@ -26,7 +30,7 @@ export async function GET(req: NextRequest) {
       status: string
       vencimento: string | null
     }>(
-      `SELECT
+      `SELECT DISTINCT ON (a.id_aplicativo)
          cl.nome,
          ap.nome_app                         AS app,
          a.status,
@@ -35,10 +39,14 @@ export async function GET(req: NextRequest) {
        JOIN public.clientes    cl ON cl.id_cliente = co.id_cliente
        JOIN public.aplicativos a  ON a.id_cliente  = co.id_cliente
        LEFT JOIN public.apps   ap ON ap.id_app     = a.id_app
-       WHERE co.telefone = $1
-       ORDER BY a.status ASC, a.validade DESC
+       WHERE (
+         co.telefone = $1
+         OR co.telefone = $2
+         OR RIGHT(co.telefone, 9) = $2
+       )
+       ORDER BY a.id_aplicativo, a.status ASC, a.validade DESC
        LIMIT 10`,
-      [telefone]
+      [telefone, telefoneSemDDD]
     )
 
     if (rows.length === 0) {
@@ -62,6 +70,10 @@ export async function GET(req: NextRequest) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro interno"
     console.error("[typebot/aplicativos] Erro:", err)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({
+      encontrado: false,
+      nome: "",
+      mensagem: "Erro ao consultar os dados. Tente novamente.",
+    })
   }
 }
