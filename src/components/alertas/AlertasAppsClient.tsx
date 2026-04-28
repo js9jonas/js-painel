@@ -73,7 +73,7 @@ export default function AlertasAppsClient({
       nome_app: r.nome_app,
       validade: r.validade ?? null,
     });
-    setModo("pagamento");
+    setModo("somente");
     setForma("PIX");
     setValor("20");
   }
