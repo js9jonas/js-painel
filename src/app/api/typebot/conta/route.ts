@@ -42,17 +42,18 @@ export async function GET(req: NextRequest) {
          pl.valor::text                       AS valor,
          TO_CHAR(a.validade, 'DD/MM/YYYY')   AS vencimento
        FROM public.contatos co
-       JOIN public.clientes    cl  ON cl.id_cliente  = co.id_cliente
-       JOIN public.aplicativos a   ON a.id_cliente   = co.id_cliente
-       LEFT JOIN public.apps   ap  ON ap.id_app      = a.id_app
-       LEFT JOIN public.pacote pac ON pac.id_pacote  = a.id_pacote
-       LEFT JOIN public.planos pl  ON pl.id_plano    = a.id_plano
+       JOIN public.clientes    cl   ON cl.id_cliente   = co.id_cliente
+       JOIN public.aplicativos a    ON a.id_cliente    = co.id_cliente
+       LEFT JOIN public.apps   ap   ON ap.id_app       = a.id_app
+       LEFT JOIN public.assinaturas asi ON asi.id_assinatura = a.id_assinatura
+       LEFT JOIN public.pacote pac  ON pac.id_pacote   = asi.id_pacote
+       LEFT JOIN public.planos pl   ON pl.id_plano     = asi.id_plano
        WHERE (
          co.telefone = $1
          OR co.telefone = $2
          OR RIGHT(co.telefone, 9) = $2
        )
-         AND a.status    = 'ativa'
+         AND lower(btrim(a.status)) IN ('ativo', 'ativa')
          AND a.validade >= CURRENT_DATE
        ORDER BY a.id_app_registro, a.validade ASC
        LIMIT 5`,
