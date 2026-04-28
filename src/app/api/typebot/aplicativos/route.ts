@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       status: string
       vencimento: string | null
     }>(
-      `SELECT DISTINCT ON (a.id_aplicativo)
+      `SELECT DISTINCT ON (a.id_app_registro)
          cl.nome,
          ap.nome_app                         AS app,
          a.status,
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
          OR co.telefone = $2
          OR RIGHT(co.telefone, 9) = $2
        )
-       ORDER BY a.id_aplicativo, a.status ASC, a.validade DESC
+       ORDER BY a.id_app_registro, a.status ASC, a.validade DESC
        LIMIT 10`,
       [telefone, telefoneSemDDD]
     )

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       valor: string | null
       vencimento: string | null
     }>(
-      `SELECT DISTINCT ON (a.id_aplicativo)
+      `SELECT DISTINCT ON (a.id_app_registro)
          cl.nome,
          ap.nome_app                          AS app,
          pac.contrato                         AS pacote,
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
        )
          AND a.status    = 'ativa'
          AND a.validade >= CURRENT_DATE
-       ORDER BY a.id_aplicativo, a.validade ASC
+       ORDER BY a.id_app_registro, a.validade ASC
        LIMIT 5`,
       [telefone, telefoneSemDDD]
     )
