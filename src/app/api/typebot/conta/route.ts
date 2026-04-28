@@ -45,9 +45,7 @@ export async function GET(req: NextRequest) {
     )
 
     if (rows.length === 0) {
-      return NextResponse.json({
-        data: { encontrado: false, nome: "", assinaturas: [], mensagem: "Nenhuma conta ativa encontrada para este número." },
-      })
+      return NextResponse.json({ encontrado: false, nome: "", assinaturas: [], mensagem: "Nenhuma conta ativa encontrada para este número." })
     }
 
     const nome = rows[0].nome
@@ -62,7 +60,7 @@ export async function GET(req: NextRequest) {
       .join("\n")
     const mensagem = `📋 *${nome}*, suas assinaturas ativas:\n\n${linhas}`
 
-    return NextResponse.json({ data: { encontrado: true, nome, assinaturas, mensagem } })
+    return NextResponse.json({ encontrado: true, nome, assinaturas, mensagem })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro interno"
     console.error("[typebot/conta] Erro:", err)
