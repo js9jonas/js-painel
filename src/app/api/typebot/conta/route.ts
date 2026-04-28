@@ -23,19 +23,23 @@ export async function GET(req: NextRequest) {
   try {
     const { rows } = await pool.query<{
       nome: string
-      plano: string | null
-      status: string
+      app: string | null
+      pacote: string | null
+      valor: string | null
       vencimento: string | null
     }>(
       `SELECT
          cl.nome,
-         ap.nome_app AS plano,
-         a.status,
-         TO_CHAR(a.validade, 'DD/MM/YYYY') AS vencimento
+         ap.nome_app                          AS app,
+         pac.contrato                         AS pacote,
+         pl.valor::text                       AS valor,
+         TO_CHAR(a.validade, 'DD/MM/YYYY')   AS vencimento
        FROM public.contatos co
-       JOIN public.clientes    cl ON cl.id_cliente = co.id_cliente
-       JOIN public.aplicativos a  ON a.id_cliente  = co.id_cliente
-       LEFT JOIN public.apps   ap ON ap.id_app     = a.id_app
+       JOIN public.clientes    cl  ON cl.id_cliente  = co.id_cliente
+       JOIN public.aplicativos a   ON a.id_cliente   = co.id_cliente
+       LEFT JOIN public.apps   ap  ON ap.id_app      = a.id_app
+       LEFT JOIN public.pacote pac ON pac.id_pacote  = a.id_pacote
+       LEFT JOIN public.planos pl  ON pl.id_plano    = a.id_plano
        WHERE co.telefone = $1
          AND a.status    = 'ativa'
          AND a.validade >= CURRENT_DATE
@@ -45,18 +49,27 @@ export async function GET(req: NextRequest) {
     )
 
     if (rows.length === 0) {
-      return NextResponse.json({ encontrado: false, nome: "", assinaturas: [], mensagem: "Nenhuma conta ativa encontrada para este número." })
+      return NextResponse.json({
+        encontrado: false,
+        nome: "",
+        assinaturas: [],
+        mensagem: "Nenhuma conta ativa encontrada para este número.",
+      })
     }
 
     const nome = rows[0].nome
     const assinaturas = rows.map((r) => ({
-      plano: r.plano ?? "—",
-      status: "ativa",
+      app: r.app ?? "—",
+      pacote: r.pacote ?? "—",
+      valor: r.valor ? `R$ ${r.valor}` : "—",
       vencimento: r.vencimento ?? "—",
     }))
 
     const linhas = assinaturas
-      .map((a, i) => `${i + 1}. ${a.plano} — vence ${a.vencimento}`)
+      .map(
+        (a, i) =>
+          `${i + 1}. *${a.app}* | ${a.pacote} | ${a.valor} — vence ${a.vencimento}`
+      )
       .join("\n")
     const mensagem = `📋 *${nome}*, suas assinaturas ativas:\n\n${linhas}`
 
