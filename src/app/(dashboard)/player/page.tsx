@@ -618,7 +618,6 @@ function PlayerContent() {
   const [tituloLista, setTituloLista] = useState('')
   const [canalAtivo, setCanalAtivo] = useState<Canal | null>(null)
   const [streamUrl, setStreamUrl] = useState<string>('')
-  const [useProxy, setUseProxy] = useState(() => isExternal(initialUrl))
 
   // Estado do player
   const [metrics, setMetrics] = useState<StreamMetrics>(METRICS_INICIAL)
@@ -628,6 +627,7 @@ function PlayerContent() {
   const startTimeRef = useRef<number>(0)
   const bufferingStartRef = useRef<number | null>(null)
   const firstFrameRef = useRef(false)
+
 
   // ── Destroy ────────────────────────────────────────────────────────────────
 
@@ -646,8 +646,9 @@ function PlayerContent() {
 
   // ── Load stream ────────────────────────────────────────────────────────────
 
-  const loadStream = useCallback(async (url: string, viaProxy: boolean) => {
+  const loadStream = useCallback(async (url: string) => {
     if (!url || !videoRef.current) return
+    const viaProxy = isExternal(url)
 
     destroyPlayer()
     firstFrameRef.current = false
@@ -744,16 +745,15 @@ function PlayerContent() {
   }, [])
 
   useEffect(() => {
-    if (streamUrl) loadStream(streamUrl, useProxy)
+    if (streamUrl) loadStream(streamUrl)
     return () => destroyPlayer()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamUrl, useProxy])
+  }, [streamUrl])
 
   // ── Selecionar canal da lista ──────────────────────────────────────────────
 
   function selecionarCanal(canal: Canal) {
     setCanalAtivo(canal)
-    setUseProxy(isExternal(canal.url))
     setStreamUrl(canal.url)
     const sp = new URLSearchParams(window.location.search)
     sp.set('url', canal.url)
@@ -774,7 +774,6 @@ function PlayerContent() {
       setCanais(null)
       setCanalAtivo(null)
       setTituloLista('')
-      setUseProxy(isExternal(url))
       setStreamUrl(url)
       const sp = new URLSearchParams(window.location.search)
       sp.set('url', url)
@@ -843,7 +842,6 @@ function PlayerContent() {
     setTituloLista('')
     setErroPlaylist(null)
     setInputUrl(url)
-    setUseProxy(isExternal(url))
     setStreamUrl(url)
     const sp = new URLSearchParams(window.location.search)
     sp.set('url', url)
@@ -905,53 +903,22 @@ function PlayerContent() {
         </button>
       </div>
 
-      {/* Indicadores de tipo + toggle proxy */}
+      {/* Indicador de tipo de URL */}
       {(() => {
         const url = inputUrl.trim()
         const tipoDetectado = url ? detectarTipoUrl(url) : null
-        const ehHLSDireto = tipoDetectado === 'direct-stream' && isHLS(url)
-        const ehPlaylist = tipoDetectado === 'm3u-playlist' || tipoDetectado === 'xtream-api'
-        const proxyApplicavel = ehHLSDireto || ehPlaylist || modoPlaylist
-
-        const infoProxy = ehHLSDireto
-          ? 'Útil quando o servidor bloqueia requisições do navegador (CORS). O hls.js tenta direto primeiro e cai no proxy automaticamente se necessário.'
-          : (ehPlaylist || modoPlaylist)
-            ? 'Os canais Xtream usam HLS — cada segmento é um arquivo curto que o proxy consegue repassar. Ativado automaticamente pelo hls.js se detectar erro de CORS.'
-            : null
-
+        if (!tipoDetectado) return null
         return (
-          <div className="mb-4 space-y-1.5">
-            <div className="flex items-center gap-3">
-              {tipoDetectado && (
-                <span className={`text-xs ${
-                  tipoDetectado === 'm3u-playlist' ? 'text-purple-600 dark:text-purple-400' :
-                  tipoDetectado === 'xtream-api'   ? 'text-blue-600 dark:text-blue-400' :
-                                                     'text-green-600 dark:text-green-400'
-                }`}>
-                  {tipoDetectado === 'm3u-playlist' ? '📋 Playlist M3U — vai mostrar lista de canais' :
-                   tipoDetectado === 'xtream-api'   ? '📡 Xtream Codes — vai buscar canais ao vivo' :
-                                                      '▶ Stream direto — vai reproduzir imediatamente'}
-                </span>
-              )}
-
-              {proxyApplicavel && (
-                <label className="flex items-center gap-1.5 cursor-pointer select-none ml-auto">
-                  <input
-                    type="checkbox"
-                    checked={useProxy}
-                    onChange={e => setUseProxy(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600"
-                  />
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Proxy CORS</span>
-                </label>
-              )}
-            </div>
-
-            {proxyApplicavel && infoProxy && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
-                {infoProxy}
-              </p>
-            )}
+          <div className="mb-4">
+            <span className={`text-xs ${
+              tipoDetectado === 'm3u-playlist' ? 'text-purple-600 dark:text-purple-400' :
+              tipoDetectado === 'xtream-api'   ? 'text-blue-600 dark:text-blue-400' :
+                                                 'text-green-600 dark:text-green-400'
+            }`}>
+              {tipoDetectado === 'm3u-playlist' ? '📋 Playlist M3U — vai mostrar lista de canais' :
+               tipoDetectado === 'xtream-api'   ? '📡 Xtream Codes — vai buscar canais ao vivo' :
+                                                  '▶ Stream direto — vai reproduzir imediatamente'}
+            </span>
           </div>
         )
       })()}
@@ -1102,9 +1069,6 @@ function MetricasPanel({
       {metrics.error_message && (
         <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 bg-red-50 dark:bg-red-900/20">
           <p className="text-sm text-red-600 dark:text-red-400 font-medium">{metrics.error_message}</p>
-          <p className="text-xs text-red-500/70 mt-1">
-            Se for erro de CORS, ative &ldquo;Proxy CORS&rdquo; acima e recarregue.
-          </p>
         </div>
       )}
 

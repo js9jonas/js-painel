@@ -94,20 +94,35 @@ export async function GET(req: NextRequest) {
       const inicio = text.trimStart()
 
       if (inicio.startsWith('#EXTM3U') || inicio.startsWith('#EXT-X-')) {
-        // Caminho relativo — evita problemas com IPv6 (::1) e origens inesperadas
-        const proxyBase = '/api/stream-proxy'
-        const rewritten = rewriteM3U8(text, decoded, proxyBase)
+        // Distingue manifesto HLS (contém #EXT-X-) de lista de canais M3U.
+        // Listas M3U só têm #EXTM3U e #EXTINF — sem tags #EXT-X-.
+        // Reescrever URLs de lista de canais quebra o parsearM3U (espera http://).
+        const isHlsManifest = text.includes('#EXT-X-')
 
-        return new NextResponse(rewritten, {
+        if (isHlsManifest) {
+          const proxyBase = '/api/stream-proxy'
+          // Usa URL final pós-redirect como base para resolver caminhos relativos.
+          // upstream.url é o URL efetivo após 302/307; decoded seria o URL original (errado).
+          const sourceUrl = upstream.url || decoded
+          const rewritten = rewriteM3U8(text, sourceUrl, proxyBase)
+
+          return new NextResponse(rewritten, {
+            status: upstream.status,
+            headers: {
+              'Content-Type': 'application/vnd.apple.mpegurl',
+              ...corsHeaders,
+            },
+          })
+        }
+
+        // Lista de canais M3U — devolve sem reescrever
+        return new NextResponse(text, {
           status: upstream.status,
-          headers: {
-            'Content-Type': 'application/vnd.apple.mpegurl',
-            ...corsHeaders,
-          },
+          headers: { 'Content-Type': contentType, ...corsHeaders },
         })
       }
 
-      // Não é M3U8 — devolve o texto como estava
+      // Não é M3U — devolve o texto como estava
       return new NextResponse(text, {
         status: upstream.status,
         headers: { 'Content-Type': contentType, ...corsHeaders },

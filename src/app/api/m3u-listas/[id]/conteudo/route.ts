@@ -99,7 +99,7 @@ export async function GET(
           nome: c.name,
           categoria: c.category_name ?? '',
           logo: c.stream_icon ?? '',
-          url: `${creds.host}/live/${creds.username}/${creds.password}/${c.stream_id}/index.m3u8`,
+          url: `${creds.host}/live/${creds.username}/${creds.password}/${c.stream_id}.m3u8`,
         }))
       return NextResponse.json(result)
     }
