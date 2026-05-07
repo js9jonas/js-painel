@@ -25,10 +25,8 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
     const [isPending, startTransition] = useTransition();
 
     const vencAtual = parceiro.venc_contrato_parceiro;
-    const vencContasAtual = parceiro.venc_contas_parceiro;
 
     const [vencContrato, setVencContrato] = useState(() => addMeses(vencAtual, 1));
-    const [vencContas, setVencContas] = useState(() => addMeses(vencContasAtual, 1));
 
     async function handleConfirmar() {
         if (!parceiro.id_assinatura_parceiro) {
@@ -40,7 +38,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
         const resp = await fetch(`/api/assinaturas/${parceiro.id_assinatura_parceiro}/cortesia`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dataManual: vencContrato, vencContasManual: vencContas }),
+            body: JSON.stringify({ dataManual: vencContrato }),
         });
 
         const j = await resp.json().catch(() => ({}));
@@ -76,20 +74,13 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
                 </div>
 
                 <div className="px-6 py-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <label className={labelClass}>Venc. contrato</label>
-                            <input type="date" className={inputClass} value={vencContrato}
-                                onChange={(e) => setVencContrato(e.target.value)} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className={labelClass}>Venc. contas</label>
-                            <input type="date" className={inputClass} value={vencContas}
-                                onChange={(e) => setVencContas(e.target.value)} />
-                        </div>
+                    <div className="space-y-1.5">
+                        <label className={labelClass}>Venc. contrato</label>
+                        <input type="date" className={inputClass} value={vencContrato}
+                            onChange={(e) => setVencContrato(e.target.value)} />
                     </div>
                     <p className="text-xs text-zinc-400">
-                        Datas calculadas com +1 mes sobre o vencimento atual. Edite se necessario.
+                        Data calculada com +1 mes sobre o vencimento atual. Edite se necessario.
                     </p>
 
                     {!parceiro.id_assinatura_parceiro && (

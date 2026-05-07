@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { abaterCreditoRenovacao } from "@/lib/saldoServidor";
 
 export async function PUT(
   req: NextRequest,
@@ -13,19 +12,20 @@ export async function PUT(
     const body = await req.json().catch(() => ({}));
     const dataManual = typeof body?.dataManual === "string" && body.dataManual.trim()
       ? body.dataManual.trim() : null;
-    const vencContasManual = typeof body?.vencContasManual === "string" && body.vencContasManual.trim()
-      ? body.vencContasManual.trim() : null;
 
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
 
-      const { rows: antes } = await client.query(
-        `SELECT venc_contas::text AS venc_contas_anterior FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+      const { rows: dadosAssinatura } = await client.query(
+        `SELECT a.id_cliente, c.nome AS nome_cliente, pc.nome AS pacote_nome
+         FROM public.assinaturas a
+         LEFT JOIN public.clientes c ON c.id_cliente = a.id_cliente
+         LEFT JOIN public.pacotes pc ON pc.id_pacote = a.id_pacote
+         WHERE a.id_assinatura = $1::bigint`,
         [idAssinatura]
       );
-      const vencContasAnterior = antes[0]?.venc_contas_anterior ?? null;
 
       const sql = `
         UPDATE public.assinaturas
@@ -35,19 +35,12 @@ export async function PUT(
               WHEN $2::date IS NOT NULL THEN $2::date
               ELSE (COALESCE(venc_contrato::date, CURRENT_DATE) + make_interval(months => 1))::date
             END,
-          venc_contas =
-            CASE
-              WHEN $3::date IS NOT NULL THEN $3::date
-              WHEN venc_contas IS NULL THEN (CURRENT_DATE + make_interval(months => 1))::date
-              WHEN venc_contas::date >= CURRENT_DATE THEN (venc_contas::date + make_interval(months => 1))::date
-              ELSE (CURRENT_DATE + make_interval(months => 1))::date
-            END,
           atualizado_em = NOW()
         WHERE id_assinatura = $1::bigint
         RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, id_cliente::text;
       `;
 
-      const result = await client.query(sql, [idAssinatura, dataManual, vencContasManual]);
+      const result = await client.query(sql, [idAssinatura, dataManual]);
 
       if (result.rowCount === 0) {
         await client.query("ROLLBACK");
@@ -55,10 +48,18 @@ export async function PUT(
       }
 
       const assinatura = result.rows[0];
-      const vencContasNova = assinatura.venc_contas ?? null;
+      const idCliente = dadosAssinatura[0]?.id_cliente ?? assinatura.id_cliente;
+      const nomeCliente = dadosAssinatura[0]?.nome_cliente ?? null;
+      const pacoteNome = dadosAssinatura[0]?.pacote_nome ?? null;
 
-      // Abate crédito com observação de cortesia
-      await abaterCreditoRenovacaoCortesia(client, idAssinatura, vencContasAnterior, vencContasNova);
+      await client.query(
+        `INSERT INTO public.pagamentos
+         (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
+         VALUES ($1::bigint, $2, $3, CURRENT_DATE, 'Cortesia', 0, 'Cortesia de indicação', 'Assinatura tv', NOW())`,
+        [idCliente, nomeCliente, pacoteNome]
+      );
+
+      await abaterCreditoRenovacaoCortesia(client, idAssinatura);
 
       await client.query("COMMIT");
       return NextResponse.json({ ok: true, assinatura });
@@ -74,22 +75,10 @@ export async function PUT(
   }
 }
 
-// Igual ao abaterCreditoRenovacao mas com observacao diferente
 async function abaterCreditoRenovacaoCortesia(
   client: any,
   idAssinatura: string,
-  vencContasAnterior?: string | null,
-  vencContasNova?: string | null
 ): Promise<void> {
-  if (vencContasAnterior && vencContasNova) {
-    const anterior = new Date(vencContasAnterior);
-    const nova = new Date(vencContasNova);
-    anterior.setHours(0, 0, 0, 0);
-    nova.setHours(0, 0, 0, 0);
-    const diffDias = Math.round((nova.getTime() - anterior.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDias < 15) return;
-  }
-
   const { rows } = await client.query(
     `SELECT cs.id_servidor, cs.creditos_mensal
      FROM public.assinaturas a
