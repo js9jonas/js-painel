@@ -22,7 +22,7 @@ export async function PUT(
         `SELECT a.id_cliente, c.nome AS nome_cliente, pc.nome AS pacote_nome
          FROM public.assinaturas a
          LEFT JOIN public.clientes c ON c.id_cliente = a.id_cliente
-         LEFT JOIN public.pacotes pc ON pc.id_pacote = a.id_pacote
+         LEFT JOIN public.pacote pc ON pc.id_pacote = a.id_pacote
          WHERE a.id_assinatura = $1::bigint`,
         [idAssinatura]
       );
