@@ -38,7 +38,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
         const resp = await fetch(`/api/assinaturas/${parceiro.id_assinatura_parceiro}/cortesia`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dataManual: vencContrato }),
+            body: JSON.stringify({ dataManual: vencContrato, totalIndicacoes: idsSelecionados.length }),
         });
 
         const j = await resp.json().catch(() => ({}));

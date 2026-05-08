@@ -12,6 +12,7 @@ export async function PUT(
     const body = await req.json().catch(() => ({}));
     const dataManual = typeof body?.dataManual === "string" && body.dataManual.trim()
       ? body.dataManual.trim() : null;
+    const totalIndicacoes = typeof body?.totalIndicacoes === "number" ? body.totalIndicacoes : null;
 
     const client = await pool.connect();
 
@@ -62,6 +63,10 @@ export async function PUT(
       await abaterCreditoRenovacaoCortesia(client, idAssinatura);
 
       await client.query("COMMIT");
+
+      // Fire-and-forget: envia mensagens WhatsApp após commit
+      enviarMensagensCortesia({ idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, totalIndicacoes }).catch(() => {});
+
       return NextResponse.json({ ok: true, assinatura });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -73,6 +78,83 @@ export async function PUT(
     console.error("Erro ao conceder cortesia:", err);
     return NextResponse.json({ ok: false, error: err?.message ?? "Erro interno" }, { status: 500 });
   }
+}
+
+async function enviarMensagensCortesia({
+  idCliente,
+  nomeCliente,
+  vencContrato,
+  totalIndicacoes,
+}: {
+  idCliente: string;
+  nomeCliente: string | null;
+  vencContrato: string | null;
+  totalIndicacoes: number | null;
+}) {
+  const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_URL;
+  const evolutionKey = process.env.NEXT_PUBLIC_EVOLUTION_KEY;
+  if (!evolutionUrl || !evolutionKey) return;
+
+  const { rows } = await pool.query(
+    `SELECT ct.telefone::text AS telefone
+     FROM public.contatos ct
+     WHERE ct.id_cliente = $1::bigint
+       AND ct.telefone IS NOT NULL
+       AND btrim(ct.telefone) <> ''
+     ORDER BY ct.atualizado_em DESC NULLS LAST, ct.criado_em DESC NULLS LAST
+     LIMIT 1`,
+    [idCliente]
+  );
+  const telefoneRaw: string | undefined = rows[0]?.telefone;
+  if (!telefoneRaw) return;
+
+  const digits = telefoneRaw.replace(/\D/g, "");
+  const numero = digits.startsWith("55") ? digits : `55${digits}`;
+
+  const nome = nomeCliente ? nomeCliente.split(" ")[0] : "cliente";
+
+  const vencFormatado = vencContrato
+    ? new Date(vencContrato + "T00:00:00").toLocaleDateString("pt-BR")
+    : null;
+
+  const msg1 =
+    `Olá! Sabia que você pode ganhar meses gratuitos na sua assinatura indicando amigos e familiares para a JS Sistemas? 🎉\n\n` +
+    `Funciona assim: a cada 2 pessoas que você indicar e que ativarem a assinatura, você ganha *1 mês de cortesia* no seu plano — sem pagar nada!\n\n` +
+    `Quanto mais indicações, mais meses você acumula. Não há limite! 😊\n\n` +
+    `Continue indicando e aproveite esse benefício exclusivo para nossos clientes parceiros.`;
+
+  const linhaIndicacoes = totalIndicacoes
+    ? `• Indicações desta cortesia: *${totalIndicacoes} pessoa${totalIndicacoes !== 1 ? "s" : ""}*\n`
+    : "";
+  const linhaVenc = vencFormatado
+    ? `• Novo vencimento do contrato: *${vencFormatado}*\n`
+    : "";
+
+  const msg2 =
+    `*Parabéns, ${nome}!* 🎁\n\n` +
+    `Você acaba de ganhar *1 mês de cortesia* na sua assinatura como agradecimento pelas suas indicações!\n\n` +
+    `${linhaIndicacoes}${linhaVenc}\n` +
+    `Muito obrigado por confiar na JS Sistemas e por nos indicar! Continue assim 🙏`;
+
+  const headers = {
+    "Content-Type": "application/json",
+    apikey: evolutionKey,
+  };
+  const endpoint = `${evolutionUrl}/message/sendText/jsevolution`;
+
+  await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ number: numero, text: msg1 }),
+  });
+
+  await new Promise((r) => setTimeout(r, 1500));
+
+  await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ number: numero, text: msg2 }),
+  });
 }
 
 async function abaterCreditoRenovacaoCortesia(
