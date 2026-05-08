@@ -94,8 +94,8 @@ async function enviarMensagensCortesia({
   vencContrato: string | null;
   totalIndicacoes: number | null;
 }): Promise<WhatsappResult> {
-  const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_URL;
-  const evolutionKey = process.env.NEXT_PUBLIC_EVOLUTION_KEY;
+  const evolutionUrl = process.env.EVOLUTION_API_URL ?? process.env.NEXT_PUBLIC_EVOLUTION_URL;
+  const evolutionKey = process.env.EVOLUTION_API_KEY ?? process.env.NEXT_PUBLIC_EVOLUTION_KEY;
   if (!evolutionUrl || !evolutionKey) return { ok: false, reason: "sem_config" };
 
   const { rows } = await pool.query(
