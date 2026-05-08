@@ -19,10 +19,25 @@ type CortesiaModalProps = {
     onSuccess: () => void;
 };
 
+type WhatsappStatus = { ok: true } | { ok: false; reason: string } | null;
+
+function whatsappMensagem(status: WhatsappStatus): { texto: string; cls: string } | null {
+    if (!status) return null;
+    if (status.ok) return { texto: "✅ Mensagens WhatsApp enviadas com sucesso!", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" };
+    const motivos: Record<string, string> = {
+        sem_telefone: "Nenhum telefone cadastrado para este cliente.",
+        sem_config: "Configuração do WhatsApp ausente no servidor.",
+        erro_envio: "Falha ao enviar via WhatsApp. Verifique o número ou a conexão.",
+    };
+    const detalhe = motivos[(status as { ok: false; reason: string }).reason] ?? "Erro desconhecido.";
+    return { texto: `⚠️ Cortesia concedida, mas não foi possível enviar a mensagem: ${detalhe}`, cls: "bg-amber-50 border-amber-200 text-amber-700" };
+}
+
 function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: CortesiaModalProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [isPending, startTransition] = useTransition();
+    const [whatsapp, setWhatsapp] = useState<WhatsappStatus>(null);
 
     const vencAtual = parceiro.venc_contrato_parceiro;
 
@@ -49,16 +64,19 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
             return;
         }
 
+        setWhatsapp(j.whatsapp ?? null);
+
         startTransition(async () => {
             await marcarIndicacoesCortesia(idsSelecionados, parceiro.id_parceiro);
             setLoading(false);
-            onSuccess();
             router.refresh();
         });
     }
 
     const inputClass = "h-9 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
     const labelClass = "text-xs font-semibold text-zinc-700";
+    const waMsg = whatsappMensagem(whatsapp);
+    const concluido = whatsapp !== null && !isPending;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -74,31 +92,50 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
                 </div>
 
                 <div className="px-6 py-4 space-y-4">
-                    <div className="space-y-1.5">
-                        <label className={labelClass}>Venc. contrato</label>
-                        <input type="date" className={inputClass} value={vencContrato}
-                            onChange={(e) => setVencContrato(e.target.value)} />
-                    </div>
-                    <p className="text-xs text-zinc-400">
-                        Data calculada com +1 mes sobre o vencimento atual. Edite se necessario.
-                    </p>
+                    {!concluido && (
+                        <>
+                            <div className="space-y-1.5">
+                                <label className={labelClass}>Venc. contrato</label>
+                                <input type="date" className={inputClass} value={vencContrato}
+                                    onChange={(e) => setVencContrato(e.target.value)} />
+                            </div>
+                            <p className="text-xs text-zinc-400">
+                                Data calculada com +1 mes sobre o vencimento atual. Edite se necessario.
+                            </p>
+                        </>
+                    )}
 
-                    {!parceiro.id_assinatura_parceiro && (
+                    {!parceiro.id_assinatura_parceiro && !concluido && (
                         <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
                             Atencao: parceiro nao possui assinatura ativa. Apenas as indicacoes serao marcadas.
+                        </div>
+                    )}
+
+                    {waMsg && (
+                        <div className={`rounded-lg border px-3 py-2.5 text-xs ${waMsg.cls}`}>
+                            {waMsg.texto}
                         </div>
                     )}
                 </div>
 
                 <div className="px-6 py-4 border-t flex justify-end gap-2">
-                    <button onClick={onClose} disabled={loading}
-                        className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
-                        Cancelar
-                    </button>
-                    <button onClick={handleConfirmar} disabled={loading || isPending}
-                        className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
-                        {loading || isPending ? "Salvando..." : "Confirmar cortesia"}
-                    </button>
+                    {concluido ? (
+                        <button onClick={onSuccess}
+                            className="h-9 rounded-xl bg-zinc-900 px-4 text-sm text-white font-medium hover:bg-zinc-700">
+                            Fechar
+                        </button>
+                    ) : (
+                        <>
+                            <button onClick={onClose} disabled={loading}
+                                className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
+                                Cancelar
+                            </button>
+                            <button onClick={handleConfirmar} disabled={loading || isPending}
+                                className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
+                                {loading || isPending ? "Salvando..." : "Confirmar cortesia"}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

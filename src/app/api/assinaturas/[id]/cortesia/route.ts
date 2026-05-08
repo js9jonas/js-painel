@@ -64,10 +64,11 @@ export async function PUT(
 
       await client.query("COMMIT");
 
-      // Fire-and-forget: envia mensagens WhatsApp após commit
-      enviarMensagensCortesia({ idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, totalIndicacoes }).catch(() => {});
+      const whatsapp = await enviarMensagensCortesia({
+        idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, totalIndicacoes,
+      }).catch(() => ({ ok: false as const, reason: "erro_envio" }));
 
-      return NextResponse.json({ ok: true, assinatura });
+      return NextResponse.json({ ok: true, assinatura, whatsapp });
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -80,6 +81,8 @@ export async function PUT(
   }
 }
 
+type WhatsappResult = { ok: true } | { ok: false; reason: string };
+
 async function enviarMensagensCortesia({
   idCliente,
   nomeCliente,
@@ -90,10 +93,10 @@ async function enviarMensagensCortesia({
   nomeCliente: string | null;
   vencContrato: string | null;
   totalIndicacoes: number | null;
-}) {
+}): Promise<WhatsappResult> {
   const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_URL;
   const evolutionKey = process.env.NEXT_PUBLIC_EVOLUTION_KEY;
-  if (!evolutionUrl || !evolutionKey) return;
+  if (!evolutionUrl || !evolutionKey) return { ok: false, reason: "sem_config" };
 
   const { rows } = await pool.query(
     `SELECT ct.telefone::text AS telefone
@@ -106,7 +109,7 @@ async function enviarMensagensCortesia({
     [idCliente]
   );
   const telefoneRaw: string | undefined = rows[0]?.telefone;
-  if (!telefoneRaw) return;
+  if (!telefoneRaw) return { ok: false, reason: "sem_telefone" };
 
   const digits = telefoneRaw.replace(/\D/g, "");
   const numero = digits.startsWith("55") ? digits : `55${digits}`;
@@ -142,19 +145,23 @@ async function enviarMensagensCortesia({
   };
   const endpoint = `${evolutionUrl}/message/sendText/jsevolution`;
 
-  await fetch(endpoint, {
+  const r1 = await fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify({ number: numero, text: msg1 }),
   });
+  if (!r1.ok) return { ok: false, reason: "erro_envio" };
 
   await new Promise((r) => setTimeout(r, 1500));
 
-  await fetch(endpoint, {
+  const r2 = await fetch(endpoint, {
     method: "POST",
     headers,
     body: JSON.stringify({ number: numero, text: msg2 }),
   });
+  if (!r2.ok) return { ok: false, reason: "erro_envio" };
+
+  return { ok: true };
 }
 
 async function abaterCreditoRenovacaoCortesia(
