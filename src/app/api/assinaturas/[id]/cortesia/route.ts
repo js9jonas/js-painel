@@ -94,9 +94,9 @@ async function enviarMensagensCortesia({
   vencContrato: string | null;
   totalIndicacoes: number | null;
 }): Promise<WhatsappResult> {
-  const evolutionUrl = process.env.EVOLUTION_API_URL ?? process.env.NEXT_PUBLIC_EVOLUTION_URL;
-  const evolutionKey = process.env.EVOLUTION_API_KEY ?? process.env.NEXT_PUBLIC_EVOLUTION_KEY;
-  console.log("[cortesia] env check — EVOLUTION_API_URL:", !!process.env.EVOLUTION_API_URL, "| NEXT_PUBLIC_EVOLUTION_URL:", !!process.env.NEXT_PUBLIC_EVOLUTION_URL);
+  const evolutionUrl = process.env.EVOLUTION_URL ?? process.env.EVOLUTION_API_URL ?? process.env.NEXT_PUBLIC_EVOLUTION_URL;
+  const evolutionKey = process.env.EVOLUTION_KEY ?? process.env.EVOLUTION_API_KEY ?? process.env.NEXT_PUBLIC_EVOLUTION_KEY;
+  const instance = process.env.EVOLUTION_INSTANCE ?? "jsevolution";
   if (!evolutionUrl || !evolutionKey) return { ok: false, reason: "sem_config" };
 
   const { rows } = await pool.query(
@@ -144,7 +144,7 @@ async function enviarMensagensCortesia({
     "Content-Type": "application/json",
     apikey: evolutionKey,
   };
-  const endpoint = `${evolutionUrl}/message/sendText/jsevolution`;
+  const endpoint = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instance}`;
 
   const r1 = await fetch(endpoint, {
     method: "POST",
