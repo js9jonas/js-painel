@@ -85,7 +85,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
         </div>
       ) : (
         <div className="overflow-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-full text-sm">
             <thead className="bg-zinc-50 border-b border-zinc-100">
               <tr>
                 {["App", "Status", "Validade", "MAC", "Chave", "Obs.", ""].map((h) => (

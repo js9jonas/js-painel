@@ -58,6 +58,27 @@ function corStatusDestaque(status: string | null): string {
   }
 }
 
+/** Badge colorido por status na tabela de assinaturas */
+function badgeStatus(status: string | null): string {
+  switch ((status ?? "").toLowerCase().trim()) {
+    case "ativo":    return "bg-emerald-100 text-emerald-700";
+    case "atrasado": return "bg-yellow-100 text-yellow-700";
+    case "pendente": return "bg-red-100 text-red-700";
+    case "vencido":  return "bg-zinc-100 text-zinc-500";
+    default:         return "bg-zinc-100 text-zinc-500";
+  }
+}
+
+/** Fundo da linha na tabela de assinaturas */
+function bgLinhaStatus(status: string | null): string {
+  switch ((status ?? "").toLowerCase().trim()) {
+    case "ativo":    return "bg-emerald-50/50 hover:bg-emerald-50";
+    case "atrasado": return "bg-yellow-50/50 hover:bg-yellow-50";
+    case "pendente": return "bg-red-50/50 hover:bg-red-50";
+    default:         return "hover:bg-zinc-50";
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default async function ClienteDetalhePage({ params }: Props) {
@@ -98,10 +119,9 @@ export default async function ClienteDetalhePage({ params }: Props) {
     });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
 
       {/* Navegacao */}
-      {/*para descongelar o cabeçalho = <div className="rounded-2xl border bg-white p-6"> */}
       <div className="flex items-center justify-between gap-3">
         <Link href="/clientes" className="text-sm text-zinc-600 hover:underline">
           &larr; Voltar
@@ -110,46 +130,50 @@ export default async function ClienteDetalhePage({ params }: Props) {
       </div>
 
       {/* Cabecalho do cliente */}
-      <div className="rounded-2xl border bg-white p-6 sticky top-4 z-20">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {cliente?.nome ?? `Cliente #${id}`}
-            </h1>
-            <ScoreFidelidade
-              idCliente={id}
-              score={cliente?.score_fidelidade ?? null}
-              calculadoEm={cliente?.score_calculado_em ?? null}
-            />
-            {cliente?.criado_em && (
-              <p className="mt-1 text-xs text-zinc-400">
-                Cliente {tempoDesde(cliente.criado_em)}
-              </p>
-            )}
-            <div className="mt-2 text-sm text-zinc-600">
-              <div className="flex flex-wrap gap-x-4 gap-y-1">
-                <p>
-                  <span className="text-zinc-500">ID:</span>{" "}
-                  <span className="font-medium text-zinc-800">{id}</span>
-                </p>
-                <p>
-                  <span className="text-zinc-500">Telefone:</span>{" "}
-                  {cliente?.telefone ? (
-                    <span className="font-medium text-zinc-800">{cliente.telefone}</span>
-                  ) : (
-                    <span className="text-zinc-400">--</span>
+      <div className="rounded-xl border bg-white px-4 py-3 sticky top-2 z-20">
+        <div className="flex items-center justify-between gap-3">
+          {/* Esquerda: nome + dados inline */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-lg font-semibold leading-tight truncate">
+                {cliente?.nome ?? `Cliente #${id}`}
+              </h1>
+              <ScoreFidelidade
+                idCliente={id}
+                score={cliente?.score_fidelidade ?? null}
+                calculadoEm={cliente?.score_calculado_em ?? null}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1 text-xs text-zinc-500">
+              <span>ID: <span className="font-medium text-zinc-800">{id}</span></span>
+              {cliente?.telefone && (
+                <span>Tel: <span className="font-medium text-zinc-800">{cliente.telefone}</span></span>
+              )}
+              {cliente?.criado_em && (
+                <span>Cliente {tempoDesde(cliente.criado_em)}</span>
+              )}
+              <span>
+                Assinaturas: <span className="font-medium text-zinc-900">{assinaturas.length}</span>
+              </span>
+              {indicacoesStats.total > 0 && (
+                <span>
+                  Indicações: <span className="font-medium text-zinc-900">{indicacoesStats.total}</span>
+                  {indicacoesStats.abertas > 0 && (
+                    <span className="ml-1 text-amber-600">({indicacoesStats.abertas} abertas)</span>
                   )}
-                </p>
-              </div>
+                  {indicacoesStats.comissao > 0 && (
+                    <span className="ml-1 text-emerald-600">(comissão)</span>
+                  )}
+                </span>
+              )}
               {cliente?.observacao && (
-                <p className="mt-1">
-                  <span className="text-zinc-500">Observacao:</span>{" "}
-                  <span className="text-zinc-800">{cliente.observacao}</span>
-                </p>
+                <span className="text-zinc-700">{cliente.observacao}</span>
               )}
             </div>
+            <IndicadorInfo idCliente={id} parceiro={parceiro} />
           </div>
 
+          {/* Direita: botões */}
           <div className="shrink-0 flex items-center gap-2">
             <NovaAssinaturaButton
               idCliente={id}
@@ -164,127 +188,63 @@ export default async function ClienteDetalhePage({ params }: Props) {
             />
           </div>
         </div>
-
-        <div className="mt-3 flex flex-wrap gap-4 text-sm text-zinc-600">
-          <p>
-            Assinaturas:{" "}
-            <span className="font-medium text-zinc-900">{assinaturas.length}</span>
-          </p>
-          <p>
-            Indicacoes:{" "}
-            <span className="font-medium text-zinc-900">{indicacoesStats.total}</span>
-          </p>
-          {indicacoesStats.abertas > 0 && (
-            <p>
-              Abertas:{" "}
-              <span className="font-medium text-amber-600">{indicacoesStats.abertas}</span>
-            </p>
-          )}
-          {indicacoesStats.comissao > 0 && (
-            <p>
-              Comissoes:{" "}
-              <span className="font-medium text-emerald-600">{indicacoesStats.comissao}</span>
-            </p>
-          )}
-        </div>
-        <IndicadorInfo idCliente={id} parceiro={parceiro} />
       </div>
       {/* Assinatura em destaque (ativo / atrasado / pendente) */}
       {ativa && (
-        <div className="rounded-2xl border bg-white overflow-hidden">
-          {/* ✅ Cabeçalho com cor dinâmica por status */}
-          <div className={`px-4 py-3 border-b flex items-center justify-between text-sm font-medium ${headerDestaque(ativa.status)}`}>
+        <div className="rounded-xl border bg-white overflow-hidden">
+          <div className={`px-3 py-2 border-b flex items-center justify-between text-xs font-medium ${headerDestaque(ativa.status)}`}>
             <span>{labelDestaque(ativa.status)}</span>
             {ativa.criado_em && (
-              <span className="text-xs font-normal opacity-60">
-                {tempoDesde(ativa.criado_em)}
-              </span>
+              <span className="font-normal opacity-60">{tempoDesde(ativa.criado_em)}</span>
             )}
           </div>
-          <div className="p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-              <div className="text-sm">
-                <div className="text-zinc-500">ID</div>
+          <div className="px-3 py-2">
+            {/* Todos os campos em uma única grade horizontal */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <div className="text-xs text-zinc-500">ID</div>
                 <div className="font-medium text-zinc-900">{ativa.id_assinatura}</div>
               </div>
-              <div className="text-sm">
-                <div className="text-zinc-500">Venc. contrato</div>
+              <div>
+                <div className="text-xs text-zinc-500">Venc. contrato</div>
                 <div className="font-medium text-zinc-900">
                   {ativa.venc_contrato ? ativa.venc_contrato.split("T")[0].split("-").reverse().join("/") : "--"}
                 </div>
               </div>
-              <div className="text-sm">
-                <div className="text-zinc-500">Venc. contas</div>
+              <div>
+                <div className="text-xs text-zinc-500">Venc. contas</div>
                 <div className="font-medium text-zinc-900">
                   {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}
                 </div>
               </div>
-              <div className="text-sm">
-                <div className="text-zinc-500">Status</div>
-                {/* ✅ Cor dinâmica do valor de status */}
-                <div className={`font-medium ${corStatusDestaque(ativa.status)}`}>
-                  {ativa.status}
+              <div>
+                <div className="text-xs text-zinc-500">Status</div>
+                <div className={`font-medium ${corStatusDestaque(ativa.status)}`}>{ativa.status}</div>
+              </div>
+              <div>
+                <div className="text-xs text-zinc-500">Pacote</div>
+                <div className="font-medium text-zinc-900">
+                  {ativa.pacote_contrato ?? <span className="text-zinc-400">--</span>}
+                  {ativa.pacote_telas ? <span className="text-zinc-500 font-normal"> · {ativa.pacote_telas}t</span> : null}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-zinc-500">Plano</div>
+                <div className="font-medium text-zinc-900">
+                  {ativa.plano_tipo ?? <span className="text-zinc-400">--</span>}
+                  {ativa.plano_valor ? <span className="text-zinc-500 font-normal"> · R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span> : null}
                 </div>
               </div>
             </div>
 
             {(ativa.identificacao || ativa.observacao) && (
-              <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                {ativa.identificacao && (
-                  <div className="text-sm">
-                    <div className="text-zinc-500">Identificacao</div>
-                    <div className="text-zinc-800">{ativa.identificacao}</div>
-                  </div>
-                )}
-                {ativa.observacao && (
-                  <div className="text-sm">
-                    <div className="text-zinc-500">Observacao</div>
-                    <div className="text-zinc-800">{ativa.observacao}</div>
-                  </div>
-                )}
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-zinc-500">
+                {ativa.identificacao && <span>Ident.: <span className="text-zinc-800">{ativa.identificacao}</span></span>}
+                {ativa.observacao && <span>Obs.: <span className="text-zinc-800">{ativa.observacao}</span></span>}
               </div>
             )}
 
-            <div className="grid sm:grid-cols-2 gap-4 p-4 bg-zinc-50 rounded-lg mb-4">
-              <div>
-                <div className="text-xs font-medium text-zinc-500 uppercase mb-2">Pacote</div>
-                {ativa.pacote_contrato ? (
-                  <div className="text-sm">
-                    <div className="font-semibold text-zinc-900">{ativa.pacote_contrato}</div>
-                    {ativa.pacote_telas && (
-                      <div className="text-zinc-600 mt-1">
-                        {ativa.pacote_telas} tela{ativa.pacote_telas > 1 ? "s" : ""}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-sm text-zinc-400">Nao informado</div>
-                )}
-              </div>
-              <div>
-                <div className="text-xs font-medium text-zinc-500 uppercase mb-2">Plano</div>
-                {ativa.plano_tipo ? (
-                  <div className="text-sm">
-                    <div className="font-semibold text-zinc-900">{ativa.plano_tipo}</div>
-                    <div className="text-zinc-600 mt-1 space-x-2">
-                      {ativa.plano_meses && (
-                        <span>{ativa.plano_meses} mes{ativa.plano_meses > 1 ? "es" : ""}</span>
-                      )}
-                      {ativa.plano_valor && (
-                        <span>R$ {parseFloat(ativa.plano_valor).toFixed(2)}</span>
-                      )}
-                    </div>
-                    {ativa.plano_descricao && (
-                      <div className="text-xs text-zinc-500 mt-1">{ativa.plano_descricao}</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-sm text-zinc-400">Nao informado</div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 mt-2">
               <EditAssinaturaButton
                 idCliente={id}
                 assinatura={{
@@ -326,54 +286,50 @@ export default async function ClienteDetalhePage({ params }: Props) {
       )}
 
       {/* Tabela completa de assinaturas */}
-      <div className="rounded-2xl border bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b bg-zinc-50 text-sm font-medium text-zinc-700">
+      <div className="rounded-xl border bg-white overflow-hidden">
+        <div className="px-3 py-2 border-b bg-zinc-50 text-xs font-medium text-zinc-700">
           Todas as assinaturas
         </div>
         <div className="overflow-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-full text-xs">
             <thead className="text-zinc-600 bg-zinc-50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">ID</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Venc. contrato</th>
-                <th className="px-4 py-3 text-left font-medium">Venc. contas</th>
-                <th className="px-4 py-3 text-left font-medium">Identificacao</th>
-                <th className="px-4 py-3 text-left font-medium">Pacote</th>
-                <th className="px-4 py-3 text-left font-medium">Plano</th>
-                <th className="px-4 py-3 text-left font-medium">Acoes</th>
+                <th className="px-3 py-2 text-left font-medium">ID</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-left font-medium">Venc. contrato</th>
+                <th className="px-3 py-2 text-left font-medium">Venc. contas</th>
+                <th className="px-3 py-2 text-left font-medium">Identificacao</th>
+                <th className="px-3 py-2 text-left font-medium">Pacote</th>
+                <th className="px-3 py-2 text-left font-medium">Plano</th>
+                <th className="px-3 py-2 text-left font-medium">Acoes</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {outras.map((a) => (
-                <tr key={a.id_assinatura} className="hover:bg-zinc-50">
-                  <td className="px-4 py-3 font-medium text-zinc-900">{a.id_assinatura}</td>
-                  <td className="px-4 py-3">
-                    {/* ✅ Todos os badges em cinza conforme solicitado */}
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-zinc-100 text-zinc-600">
+                <tr key={a.id_assinatura} className={bgLinhaStatus(a.status)}>
+                  <td className="px-3 py-2 font-medium text-zinc-900">{a.id_assinatura}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${badgeStatus(a.status)}`}>
                       {a.status ?? "--"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">{a.venc_contrato ?? "--"}</td>
-                  <td className="px-4 py-3 text-zinc-700">{a.venc_contas ?? "--"}</td>
-                  <td className="px-4 py-3 text-zinc-700">{a.identificacao ?? "--"}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2 text-zinc-700">{a.venc_contrato ?? "--"}</td>
+                  <td className="px-3 py-2 text-zinc-700">{a.venc_contas ?? "--"}</td>
+                  <td className="px-3 py-2 text-zinc-700">{a.identificacao ?? "--"}</td>
+                  <td className="px-3 py-2">
                     {a.pacote_contrato ?? "--"}
                     {a.pacote_telas ? (
-                      <span className="text-zinc-500"> - {a.pacote_telas} telas</span>
+                      <span className="text-zinc-500"> · {a.pacote_telas}t</span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2">
                     {a.plano_tipo ?? "--"}
-                    {a.plano_meses ? (
-                      <span className="text-zinc-500"> - {a.plano_meses} mes(es)</span>
-                    ) : null}
                     {a.plano_valor ? (
-                      <span className="text-zinc-500"> - R$ {parseFloat(a.plano_valor).toFixed(2)}</span>
+                      <span className="text-zinc-500"> · R$ {parseFloat(a.plano_valor).toFixed(2)}</span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1.5">
                       <EditAssinaturaButton
                         idCliente={id}
                         assinatura={{
@@ -405,7 +361,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
               ))}
               {outras.length === 0 && (
                 <tr>
-                  <td className="px-4 py-10 text-center text-zinc-500" colSpan={8}>
+                  <td className="px-3 py-6 text-center text-zinc-500" colSpan={8}>
                     Nenhuma assinatura encontrada.
                   </td>
                 </tr>

@@ -45,7 +45,7 @@ export default function TabelaPagamentos({ pagamentos }: Props) {
       </div>
 
       <div className="overflow-auto">
-        <table className="w-full text-sm">
+        <table className="min-w-full text-sm">
           <thead className="text-zinc-600 bg-zinc-50">
             <tr>
               <th className="px-6 py-3 text-left font-medium text-xs uppercase tracking-wider">Data</th>
