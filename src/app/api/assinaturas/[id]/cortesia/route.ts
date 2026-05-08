@@ -12,7 +12,7 @@ export async function PUT(
     const body = await req.json().catch(() => ({}));
     const dataManual = typeof body?.dataManual === "string" && body.dataManual.trim()
       ? body.dataManual.trim() : null;
-    const totalIndicacoes = typeof body?.totalIndicacoes === "number" ? body.totalIndicacoes : null;
+    const idsIndicacoes: string[] = Array.isArray(body?.idsIndicacoes) ? body.idsIndicacoes : [];
 
     const client = await pool.connect();
 
@@ -65,7 +65,7 @@ export async function PUT(
       await client.query("COMMIT");
 
       const whatsapp = await enviarMensagensCortesia({
-        idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, totalIndicacoes,
+        idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, idsIndicacoes,
       }).catch(() => ({ ok: false as const, reason: "erro_envio" }));
 
       return NextResponse.json({ ok: true, assinatura, whatsapp });
@@ -87,12 +87,12 @@ async function enviarMensagensCortesia({
   idCliente,
   nomeCliente,
   vencContrato,
-  totalIndicacoes,
+  idsIndicacoes,
 }: {
   idCliente: string;
   nomeCliente: string | null;
   vencContrato: string | null;
-  totalIndicacoes: number | null;
+  idsIndicacoes: string[];
 }): Promise<WhatsappResult> {
   const evolutionUrl = process.env.EVOLUTION_URL ?? process.env.EVOLUTION_API_URL ?? process.env.NEXT_PUBLIC_EVOLUTION_URL;
   const evolutionKey = process.env.EVOLUTION_KEY ?? process.env.EVOLUTION_API_KEY ?? process.env.NEXT_PUBLIC_EVOLUTION_KEY;
@@ -127,8 +127,21 @@ async function enviarMensagensCortesia({
     `Quanto mais indicações, mais meses você acumula. Não há limite! 😊\n\n` +
     `Continue indicando e aproveite esse benefício exclusivo para nossos clientes parceiros.`;
 
-  const linhaIndicacoes = totalIndicacoes
-    ? `• Indicações desta cortesia: *${totalIndicacoes} pessoa${totalIndicacoes !== 1 ? "s" : ""}*\n`
+  let nomesIndicados: string[] = [];
+  if (idsIndicacoes.length > 0) {
+    const { rows: indicadosRows } = await pool.query(
+      `SELECT c.nome
+       FROM public.indicacoes i
+       JOIN public.clientes c ON c.id_cliente = i.id_indicado
+       WHERE i.id_indicacao = ANY($1::bigint[])
+       ORDER BY c.nome ASC`,
+      [idsIndicacoes]
+    );
+    nomesIndicados = indicadosRows.map((r: { nome: string }) => r.nome);
+  }
+
+  const linhaIndicados = nomesIndicados.length > 0
+    ? `• Indicações: *${nomesIndicados.join(", ")}*\n`
     : "";
   const linhaVenc = vencFormatado
     ? `• Novo vencimento do contrato: *${vencFormatado}*\n`
@@ -137,7 +150,7 @@ async function enviarMensagensCortesia({
   const msg2 =
     `*Parabéns, ${nome}!* 🎁\n\n` +
     `Você acaba de ganhar *1 mês de cortesia* na sua assinatura como agradecimento pelas suas indicações!\n\n` +
-    `${linhaIndicacoes}${linhaVenc}\n` +
+    `${linhaIndicados}${linhaVenc}\n` +
     `Muito obrigado por confiar na JS Sistemas e por nos indicar! Continue assim 🙏`;
 
   const headers = {
