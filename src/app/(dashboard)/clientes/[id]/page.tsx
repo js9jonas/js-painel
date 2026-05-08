@@ -58,6 +58,14 @@ function corStatusDestaque(status: string | null): string {
   }
 }
 
+/** Dias desde o último pagamento da lista (já ordenada por data DESC) */
+function diasDesdeUltimoPagamento(pagamentos: { data_pgto: string | null }[]): number | null {
+  const ultimo = pagamentos.find(p => p.data_pgto);
+  if (!ultimo?.data_pgto) return null;
+  const diff = Date.now() - new Date(ultimo.data_pgto).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
 /** Badge colorido por status na tabela de assinaturas */
 function badgeStatus(status: string | null): string {
   switch ((status ?? "").toLowerCase().trim()) {
@@ -193,7 +201,13 @@ export default async function ClienteDetalhePage({ params }: Props) {
       {ativa && (
         <div className="rounded-xl border bg-white overflow-hidden">
           <div className={`px-3 py-2 border-b flex items-center justify-between text-xs font-medium ${headerDestaque(ativa.status)}`}>
-            <span>{labelDestaque(ativa.status)}</span>
+            <span>
+              {labelDestaque(ativa.status)}
+              {(() => {
+                const dias = diasDesdeUltimoPagamento(todosPagamentos);
+                return dias !== null ? <span className="font-normal opacity-70"> ({dias} dias desde o último pagamento)</span> : null;
+              })()}
+            </span>
             {ativa.criado_em && (
               <span className="font-normal opacity-60">{tempoDesde(ativa.criado_em)}</span>
             )}
