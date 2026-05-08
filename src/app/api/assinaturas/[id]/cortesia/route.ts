@@ -13,6 +13,7 @@ export async function PUT(
     const dataManual = typeof body?.dataManual === "string" && body.dataManual.trim()
       ? body.dataManual.trim() : null;
     const idsIndicacoes: string[] = Array.isArray(body?.idsIndicacoes) ? body.idsIndicacoes : [];
+    const enviarMensagem: boolean = body?.enviarMensagem !== false;
 
     const client = await pool.connect();
 
@@ -64,9 +65,11 @@ export async function PUT(
 
       await client.query("COMMIT");
 
-      const whatsapp = await enviarMensagensCortesia({
-        idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, idsIndicacoes,
-      }).catch(() => ({ ok: false as const, reason: "erro_envio" }));
+      const whatsapp = enviarMensagem
+        ? await enviarMensagensCortesia({
+            idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, idsIndicacoes,
+          }).catch(() => ({ ok: false as const, reason: "erro_envio" }))
+        : null;
 
       return NextResponse.json({ ok: true, assinatura, whatsapp });
     } catch (err) {

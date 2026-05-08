@@ -38,6 +38,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
     const [loading, setLoading] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [whatsapp, setWhatsapp] = useState<WhatsappStatus>(null);
+    const [enviarMensagem, setEnviarMensagem] = useState(true);
 
     const vencAtual = parceiro.venc_contrato_parceiro;
 
@@ -53,7 +54,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
         const resp = await fetch(`/api/assinaturas/${parceiro.id_assinatura_parceiro}/cortesia`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dataManual: vencContrato, idsIndicacoes: idsSelecionados }),
+            body: JSON.stringify({ dataManual: vencContrato, idsIndicacoes: idsSelecionados, enviarMensagem }),
         });
 
         const j = await resp.json().catch(() => ({}));
@@ -76,7 +77,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
     const inputClass = "h-9 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
     const labelClass = "text-xs font-semibold text-zinc-700";
     const waMsg = whatsappMensagem(whatsapp);
-    const concluido = whatsapp !== null && !isPending;
+    const concluido = (whatsapp !== null || !enviarMensagem) && !loading && !isPending;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -102,6 +103,15 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
                             <p className="text-xs text-zinc-400">
                                 Data calculada com +1 mes sobre o vencimento atual. Edite se necessario.
                             </p>
+                            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={enviarMensagem}
+                                    onChange={(e) => setEnviarMensagem(e.target.checked)}
+                                    className="w-4 h-4 rounded accent-emerald-600"
+                                />
+                                <span className="text-sm text-zinc-700">Enviar mensagem WhatsApp ao cliente</span>
+                            </label>
                         </>
                     )}
 
