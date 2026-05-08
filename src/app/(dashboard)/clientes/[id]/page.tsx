@@ -205,7 +205,9 @@ export default async function ClienteDetalhePage({ params }: Props) {
               {labelDestaque(ativa.status)}
               {(() => {
                 const dias = diasDesdeUltimoPagamento(todosPagamentos);
-                return dias !== null ? <span className="font-normal opacity-70"> ({dias} dias desde o último pagamento)</span> : null;
+                if (dias === null) return null;
+                if (dias === 0) return <span className="font-semibold text-blue-600 opacity-100"> (pago hoje)</span>;
+                return <span className="font-normal opacity-70"> ({dias} dias desde o último pagamento)</span>;
               })()}
             </span>
             {ativa.criado_em && (
