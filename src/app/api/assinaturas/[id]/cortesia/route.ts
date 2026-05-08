@@ -96,6 +96,7 @@ async function enviarMensagensCortesia({
 }): Promise<WhatsappResult> {
   const evolutionUrl = process.env.EVOLUTION_API_URL ?? process.env.NEXT_PUBLIC_EVOLUTION_URL;
   const evolutionKey = process.env.EVOLUTION_API_KEY ?? process.env.NEXT_PUBLIC_EVOLUTION_KEY;
+  console.log("[cortesia] env check — EVOLUTION_API_URL:", !!process.env.EVOLUTION_API_URL, "| NEXT_PUBLIC_EVOLUTION_URL:", !!process.env.NEXT_PUBLIC_EVOLUTION_URL);
   if (!evolutionUrl || !evolutionKey) return { ok: false, reason: "sem_config" };
 
   const { rows } = await pool.query(
