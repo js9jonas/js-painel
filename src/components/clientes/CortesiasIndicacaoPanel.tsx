@@ -39,6 +39,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
     const [isPending, startTransition] = useTransition();
     const [whatsapp, setWhatsapp] = useState<WhatsappStatus>(null);
     const [enviarMensagem, setEnviarMensagem] = useState(true);
+    const [salvo, setSalvo] = useState(false);
 
     const vencAtual = parceiro.venc_contrato_parceiro;
 
@@ -66,6 +67,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
         }
 
         setWhatsapp(j.whatsapp ?? null);
+        setSalvo(true);
 
         startTransition(async () => {
             await marcarIndicacoesCortesia(idsSelecionados, parceiro.id_parceiro);
@@ -77,7 +79,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
     const inputClass = "h-9 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
     const labelClass = "text-xs font-semibold text-zinc-700";
     const waMsg = whatsappMensagem(whatsapp);
-    const concluido = (whatsapp !== null || !enviarMensagem) && !loading && !isPending;
+    const concluido = salvo && !loading && !isPending;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
