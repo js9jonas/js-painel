@@ -133,43 +133,29 @@ export async function getParceirosComCortesiaPendente(): Promise<ParceiroCortesi
       i.id_parceiro::text,
       c.nome AS nome_parceiro,
       COUNT(*)::int AS total_abertas,
-      (
-        SELECT a.id_assinatura::text
-        FROM public.assinaturas a
-        WHERE a.id_cliente = i.id_parceiro
-          AND lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
-        ORDER BY a.venc_contrato DESC NULLS LAST
-        LIMIT 1
-      ) AS id_assinatura_parceiro,
-      (
-        SELECT a.venc_contrato::text
-        FROM public.assinaturas a
-        WHERE a.id_cliente = i.id_parceiro
-          AND lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
-        ORDER BY a.venc_contrato DESC NULLS LAST
-        LIMIT 1
-      ) AS venc_contrato_parceiro,
-      (
-        SELECT a.venc_contas::text
-        FROM public.assinaturas a
-        WHERE a.id_cliente = i.id_parceiro
-          AND lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
-        ORDER BY a.venc_contrato DESC NULLS LAST
-        LIMIT 1
-      ) AS venc_contas_parceiro,
-       (
-  SELECT pac.contrato::text
-  FROM public.assinaturas a
-  LEFT JOIN public.pacote pac ON pac.id_pacote = a.id_pacote
-  WHERE a.id_cliente = i.id_parceiro
-    AND lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
-  ORDER BY a.venc_contrato DESC NULLS LAST
-  LIMIT 1
-) AS pacote_nome_parceiro
+      assin_parc.id_assinatura_parceiro,
+      assin_parc.venc_contrato_parceiro,
+      assin_parc.venc_contas_parceiro,
+      assin_parc.pacote_nome_parceiro
     FROM public.indicacoes i
     LEFT JOIN public.clientes c ON c.id_cliente = i.id_parceiro
+    LEFT JOIN LATERAL (
+      SELECT
+        a.id_assinatura::text AS id_assinatura_parceiro,
+        a.venc_contrato::text AS venc_contrato_parceiro,
+        a.venc_contas::text AS venc_contas_parceiro,
+        pac.contrato::text AS pacote_nome_parceiro
+      FROM public.assinaturas a
+      LEFT JOIN public.pacote pac ON pac.id_pacote = a.id_pacote
+      WHERE a.id_cliente = i.id_parceiro
+        AND lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
+      ORDER BY a.venc_contrato DESC NULLS LAST
+      LIMIT 1
+    ) assin_parc ON true
     WHERE i.bonificacao = 'aberta'
-    GROUP BY i.id_parceiro, c.nome
+    GROUP BY i.id_parceiro, c.nome,
+             assin_parc.id_assinatura_parceiro, assin_parc.venc_contrato_parceiro,
+             assin_parc.venc_contas_parceiro, assin_parc.pacote_nome_parceiro
     HAVING COUNT(*) >= 2
     ORDER BY COUNT(*) DESC, c.nome ASC
   `);
