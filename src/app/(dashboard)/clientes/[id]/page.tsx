@@ -62,7 +62,9 @@ function corStatusDestaque(status: string | null): string {
 function diasDesdeUltimoPagamento(pagamentos: { data_pgto: string | null }[]): number | null {
   const ultimo = pagamentos.find(p => p.data_pgto);
   if (!ultimo?.data_pgto) return null;
-  const diff = Date.now() - new Date(ultimo.data_pgto).getTime();
+  const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const hoje = new Date(hojeStr + 'T00:00:00');
+  const diff = hoje.getTime() - new Date(ultimo.data_pgto + 'T00:00:00').getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 

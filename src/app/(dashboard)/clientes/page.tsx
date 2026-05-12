@@ -191,7 +191,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               <td className="px-6 py-4">
                 {c.prox_vencimento ? (
                   <div className="text-sm font-medium text-zinc-900">
-                    {new Date(c.prox_vencimento).toLocaleDateString("pt-BR")}
+                    {c.prox_vencimento.split('-').reverse().join('/')}
                   </div>
                 ) : (
                   <span className="text-zinc-400 text-xs">—</span>

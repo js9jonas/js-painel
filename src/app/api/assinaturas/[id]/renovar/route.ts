@@ -60,10 +60,9 @@ export async function PUT(
 
           let detalhes = "novo";
           if (ultPgto.length > 0 && ultPgto[0].data_pgto) {
-            const ultimo = new Date(ultPgto[0].data_pgto);
-            const hoje = new Date();
-            ultimo.setHours(0, 0, 0, 0);
-            hoje.setHours(0, 0, 0, 0);
+            const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+            const hoje = new Date(hojeStr + 'T00:00:00');
+            const ultimo = new Date(ultPgto[0].data_pgto + 'T00:00:00');
             const dias = Math.round((hoje.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24));
             detalhes = `${dias} dias desde o último pagamento`;
           }
@@ -142,10 +141,9 @@ export async function PUT(
 
         let detalhes = "novo";
         if (ultPgto.length > 0 && ultPgto[0].data_pgto) {
-          const ultimo = new Date(ultPgto[0].data_pgto);
-          const hoje = new Date();
-          ultimo.setHours(0, 0, 0, 0);
-          hoje.setHours(0, 0, 0, 0);
+          const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+          const hoje = new Date(hojeStr + 'T00:00:00');
+          const ultimo = new Date(ultPgto[0].data_pgto + 'T00:00:00');
           const dias = Math.round((hoje.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24));
           detalhes = `${dias} dias desde o último pagamento`;
         }

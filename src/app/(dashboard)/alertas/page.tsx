@@ -12,8 +12,8 @@ import DefinirDataContaButton from "@/components/alertas/DefinirDataContaButton"
 import AutoRefresh from "@/components/AutoRefresh";
 
 function diasRestantes(data: string): number {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const hoje = new Date(hojeStr + 'T00:00:00');
     const venc = new Date(data + "T00:00:00");
     return Math.round((venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -42,8 +42,8 @@ export default async function AlertasPage() {
     ]);
 
     // Servidores com previsão < 15 dias
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const hoje = new Date(hojeStr + 'T00:00:00');
     const saldoMap = Object.fromEntries(saldos.map((s) => [s.id_servidor, s]));
     const servidoresCriticos = previsoes
         .filter((p) => {

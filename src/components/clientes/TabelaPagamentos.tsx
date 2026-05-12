@@ -56,7 +56,7 @@ export default function TabelaPagamentos({ pagamentos }: Props) {
             {pagamentosVisiveis.map((p) => (
               <tr key={p.id} className="hover:bg-zinc-50">
                 <td className="px-3 py-2 font-medium text-zinc-900">
-                  {p.data_pgto ? new Date(p.data_pgto).toLocaleDateString('pt-BR') : "—"}
+                  {p.data_pgto ? p.data_pgto.split('-').reverse().join('/') : "—"}
                 </td>
                 <td className="px-3 py-2 text-zinc-700">{p.compra ?? "—"}</td>
                 <td className="px-3 py-2">

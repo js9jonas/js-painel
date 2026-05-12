@@ -17,8 +17,8 @@ type ModalData = {
 };
 
 function diasRestantes(data: string): number {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const hoje = new Date(hojeStr + 'T00:00:00');
   const venc = new Date(data + "T00:00:00");
   return Math.round((venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -52,9 +52,8 @@ export default function AlertasAppsClient({
   const [valor, setValor] = useState("20");
   const [isPending, startTransition] = useTransition();
 
-  const ontem = new Date();
-  ontem.setDate(ontem.getDate() - 1);
-  ontem.setHours(0, 0, 0, 0);
+  const ontemStr = new Date(Date.now() - 86400000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const ontem = new Date(ontemStr + 'T00:00:00');
 
   const filtrados = apps.filter((r) => {
     if (filtro === "com_contrato") {
