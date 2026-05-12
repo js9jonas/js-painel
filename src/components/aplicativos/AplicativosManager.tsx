@@ -104,7 +104,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                   {/* App */}
                   <td className="px-4 py-3">
                     <div className="font-medium text-zinc-900">
-                      {a.nome_app ?? `App #${a.id_app}`}
+                      {a.nome_app ?? (a.id_app ? `App #${a.id_app}` : "App sem tipo")}
                     </div>
                     {a.exige_licenca && (
                       <div className="text-xs text-amber-600 mt-0.5">🔑 Exige licença</div>

@@ -40,6 +40,10 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
 
   function handleSave() {
     setError(null);
+    if (!idApp) {
+      setError("Selecione o aplicativo antes de salvar.");
+      return;
+    }
     const data: AplicativoData = {
       id_cliente: idCliente,
       id_app: idApp || null,
