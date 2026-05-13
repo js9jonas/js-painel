@@ -52,19 +52,16 @@ export async function PUT(
         if (registrarPagamento && pgto) {
           const idCliente = pgto.idCliente;
           const { rows: ultPgto } = await client.query(
-            `SELECT data_pgto FROM public.pagamentos
+            `SELECT (CURRENT_DATE - data_pgto::date)::int AS dias
+             FROM public.pagamentos
              WHERE id_cliente = $1::bigint
              ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
             [idCliente]
           );
 
           let detalhes = "novo";
-          if (ultPgto.length > 0 && ultPgto[0].data_pgto) {
-            const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-            const hoje = new Date(hojeStr + 'T00:00:00');
-            const ultimo = new Date(ultPgto[0].data_pgto + 'T00:00:00');
-            const dias = Math.round((hoje.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24));
-            detalhes = `${dias} dias desde o último pagamento`;
+          if (ultPgto.length > 0 && ultPgto[0].dias != null) {
+            detalhes = `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`;
           }
 
           await client.query(
@@ -133,19 +130,16 @@ export async function PUT(
       if (registrarPagamento && pgto && statusFinal !== "pendente") {
         const idCliente = pgto.idCliente ?? assinatura.id_cliente;
         const { rows: ultPgto } = await client.query(
-          `SELECT data_pgto FROM public.pagamentos
+          `SELECT (CURRENT_DATE - data_pgto::date)::int AS dias
+           FROM public.pagamentos
            WHERE id_cliente = $1::bigint
            ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
           [idCliente]
         );
 
         let detalhes = "novo";
-        if (ultPgto.length > 0 && ultPgto[0].data_pgto) {
-          const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-          const hoje = new Date(hojeStr + 'T00:00:00');
-          const ultimo = new Date(ultPgto[0].data_pgto + 'T00:00:00');
-          const dias = Math.round((hoje.getTime() - ultimo.getTime()) / (1000 * 60 * 60 * 24));
-          detalhes = `${dias} dias desde o último pagamento`;
+        if (ultPgto.length > 0 && ultPgto[0].dias != null) {
+          detalhes = `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`;
         }
 
         await client.query(
