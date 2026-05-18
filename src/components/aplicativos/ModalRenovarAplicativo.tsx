@@ -8,6 +8,7 @@ interface Props {
   id_cliente: number;
   nome_app: string;
   validadeAtual: string | null; // ISO date string
+  statusAtual: string | null;
   onClose: () => void;
 }
 
@@ -36,10 +37,14 @@ export default function ModalRenovarAplicativo({
   id_cliente,
   nome_app,
   validadeAtual,
+  statusAtual,
   onClose,
 }: Props) {
+  const isPendente = (statusAtual ?? "").toLowerCase() === "pendente";
   const [modo, setModo] = useState<Modo>("pagamento");
-  const [novaValidade, setNovaValidade] = useState(() => calcNovaValidade(validadeAtual));
+  const [novaValidade, setNovaValidade] = useState(() =>
+    isPendente ? (validadeAtual?.split("T")[0] ?? "") : calcNovaValidade(validadeAtual)
+  );
   const [forma, setForma] = useState("PIX");
   const [valor, setValor] = useState("20");
   const [loading, setLoading] = useState(false);
@@ -154,7 +159,7 @@ export default function ModalRenovarAplicativo({
           {/* Aviso pendente */}
           {modo === "pendente" && (
             <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-              A validade será atualizada mas nenhum pagamento será registrado. O app ficará como <b>pendente</b> e aparecerá na lista de pendentes.
+              A <b>data de vencimento não será alterada</b>. Nenhum pagamento será registrado. O app ficará como <b>pendente</b> aguardando pagamento ou cortesia.
             </div>
           )}
 

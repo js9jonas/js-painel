@@ -207,6 +207,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
           id_cliente={Number(idCliente)}
           nome_app={appPgto.nome_app ?? `App #${appPgto.id_app}`}
           validadeAtual={appPgto.validade ?? null}
+          statusAtual={appPgto.status ?? null}
           onClose={() => {
             setAppPgto(null);
             router.refresh();
