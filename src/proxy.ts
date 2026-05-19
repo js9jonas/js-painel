@@ -5,6 +5,11 @@ import { NextResponse } from "next/server"
 export default auth((req) => {
   const { pathname } = req.nextUrl
 
+  // Rotas públicas
+  if (pathname === '/privacidade' || pathname.startsWith('/privacidade/')) {
+    return NextResponse.next()
+  }
+
   if (
     pathname.startsWith('/api/stream-proxy') ||
     pathname.startsWith('/api/proxy-test') ||
