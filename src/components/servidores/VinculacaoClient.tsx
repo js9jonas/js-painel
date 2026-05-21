@@ -262,7 +262,7 @@ export default function VinculacaoClient({ contas }: { contas: ContaVinculacao[]
                       <td className="px-4 py-3 font-mono text-xs text-zinc-700">{c.usuario}</td>
                       <td className="px-4 py-3 text-zinc-800">{c.rotulo || <span className="text-zinc-400 italic">sem rótulo</span>}</td>
                       <td className="px-4 py-3 text-zinc-600 text-xs">{c.nome_servidor}</td>
-                      <td className={`px-4 py-3 text-xs font-medium ${c.vencimento_real_painel && c.vencimento_real_painel < new Date().toISOString().slice(0, 10) ? "text-red-600" : "text-zinc-600"}`}>
+                      <td className={`px-4 py-3 text-xs font-medium ${c.vencimento_real_painel && c.vencimento_real_painel < new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) ? "text-red-600" : "text-zinc-600"}`}>
                         {formatDate(c.vencimento_real_painel)}
                       </td>
                       <td className="px-4 py-3 min-w-64">

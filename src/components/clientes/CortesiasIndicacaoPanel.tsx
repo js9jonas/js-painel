@@ -6,10 +6,15 @@ import { useRouter } from "next/navigation";
 import { marcarIndicacoesCortesia } from "@/app/actions/indicacoes";
 import type { ParceiroCortesiaRow } from "@/lib/indicacoes";
 
+function hojeStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function addMeses(dataStr: string | null | undefined, meses: number): string {
-    const base = dataStr ? new Date(dataStr + "T00:00:00") : new Date();
+    const base = new Date((dataStr ?? hojeStr()) + "T00:00:00");
     base.setMonth(base.getMonth() + meses);
-    return base.toISOString().split("T")[0];
+    return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
 }
 
 type CortesiaModalProps = {

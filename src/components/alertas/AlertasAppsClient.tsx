@@ -89,12 +89,12 @@ export default function AlertasAppsClient({
         await renovarValidadeApp(modal.id_app_registro);
       } else {
         // Calcula novaValidade: vencido = hoje + 1 ano, vigente = validade + 1 ano
-        const base = modal.validade ? new Date(modal.validade + "T00:00:00") : new Date();
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
+        const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+        const base = new Date((modal.validade ?? hojeStr) + "T00:00:00");
+        const hoje = new Date(hojeStr + "T00:00:00");
         const ref = base < hoje ? hoje : base;
         ref.setFullYear(ref.getFullYear() + 1);
-        const novaValidade = ref.toISOString().split("T")[0];
+        const novaValidade = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
 
         await renovarAplicativo({
           id_app_registro: Number(modal.id_app_registro),
