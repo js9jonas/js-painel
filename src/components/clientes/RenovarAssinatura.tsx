@@ -9,10 +9,15 @@ type StatusFinal = "ativo" | "pendente";
 const FORMAS_PGTO = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
 
+function hojeStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function addMeses(dataStr: string | null | undefined, meses: number): string {
-    const base = dataStr ? new Date(dataStr + "T00:00:00") : new Date();
+    const base = new Date((dataStr ?? hojeStr()) + "T00:00:00");
     base.setMonth(base.getMonth() + meses);
-    return base.toISOString().split("T")[0];
+    return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
 }
 
 function calcVencContrato(

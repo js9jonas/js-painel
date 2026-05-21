@@ -14,15 +14,21 @@ interface Props {
 
 const FORMAS = ["PIX", "Nubank", "Nu PJ", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 
+function hojeStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function calcNovaValidade(validadeAtual: string | null): string {
-  const base = validadeAtual
-    ? new Date(validadeAtual + "T00:00:00")
-    : new Date();
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const base = new Date((validadeAtual ?? hojeStr()) + "T00:00:00");
+  const hoje = new Date(hojeStr() + "T00:00:00");
   const ref = base < hoje ? hoje : base;
   ref.setFullYear(ref.getFullYear() + 1);
-  return ref.toISOString().split("T")[0];
+  return toLocalDateStr(ref);
 }
 
 function formatDate(d: string | null) {
