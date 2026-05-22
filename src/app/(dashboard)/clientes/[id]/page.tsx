@@ -331,8 +331,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       {a.status ?? "--"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-zinc-700">{a.venc_contrato ?? "--"}</td>
-                  <td className="px-3 py-2 text-zinc-700">{a.venc_contas ?? "--"}</td>
+                  <td className="px-3 py-2 text-zinc-700">{a.venc_contrato ? a.venc_contrato.split("T")[0].split("-").reverse().join("/") : "--"}</td>
+                  <td className="px-3 py-2 text-zinc-700">{a.venc_contas ? a.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}</td>
                   <td className="px-3 py-2 text-zinc-700">{a.identificacao ?? "--"}</td>
                   <td className="px-3 py-2">
                     {a.pacote_contrato ?? "--"}
