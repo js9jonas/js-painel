@@ -47,9 +47,7 @@ export default function DefinirDataContaButton({ idAssinatura, vencContas }: Pro
       {/* Botão de abertura */}
       <button
         onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium
-                   bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200
-                   transition-colors whitespace-nowrap"
+        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 transition-colors whitespace-nowrap"
       >
         📅 31 / outra data
       </button>
@@ -85,9 +83,7 @@ export default function DefinirDataContaButton({ idAssinatura, vencContas }: Pro
                   type="date"
                   value={data}
                   onChange={(e) => setData(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm
-                             text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-400
-                             focus:border-violet-400"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400"
                 />
               </div>
               <p className="text-xs text-zinc-400">
@@ -109,14 +105,11 @@ export default function DefinirDataContaButton({ idAssinatura, vencContas }: Pro
               <button
                 onClick={confirmar}
                 disabled={isPending || !data}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-violet-600
-                           text-white hover:bg-violet-700 disabled:opacity-50
-                           transition-colors flex items-center gap-1.5"
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
               >
                 {isPending ? (
                   <>
-                    <span className="h-3 w-3 rounded-full border-2 border-white/30
-                                     border-t-white animate-spin" />
+                    <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                     Salvando…
                   </>
                 ) : (

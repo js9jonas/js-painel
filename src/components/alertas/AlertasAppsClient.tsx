@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
 import { renovarValidadeApp } from "@/app/actions/renovarValidadeApp";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
@@ -51,6 +52,13 @@ export default function AlertasAppsClient({
   const [forma, setForma] = useState("Pix");
   const [valor, setValor] = useState("20");
   const [isPending, startTransition] = useTransition();
+  const [copiadoId, setCopiadoId] = useState<string | null>(null);
+
+  function copiarNome(id: string, nome: string) {
+    navigator.clipboard.writeText(nome);
+    setCopiadoId(id);
+    setTimeout(() => setCopiadoId(null), 1500);
+  }
 
   const ontemStr = new Date(Date.now() - 86400000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
   const ontem = new Date(ontemStr + 'T00:00:00');
@@ -186,12 +194,23 @@ export default function AlertasAppsClient({
                       return (
                         <tr key={r.id_app_registro} className="hover:bg-zinc-50/50">
                           <td className="px-4 py-3">
-                            <Link
-                              href={`/clientes/${r.id_cliente}`}
-                              className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
-                            >
-                              {r.nome}
-                            </Link>
+                            <div className="flex items-center gap-1.5">
+                              <Link
+                                href={`/clientes/${r.id_cliente}`}
+                                className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
+                              >
+                                {r.nome}
+                              </Link>
+                              <button
+                                onClick={() => copiarNome(r.id_app_registro, r.nome)}
+                                title="Copiar nome"
+                                className="text-zinc-300 hover:text-zinc-500 transition-colors"
+                              >
+                                {copiadoId === r.id_app_registro
+                                  ? <Check className="w-3.5 h-3.5 text-green-500" />
+                                  : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
                             <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
                           </td>
                           <td className="px-4 py-3">
