@@ -288,9 +288,9 @@ export async function getVendasUltimos30Dias(): Promise<VendaUltimos30Dias[]> {
 export async function getMetricasQuantitativas(): Promise<MetricasQuantitativas> {
   const { rows } = await pool.query(`
     SELECT
-      -- Clientes ativos (com assinatura ativo/atrasado)
+      -- Clientes ativos (com assinatura ativo)
       (SELECT COUNT(DISTINCT id_cliente) FROM public.assinaturas
-       WHERE lower(btrim(status)) IN ('ativo','atrasado'))::int AS clientes_ativos,
+       WHERE lower(btrim(status)) = 'ativo')::int AS clientes_ativos,
 
       -- Novos clientes este mês
       (SELECT COUNT(*) FROM public.clientes
@@ -400,15 +400,13 @@ export async function getServidoresUso(): Promise<ServidorUso[]> {
 export async function getStatusAssinaturas(): Promise<AssinaturasStatusDist[]> {
   const { rows } = await pool.query(`
     WITH total AS (
-     SELECT COUNT(*)::numeric AS t FROM public.assinaturas
-     WHERE venc_contrato >= CURRENT_DATE - INTERVAL '6 months'
-)
+      SELECT COUNT(*)::numeric AS t FROM public.assinaturas
+    )
     SELECT
       lower(btrim(status)) AS status,
       COUNT(*)::int AS quantidade,
       ROUND(COUNT(*)::numeric / t.t * 100, 1)::numeric AS percentual
     FROM public.assinaturas, total t
-    WHERE venc_contrato >= CURRENT_DATE - INTERVAL '6 months'
     GROUP BY lower(btrim(status)), t.t
     ORDER BY quantidade DESC
   `);
