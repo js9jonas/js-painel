@@ -401,12 +401,14 @@ export async function getStatusAssinaturas(): Promise<AssinaturasStatusDist[]> {
   const { rows } = await pool.query(`
     WITH total AS (
       SELECT COUNT(*)::numeric AS t FROM public.assinaturas
+      WHERE venc_contrato >= CURRENT_DATE - INTERVAL '6 months'
     )
     SELECT
       lower(btrim(status)) AS status,
       COUNT(*)::int AS quantidade,
       ROUND(COUNT(*)::numeric / t.t * 100, 1)::numeric AS percentual
     FROM public.assinaturas, total t
+    WHERE venc_contrato >= CURRENT_DATE - INTERVAL '6 months'
     GROUP BY lower(btrim(status)), t.t
     ORDER BY quantidade DESC
   `);
