@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getAssinaturasByClienteId, getClienteById, getPagamentosByClienteId } from "@/lib/clientes";
+import { getAuditLogByClienteId } from "@/lib/audit";
 import { getPlanos } from "@/lib/planos";
 import { getPacotes } from "@/lib/pacotes";
 import { getAplicativosByClienteId, getApps } from "@/lib/aplicativos";
@@ -18,6 +19,7 @@ import { getIndicacoesStatsByParceiroId } from "@/lib/indicacoes";
 import IndicadorInfo from "@/components/clientes/IndicadorInfo";
 import { getParceiroByIndicadoId } from "@/lib/indicacoes";
 import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
+import HistoricoAudit from "@/components/clientes/HistoricoAudit";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -95,7 +97,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro, auditLog] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
@@ -105,6 +107,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getApps(),
     getIndicacoesStatsByParceiroId(id),
     getParceiroByIndicadoId(id),
+    getAuditLogByClienteId(id),
   ]);
 
   // ✅ Inclui "atrasado" no card de destaque
@@ -395,6 +398,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
         />
 
         <TabelaPagamentos pagamentos={todosPagamentos} />
+        <HistoricoAudit entradas={auditLog} />
       </div>
       <ListaIndicacoes idParceiro={id} />
     </div>

@@ -1,4 +1,36 @@
 import { PoolClient } from "pg";
+import { pool } from "@/lib/db";
+
+export type AuditLogRow = {
+  id: string;
+  criado_em: string;
+  tipo: string;
+  id_assinatura: string | null;
+  id_app_registro: number | null;
+  descricao: string | null;
+  dados_antes: Record<string, unknown> | null;
+  dados_depois: Record<string, unknown> | null;
+};
+
+export async function getAuditLogByClienteId(idCliente: string): Promise<AuditLogRow[]> {
+  const { rows } = await pool.query<AuditLogRow>(
+    `SELECT
+       id::text,
+       criado_em,
+       tipo,
+       id_assinatura::text,
+       id_app_registro,
+       descricao,
+       dados_antes,
+       dados_depois
+     FROM public.audit_log
+     WHERE id_cliente = $1::bigint
+     ORDER BY criado_em DESC
+     LIMIT 200`,
+    [idCliente]
+  );
+  return rows;
+}
 
 export type AuditTipo =
   | "troca_pacote"

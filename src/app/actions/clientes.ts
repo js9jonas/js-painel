@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { registrarAudit } from "@/lib/audit";
 
 export async function updateCliente(
   id: string,
@@ -14,25 +15,59 @@ export async function updateCliente(
 ) {
   if (!data.nome.trim()) throw new Error("Nome é obrigatório");
 
-  await pool.query(
-    `UPDATE public.clientes
-     SET nome = $1, observacao = $2
-     WHERE id_cliente = $3::bigint`,
-    [data.nome.trim(), data.observacao?.trim() || null, id]
-  );
+  const client = await pool.connect();
 
-  // Atualiza observação da assinatura principal se fornecida
-  if (data.id_assinatura) {
-    await pool.query(
-      `UPDATE public.assinaturas
-       SET observacao = $1, atualizado_em = NOW()
-       WHERE id_assinatura = $2::bigint`,
-      [data.observacao_assinatura?.trim() || null, data.id_assinatura]
+  try {
+    await client.query("BEGIN");
+
+    const { rows: antes } = await client.query(
+      `SELECT nome, observacao FROM public.clientes WHERE id_cliente = $1::bigint`,
+      [id]
     );
-  }
+    const ant = antes[0];
 
-  revalidatePath("/clientes");
-  revalidatePath(`/clientes/${id}`);
+    await client.query(
+      `UPDATE public.clientes SET nome = $1, observacao = $2 WHERE id_cliente = $3::bigint`,
+      [data.nome.trim(), data.observacao?.trim() || null, id]
+    );
+
+    if (ant) {
+      const camposAlterados: Record<string, { antes: string | null; depois: string | null }> = {};
+
+      if (ant.nome !== data.nome.trim()) {
+        camposAlterados.nome = { antes: ant.nome, depois: data.nome.trim() };
+      }
+      if ((ant.observacao ?? null) !== (data.observacao?.trim() || null)) {
+        camposAlterados.observacao = { antes: ant.observacao, depois: data.observacao?.trim() || null };
+      }
+
+      if (Object.keys(camposAlterados).length > 0) {
+        await registrarAudit(client, {
+          tipo: "edicao_cadastro",
+          id_cliente: id,
+          descricao: `Campos alterados: ${Object.keys(camposAlterados).join(", ")}`,
+          dados_antes:  Object.fromEntries(Object.entries(camposAlterados).map(([k, v]) => [k, v.antes])),
+          dados_depois: Object.fromEntries(Object.entries(camposAlterados).map(([k, v]) => [k, v.depois])),
+        });
+      }
+    }
+
+    if (data.id_assinatura) {
+      await client.query(
+        `UPDATE public.assinaturas SET observacao = $1, atualizado_em = NOW() WHERE id_assinatura = $2::bigint`,
+        [data.observacao_assinatura?.trim() || null, data.id_assinatura]
+      );
+    }
+
+    await client.query("COMMIT");
+    revalidatePath("/clientes");
+    revalidatePath(`/clientes/${id}`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export type ContatoRow = {
