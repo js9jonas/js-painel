@@ -2,6 +2,7 @@
 
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { registrarAudit } from "@/lib/audit";
 
 export interface RenovarAplicativoParams {
   id_app_registro: number;
@@ -27,9 +28,11 @@ export async function renovarAplicativo({
   try {
     await client.query("BEGIN");
 
-    // Busca nome do app e do cliente
+    // Busca nome do app, validade atual e do cliente
     const { rows: appRows } = await client.query(
-      `SELECT a.nome_app, c.nome AS cliente
+      `SELECT a.nome_app, c.nome AS cliente,
+              ap.validade::text AS validade_atual, ap.status AS status_atual,
+              ap.id_assinatura::text
        FROM public.apps a
        JOIN public.aplicativos ap ON ap.id_app = a.id_app
        JOIN public.clientes c ON c.id_cliente = ap.id_cliente
@@ -38,7 +41,7 @@ export async function renovarAplicativo({
     );
 
     if (!appRows.length) throw new Error("Aplicativo não encontrado");
-    const { nome_app, cliente } = appRows[0];
+    const { nome_app, cliente, validade_atual, status_atual, id_assinatura } = appRows[0];
 
     // Define novo status conforme modo
     const novoStatus =
@@ -53,6 +56,17 @@ export async function renovarAplicativo({
        WHERE id_app_registro = $3`,
       [novaValidade, novoStatus, id_app_registro]
     );
+
+    // Log de alteração de validade
+    await registrarAudit(client, {
+      tipo: "alteracao_app",
+      id_cliente,
+      id_assinatura: id_assinatura ?? null,
+      id_app_registro,
+      descricao: `${nome_app}: renovação ${modo} — validade ${validade_atual} → ${novaValidade}`,
+      dados_antes:  { validade: validade_atual, status: status_atual },
+      dados_depois: { validade: novaValidade,   status: novoStatus },
+    });
 
     // Lança pagamento somente no modo pagamento
     if (modo === "pagamento") {

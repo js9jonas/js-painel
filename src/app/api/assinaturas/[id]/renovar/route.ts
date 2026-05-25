@@ -44,6 +44,18 @@ export async function PUT(
       try {
         await client.query("BEGIN");
 
+        // Captura venc_contrato antes de ativar para calcular tipo_pagamento
+        const { rows: vcRows } = await client.query(
+          `SELECT (CURRENT_DATE - venc_contrato)::int AS dias_rel, venc_contrato
+           FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+          [idAssinatura]
+        );
+        const diasRelSoPag: number | null = vcRows[0]?.dias_rel ?? null;
+        const tipoPagSoPag =
+          diasRelSoPag == null ? "novo"
+          : diasRelSoPag > 0   ? "atrasado"
+          : "adiantado";
+
         await client.query(
           `UPDATE public.assinaturas SET status = 'ativo', atualizado_em = NOW() WHERE id_assinatura = $1::bigint`,
           [idAssinatura]
@@ -51,24 +63,16 @@ export async function PUT(
 
         if (registrarPagamento && pgto) {
           const idCliente = pgto.idCliente;
-          const { rows: ultPgto } = await client.query(
-            `SELECT (CURRENT_DATE - data_pgto::date)::int AS dias
-             FROM public.pagamentos
-             WHERE id_cliente = $1::bigint
-             ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
-            [idCliente]
-          );
-
-          let detalhes = "novo";
-          if (ultPgto.length > 0 && ultPgto[0].dias != null) {
-            detalhes = `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`;
-          }
 
           await client.query(
             `INSERT INTO public.pagamentos
-             (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
-             VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
-            [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null, pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes]
+             (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
+              tipo_pagamento, dias_relativo_vencimento, atualizado_em)
+             VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
+                     $7, $8, NOW())`,
+            [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
+             pgto.forma ?? "PIX", pgto.valor ?? 0, null,
+             tipoPagSoPag, diasRelSoPag]
           );
         }
 
@@ -87,10 +91,18 @@ export async function PUT(
       await client.query("BEGIN");
 
       const { rows: antes } = await client.query(
-        `SELECT venc_contas::text AS venc_contas_anterior FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+        `SELECT
+           venc_contas::text    AS venc_contas_anterior,
+           venc_contrato::text  AS venc_contrato_anterior,
+           (CURRENT_DATE - venc_contrato)::int AS dias_rel_vencimento
+         FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
         [idAssinatura]
       );
-      const vencContasAnterior: string | null = antes[0]?.venc_contas_anterior ?? null;
+      const vencContasAnterior: string | null    = antes[0]?.venc_contas_anterior    ?? null;
+      const diasRelVencimento:   number | null   = antes[0]?.dias_rel_vencimento     ?? null;
+      const tipoPagamento = diasRelVencimento == null ? "novo"
+                          : diasRelVencimento > 0     ? "atrasado"
+                          : "adiantado";
 
       // statusFinal null = manter status; caso contrário seta o valor recebido
       const sql = `
@@ -129,24 +141,16 @@ export async function PUT(
       // Registra pagamento somente se status = ativo
       if (registrarPagamento && pgto && statusFinal !== "pendente") {
         const idCliente = pgto.idCliente ?? assinatura.id_cliente;
-        const { rows: ultPgto } = await client.query(
-          `SELECT (CURRENT_DATE - data_pgto::date)::int AS dias
-           FROM public.pagamentos
-           WHERE id_cliente = $1::bigint
-           ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
-          [idCliente]
-        );
-
-        let detalhes = "novo";
-        if (ultPgto.length > 0 && ultPgto[0].dias != null) {
-          detalhes = `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`;
-        }
 
         await client.query(
           `INSERT INTO public.pagamentos
-           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
-           VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv', NOW())`,
-          [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null, pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes]
+           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
+            tipo_pagamento, dias_relativo_vencimento, atualizado_em)
+           VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
+                   $7, $8, NOW())`,
+          [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
+           pgto.forma ?? "PIX", pgto.valor ?? 0, null,
+           tipoPagamento, diasRelVencimento]
         );
       }
 
