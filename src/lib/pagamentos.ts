@@ -11,6 +11,8 @@ export type PagamentoFullRow = {
   detalhes: string | null;
   tipo: string | null;
   compra: string | null;
+  tipo_pagamento: string | null;
+  dias_relativo_vencimento: number | null;
 };
 
 export type GetPagamentosParams = {
@@ -73,7 +75,9 @@ export async function getPagamentos(
        p.valor::text,
        p.detalhes,
        p.tipo,
-       p.compra
+       p.compra,
+       p.tipo_pagamento,
+       p.dias_relativo_vencimento
      FROM public.pagamentos p
      LEFT JOIN public.clientes c ON c.id_cliente = p.id_cliente
      ${whereSql}

@@ -27,6 +27,43 @@ function formatDate(d: string | null) {
   return d.split("T")[0].split("-").reverse().join("/");
 }
 
+function VencimentoBadge({
+  tipo,
+  dias,
+  tipoPagamento,
+}: {
+  tipo: string | null;
+  dias: number | null;
+  tipoPagamento: string | null;
+}) {
+  if (tipo?.toLowerCase() !== "assinatura tv") return null;
+
+  if (tipoPagamento === "novo") {
+    return (
+      <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 ring-1 ring-inset ring-blue-200 whitespace-nowrap">
+        novo
+      </span>
+    );
+  }
+  if (tipoPagamento === "atrasado" && dias != null) {
+    return (
+      <span className="inline-flex items-center gap-px justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-200 whitespace-nowrap">
+        <span>↑</span>
+        <span>{dias}d</span>
+      </span>
+    );
+  }
+  if (tipoPagamento === "adiantado" && dias != null) {
+    return (
+      <span className="inline-flex items-center gap-px justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-200 whitespace-nowrap">
+        <span>↓</span>
+        <span>{Math.abs(dias)}d</span>
+      </span>
+    );
+  }
+  return null;
+}
+
 function BotaoOK({ id, onDone }: { id: number; onDone: () => void }) {
   const [loading, setLoading] = useState(false);
 
@@ -241,10 +278,10 @@ export default function PagamentosClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white">
-                {["Data", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", ""].map((h) => (
+                {["Data", "", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", ""].map((h, i) => (
                   <th
-                    key={h}
-                    className="sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 px-6 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider"
+                    key={i}
+                    className={`sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider ${h === "" && i === 1 ? "px-2 w-14" : "px-6"}`}
                   >
                     {h}
                   </th>
@@ -258,6 +295,13 @@ export default function PagamentosClient({
                   <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-zinc-900 whitespace-nowrap">
                       {formatDate(p.data_pgto)}
+                    </td>
+                    <td className="px-2 py-4 w-14">
+                      <VencimentoBadge
+                        tipo={p.tipo}
+                        dias={p.dias_relativo_vencimento}
+                        tipoPagamento={p.tipo_pagamento}
+                      />
                     </td>
                     <td className="px-6 py-4">
                       {p.nome_cliente ? (
@@ -311,7 +355,7 @@ export default function PagamentosClient({
 
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-zinc-500">
+                  <td colSpan={9} className="px-6 py-16 text-center text-zinc-500">
                     <div className="flex flex-col items-center gap-2">
                       <div className="text-4xl">💰</div>
                       <div className="font-medium">Nenhum pagamento encontrado</div>
