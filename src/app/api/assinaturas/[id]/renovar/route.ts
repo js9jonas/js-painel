@@ -48,7 +48,7 @@ export async function PUT(
         // Como a assinatura estava pendente, venc_contrato já foi avançado um ciclo
         // na renovação anterior. Subtraímos o período para obter o vencimento original.
         const { rows: vcRows } = await client.query(
-          `SELECT (CURRENT_DATE - (venc_contrato - make_interval(months => $2)))::int AS dias_rel, venc_contrato
+          `SELECT (CURRENT_DATE - (venc_contrato - make_interval(months => $2::int))::date)::int AS dias_rel, venc_contrato
            FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
           [idAssinatura, meses]
         );
