@@ -10,6 +10,10 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
+  if (pathname === '/sobre' || pathname.startsWith('/sobre/')) {
+    return NextResponse.next()
+  }
+
   if (
     pathname.startsWith('/api/stream-proxy') ||
     pathname.startsWith('/api/proxy-test') ||
