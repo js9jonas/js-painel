@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
-import { renovarValidadeApp } from "@/app/actions/renovarValidadeApp";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
@@ -15,6 +14,7 @@ type ModalData = {
   nome: string;
   nome_app: string;
   validade: string | null;
+  novaValidade: string;
 };
 
 function diasRestantes(data: string): number {
@@ -48,6 +48,7 @@ export default function AlertasAppsClient({
   const [aberto, setAberto] = useState(true);
   const [filtro, setFiltro] = useState<Filtro>("com_contrato");
   const [modal, setModal] = useState<ModalData | null>(null);
+  const [novaValidadeInput, setNovaValidadeInput] = useState("");
   const [modo, setModo] = useState<"pagamento" | "somente">("pagamento");
   const [forma, setForma] = useState("Pix");
   const [valor, setValor] = useState("20");
@@ -72,14 +73,26 @@ export default function AlertasAppsClient({
     return true;
   });
 
+  function calcularNovaValidade(validade: string | null): string {
+    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const base = new Date((validade ?? hojeStr) + "T00:00:00");
+    const hoje = new Date(hojeStr + "T00:00:00");
+    const ref = base < hoje ? hoje : base;
+    ref.setFullYear(ref.getFullYear() + 1);
+    return `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
+  }
+
   function abrirModal(r: AlertaAppRow) {
+    const nova = calcularNovaValidade(r.validade ?? null);
     setModal({
       id_app_registro: r.id_app_registro,
       id_cliente: r.id_cliente,
       nome: r.nome,
       nome_app: r.nome_app,
       validade: r.validade ?? null,
+      novaValidade: nova,
     });
+    setNovaValidadeInput(nova);
     setModo("somente");
     setForma("PIX");
     setValor("20");
@@ -93,26 +106,14 @@ export default function AlertasAppsClient({
   function handleConfirmar() {
     if (!modal) return;
     startTransition(async () => {
-      if (modo === "somente") {
-        await renovarValidadeApp(modal.id_app_registro);
-      } else {
-        // Calcula novaValidade: vencido = hoje + 1 ano, vigente = validade + 1 ano
-        const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-        const base = new Date((modal.validade ?? hojeStr) + "T00:00:00");
-        const hoje = new Date(hojeStr + "T00:00:00");
-        const ref = base < hoje ? hoje : base;
-        ref.setFullYear(ref.getFullYear() + 1);
-        const novaValidade = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
-
-        await renovarAplicativo({
-          id_app_registro: Number(modal.id_app_registro),
-          id_cliente: Number(modal.id_cliente),
-          novaValidade,
-          modo: "pagamento",
-          valor: parseFloat(valor) || 0,
-          forma,
-        });
-      }
+      await renovarAplicativo({
+        id_app_registro: Number(modal.id_app_registro),
+        id_cliente: Number(modal.id_cliente),
+        novaValidade: novaValidadeInput,
+        modo: modo === "pagamento" ? "pagamento" : "cortesia",
+        valor: modo === "pagamento" ? parseFloat(valor) || 0 : 0,
+        forma: modo === "pagamento" ? forma : undefined,
+      });
       setModal(null);
     });
   }
@@ -269,6 +270,15 @@ export default function AlertasAppsClient({
                 {modal.nome} — {modal.nome_app}
               </p>
             </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-500 block">Novo vencimento</label>
+              <input
+                type="date"
+                value={novaValidadeInput}
+                onChange={(e) => setNovaValidadeInput(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setModo("pagamento")}
@@ -326,7 +336,7 @@ export default function AlertasAppsClient({
               </button>
               <button
                 onClick={handleConfirmar}
-                disabled={isPending || (modo === "pagamento" && !valor)}
+                disabled={isPending || !novaValidadeInput || (modo === "pagamento" && !valor)}
                 className="flex-1 rounded-xl bg-zinc-900 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-50"
               >
                 {isPending ? "Salvando..." : "Confirmar"}
