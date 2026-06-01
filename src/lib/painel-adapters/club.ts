@@ -1,24 +1,13 @@
-import { pool } from "@/lib/db";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 const API_URL = "https://pdcapi.io/";
 const LOGIN_URL = "https://dashboard.bz/ss.php";
 
-async function getToken(creds: ServidorCredenciais): Promise<string> {
-  // Token válido no banco
+function getToken(creds: ServidorCredenciais): string {
   if (creds.session_cookie && creds.session_expiry && new Date(creds.session_expiry) > new Date()) {
     return creds.session_cookie;
   }
-  throw new Error("Token expirado. Faça login manual no painel CLUB para renovar a sessão.");
-}
-
-async function atualizarToken(idServidor: number, token: string) {
-  await pool.query(
-    `UPDATE public.servidores
-     SET session_cookie = $1, session_expiry = now() + interval '7 days'
-     WHERE id_servidor = $2`,
-    [token, idServidor]
-  );
+  throw new Error("Token CLUB expirado. Faça login manual no painel e cole o token via botão 'Atualizar token'.");
 }
 
 async function apiFetch(token: string, path: string, options: RequestInit = {}) {
@@ -39,10 +28,10 @@ function mapStatus(s: string | number): ContaPainel["status"] {
   return "vencida";
 }
 
-export function criarClubAdapter(creds: ServidorCredenciais, idServidor: number): PainelAdapter {
+export function criarClubAdapter(creds: ServidorCredenciais, _id: number, _onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const token = await getToken(creds);
+      const token = getToken(creds);
       const body = new URLSearchParams({ draw: "1", start: "0", length: "2000" });
       const data = await apiFetch(token, "listas/minhas", { method: "POST", body });
 
@@ -55,7 +44,7 @@ export function criarClubAdapter(creds: ServidorCredenciais, idServidor: number)
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
-      const token = await getToken(creds);
+      const token = getToken(creds);
 
       // Busca o ID interno da conta pelo username
       const lista = await apiFetch(token, "listas/minhas", {
@@ -75,11 +64,7 @@ export function criarClubAdapter(creds: ServidorCredenciais, idServidor: number)
       // Atualiza vencimento na tabela contas
       if (result.exp_date) {
         const novoVenc = new Date(Number(result.exp_date) * 1000).toISOString().slice(0, 10);
-        await pool.query(
-          `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = 'ok'
-           WHERE id_servidor = $2 AND usuario = $3`,
-          [novoVenc, idServidor, usuario]
-        );
+        await onSaveContas(usuario, novoVenc);
         return { ok: true, novoVencimento: novoVenc, comprovante: result.comprovante };
       }
 

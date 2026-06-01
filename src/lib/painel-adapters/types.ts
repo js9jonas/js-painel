@@ -18,6 +18,9 @@ export interface PainelAdapter {
   getCreditos?(): Promise<number | null>;
 }
 
+export type SaveSession = (cookie: string, expiry?: Date) => Promise<void>;
+export type SaveContaVencimento = (usuario: string, novoVenc: string) => Promise<void>;
+
 export interface ServidorCredenciais {
   painel_url: string;
   painel_usuario: string;

@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash } from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { pool } from "@/lib/db";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // UNITV (ResellerSystem) — https://panel-web.starhome.vip/
 // Cloudflare WAF: requer TLS impersonation Chrome120 via curl_cffi (Python).
@@ -65,7 +65,7 @@ async function callUnitvApi(session: UnitvSession, action: string, bodyObj: obje
   return JSON.parse(aesDecrypt(result.data));
 }
 
-export function criarUnitvAdapter(creds: ServidorCredenciais, idServidor: number): PainelAdapter {
+export function criarUnitvAdapter(creds: ServidorCredenciais, _id: number, _onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
   const session = parseSession(creds.session_cookie);
 
   if (!session) {
@@ -136,13 +136,7 @@ export function criarUnitvAdapter(creds: ServidorCredenciais, idServidor: number
       const updated = (updatedList.list ?? []).find((u: any) => u.sn === usuario);
       const novoVenc = updated?.expireTime ? updated.expireTime.slice(0, 10) : undefined;
 
-      if (novoVenc) {
-        await pool.query(
-          `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = 'ok'
-           WHERE id_servidor = $2 AND usuario = $3`,
-          [novoVenc, idServidor, usuario]
-        );
-      }
+      if (novoVenc) await onSaveContas(usuario, novoVenc);
 
       return { ok: true, novoVencimento: novoVenc };
     },

@@ -1,5 +1,4 @@
-import { pool } from "@/lib/db";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://api.painelcliente.com
 // Auth: token permanente na URL + secret no body JSON
@@ -32,7 +31,7 @@ function mapStatus(enabled: number, expDate: number): ContaPainel["status"] {
   return "ok";
 }
 
-export function criarFastAdapter(creds: ServidorCredenciais, idServidor: number): PainelAdapter {
+export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
   return {
     async listarContas(): Promise<ContaPainel[]> {
       const { token, secret } = getCredentials(creds);
@@ -62,13 +61,7 @@ export function criarFastAdapter(creds: ServidorCredenciais, idServidor: number)
         ? new Date(Number(data.exp_date) * 1000).toISOString().slice(0, 10)
         : undefined;
 
-      if (novoVenc) {
-        await pool.query(
-          `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = 'ok'
-           WHERE id_painel_servidor = $2 AND usuario = $3`,
-          [novoVenc, idServidor, usuario]
-        );
-      }
+      if (novoVenc) await onSaveContas(usuario, novoVenc);
 
       return { ok: true, novoVencimento: novoVenc };
     },

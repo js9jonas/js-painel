@@ -1,5 +1,4 @@
-import { pool } from "@/lib/db";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // Painel N (pnw7.cc) — PHP session, sem auto-login (reCAPTCHA obrigatório)
 // Sessão manual: Jonas loga no painel, PHPSESSID salvo em servidores.session_cookie
@@ -79,7 +78,7 @@ function buildDataTablesParams(length = 5000): URLSearchParams {
   return p;
 }
 
-export function criarNowAdapter(creds: ServidorCredenciais, idServidor: number): PainelAdapter {
+export function criarNowAdapter(creds: ServidorCredenciais, _id: number, _onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
   return {
     async listarContas(): Promise<ContaPainel[]> {
       const session = getSession(creds);
@@ -122,14 +121,7 @@ export function criarNowAdapter(creds: ServidorCredenciais, idServidor: number):
       const row = rows.find((r) => parseUsername(r[0]) === usuario);
       const novoVenc = row ? parseVencimento(row[3]) ?? undefined : undefined;
 
-      if (novoVenc) {
-        await pool.query(
-          `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = 'ok'
-           WHERE id_servidor = $2 AND usuario = $3`,
-          [novoVenc, idServidor, usuario]
-        );
-      }
-
+      if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
     },
   };

@@ -1,6 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { PainelServidorRow } from "@/lib/paineis";
+import AtualizarTokenModal from "./AtualizarTokenModal";
+
+const INSTRUCAO_TOKEN: Record<string, string> = {
+  club:    "Acesse dashboard.bz, abra DevTools (F12) → Application → Local Storage → X-ACCESS-TOKEN e cole aqui.",
+  central: "Acesse painel.fun, abra DevTools (F12) → Application → Local Storage → session-store → state.token e cole aqui.",
+  now:     "Acesse o painel NOW, abra DevTools (F12) → Application → Cookies → PHPSESSID. Cole o valor no formato: PHPSESSID=<valor>",
+  liebe:   "Acesse painel.liebeapp.me, abra DevTools (F12) → Application → Local Storage → token e cole aqui.",
+};
+
+const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);
 
 const TIPO_LABEL: Record<string, string> = {
   club:    "CLUB",
@@ -40,6 +50,7 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
+  const [modalToken, setModalToken] = useState(false);
 
   // Apenas painéis com token ativo ou sessão válida buscam status ao carregar
   const podeBuscarStatus =
@@ -178,6 +189,16 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
         <p className="text-xs text-zinc-500 bg-zinc-50 rounded px-3 py-2">{mensagem}</p>
       )}
 
+      {/* Botão atualizar token — só para painéis com sessão manual */}
+      {TIPOS_TOKEN_MANUAL.includes(painel.tipo) && (
+        <button
+          onClick={() => setModalToken(true)}
+          className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+        >
+          Atualizar token de sessão
+        </button>
+      )}
+
       {/* Ações */}
       <div className="flex gap-2 pt-1">
         <button
@@ -213,6 +234,16 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
           </a>
         )}
       </div>
+
+      {modalToken && (
+        <AtualizarTokenModal
+          painelNome={painel.nome}
+          painelId={painel.id}
+          instrucao={INSTRUCAO_TOKEN[painel.tipo] ?? "Cole o token de autenticação do painel."}
+          onClose={() => setModalToken(false)}
+          onSalvo={() => { setModalToken(false); buscarStatus(); }}
+        />
+      )}
     </div>
   );
 }

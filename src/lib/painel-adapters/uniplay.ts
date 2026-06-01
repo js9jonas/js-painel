@@ -1,5 +1,4 @@
-import { pool } from "@/lib/db";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://gesapioffice.com/api
 // Auth: JWT Bearer — auto-login (sem CAPTCHA, code:"" funciona)
@@ -39,17 +38,14 @@ async function login(usuario: string, senha: string): Promise<UniplaySession> {
   return { token: data.access_token, cryptPass: data.crypt_pass };
 }
 
-async function getSession(creds: ServidorCredenciais, idServidor: number): Promise<UniplaySession> {
+async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<UniplaySession> {
   if (creds.session_cookie && creds.session_expiry && new Date(creds.session_expiry) > new Date()) {
     const session = parseSession(creds.session_cookie);
     if (session) return session;
   }
   const session = await login(creds.painel_usuario, creds.painel_senha);
   const expiresAt = new Date(Date.now() + 5.5 * 60 * 60 * 1000); // 5.5h (token dura 6h)
-  await pool.query(
-    `UPDATE public.servidores SET session_cookie = $1, session_expiry = $2 WHERE id_servidor = $3`,
-    [JSON.stringify(session), expiresAt, idServidor]
-  );
+  await onSaveSession(JSON.stringify(session), expiresAt);
   return session;
 }
 
@@ -78,10 +74,10 @@ async function listarUsuarios(session: UniplaySession): Promise<any[]> {
   return Array.isArray(data) ? data : Object.values(data);
 }
 
-export function criarUniplayAdapter(creds: ServidorCredenciais, idServidor: number): PainelAdapter {
+export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const session = await getSession(creds, idServidor);
+      const session = await getSession(creds, onSaveSession);
       const users = await listarUsuarios(session);
       return users.map((u: any) => ({
         usuario: u.username,
@@ -94,7 +90,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, idServidor: numb
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
-      const session = await getSession(creds, idServidor);
+      const session = await getSession(creds, onSaveSession);
       const users = await listarUsuarios(session);
       const user = users.find((u: any) => u.username === usuario);
       if (!user) throw new Error(`UNIPLAY: usuário "${usuario}" não encontrado`);
@@ -111,14 +107,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, idServidor: numb
         ? new Date(updated.exp_date_timestamp * 1000).toISOString().slice(0, 10)
         : undefined;
 
-      if (novoVenc) {
-        await pool.query(
-          `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = 'ok'
-           WHERE id_servidor = $2 AND usuario = $3`,
-          [novoVenc, idServidor, usuario]
-        );
-      }
-
+      if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
     },
   };
