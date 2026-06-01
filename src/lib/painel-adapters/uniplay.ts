@@ -46,8 +46,12 @@ async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession
     const session = parseSession(creds.session_cookie);
     if (session) return session;
   }
-  const session = await login(creds.painel_usuario, creds.painel_senha);
-  const expiresAt = new Date(Date.now() + 5.5 * 60 * 60 * 1000); // 5.5h (token dura 6h)
+  return freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
+}
+
+async function freshLogin(onSaveSession: SaveSession, usuario: string, senha: string): Promise<UniplaySession> {
+  const session = await login(usuario, senha);
+  const expiresAt = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
   await onSaveSession(JSON.stringify(session), expiresAt);
   return session;
 }
@@ -73,8 +77,20 @@ function mapStatus(status: string, expTimestamp: number): ContaPainel["status"] 
   return "ok";
 }
 
-async function listarUsuarios(session: UniplaySession): Promise<any[]> {
+async function listarUsuarios(
+  session: UniplaySession,
+  onSaveSession: SaveSession,
+  creds: ServidorCredenciais,
+  jaRelogou = false
+): Promise<any[]> {
   const res = await authFetch(session.token, `users-iptv?reg_password=${encodeURIComponent(session.cryptPass)}`);
+
+  // Sessão stale (crypt_pass inválido) — força re-login uma vez
+  if ((res.status === 404 || res.status === 401) && !jaRelogou) {
+    const nova = await freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
+    return listarUsuarios(nova, onSaveSession, creds, true);
+  }
+
   if (!res.ok) throw new Error(`UNIPLAY users-iptv → ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data : Object.values(data);
@@ -88,10 +104,13 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
     if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
     return _sessionPromise;
   }
+  function listar(session: UniplaySession) {
+    return listarUsuarios(session, onSaveSession, creds);
+  }
   return {
     async listarContas(): Promise<ContaPainel[]> {
       const session = await obterSessao();
-      const users = await listarUsuarios(session);
+      const users = await listar(session);
       return users.map((u: any) => ({
         usuario: u.username,
         rotulo: u.nota || "",
@@ -104,7 +123,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
       const session = await obterSessao();
-      const users = await listarUsuarios(session);
+      const users = await listar(session);
       const user = users.find((u: any) => u.username === usuario);
       if (!user) throw new Error(`UNIPLAY: usuário "${usuario}" não encontrado`);
 
@@ -115,7 +134,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       if (!res.ok) throw new Error(`UNIPLAY renovar → ${res.status}`);
 
       // Buscar vencimento atualizado
-      const updated = (await listarUsuarios(session)).find((u: any) => u.username === usuario);
+      const updated = (await listar(session)).find((u: any) => u.username === usuario);
       const novoVenc = updated?.exp_date_timestamp
         ? new Date(updated.exp_date_timestamp * 1000).toISOString().slice(0, 10)
         : undefined;
