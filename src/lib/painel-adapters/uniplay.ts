@@ -27,8 +27,11 @@ function parseSession(cookie: string | null): UniplaySession | null {
 }
 
 async function login(usuario: string, senha: string): Promise<UniplaySession> {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 10_000);
   const res = await fetch(`${API_BASE}/login`, {
     method: "POST",
+    signal: controller.signal,
     headers: { "Content-Type": "application/json", ...ORIGIN_HEADERS },
     body: JSON.stringify({ username: usuario, password: senha, code: "" }),
   });
@@ -50,8 +53,11 @@ async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession
 }
 
 function authFetch(token: string, path: string, options: RequestInit = {}) {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 10_000);
   return fetch(`${API_BASE}/${path}`, {
     ...options,
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
