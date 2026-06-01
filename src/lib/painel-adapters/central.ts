@@ -7,8 +7,9 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 const API_BASE = "https://api.controle.fit/api";
 
 function getToken(creds: ServidorCredenciais): string {
-  if (creds.session_cookie && creds.session_expiry && new Date(creds.session_expiry) > new Date()) {
-    return creds.session_cookie;
+  if (creds.session_cookie) {
+    const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
+    if (!expirado) return creds.session_cookie;
   }
   throw new Error("Token CENTRAL expirado. Acesse painel.fun, copie o JWT e cole via botão 'Atualizar token'.");
 }

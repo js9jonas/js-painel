@@ -4,8 +4,9 @@ const API_URL = "https://pdcapi.io/";
 const LOGIN_URL = "https://dashboard.bz/ss.php";
 
 function getToken(creds: ServidorCredenciais): string {
-  if (creds.session_cookie && creds.session_expiry && new Date(creds.session_expiry) > new Date()) {
-    return creds.session_cookie;
+  if (creds.session_cookie) {
+    const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
+    if (!expirado) return creds.session_cookie;
   }
   throw new Error("Token CLUB expirado. Faça login manual no painel e cole o token via botão 'Atualizar token'.");
 }

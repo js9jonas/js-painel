@@ -42,9 +42,12 @@ async function login(usuario: string, senha: string): Promise<UniplaySession> {
 }
 
 async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<UniplaySession> {
-  if (creds.session_cookie && creds.session_expiry && new Date(creds.session_expiry) > new Date()) {
-    const session = parseSession(creds.session_cookie);
-    if (session) return session;
+  if (creds.session_cookie) {
+    const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
+    if (!expirado) {
+      const session = parseSession(creds.session_cookie);
+      if (session) return session;
+    }
   }
   return freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
 }
