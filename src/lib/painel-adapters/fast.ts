@@ -65,12 +65,23 @@ export function criarFastAdapter(creds: ServidorCredenciais, idServidor: number)
       if (novoVenc) {
         await pool.query(
           `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = 'ok'
-           WHERE id_servidor = $2 AND usuario = $3`,
+           WHERE id_painel_servidor = $2 AND usuario = $3`,
           [novoVenc, idServidor, usuario]
         );
       }
 
       return { ok: true, novoVencimento: novoVenc };
+    },
+
+    async getCreditos(): Promise<number | null> {
+      const { token, secret } = getCredentials(creds);
+      try {
+        const data = await apiFetch(token, "profile", { secret });
+        const valor = data?.credits ?? data?.credit ?? data?.saldo ?? null;
+        return valor !== null ? Number(valor) : null;
+      } catch {
+        return null;
+      }
     },
   };
 }

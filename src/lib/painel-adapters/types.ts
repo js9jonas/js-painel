@@ -15,6 +15,7 @@ export interface ResultadoRenovacao {
 export interface PainelAdapter {
   listarContas(): Promise<ContaPainel[]>;
   renovar(usuario: string, meses: number): Promise<ResultadoRenovacao>;
+  getCreditos?(): Promise<number | null>;
 }
 
 export interface ServidorCredenciais {

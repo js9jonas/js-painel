@@ -50,8 +50,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NavDropdown
               label="📡 IPTV"
               items={[
+                { href: '/conexoes', label: '🔌 Conexões' },
                 { href: '/teste-listas', label: '📡 Servidores' },
-                { href: '/servidores/vinculacao', label: '🔗 Vinculação' },
                 { href: '/planos', label: '📋 Planos e Pacotes' },
                 { href: '/player', label: '▶ Player' },
               ]}
