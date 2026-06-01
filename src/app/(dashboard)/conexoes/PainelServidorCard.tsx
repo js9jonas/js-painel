@@ -52,9 +52,12 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [carregandoStatus, setCarregandoStatus] = useState(false);
   const [modalToken, setModalToken] = useState(false);
 
-  // Apenas painéis com token ativo ou sessão válida buscam status ao carregar
+  // Tipos com auto-login: buscam status mesmo sem sessão salva no banco
+  const TIPOS_AUTO_LOGIN = ["uniplay"];
+
   const podeBuscarStatus =
     painel.tem_api_token ||
+    TIPOS_AUTO_LOGIN.includes(painel.tipo) ||
     (painel.tem_session &&
       (!painel.session_expiry || new Date(painel.session_expiry) > new Date()));
 
