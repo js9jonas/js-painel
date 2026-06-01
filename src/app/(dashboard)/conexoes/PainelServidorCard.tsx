@@ -8,7 +8,7 @@ const INSTRUCAO_TOKEN: Record<string, string> = {
   central: "Acesse painel.fun, abra DevTools (F12) → Application → Local Storage → session-store → state.token e cole aqui.",
   now:     "Acesse o painel NOW, abra DevTools (F12) → Application → Cookies → PHPSESSID. Cole o valor no formato: PHPSESSID=<valor>",
   liebe:   "Acesse painel.liebeapp.me, abra DevTools (F12) → Application → Local Storage → token e cole aqui.",
-  uniplay: "Acesse searchdefense.top, abra DevTools (F12) → Network → filtre por 'users-iptv' → clique na requisição → em Headers copie o valor de Authorization (sem 'Bearer ') e em URL copie o valor de reg_password. Cole aqui no formato JSON: {\"token\":\"eyJ...\",\"cryptPass\":\"<reg_password>\"}",
+  uniplay: "Acesse searchdefense.top logado → F12 → Network → filtre 'users-iptv' → clique na requisição → copie Authorization (sem 'Bearer ') no 1º campo e o valor de reg_password da URL no 2º campo.",
 };
 
 const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);
@@ -243,6 +243,7 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
         <AtualizarTokenModal
           painelNome={painel.nome}
           painelId={painel.id}
+          painelTipo={painel.tipo}
           instrucao={INSTRUCAO_TOKEN[painel.tipo] ?? "Cole o token de autenticação do painel."}
           onClose={() => setModalToken(false)}
           onSalvo={() => { setModalToken(false); buscarStatus(); }}
