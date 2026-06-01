@@ -123,7 +123,7 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
           {/* Créditos — só aparece quando disponível */}
           {aoVivo?.creditos !== undefined && aoVivo.creditos !== null && (
             <span className="text-xs font-semibold text-zinc-700">
-              R$ {aoVivo.creditos.toFixed(2).replace(".", ",")}
+              {aoVivo.creditos.toFixed(1).replace(".", ",")} créditos
             </span>
           )}
         </div>
