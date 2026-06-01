@@ -8,6 +8,7 @@ const INSTRUCAO_TOKEN: Record<string, string> = {
   central: "Acesse painel.fun, abra DevTools (F12) → Application → Local Storage → session-store → state.token e cole aqui.",
   now:     "Acesse o painel NOW, abra DevTools (F12) → Application → Cookies → PHPSESSID. Cole o valor no formato: PHPSESSID=<valor>",
   liebe:   "Acesse painel.liebeapp.me, abra DevTools (F12) → Application → Local Storage → token e cole aqui.",
+  uniplay: "Acesse searchdefense.top, abra DevTools (F12) → Network → filtre por 'users-iptv' → clique na requisição → em Headers copie o valor de Authorization (sem 'Bearer ') e em URL copie o valor de reg_password. Cole aqui no formato JSON: {\"token\":\"eyJ...\",\"cryptPass\":\"<reg_password>\"}",
 };
 
 const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);
@@ -53,7 +54,7 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [modalToken, setModalToken] = useState(false);
 
   // Tipos com auto-login: buscam status mesmo sem sessão salva no banco
-  const TIPOS_AUTO_LOGIN = ["uniplay"];
+  const TIPOS_AUTO_LOGIN: string[] = []; // uniplay removido: login bloqueado por IP na VPS
 
   const podeBuscarStatus =
     painel.tem_api_token ||
