@@ -110,5 +110,17 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
     },
+
+    async getCreditos(): Promise<number | null> {
+      try {
+        const session = await getSession(creds, onSaveSession);
+        const res = await authFetch(session.token, "dash-reseller");
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.credits != null ? parseFloat(data.credits) : null;
+      } catch {
+        return null;
+      }
+    },
   };
 }
