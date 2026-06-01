@@ -75,9 +75,16 @@ async function listarUsuarios(session: UniplaySession): Promise<any[]> {
 }
 
 export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
+  // Cache da sessão dentro do ciclo de vida do adapter (uma request = uma instância)
+  // Evita dois logins simultâneos quando listarContas() e getCreditos() rodam em paralelo
+  let _sessionPromise: Promise<UniplaySession> | null = null;
+  function obterSessao(): Promise<UniplaySession> {
+    if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
+    return _sessionPromise;
+  }
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const session = await getSession(creds, onSaveSession);
+      const session = await obterSessao();
       const users = await listarUsuarios(session);
       return users.map((u: any) => ({
         usuario: u.username,
@@ -90,7 +97,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
-      const session = await getSession(creds, onSaveSession);
+      const session = await obterSessao();
       const users = await listarUsuarios(session);
       const user = users.find((u: any) => u.username === usuario);
       if (!user) throw new Error(`UNIPLAY: usuário "${usuario}" não encontrado`);
@@ -113,7 +120,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
 
     async getCreditos(): Promise<number | null> {
       try {
-        const session = await getSession(creds, onSaveSession);
+        const session = await obterSessao();
         const res = await authFetch(session.token, "dash-reseller");
         if (!res.ok) return null;
         const data = await res.json();
