@@ -38,8 +38,6 @@ async function loginViaBrowser(usuario: string, senha: string): Promise<string> 
   // Import dinâmico para não quebrar bundling do webpack
   const { chromium } = await import("playwright");
 
-  const proxyUrl = process.env.UNIPLAY_PROXY_URL;
-
   const browser = await chromium.launch({
     executablePath: resolverChromium(),
     headless: true,
@@ -47,8 +45,20 @@ async function loginViaBrowser(usuario: string, senha: string): Promise<string> 
   });
 
   try {
+    // Playwright exige credenciais separadas da URL do servidor
+    const proxyConfig = (() => {
+      const raw = process.env.UNIPLAY_PROXY_URL;
+      if (!raw) return undefined;
+      const u = new URL(raw);
+      return {
+        server:   `${u.protocol}//${u.host}`,
+        username: u.username || undefined,
+        password: u.password || undefined,
+      };
+    })();
+
     const ctx = await browser.newContext(
-      proxyUrl ? { proxy: { server: proxyUrl } } : {}
+      proxyConfig ? { proxy: proxyConfig } : {}
     );
     const page = await ctx.newPage();
 
