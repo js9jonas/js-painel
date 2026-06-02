@@ -42,7 +42,7 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
         usuario: c.username,
         rotulo: c.reseller_notes || "",
         vencimento: c.exp_date
-          ? new Date(Number(c.exp_date) * 1000).toISOString().slice(0, 10)
+          ? new Date(Number(c.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
           : null,
         status: mapStatus(c.enabled ?? 1, c.exp_date ?? 0),
       }));
@@ -58,7 +58,7 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
       });
 
       const novoVenc = data?.exp_date
-        ? new Date(Number(data.exp_date) * 1000).toISOString().slice(0, 10)
+        ? new Date(Number(data.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
         : undefined;
 
       if (novoVenc) await onSaveContas(usuario, novoVenc);

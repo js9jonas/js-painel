@@ -62,7 +62,7 @@ export function criarCentralAdapter(creds: ServidorCredenciais, _id: number, _on
         usuario: u.username,
         rotulo: u.reseller_notes || u.full_name || "",
         vencimento: u.exp_date
-          ? new Date(Number(u.exp_date) * 1000).toISOString().slice(0, 10)
+          ? new Date(Number(u.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
           : null,
         status: mapStatus(u.enabled ?? 1, u.exp_date ?? 0),
       }));
@@ -98,7 +98,7 @@ export function criarCentralAdapter(creds: ServidorCredenciais, _id: number, _on
       });
 
       const novoVenc = result.exp_date
-        ? new Date(Number(result.exp_date) * 1000).toISOString().slice(0, 10)
+        ? new Date(Number(result.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
         : undefined;
 
       if (novoVenc) await onSaveContas(usuario, novoVenc);

@@ -118,7 +118,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
         usuario: u.username,
         rotulo: u.nota || "",
         vencimento: u.exp_date_timestamp
-          ? new Date(u.exp_date_timestamp * 1000).toISOString().slice(0, 10)
+          ? new Date(u.exp_date_timestamp * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
           : null,
         status: mapStatus(u.status, u.exp_date_timestamp ?? 0),
       }));
@@ -138,7 +138,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
 
       const updated = (await listar(session)).find((u: any) => u.username === usuario);
       const novoVenc = updated?.exp_date_timestamp
-        ? new Date(updated.exp_date_timestamp * 1000).toISOString().slice(0, 10)
+        ? new Date(updated.exp_date_timestamp * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
         : undefined;
 
       if (novoVenc) await onSaveContas(usuario, novoVenc);

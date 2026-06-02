@@ -39,7 +39,7 @@ export function criarClubAdapter(creds: ServidorCredenciais, _id: number, _onSav
       return (data.data ?? []).map((l: any) => ({
         usuario: l.username,
         rotulo: l.reseller_notes || "",
-        vencimento: l.exp_date ? new Date(Number(l.exp_date) * 1000).toISOString().slice(0, 10) : null,
+        vencimento: l.exp_date ? new Date(Number(l.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) : null,
         status: mapStatus(l.status),
       }));
     },
@@ -64,7 +64,7 @@ export function criarClubAdapter(creds: ServidorCredenciais, _id: number, _onSav
 
       // Atualiza vencimento na tabela contas
       if (result.exp_date) {
-        const novoVenc = new Date(Number(result.exp_date) * 1000).toISOString().slice(0, 10);
+        const novoVenc = new Date(Number(result.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
         await onSaveContas(usuario, novoVenc);
         return { ok: true, novoVencimento: novoVenc, comprovante: result.comprovante };
       }
