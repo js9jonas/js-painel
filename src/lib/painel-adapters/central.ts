@@ -12,7 +12,10 @@ async function loginViaBrowser(usuario: string, senha: string): Promise<string> 
 
   const proxyUrl = process.env.UNIPLAY_PROXY_URL;
 
+  // executablePath: usa o Chromium instalado via nix (sem download separado)
+  const executablePath = process.env.CHROMIUM_PATH || "chromium";
   const browser = await chromium.launch({
+    executablePath,
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
