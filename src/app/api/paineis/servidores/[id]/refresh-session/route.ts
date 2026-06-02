@@ -41,7 +41,7 @@ export async function POST(
       timeout: 20_000,
       encoding: "utf8",
     } as any);
-    resultado = JSON.parse((stdout as string).trim());
+    resultado = JSON.parse((stdout as unknown as string).trim());
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Erro ao executar script.";
     return NextResponse.json({ erro: msg }, { status: 500 });
