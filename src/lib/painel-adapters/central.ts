@@ -41,25 +41,20 @@ async function loginViaBrowser(usuario: string, senha: string): Promise<string> 
   const browser = await chromium.launch({
     executablePath: resolverChromium(),
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-zygote",
+      "--disable-software-rasterizer",
+      "--disable-extensions",
+    ],
   });
 
   try {
-    // Playwright exige credenciais separadas da URL do servidor
-    const proxyConfig = (() => {
-      const raw = process.env.UNIPLAY_PROXY_URL;
-      if (!raw) return undefined;
-      const u = new URL(raw);
-      return {
-        server:   `${u.protocol}//${u.host}`,
-        username: u.username || undefined,
-        password: u.password || undefined,
-      };
-    })();
-
-    const ctx = await browser.newContext(
-      proxyConfig ? { proxy: proxyConfig } : {}
-    );
+    // Sem proxy — painel.fun não bloqueia IP de datacenter (diferente de UNIPLAY)
+    const ctx = await browser.newContext();
     const page = await ctx.newPage();
 
     await page.goto("https://painel.fun/login", {
