@@ -14,29 +14,20 @@ async function resolverHCaptcha(): Promise<string> {
   const apiKey = process.env.TWOCAPTCHA_API_KEY;
   if (!apiKey) throw new Error("TWOCAPTCHA_API_KEY não definida no Easypanel.");
 
-  const proxy = process.env.UNIPLAY_PROXY_URL;
-  if (!proxy) throw new Error("UNIPLAY_PROXY_URL não definida (necessária para hCaptcha).");
-
-  const u = new URL(proxy);
-
   let ultimoErro = "";
 
-  // Tenta até 6 vezes — workers do 2captcha falham ~2/3 das vezes neste challenge
-  for (let tentativa = 1; tentativa <= 6; tentativa++) {
+  // Tenta até 10 vezes sem proxy — workers falham ~66% das vezes neste challenge
+  // P(falhar todas) = 0.66^10 ≈ 1.8%
+  for (let tentativa = 1; tentativa <= 10; tentativa++) {
     const criacao = await fetch("https://api.2captcha.com/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientKey: apiKey,
         task: {
-          type: "HCaptchaTask",
+          type: "HCaptchaTaskProxyless",
           websiteURL: WEBSITE_URL,
           websiteKey: SITEKEY,
-          proxyType: "http",
-          proxyAddress: u.hostname,
-          proxyPort: parseInt(u.port),
-          proxyLogin: u.username,
-          proxyPassword: u.password,
         },
       }),
     }).then(r => r.json()) as any;
@@ -63,7 +54,7 @@ async function resolverHCaptcha(): Promise<string> {
       }
     }
   }
-  throw new Error(`CLUB: hCaptcha não resolvido após 6 tentativas. Último erro: ${ultimoErro}`);
+  throw new Error(`CLUB: hCaptcha não resolvido após 10 tentativas. Último erro: ${ultimoErro}`);
 }
 
 async function loginViaCaptcha(usuario: string, senha: string): Promise<string> {
