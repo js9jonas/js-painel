@@ -1,23 +1,108 @@
+import { Impit } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
-const API_URL = "https://pdcapi.io/";
-const LOGIN_URL = "https://dashboard.bz/ss.php";
+// API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
+// Login: 2captcha (HCaptchaTask+proxy) → POST pdcapi.io/login (URL-encoded)
+// hCaptcha sitekey dashboard.bz: 8cf2ef3e-6e60-456a-86ca-6f2c855c3a06
 
-function getToken(creds: ServidorCredenciais): string {
+const API_URL     = "https://pdcapi.io/";
+const WEBSITE_URL = "https://dashboard.bz/login.php";
+const SITEKEY     = "8cf2ef3e-6e60-456a-86ca-6f2c855c3a06";
+const impit       = new Impit({ browser: "chrome" });
+
+async function resolverHCaptcha(): Promise<string> {
+  const apiKey = process.env.TWOCAPTCHA_API_KEY;
+  if (!apiKey) throw new Error("TWOCAPTCHA_API_KEY não definida no Easypanel.");
+
+  const proxy = process.env.UNIPLAY_PROXY_URL;
+  if (!proxy) throw new Error("UNIPLAY_PROXY_URL não definida (necessária para hCaptcha).");
+
+  const u = new URL(proxy);
+
+  // Tenta até 6 vezes — workers do 2captcha falham ~2/3 das vezes neste challenge
+  for (let tentativa = 1; tentativa <= 6; tentativa++) {
+    const { taskId, errorId, errorDescription } = await fetch("https://api.2captcha.com/createTask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientKey: apiKey,
+        task: {
+          type: "HCaptchaTask",
+          websiteURL: WEBSITE_URL,
+          websiteKey: SITEKEY,
+          proxyType: "http",
+          proxyAddress: u.hostname,
+          proxyPort: parseInt(u.port),
+          proxyLogin: u.username,
+          proxyPassword: u.password,
+        },
+      }),
+    }).then(r => r.json()) as any;
+
+    if (errorId) continue;
+
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 5000));
+      const result = await fetch("https://api.2captcha.com/getTaskResult", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientKey: apiKey, taskId }),
+      }).then(r => r.json()) as any;
+
+      if (result.status === "ready") return result.solution.gRecaptchaResponse as string;
+      if (result.errorId) break;
+    }
+  }
+  throw new Error("CLUB: não foi possível resolver o hCaptcha após 6 tentativas.");
+}
+
+async function loginViaCaptcha(usuario: string, senha: string): Promise<string> {
+  const hcapToken = await resolverHCaptcha();
+
+  const res = await impit.fetch(`${API_URL}login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Requested-With": "XMLHttpRequest",
+      "Origin": "https://dashboard.bz",
+      "Referer": "https://dashboard.bz/login.php",
+    },
+    body: new URLSearchParams({
+      username: usuario,
+      password: senha,
+      email: "",
+      "g-recaptcha-response": hcapToken,
+      "h-captcha-response": hcapToken,
+    }).toString(),
+  });
+
+  if (!res.ok) throw new Error(`CLUB login → ${res.status}`);
+  const data = await res.json() as any;
+  if (!data.result || !data.token) {
+    throw new Error(`CLUB login falhou: ${data.msg ?? JSON.stringify(data)}`);
+  }
+  return data.token as string;
+}
+
+async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<string> {
   if (creds.session_cookie) {
     const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
     if (!expirado) return creds.session_cookie;
   }
-  throw new Error("Token CLUB expirado. Faça login manual no painel e cole o token via botão 'Atualizar token'.");
+  return freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
+}
+
+async function freshLogin(usuario: string, senha: string, onSaveSession: SaveSession): Promise<string> {
+  const token = await loginViaCaptcha(usuario, senha);
+  // Token dura ~7 dias — salva com 6 dias de margem
+  await onSaveSession(token, new Date(Date.now() + 6 * 24 * 60 * 60 * 1000));
+  return token;
 }
 
 async function apiFetch(token: string, path: string, options: RequestInit = {}) {
   const res = await fetch(API_URL + path, {
     ...options,
-    headers: {
-      "X-ACCESS-TOKEN": token,
-      ...(options.headers ?? {}),
-    },
+    headers: { "X-ACCESS-TOKEN": token, ...(options.headers ?? {}) },
   });
   if (!res.ok) throw new Error(`pdcapi.io/${path} → ${res.status}`);
   return res.json();
@@ -29,46 +114,67 @@ function mapStatus(s: string | number): ContaPainel["status"] {
   return "vencida";
 }
 
-export function criarClubAdapter(creds: ServidorCredenciais, _id: number, _onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
+export function criarClubAdapter(
+  creds: ServidorCredenciais,
+  _id: number,
+  onSaveSession: SaveSession,
+  onSaveContas: SaveContaVencimento
+): PainelAdapter {
+  let _sessionPromise: Promise<string> | null = null;
+
+  function obterToken(): Promise<string> {
+    if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
+    return _sessionPromise;
+  }
+
+  async function fetchComRetry(path: string, options: RequestInit = {}): Promise<any> {
+    const token = await obterToken();
+    try {
+      return await apiFetch(token, path, options);
+    } catch (err: any) {
+      if (err.message?.includes("401") || err.message?.includes("403")) {
+        _sessionPromise = freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
+        return apiFetch(await _sessionPromise, path, options);
+      }
+      throw err;
+    }
+  }
+
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const token = getToken(creds);
-      const body = new URLSearchParams({ draw: "1", start: "0", length: "2000" });
-      const data = await apiFetch(token, "listas/minhas", { method: "POST", body });
-
+      const data = await fetchComRetry("listas/minhas", {
+        method: "POST",
+        body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
+      });
       return (data.data ?? []).map((l: any) => ({
         usuario: l.username,
         rotulo: l.reseller_notes || "",
-        vencimento: l.exp_date ? new Date(Number(l.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) : null,
+        vencimento: l.exp_date
+          ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+          : null,
         status: mapStatus(l.status),
       }));
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
-      const token = getToken(creds);
-
-      // Busca o ID interno da conta pelo username
-      const lista = await apiFetch(token, "listas/minhas", {
+      const lista = await fetchComRetry("listas/minhas", {
         method: "POST",
         body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
       });
       const conta = (lista.data ?? []).find((l: any) => l.username === usuario);
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CLUB.` };
 
-      const body = new URLSearchParams({ tempo: String(meses) });
-      const result = await apiFetch(token, `listas/${conta.id}/renovar`, { method: "POST", body });
+      const result = await fetchComRetry(`listas/${conta.id}/renovar`, {
+        method: "POST",
+        body: new URLSearchParams({ tempo: String(meses) }),
+      });
+      if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao renovar no CLUB." };
 
-      if (!result.result) {
-        return { ok: false, erro: result.msg ?? "Erro ao renovar no CLUB." };
-      }
-
-      // Atualiza vencimento na tabela contas
       if (result.exp_date) {
-        const novoVenc = new Date(Number(result.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+        const novoVenc = new Date(Number(result.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
         await onSaveContas(usuario, novoVenc);
-        return { ok: true, novoVencimento: novoVenc, comprovante: result.comprovante };
+        return { ok: true, novoVencimento: novoVenc };
       }
-
       return { ok: true };
     },
   };
