@@ -14,6 +14,8 @@ export type ContaVinculacaoAssinatura = {
   nome_painel: string;
   tipo_painel: string;
   id_assinatura: number | null;
+  id_cliente_vinculado: number | null;
+  nome_cliente_vinculado: string | null;
   sugestao_id_assinatura: number | null;
   sugestao_id_cliente: number | null;
   sugestao_nome_cliente: string | null;
@@ -32,12 +34,21 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
       ps.nome       AS nome_painel,
       ps.tipo       AS tipo_painel,
       c.id_assinatura,
+      vinculo.id_cliente  AS id_cliente_vinculado,
+      vinculo.nome        AS nome_cliente_vinculado,
       best.id_assinatura  AS sugestao_id_assinatura,
       best.id_cliente     AS sugestao_id_cliente,
       best.nome_cliente   AS sugestao_nome_cliente,
       best.score::float   AS score
     FROM public.contas c
     JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
+    LEFT JOIN LATERAL (
+      SELECT cl2.id_cliente, cl2.nome
+      FROM public.assinaturas a2
+      JOIN public.clientes cl2 ON cl2.id_cliente = a2.id_cliente
+      WHERE a2.id_assinatura = c.id_assinatura
+      LIMIT 1
+    ) vinculo ON c.id_assinatura IS NOT NULL
     LEFT JOIN LATERAL (
       SELECT
         a.id_assinatura,

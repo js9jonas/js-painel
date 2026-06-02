@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   vincularContaAssinatura,
   desvincularContaAssinatura,
@@ -266,9 +267,12 @@ export default function VinculacaoAssinaturaClient({
                             onDone={() => { setVinculandoId(null); router.refresh(); }}
                           />
                         ) : c.id_assinatura ? (
-                          <span className="text-sm font-medium text-emerald-700">
-                            Vinculada #{c.id_assinatura}
-                          </span>
+                          <Link
+                            href={`/clientes/${c.id_cliente_vinculado}`}
+                            className="text-sm font-medium text-emerald-700 hover:underline"
+                          >
+                            {c.nome_cliente_vinculado ?? `Assinatura #${c.id_assinatura}`}
+                          </Link>
                         ) : c.sugestao_id_assinatura ? (
                           <SugestaoInline
                             conta={c}

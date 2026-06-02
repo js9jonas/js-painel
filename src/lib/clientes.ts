@@ -51,6 +51,8 @@ export type AssinaturaRow = {
   plano_meses: number | null;
   plano_valor: string | null;
   plano_descricao: string | null;
+  tem_vinculo_painel: boolean;
+  nome_painel_vinculado: string | null;
 };
 
 export type PagamentoRow = {
@@ -344,7 +346,13 @@ export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaR
       pl.telas::int         AS plano_telas,
       pl.meses::int         AS plano_meses,
       pl.valor::text        AS plano_valor,
-      pl.descricao::text    AS plano_descricao
+      pl.descricao::text    AS plano_descricao,
+      EXISTS (
+        SELECT 1 FROM public.contas c WHERE c.id_assinatura = a.id_assinatura
+      ) AS tem_vinculo_painel,
+      (SELECT ps.nome FROM public.contas c
+       JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
+       WHERE c.id_assinatura = a.id_assinatura LIMIT 1) AS nome_painel_vinculado
     FROM public.assinaturas a
     LEFT JOIN public.pacote p  ON p.id_pacote = a.id_pacote
     LEFT JOIN public.planos pl ON pl.id_plano  = a.id_plano

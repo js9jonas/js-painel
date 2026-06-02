@@ -244,9 +244,14 @@ export default async function ClienteDetalhePage({ params }: Props) {
               </div>
               <div>
                 <div className="text-xs text-zinc-500">Pacote</div>
-                <div className="font-medium text-zinc-900">
+                <div className="font-medium text-zinc-900 flex items-center gap-1.5">
                   {ativa.pacote_contrato ?? <span className="text-zinc-400">--</span>}
                   {ativa.pacote_telas ? <span className="text-zinc-500 font-normal"> · {ativa.pacote_telas}t</span> : null}
+                  {ativa.tem_vinculo_painel && (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700" title={`Vinculada ao painel ${ativa.nome_painel_vinculado}`}>
+                      🔗 {ativa.nome_painel_vinculado}
+                    </span>
+                  )}
                 </div>
               </div>
               <div>
@@ -338,10 +343,15 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <td className="px-3 py-2 text-zinc-700">{a.venc_contas ? a.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}</td>
                   <td className="px-3 py-2 text-zinc-700">{a.identificacao ?? "--"}</td>
                   <td className="px-3 py-2">
-                    {a.pacote_contrato ?? "--"}
-                    {a.pacote_telas ? (
-                      <span className="text-zinc-500"> · {a.pacote_telas}t</span>
-                    ) : null}
+                    <span className="flex items-center gap-1.5 flex-wrap">
+                      {a.pacote_contrato ?? "--"}
+                      {a.pacote_telas ? <span className="text-zinc-500"> · {a.pacote_telas}t</span> : null}
+                      {a.tem_vinculo_painel && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700" title={`Vinculada ao painel ${a.nome_painel_vinculado}`}>
+                          🔗 {a.nome_painel_vinculado}
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-3 py-2">
                     {a.plano_tipo ?? "--"}
