@@ -171,6 +171,26 @@ export function criarClubAdapter(
       }));
     },
 
+    async getCreditos(): Promise<number | null> {
+      try {
+        const token = obterToken();
+        const res = await impit.fetch(`${API_URL}stats`, {
+          method: "GET",
+          headers: {
+            "X-ACCESS-TOKEN": token,
+            "X_FILTRO": "1",
+            "Origin": "https://dashboard.bz",
+            "Referer": "https://dashboard.bz/",
+          },
+        });
+        if (!res.ok) return null;
+        const data = await res.json() as any;
+        return data?.data?.credits != null ? parseFloat(data.data.credits) : null;
+      } catch {
+        return null;
+      }
+    },
+
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
       const lista = await fetchComRetry("listas/minhas", {
         method: "POST",
