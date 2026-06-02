@@ -1,4 +1,4 @@
-import { Impit } from "impit";
+import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
@@ -111,10 +111,16 @@ function getSession(creds: ServidorCredenciais): string {
   throw new Error("CLUB: sessão expirada. Clique em 'Renovar Sessão' no card.");
 }
 
-async function apiFetch(token: string, path: string, options: RequestInit = {}) {
-  const res = await fetch(API_URL + path, {
-    ...options,
-    headers: { "X-ACCESS-TOKEN": token, ...(options.headers ?? {}) },
+async function apiFetch(token: string, path: string, options: { method?: HttpMethod; body?: URLSearchParams | string } = {}) {
+  const res = await impit.fetch(API_URL + path, {
+    method: options.method ?? "GET",
+    body: options.body instanceof URLSearchParams ? options.body.toString() : options.body,
+    headers: {
+      "X-ACCESS-TOKEN": token,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Origin": "https://dashboard.bz",
+      "Referer": "https://dashboard.bz/",
+    },
   });
   if (!res.ok) throw new Error(`pdcapi.io/${path} → ${res.status}`);
   return res.json();
@@ -136,7 +142,7 @@ export function criarClubAdapter(
     return getSession(creds);
   }
 
-  async function fetchComRetry(path: string, options: RequestInit = {}): Promise<any> {
+  async function fetchComRetry(path: string, options: { method?: HttpMethod; body?: URLSearchParams | string } = {}): Promise<any> {
     const token = obterToken();
     try {
       return await apiFetch(token, path, options);
