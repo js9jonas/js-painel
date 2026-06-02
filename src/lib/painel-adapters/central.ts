@@ -1,3 +1,5 @@
+import { execSync } from "child_process";
+import { existsSync } from "fs";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://api.controle.fit/api
@@ -6,16 +8,40 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 
 const API_BASE = "https://api.controle.fit/api";
 
+function resolverChromium(): string {
+  // 1. Override manual via env var (Easypanel → Variáveis de ambiente)
+  if (process.env.CHROMIUM_PATH && existsSync(process.env.CHROMIUM_PATH)) {
+    return process.env.CHROMIUM_PATH;
+  }
+  // 2. Buscar via which (resolve para caminho absoluto)
+  for (const nome of ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome"]) {
+    try {
+      const caminho = execSync(`which ${nome} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
+      if (caminho && existsSync(caminho)) return caminho;
+    } catch {}
+  }
+  // 3. Caminhos conhecidos em containers nix/linux
+  for (const p of [
+    "/root/.nix-profile/bin/chromium",
+    "/nix/var/nix/profiles/default/bin/chromium",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ]) {
+    if (existsSync(p)) return p;
+  }
+  throw new Error(
+    "Chromium não encontrado. Defina CHROMIUM_PATH no Easypanel com o caminho completo do executável."
+  );
+}
+
 async function loginViaBrowser(usuario: string, senha: string): Promise<string> {
   // Import dinâmico para não quebrar bundling do webpack
   const { chromium } = await import("playwright");
 
   const proxyUrl = process.env.UNIPLAY_PROXY_URL;
 
-  // executablePath: usa o Chromium instalado via nix (sem download separado)
-  const executablePath = process.env.CHROMIUM_PATH || "chromium";
   const browser = await chromium.launch({
-    executablePath,
+    executablePath: resolverChromium(),
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
