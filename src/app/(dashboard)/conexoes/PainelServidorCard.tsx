@@ -207,7 +207,9 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
                 setMensagem("Sessão renovada. Atualizando status...");
                 await buscarStatus();
               } else {
-                setMensagem(`Erro: ${json.erro ?? json.error ?? "falha ao renovar"} ${json.detalhe ? `— ${JSON.stringify(json.detalhe)}` : ""}`);
+                const detalhe = json.detalhe ? ` — ${JSON.stringify(json.detalhe)}` : "";
+                const errStderr = json.stderr ? ` [stderr: ${json.stderr.slice(0, 200)}]` : "";
+                setMensagem(`Erro: ${json.erro ?? json.error ?? "falha ao renovar"}${detalhe}${errStderr}`);
               }
             } catch {
               setMensagem("Erro de rede.");

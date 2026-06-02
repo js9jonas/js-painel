@@ -5,21 +5,25 @@ Testa se o IP da VPS passa quando o fingerprint é de browser real.
 
 Stdin:  JSON { usuario, senha }
 Stdout: JSON { ok, token, cryptPass } | { ok: false, error }
+
+Sempre sai com código 0 para que execFileAsync não jogue exceção —
+o chamador verifica o campo "ok" do JSON.
 """
 import sys, json
 
 def main():
     try:
-        req = json.load(sys.stdin)
+        raw = sys.stdin.read()
+        req = json.loads(raw)
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"stdin parse error: {e}"}))
-        sys.exit(1)
+        print(json.dumps({"ok": False, "error": f"stdin parse error: {e}"}), flush=True)
+        sys.exit(0)
 
     try:
         from curl_cffi import requests as cffi_req
-    except ImportError:
-        print(json.dumps({"ok": False, "error": "curl_cffi não instalado"}))
-        sys.exit(1)
+    except ImportError as e:
+        print(json.dumps({"ok": False, "error": f"curl_cffi não instalado: {e}"}), flush=True)
+        sys.exit(0)
 
     usuario = req.get("usuario", "")
     senha   = req.get("senha", "")
@@ -38,26 +42,27 @@ def main():
             timeout=15,
         )
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"request error: {e}"}))
-        sys.exit(1)
+        print(json.dumps({"ok": False, "error": f"request error: {e}"}), flush=True)
+        sys.exit(0)
 
     if resp.status_code != 200:
-        print(json.dumps({"ok": False, "error": f"login falhou: {resp.status_code}", "body": resp.text[:300]}))
-        sys.exit(1)
+        print(json.dumps({"ok": False, "error": f"login falhou: {resp.status_code}", "body": resp.text[:300]}), flush=True)
+        sys.exit(0)
 
     try:
         data = resp.json()
     except Exception:
-        print(json.dumps({"ok": False, "error": "resposta não é JSON", "body": resp.text[:300]}))
-        sys.exit(1)
+        print(json.dumps({"ok": False, "error": "resposta não é JSON", "body": resp.text[:300]}), flush=True)
+        sys.exit(0)
 
     token      = data.get("access_token")
     crypt_pass = data.get("crypt_pass")
 
     if not token:
-        print(json.dumps({"ok": False, "error": "access_token ausente", "data": data}))
-        sys.exit(1)
+        print(json.dumps({"ok": False, "error": "access_token ausente", "data": data}), flush=True)
+        sys.exit(0)
 
-    print(json.dumps({"ok": True, "token": token, "cryptPass": crypt_pass}))
+    print(json.dumps({"ok": True, "token": token, "cryptPass": crypt_pass}), flush=True)
+    sys.exit(0)
 
 main()

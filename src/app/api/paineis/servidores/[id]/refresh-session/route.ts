@@ -1,11 +1,36 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import path from "path";
 import { pool } from "@/lib/db";
 
-const execFileAsync = promisify(execFile);
+function runPython(scriptPath: string, stdinData: string, timeoutMs: number): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  return new Promise((resolve) => {
+    const proc = spawn("python3", [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (d) => { stdout += d.toString(); });
+    proc.stderr.on("data", (d) => { stderr += d.toString(); });
+    proc.stdin.write(stdinData);
+    proc.stdin.end();
+
+    const timer = setTimeout(() => {
+      proc.kill();
+      resolve({ stdout, stderr: stderr + "\n[timeout]", code: -1 });
+    }, timeoutMs);
+
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr, code });
+    });
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr: stderr + "\n" + err.message, code: -1 });
+    });
+  });
+}
 
 export async function POST(
   _req: NextRequest,
@@ -17,7 +42,6 @@ export async function POST(
     return NextResponse.json({ erro: "ID inválido." }, { status: 400 });
   }
 
-  // Busca credenciais do painel
   const { rows } = await pool.query(
     `SELECT tipo, usuario, senha FROM public.painel_servidores WHERE id = $1`,
     [idPainel]
@@ -32,37 +56,34 @@ export async function POST(
   }
 
   const scriptPath = path.join(process.cwd(), "src", "scripts", "uniplay_login.py");
-  const input = JSON.stringify({ usuario, senha });
+  const { stdout, stderr, code } = await runPython(
+    scriptPath,
+    JSON.stringify({ usuario, senha }),
+    25_000
+  );
+
+  if (!stdout.trim()) {
+    return NextResponse.json(
+      { erro: "Script não produziu saída.", stderr: stderr.slice(0, 1000), code },
+      { status: 500 }
+    );
+  }
 
   let resultado: { ok: boolean; token?: string; cryptPass?: string; error?: string; body?: string; data?: unknown };
   try {
-    const { stdout } = await execFileAsync("python3", [scriptPath], {
-      input,
-      timeout: 20_000,
-      encoding: "utf8",
-    } as any);
-    resultado = JSON.parse((stdout as unknown as string).trim());
-  } catch (e: unknown) {
-    // execFileAsync joga quando o processo sai com código != 0,
-    // mas o stdout ainda contém o JSON de erro do script
-    const errAny = e as any;
-    if (errAny.stdout) {
-      try {
-        const parsed = JSON.parse((errAny.stdout as string).trim());
-        return NextResponse.json(
-          { erro: parsed.error ?? "Login falhou.", detalhe: parsed.body ?? parsed.data },
-          { status: 500 }
-        );
-      } catch {}
-    }
-    const msg = e instanceof Error ? e.message : "Erro ao executar script.";
-    return NextResponse.json({ erro: msg }, { status: 500 });
+    resultado = JSON.parse(stdout.trim());
+  } catch {
+    return NextResponse.json(
+      { erro: "Saída do script inválida.", stdout: stdout.slice(0, 500), stderr: stderr.slice(0, 500) },
+      { status: 500 }
+    );
   }
 
   if (!resultado.ok || !resultado.token) {
     return NextResponse.json({
       erro: resultado.error ?? "Login falhou.",
       detalhe: resultado.body ?? resultado.data,
+      stderr: stderr.slice(0, 500) || undefined,
     });
   }
 
