@@ -85,19 +85,19 @@ async function loginViaCaptcha(usuario: string, senha: string): Promise<string> 
   return data.token as string;
 }
 
-async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<string> {
+// Exposta para uso no endpoint /renovar-sessao (operação longa, fora do status check)
+export async function loginClub(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<string> {
+  const token = await loginViaCaptcha(creds.painel_usuario, creds.painel_senha);
+  await onSaveSession(token, new Date(Date.now() + 6 * 24 * 60 * 60 * 1000));
+  return token;
+}
+
+function getSession(creds: ServidorCredenciais): string {
   if (creds.session_cookie) {
     const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
     if (!expirado) return creds.session_cookie;
   }
-  return freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
-}
-
-async function freshLogin(usuario: string, senha: string, onSaveSession: SaveSession): Promise<string> {
-  const token = await loginViaCaptcha(usuario, senha);
-  // Token dura ~7 dias — salva com 6 dias de margem
-  await onSaveSession(token, new Date(Date.now() + 6 * 24 * 60 * 60 * 1000));
-  return token;
+  throw new Error("CLUB: sessão expirada. Clique em 'Renovar Sessão' no card.");
 }
 
 async function apiFetch(token: string, path: string, options: RequestInit = {}) {
@@ -121,21 +121,17 @@ export function criarClubAdapter(
   onSaveSession: SaveSession,
   onSaveContas: SaveContaVencimento
 ): PainelAdapter {
-  let _sessionPromise: Promise<string> | null = null;
-
-  function obterToken(): Promise<string> {
-    if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
-    return _sessionPromise;
+  function obterToken(): string {
+    return getSession(creds);
   }
 
   async function fetchComRetry(path: string, options: RequestInit = {}): Promise<any> {
-    const token = await obterToken();
+    const token = obterToken();
     try {
       return await apiFetch(token, path, options);
     } catch (err: any) {
       if (err.message?.includes("401") || err.message?.includes("403")) {
-        _sessionPromise = freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
-        return apiFetch(await _sessionPromise, path, options);
+        throw new Error("CLUB: sessão expirada. Clique em 'Renovar Sessão' no card.");
       }
       throw err;
     }

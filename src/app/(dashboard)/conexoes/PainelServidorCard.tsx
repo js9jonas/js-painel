@@ -46,6 +46,7 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
   const [modalToken, setModalToken] = useState(false);
+  const [renovandoSessao, setRenovandoSessao] = useState(false);
 
   // Tipos com auto-login via impit (TLS Chrome) — login automático sem sessão salva
   const TIPOS_AUTO_LOGIN: string[] = ["uniplay", "central"];
@@ -90,6 +91,28 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
     if (painel.tem_session && sessionExpirada)
       return { label: "Sessão expirada", cor: "text-amber-600 bg-amber-50" };
     return { label: "Sem sessão", cor: "text-red-600 bg-red-50" };
+  }
+
+  async function renovarSessaoClub() {
+    setRenovandoSessao(true);
+    setMensagem("Resolvendo hCaptcha via 2captcha... pode levar alguns minutos.");
+    try {
+      const res = await fetch(`/api/paineis/servidores/${painel.id}/renovar-sessao`, {
+        method: "POST",
+        signal: AbortSignal.timeout(620_000), // 10min+ para o 2captcha
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setMensagem("Sessão renovada com sucesso!");
+        await buscarStatus();
+      } else {
+        setMensagem(`Erro: ${json.erro}`);
+      }
+    } catch {
+      setMensagem("Sessão pode ter sido renovada — verifique o status.");
+    } finally {
+      setRenovandoSessao(false);
+    }
   }
 
   async function sincronizar() {
@@ -195,6 +218,17 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
           className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
         >
           Atualizar token de sessão
+        </button>
+      )}
+
+      {/* Renovar sessão — exclusivo para painéis com captcha longo (CLUB) */}
+      {painel.tipo === "club" && (!painel.tem_session || painel.session_expiry && new Date(painel.session_expiry) < new Date()) && (
+        <button
+          onClick={renovarSessaoClub}
+          disabled={renovandoSessao}
+          className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+        >
+          {renovandoSessao ? "Resolvendo captcha... (pode levar minutos)" : "Renovar Sessão CLUB"}
         </button>
       )}
 
