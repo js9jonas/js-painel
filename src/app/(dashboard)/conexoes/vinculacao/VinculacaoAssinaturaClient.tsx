@@ -191,6 +191,21 @@ export default function VinculacaoAssinaturaClient({
 
   const paineis = [...new Set(contas.map((c) => c.nome_painel))];
 
+  // Mapa tipo → cor do cabeçalho (mesmo esquema do card /conexoes)
+  const COR_HEADER: Record<string, string> = {
+    club:    "bg-purple-50 border-purple-200 text-purple-800",
+    central: "bg-blue-50 border-blue-200 text-blue-800",
+    uniplay: "bg-indigo-50 border-indigo-200 text-indigo-800",
+    now:     "bg-cyan-50 border-cyan-200 text-cyan-800",
+    unitv:   "bg-teal-50 border-teal-200 text-teal-800",
+    fast:    "bg-orange-50 border-orange-200 text-orange-800",
+    liebe:   "bg-pink-50 border-pink-200 text-pink-800",
+  };
+
+  // tipo por nome (para lookup de cor)
+  const tipoPorNome: Record<string, string> = {};
+  contas.forEach((c) => { tipoPorNome[c.nome_painel] = c.tipo_painel; });
+
   function handleDesvincular(idConta: number) {
     if (!confirm("Remover vínculo desta conta?")) return;
     startTransition(async () => {
@@ -237,9 +252,9 @@ export default function VinculacaoAssinaturaClient({
         if (!linhas.length) return null;
         return (
           <div key={painel} className="rounded-2xl border bg-white overflow-hidden shadow-sm">
-            <div className="px-4 py-3 border-b bg-zinc-50 flex items-center justify-between">
-              <span className="text-sm font-semibold text-zinc-700">{painel}</span>
-              <span className="text-xs text-zinc-400">
+            <div className={`px-4 py-3 border-b flex items-center justify-between ${COR_HEADER[tipoPorNome[painel]] ?? "bg-zinc-50 border-zinc-200 text-zinc-700"}`}>
+              <span className="text-sm font-semibold">{painel}</span>
+              <span className="text-xs opacity-60">
                 {linhas.length} conta{linhas.length !== 1 ? "s" : ""}
               </span>
             </div>
