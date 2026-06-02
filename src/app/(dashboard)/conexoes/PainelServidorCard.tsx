@@ -8,7 +8,6 @@ const INSTRUCAO_TOKEN: Record<string, string> = {
   central: "Acesse painel.fun, abra DevTools (F12) → Application → Local Storage → session-store → state.token e cole aqui.",
   now:     "Acesse o painel NOW, abra DevTools (F12) → Application → Cookies → PHPSESSID. Cole o valor no formato: PHPSESSID=<valor>",
   liebe:   "Acesse painel.liebeapp.me, abra DevTools (F12) → Application → Local Storage → token e cole aqui.",
-  uniplay: "Acesse searchdefense.top logado → F12 → Network → filtre 'users-iptv' → clique na requisição → copie Authorization (sem 'Bearer ') no 1º campo e o valor de reg_password da URL no 2º campo.",
 };
 
 const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);

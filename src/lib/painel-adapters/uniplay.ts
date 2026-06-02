@@ -104,6 +104,9 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
     if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
     return _sessionPromise;
   }
+  function resetarSessao(nova: UniplaySession) {
+    _sessionPromise = Promise.resolve(nova);
+  }
   function listar(session: UniplaySession) {
     return listarUsuarios(session, onSaveSession, creds);
   }
@@ -144,8 +147,13 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
 
     async getCreditos(): Promise<number | null> {
       try {
-        const session = await obterSessao();
-        const res = await authFetch(session.token, "dash-reseller");
+        let session = await obterSessao();
+        let res = await authFetch(session.token, "dash-reseller");
+        if (res.status === 401 || res.status === 404) {
+          session = await freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
+          resetarSessao(session);
+          res = await authFetch(session.token, "dash-reseller");
+        }
         if (!res.ok) return null;
         const data = await res.json() as any;
         return data.credits != null ? parseFloat(data.credits) : null;
