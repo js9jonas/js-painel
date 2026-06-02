@@ -55,6 +55,32 @@ export type AssinaturaRow = {
   nome_painel_vinculado: string | null;
 };
 
+export type ContaPainelVinculada = {
+  id_conta: string;
+  id_assinatura: string;
+  usuario: string;
+  senha: string | null;
+  rotulo: string | null;
+  status_conta: string;
+  nome_painel: string;
+  tipo_painel: string;
+};
+
+export async function getContasPainelByClienteId(id: string): Promise<ContaPainelVinculada[]> {
+  const { rows } = await pool.query<ContaPainelVinculada>(
+    `SELECT c.id_conta::text, c.id_assinatura::text, c.usuario, c.senha,
+            c.rotulo, c.status_conta, ps.nome AS nome_painel, ps.tipo AS tipo_painel
+     FROM public.contas c
+     JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
+     WHERE c.id_assinatura IN (
+       SELECT id_assinatura FROM public.assinaturas WHERE id_cliente = $1::bigint
+     )
+     ORDER BY ps.nome, c.usuario`,
+    [id]
+  );
+  return rows;
+}
+
 export type PagamentoRow = {
   id: number;
   data_pgto: string | null;

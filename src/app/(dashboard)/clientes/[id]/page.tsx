@@ -1,7 +1,8 @@
 ﻿export const dynamic = "force-dynamic";
 
+import { Fragment } from "react";
 import Link from "next/link";
-import { getAssinaturasByClienteId, getClienteById, getPagamentosByClienteId } from "@/lib/clientes";
+import { getAssinaturasByClienteId, getClienteById, getPagamentosByClienteId, getContasPainelByClienteId, type ContaPainelVinculada } from "@/lib/clientes";
 import { getAuditLogByClienteId } from "@/lib/audit";
 import { getPlanos } from "@/lib/planos";
 import { getPacotes } from "@/lib/pacotes";
@@ -97,7 +98,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro, auditLog] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro, auditLog, contasPainel] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
@@ -108,7 +109,15 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getIndicacoesStatsByParceiroId(id),
     getParceiroByIndicadoId(id),
     getAuditLogByClienteId(id),
+    getContasPainelByClienteId(id),
   ]);
+
+  const contasPorAssinatura = new Map<string, ContaPainelVinculada[]>();
+  for (const c of contasPainel) {
+    const lista = contasPorAssinatura.get(c.id_assinatura) ?? [];
+    lista.push(c);
+    contasPorAssinatura.set(c.id_assinatura, lista);
+  }
 
   // ✅ Inclui "atrasado" no card de destaque
   const ativa = [...assinaturas]
@@ -269,6 +278,28 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 {ativa.observacao && <span>Obs.: <span className="text-zinc-800">{ativa.observacao}</span></span>}
               </div>
             )}
+            {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-zinc-100">
+                {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).map((c) => (
+                  <div key={c.id_conta} className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-1.5 text-xs">
+                    <span className="font-medium text-zinc-500">{c.nome_painel}</span>
+                    <span className="text-zinc-300">·</span>
+                    <span className="font-mono font-semibold text-zinc-800 select-all">{c.usuario}</span>
+                    {c.senha && (
+                      <>
+                        <span className="text-zinc-300">/</span>
+                        <span className="font-mono text-zinc-600 select-all">{c.senha}</span>
+                      </>
+                    )}
+                    <span className={`rounded-full px-1.5 py-0.5 ${
+                      c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
+                      c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
+                      "bg-red-100 text-red-600"
+                    }`}>{c.status_conta}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 mt-2">
               <EditAssinaturaButton
@@ -332,7 +363,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
             </thead>
             <tbody className="divide-y">
               {outras.map((a) => (
-                <tr key={a.id_assinatura} className={bgLinhaStatus(a.status)}>
+                <Fragment key={a.id_assinatura}>
+                <tr className={bgLinhaStatus(a.status)}>
                   <td className="px-3 py-2 font-medium text-zinc-900">{a.id_assinatura}</td>
                   <td className="px-3 py-2">
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${badgeStatus(a.status)}`}>
@@ -359,7 +391,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       <span className="text-zinc-500"> · R$ {parseFloat(a.plano_valor).toFixed(2)}</span>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2" colSpan={1}>
                     <div className="flex items-center gap-1.5">
                       <EditAssinaturaButton
                         idCliente={id}
@@ -389,6 +421,29 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     </div>
                   </td>
                 </tr>
+                {(contasPorAssinatura.get(String(a.id_assinatura)) ?? []).map((c) => (
+                  <tr key={`conta-${c.id_conta}`} className="bg-zinc-50/70">
+                    <td colSpan={8} className="px-3 py-1.5">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="font-medium text-zinc-400">{c.nome_painel}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-mono font-semibold text-zinc-700 select-all">{c.usuario}</span>
+                        {c.senha && (
+                          <>
+                            <span className="text-zinc-300">/</span>
+                            <span className="font-mono text-zinc-500 select-all">{c.senha}</span>
+                          </>
+                        )}
+                        <span className={`rounded-full px-1.5 py-0.5 ${
+                          c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
+                          c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
+                          "bg-red-100 text-red-600"
+                        }`}>{c.status_conta}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                </Fragment>
               ))}
               {outras.length === 0 && (
                 <tr>
