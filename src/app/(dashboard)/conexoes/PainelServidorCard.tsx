@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import type { PainelServidorRow } from "@/lib/paineis";
 import AtualizarTokenModal from "./AtualizarTokenModal";
 
-const INSTRUCAO_TOKEN: Record<string, string> = {};
+const INSTRUCAO_TOKEN: Record<string, string> = {
+  club: "Acesse dashboard.bz e faça login normalmente. Depois abra DevTools (F12) → Application → Local Storage → https://dashboard.bz → chave 'tkn' e cole o valor aqui.",
+};
 
 const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);
 
