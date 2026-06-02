@@ -19,9 +19,11 @@ async function resolverHCaptcha(): Promise<string> {
 
   const u = new URL(proxy);
 
+  let ultimoErro = "";
+
   // Tenta até 6 vezes — workers do 2captcha falham ~2/3 das vezes neste challenge
   for (let tentativa = 1; tentativa <= 6; tentativa++) {
-    const { taskId, errorId, errorDescription } = await fetch("https://api.2captcha.com/createTask", {
+    const criacao = await fetch("https://api.2captcha.com/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -39,7 +41,12 @@ async function resolverHCaptcha(): Promise<string> {
       }),
     }).then(r => r.json()) as any;
 
-    if (errorId) continue;
+    if (criacao.errorId) {
+      ultimoErro = `createTask: ${criacao.errorDescription ?? criacao.errorCode ?? criacao.errorId}`;
+      continue;
+    }
+
+    const { taskId } = criacao;
 
     for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 5000));
@@ -50,10 +57,13 @@ async function resolverHCaptcha(): Promise<string> {
       }).then(r => r.json()) as any;
 
       if (result.status === "ready") return result.solution.gRecaptchaResponse as string;
-      if (result.errorId) break;
+      if (result.errorId) {
+        ultimoErro = `getTaskResult: ${result.errorDescription ?? result.errorCode}`;
+        break;
+      }
     }
   }
-  throw new Error("CLUB: não foi possível resolver o hCaptcha após 6 tentativas.");
+  throw new Error(`CLUB: hCaptcha não resolvido após 6 tentativas. Último erro: ${ultimoErro}`);
 }
 
 async function loginViaCaptcha(usuario: string, senha: string): Promise<string> {
