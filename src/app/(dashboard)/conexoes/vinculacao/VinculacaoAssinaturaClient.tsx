@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition, useCallback } from "react";
+import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -186,13 +186,17 @@ export default function VinculacaoAssinaturaClient({
 
   const paineis = [...new Set(contas.map((c) => c.nome_painel))];
 
-  const handleDesvincular = useCallback((idConta: number) => {
+  function handleDesvincular(idConta: number) {
     if (!confirm("Remover vínculo desta conta?")) return;
     startTransition(async () => {
-      await desvincularContaAssinatura(idConta);
-      router.refresh();
+      try {
+        await desvincularContaAssinatura(idConta);
+        router.refresh();
+      } catch {
+        alert("Erro ao desvincular conta.");
+      }
     });
-  }, [router]);
+  }
 
   return (
     <div className="space-y-4">
