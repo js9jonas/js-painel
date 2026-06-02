@@ -43,6 +43,18 @@ export async function POST(
     } as any);
     resultado = JSON.parse((stdout as unknown as string).trim());
   } catch (e: unknown) {
+    // execFileAsync joga quando o processo sai com código != 0,
+    // mas o stdout ainda contém o JSON de erro do script
+    const errAny = e as any;
+    if (errAny.stdout) {
+      try {
+        const parsed = JSON.parse((errAny.stdout as string).trim());
+        return NextResponse.json(
+          { erro: parsed.error ?? "Login falhou.", detalhe: parsed.body ?? parsed.data },
+          { status: 500 }
+        );
+      } catch {}
+    }
     const msg = e instanceof Error ? e.message : "Erro ao executar script.";
     return NextResponse.json({ erro: msg }, { status: 500 });
   }
