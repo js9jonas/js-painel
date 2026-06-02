@@ -3,11 +3,7 @@ import { useState, useEffect } from "react";
 import type { PainelServidorRow } from "@/lib/paineis";
 import AtualizarTokenModal from "./AtualizarTokenModal";
 
-const INSTRUCAO_TOKEN: Record<string, string> = {
-  club:  "Acesse dashboard.bz, abra DevTools (F12) → Application → Local Storage → X-ACCESS-TOKEN e cole aqui.",
-  now:   "Acesse o painel NOW, abra DevTools (F12) → Application → Cookies → PHPSESSID. Cole o valor no formato: PHPSESSID=<valor>",
-  liebe: "Acesse painel.liebeapp.me, abra DevTools (F12) → Application → Local Storage → token e cole aqui.",
-};
+const INSTRUCAO_TOKEN: Record<string, string> = {};
 
 const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);
 
