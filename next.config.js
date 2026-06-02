@@ -2,7 +2,7 @@
 const nextConfig = {
   reactCompiler: true,
   // impit usa módulo nativo Rust (NAPI) — não pode ser empacotado pelo webpack
-  serverExternalPackages: ["impit"],
+  serverExternalPackages: ["impit", "playwright", "playwright-core"],
   images: {
     remotePatterns: [
       {
