@@ -142,6 +142,15 @@ export function criarCentralAdapter(
       }));
     },
 
+    async getCreditos(): Promise<number | null> {
+      try {
+        const data = await fetchComRetry("profile");
+        return data.credits != null ? parseFloat(data.credits) : null;
+      } catch {
+        return null;
+      }
+    },
+
     async renovar(usuario: string, _meses = 1): Promise<ResultadoRenovacao> {
       let page = 1;
       const per = 100;
