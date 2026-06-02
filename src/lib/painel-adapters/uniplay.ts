@@ -1,10 +1,14 @@
+import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://gesapioffice.com/api
-// Auth: JWT Bearer — auto-login (sem CAPTCHA, code:"" funciona)
+// Auth: JWT Bearer — auto-login com TLS Chrome (via impit)
 // Sessão: ~6h — renovada automaticamente via login
 
 const API_BASE = "https://gesapioffice.com/api";
+
+// Instância global reutilizada entre requisições — imita TLS Chrome
+const impit = new Impit({ browser: "chrome" });
 
 const ORIGIN_HEADERS = {
   Origin: "http://searchdefense.top",
@@ -27,16 +31,13 @@ function parseSession(cookie: string | null): UniplaySession | null {
 }
 
 async function login(usuario: string, senha: string): Promise<UniplaySession> {
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), 10_000);
-  const res = await fetch(`${API_BASE}/login`, {
+  const res = await impit.fetch(`${API_BASE}/login`, {
     method: "POST",
-    signal: controller.signal,
     headers: { "Content-Type": "application/json", ...ORIGIN_HEADERS },
     body: JSON.stringify({ username: usuario, password: senha, code: "" }),
   });
   if (!res.ok) throw new Error(`UNIPLAY login falhou: ${res.status}`);
-  const data = await res.json();
+  const data = await res.json() as any;
   if (!data.access_token) throw new Error("UNIPLAY: sem access_token na resposta de login");
   return { token: data.access_token, cryptPass: data.crypt_pass };
 }
@@ -59,17 +60,14 @@ async function freshLogin(onSaveSession: SaveSession, usuario: string, senha: st
   return session;
 }
 
-function authFetch(token: string, path: string, options: RequestInit = {}) {
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), 10_000);
-  return fetch(`${API_BASE}/${path}`, {
-    ...options,
-    signal: controller.signal,
+async function authFetch(token: string, path: string, init: { method?: HttpMethod; body?: string } = {}) {
+  return impit.fetch(`${API_BASE}/${path}`, {
+    method: init.method ?? "GET",
+    body: init.body,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
       ...ORIGIN_HEADERS,
-      ...(options.headers ?? {}),
     },
   });
 }
@@ -88,20 +86,18 @@ async function listarUsuarios(
 ): Promise<any[]> {
   const res = await authFetch(session.token, `users-iptv?reg_password=${encodeURIComponent(session.cryptPass)}`);
 
-  // Sessão stale (crypt_pass inválido) — força re-login uma vez
+  // Sessão stale — força re-login uma vez
   if ((res.status === 404 || res.status === 401) && !jaRelogou) {
     const nova = await freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
     return listarUsuarios(nova, onSaveSession, creds, true);
   }
 
   if (!res.ok) throw new Error(`UNIPLAY users-iptv → ${res.status}`);
-  const data = await res.json();
+  const data = await res.json() as any;
   return Array.isArray(data) ? data : Object.values(data);
 }
 
 export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
-  // Cache da sessão dentro do ciclo de vida do adapter (uma request = uma instância)
-  // Evita dois logins simultâneos quando listarContas() e getCreditos() rodam em paralelo
   let _sessionPromise: Promise<UniplaySession> | null = null;
   function obterSessao(): Promise<UniplaySession> {
     if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
@@ -136,7 +132,6 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       });
       if (!res.ok) throw new Error(`UNIPLAY renovar → ${res.status}`);
 
-      // Buscar vencimento atualizado
       const updated = (await listar(session)).find((u: any) => u.username === usuario);
       const novoVenc = updated?.exp_date_timestamp
         ? new Date(updated.exp_date_timestamp * 1000).toISOString().slice(0, 10)
@@ -151,7 +146,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
         const session = await obterSessao();
         const res = await authFetch(session.token, "dash-reseller");
         if (!res.ok) return null;
-        const data = await res.json();
+        const data = await res.json() as any;
         return data.credits != null ? parseFloat(data.credits) : null;
       } catch {
         return null;

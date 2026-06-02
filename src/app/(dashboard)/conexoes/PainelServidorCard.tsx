@@ -52,10 +52,9 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
   const [modalToken, setModalToken] = useState(false);
-  const [renovandoSessao, setRenovandoSessao] = useState(false);
 
-  // Tipos com auto-login: buscam status mesmo sem sessão salva no banco
-  const TIPOS_AUTO_LOGIN: string[] = []; // uniplay removido: login bloqueado por IP na VPS
+  // Tipos com auto-login via impit (TLS Chrome) — login automático sem sessão salva
+  const TIPOS_AUTO_LOGIN: string[] = ["uniplay"];
 
   const podeBuscarStatus =
     painel.tem_api_token ||
@@ -194,35 +193,6 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
         <p className="text-xs text-zinc-500 bg-zinc-50 rounded px-3 py-2">{mensagem}</p>
       )}
 
-      {/* Renovar sessão via Python curl_cffi — só UNIPLAY */}
-      {painel.tipo === "uniplay" && (
-        <button
-          onClick={async () => {
-            setRenovandoSessao(true);
-            setMensagem(null);
-            try {
-              const res = await fetch(`/api/paineis/servidores/${painel.id}/refresh-session`, { method: "POST" });
-              const json = await res.json();
-              if (res.ok && json.ok) {
-                setMensagem("Sessão renovada. Atualizando status...");
-                await buscarStatus();
-              } else {
-                const detalhe = json.detalhe ? ` — ${JSON.stringify(json.detalhe)}` : "";
-                const errStderr = json.stderr ? ` [stderr: ${json.stderr.slice(0, 200)}]` : "";
-                setMensagem(`Erro: ${json.erro ?? json.error ?? "falha ao renovar"}${detalhe}${errStderr}`);
-              }
-            } catch {
-              setMensagem("Erro de rede.");
-            } finally {
-              setRenovandoSessao(false);
-            }
-          }}
-          disabled={renovandoSessao}
-          className="w-full rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 transition-colors"
-        >
-          {renovandoSessao ? "Renovando sessão…" : "Renovar sessão (VPS)"}
-        </button>
-      )}
 
       {/* Botão atualizar token — só para painéis com sessão manual */}
       {TIPOS_TOKEN_MANUAL.includes(painel.tipo) && (
