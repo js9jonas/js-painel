@@ -4,9 +4,9 @@ import { spawn } from "child_process";
 import path from "path";
 import { pool } from "@/lib/db";
 
-function runPython(scriptPath: string, stdinData: string, timeoutMs: number, bin = "python3"): Promise<{ stdout: string; stderr: string; code: number | null }> {
+function runPython(scriptPath: string, stdinData: string, timeoutMs: number): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve) => {
-    const proc = spawn(bin, [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn("python3", [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
 
@@ -56,13 +56,10 @@ export async function POST(
   }
 
   const scriptPath = path.join(process.cwd(), "src", "scripts", "uniplay_login.py");
-  // Usa o Python do venv onde curl_cffi está instalado; fallback para python3 do sistema
-  const pythonBin = "/app/venv/bin/python3";
   const { stdout, stderr, code } = await runPython(
     scriptPath,
     JSON.stringify({ usuario, senha }),
-    25_000,
-    pythonBin
+    25_000
   );
 
   if (!stdout.trim()) {

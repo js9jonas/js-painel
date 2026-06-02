@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
 Login no UNIPLAY (gesapioffice.com) usando curl_cffi com TLS Chrome120.
-Testa se o IP da VPS passa quando o fingerprint é de browser real.
 
 Stdin:  JSON { usuario, senha }
 Stdout: JSON { ok, token, cryptPass } | { ok: false, error }
 
-Sempre sai com código 0 para que execFileAsync não jogue exceção —
-o chamador verifica o campo "ok" do JSON.
+Sempre sai com código 0 — o chamador verifica o campo "ok".
 """
-import sys, json
+import sys, json, os
+
+# Pacotes instalados localmente via pip --target (preservados no container)
+_pkg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "python_packages")
+if os.path.isdir(_pkg_dir) and _pkg_dir not in sys.path:
+    sys.path.insert(0, _pkg_dir)
 
 def main():
     try:
