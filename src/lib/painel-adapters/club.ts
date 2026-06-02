@@ -85,10 +85,21 @@ async function loginViaCaptcha(usuario: string, senha: string): Promise<string> 
   return data.token as string;
 }
 
+function parseJwtExpiry(token: string): Date | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    return payload.exp ? new Date(Number(payload.exp) * 1000) : null;
+  } catch { return null; }
+}
+
 // Exposta para uso no endpoint /renovar-sessao (operação longa, fora do status check)
 export async function loginClub(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<string> {
   const token = await loginViaCaptcha(creds.painel_usuario, creds.painel_senha);
-  await onSaveSession(token, new Date(Date.now() + 6 * 24 * 60 * 60 * 1000));
+  // Tenta ler o exp do JWT; fallback para 2h se token opaco ou exp ausente
+  const expiry = parseJwtExpiry(token) ?? new Date(Date.now() + 2 * 60 * 60 * 1000);
+  await onSaveSession(token, expiry);
   return token;
 }
 
