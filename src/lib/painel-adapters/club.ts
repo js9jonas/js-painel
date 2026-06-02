@@ -8,7 +8,8 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 const API_URL     = "https://pdcapi.io/";
 const WEBSITE_URL = "https://dashboard.bz/login.php";
 const SITEKEY     = "8cf2ef3e-6e60-456a-86ca-6f2c855c3a06";
-const impit       = new Impit({ browser: "chrome" });
+// pdcapi.io bloqueia IP do datacenter Hostinger — proxy residencial necessário
+const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
 
 async function resolverHCaptcha(): Promise<string> {
   const apiKey = process.env.TWOCAPTCHA_API_KEY;
