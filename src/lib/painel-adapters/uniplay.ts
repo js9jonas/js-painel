@@ -8,7 +8,8 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 const API_BASE = "https://gesapioffice.com/api";
 
 // Instância global reutilizada entre requisições — imita TLS Chrome
-const impit = new Impit({ browser: "chrome" });
+// proxyUrl roteia via proxy residencial (bypassa bloqueio de IP do datacenter)
+const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
 
 const ORIGIN_HEADERS = {
   Origin: "http://searchdefense.top",
