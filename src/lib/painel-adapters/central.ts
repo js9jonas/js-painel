@@ -1,105 +1,63 @@
-import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { Impit } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://api.controle.fit/api
 // Auth: JWT Bearer, expira em 1h
-// Login: Cloudflare Turnstile invisível → resolvido automaticamente via Playwright
+// Login: Cloudflare Turnstile resolvido via CapSolver (sitekey 0x4AAAAAACFhU7XJduqvbHH2)
 
-const API_BASE = "https://api.controle.fit/api";
+const API_BASE       = "https://api.controle.fit/api";
+const SITEKEY        = "0x4AAAAAACFhU7XJduqvbHH2";
+const WEBSITE_URL    = "https://painel.fun/login";
+const impit          = new Impit({ browser: "chrome" });
 
-function resolverChromium(): string {
-  // 1. Override manual via env var (Easypanel → Variáveis de ambiente)
-  if (process.env.CHROMIUM_PATH && existsSync(process.env.CHROMIUM_PATH)) {
-    return process.env.CHROMIUM_PATH;
+async function resolverTurnstile(): Promise<string> {
+  const apiKey = process.env.CAPSOLVER_API_KEY;
+  if (!apiKey) throw new Error("CAPSOLVER_API_KEY não definida no Easypanel.");
+
+  const { taskId, errorId, errorDescription } = await fetch("https://api.capsolver.com/createTask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      clientKey: apiKey,
+      task: { type: "AntiTurnstileTaskProxyLess", websiteURL: WEBSITE_URL, websiteKey: SITEKEY },
+    }),
+  }).then(r => r.json()) as any;
+
+  if (errorId) throw new Error(`CapSolver erro ao criar tarefa: ${errorDescription}`);
+
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const result = await fetch("https://api.capsolver.com/getTaskResult", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientKey: apiKey, taskId }),
+    }).then(r => r.json()) as any;
+
+    if (result.status === "ready")  return result.solution.token as string;
+    if (result.status === "failed") throw new Error(`CapSolver falhou: ${result.errorDescription}`);
   }
-  // 2. Buscar via which (resolve para caminho absoluto)
-  for (const nome of ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome"]) {
-    try {
-      const caminho = execSync(`which ${nome} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
-      if (caminho && existsSync(caminho)) return caminho;
-    } catch {}
-  }
-  // 3. Caminhos conhecidos em containers nix/linux
-  for (const p of [
-    "/root/.nix-profile/bin/chromium",
-    "/nix/var/nix/profiles/default/bin/chromium",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ]) {
-    if (existsSync(p)) return p;
-  }
-  throw new Error(
-    "Chromium não encontrado. Defina CHROMIUM_PATH no Easypanel com o caminho completo do executável."
-  );
+  throw new Error("CapSolver timeout após 60s.");
 }
 
-async function loginViaBrowser(usuario: string, senha: string): Promise<string> {
-  // Import dinâmico para não quebrar bundling do webpack
-  const { chromium } = await import("playwright");
-
-  const browser = await chromium.launch({
-    executablePath: resolverChromium(),
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-zygote",
-      "--disable-software-rasterizer",
-      "--disable-extensions",
-    ],
+async function loginViaCapSolver(usuario: string, senha: string): Promise<string> {
+  const turnstileToken = await resolverTurnstile();
+  const res = await impit.fetch(`${API_BASE}/auth/sign-in`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Origin: "https://painel.fun",
+      Referer: "https://painel.fun/",
+    },
+    body: JSON.stringify({ username: usuario, password: senha, "cf-turnstile-response": turnstileToken }),
   });
-
-  try {
-    // Sem proxy — painel.fun não bloqueia IP de datacenter (diferente de UNIPLAY)
-    const ctx = await browser.newContext();
-    const page = await ctx.newPage();
-
-    await page.goto("https://painel.fun/login", {
-      waitUntil: "networkidle",
-      timeout: 30_000,
-    });
-
-    // Turnstile invisível — token gerado automaticamente pelo browser
-    await page.waitForFunction(() => {
-      const el = document.querySelector('[name="cf-turnstile-response"]');
-      return el && (el as HTMLInputElement).value.length > 100;
-    }, { timeout: 20_000 });
-
-    const turnstileToken = await page.$eval(
-      '[name="cf-turnstile-response"]',
-      (el) => (el as HTMLInputElement).value
-    );
-
-    // Login via fetch dentro do browser (mesmo IP/sessão que gerou o token)
-    const result: any = await page.evaluate(
-      async ({ username, password, token }) => {
-        const res = await fetch("https://api.controle.fit/api/auth/sign-in", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ username, password, "cf-turnstile-response": token }),
-        });
-        return res.json();
-      },
-      { username: usuario, password: senha, token: turnstileToken }
-    );
-
-    if (!result.token) {
-      throw new Error(`Login CENTRAL falhou: ${JSON.stringify(result.message ?? result)}`);
-    }
-
-    return result.token as string;
-  } finally {
-    await browser.close();
-  }
+  if (!res.ok) throw new Error(`Login CENTRAL → ${res.status}`);
+  const data = await res.json() as any;
+  if (!data.token) throw new Error(`Login CENTRAL falhou: ${JSON.stringify(data.message ?? data)}`);
+  return data.token as string;
 }
 
-async function getSession(
-  creds: ServidorCredenciais,
-  onSaveSession: SaveSession
-): Promise<string> {
+async function getSession(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<string> {
   if (creds.session_cookie) {
     const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
     if (!expirado) return creds.session_cookie;
@@ -107,15 +65,9 @@ async function getSession(
   return freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
 }
 
-async function freshLogin(
-  usuario: string,
-  senha: string,
-  onSaveSession: SaveSession
-): Promise<string> {
-  const token = await loginViaBrowser(usuario, senha);
-  // Salva com 55min de validade (token expira em 1h)
-  const expiresAt = new Date(Date.now() + 55 * 60 * 1000);
-  await onSaveSession(token, expiresAt);
+async function freshLogin(usuario: string, senha: string, onSaveSession: SaveSession): Promise<string> {
+  const token = await loginViaCapSolver(usuario, senha);
+  await onSaveSession(token, new Date(Date.now() + 55 * 60 * 1000));
   return token;
 }
 
@@ -161,10 +113,8 @@ export function criarCentralAdapter(
       return await apiFetch(token, path, options);
     } catch (err: any) {
       if (err.message?.includes("401") || err.message?.includes("403")) {
-        // Token expirou — força novo login
         _sessionPromise = freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
-        const novoToken = await _sessionPromise;
-        return apiFetch(novoToken, path, options);
+        return apiFetch(await _sessionPromise, path, options);
       }
       throw err;
     }
@@ -175,17 +125,13 @@ export function criarCentralAdapter(
       const allUsers: any[] = [];
       let page = 1;
       const per = 100;
-
       while (true) {
-        const data = await fetchComRetry(
-          `users?page=${page}&per=${per}&reseller=${creds.painel_usuario}`
-        );
+        const data = await fetchComRetry(`users?page=${page}&per=${per}&reseller=${creds.painel_usuario}`);
         const users: any[] = data.data ?? [];
         allUsers.push(...users);
         if (allUsers.length >= (data.meta?.total ?? 0) || users.length < per) break;
         page++;
       }
-
       return allUsers.map((u: any) => ({
         usuario: u.username,
         rotulo: u.reseller_notes || u.full_name || "",
@@ -197,21 +143,16 @@ export function criarCentralAdapter(
     },
 
     async renovar(usuario: string, _meses = 1): Promise<ResultadoRenovacao> {
-      // Busca ID interno pelo username
       let page = 1;
       const per = 100;
       let conta: any = null;
-
       while (!conta) {
-        const data = await fetchComRetry(
-          `users?page=${page}&per=${per}&reseller=${creds.painel_usuario}`
-        );
+        const data = await fetchComRetry(`users?page=${page}&per=${per}&reseller=${creds.painel_usuario}`);
         const users: any[] = data.data ?? [];
         conta = users.find((u: any) => u.username === usuario);
         if (!conta && users.length < per) break;
         page++;
       }
-
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
 
       // mounth (typo intencional do servidor)
@@ -219,11 +160,9 @@ export function criarCentralAdapter(
         method: "POST",
         body: JSON.stringify({ mounth: 1 }),
       });
-
       const novoVenc = result.exp_date
         ? new Date(Number(result.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
         : undefined;
-
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
     },
