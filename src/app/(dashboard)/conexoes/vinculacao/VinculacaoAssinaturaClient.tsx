@@ -53,7 +53,12 @@ function SugestaoInline({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-sm font-medium text-zinc-800">{conta.sugestao_nome_cliente}</span>
+      <Link
+        href={`/clientes/${conta.sugestao_id_cliente}`}
+        className="text-sm font-medium text-zinc-800 hover:underline"
+      >
+        {conta.sugestao_nome_cliente}
+      </Link>
       <ScoreBadge score={conta.score} />
       <button
         onClick={confirmar}
