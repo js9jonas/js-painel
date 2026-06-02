@@ -95,21 +95,36 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
 
   async function renovarSessaoClub() {
     setRenovandoSessao(true);
-    setMensagem("Resolvendo hCaptcha via 2captcha... pode levar alguns minutos.");
+    setMensagem("Iniciando resolução de captcha...");
     try {
-      const res = await fetch(`/api/paineis/servidores/${painel.id}/renovar-sessao`, {
-        method: "POST",
-        signal: AbortSignal.timeout(620_000), // 10min+ para o 2captcha
-      });
-      const json = await res.json();
-      if (json.ok) {
-        setMensagem("Sessão renovada com sucesso!");
-        await buscarStatus();
-      } else {
-        setMensagem(`Erro: ${json.erro}`);
+      // 1. Dispara o job em background (retorna imediatamente)
+      const startRes = await fetch(`/api/paineis/servidores/${painel.id}/renovar-sessao`, { method: "POST" });
+      const { jobId } = await startRes.json();
+      if (!jobId) { setMensagem("Erro ao iniciar o job."); return; }
+
+      // 2. Polling a cada 10 segundos até concluir (máx 15 min)
+      const inicio = Date.now();
+      const MAX_ESPERA = 15 * 60 * 1000;
+      let tentativa = 0;
+      while (Date.now() - inicio < MAX_ESPERA) {
+        await new Promise(r => setTimeout(r, 10_000));
+        tentativa++;
+        setMensagem(`Aguardando 2captcha... tentativa ${tentativa} (~${Math.round((Date.now() - inicio) / 1000)}s)`);
+        const poll = await fetch(`/api/paineis/servidores/${painel.id}/renovar-sessao?jobId=${jobId}`);
+        const state = await poll.json();
+        if (state.done) {
+          if (state.ok) {
+            setMensagem("Sessão renovada com sucesso!");
+            await buscarStatus();
+          } else {
+            setMensagem(`Erro: ${state.erro}`);
+          }
+          return;
+        }
       }
-    } catch {
-      setMensagem("Sessão pode ter sido renovada — verifique o status.");
+      setMensagem("Timeout: 2captcha não resolveu em 15 minutos. Tente novamente.");
+    } catch (e: unknown) {
+      setMensagem(`Erro inesperado: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setRenovandoSessao(false);
     }
