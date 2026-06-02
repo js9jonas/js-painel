@@ -39,7 +39,8 @@ export async function POST(
     const { stdout } = await execFileAsync("python3", [scriptPath], {
       input,
       timeout: 20_000,
-    });
+      encoding: "utf8",
+    } as any);
     resultado = JSON.parse(stdout.trim());
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Erro ao executar script.";
