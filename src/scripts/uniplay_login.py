@@ -7,12 +7,7 @@ Stdout: JSON { ok, token, cryptPass } | { ok: false, error }
 
 Sempre sai com código 0 — o chamador verifica o campo "ok".
 """
-import sys, json, os
-
-# Pacotes instalados localmente via pip --target (preservados no container)
-_pkg_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "python_packages")
-if os.path.isdir(_pkg_dir) and _pkg_dir not in sys.path:
-    sys.path.insert(0, _pkg_dir)
+import sys, json
 
 def main():
     try:
