@@ -4,5 +4,6 @@ nixPkgs = ['nodejs_20', 'python311', 'python311Packages.pip']
 [phases.install]
 cmds = [
   'npm ci --legacy-peer-deps',
-  'pip3 install curl-cffi --target=src/scripts/python_packages',
+  'python3 -m pip install curl-cffi --target=src/scripts/python_packages',
+  'python3 -c "import sys; sys.path.insert(0, \"src/scripts/python_packages\"); import curl_cffi; print(\"curl_cffi OK:\", curl_cffi.__version__)"',
 ]
