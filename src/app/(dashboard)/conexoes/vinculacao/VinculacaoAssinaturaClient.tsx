@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -170,12 +170,24 @@ export default function VinculacaoAssinaturaClient({
   contas: ContaVinculacaoAssinatura[];
 }) {
   const router = useRouter();
+  const [listaContas, setListaContas] = useState(contas);
   const [vinculandoId, setVinculandoId] = useState<number | null>(null);
   const [filtro, setFiltro] = useState<"sem" | "com" | "todos">("sem");
   const [busca, setBusca] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const contasFiltradas = contas.filter((c) => {
+  useEffect(() => { setListaContas(contas); }, [contas]);
+
+  function confirmarOtimista(idConta: number, sugestao: Pick<ContaVinculacaoAssinatura, "sugestao_id_assinatura" | "sugestao_id_cliente" | "sugestao_nome_cliente">) {
+    setListaContas(prev => prev.map(x =>
+      x.id_conta === idConta
+        ? { ...x, id_assinatura: sugestao.sugestao_id_assinatura, id_cliente_vinculado: sugestao.sugestao_id_cliente, nome_cliente_vinculado: sugestao.sugestao_nome_cliente, sugestao_id_assinatura: null, sugestao_id_cliente: null, sugestao_nome_cliente: null, score: null }
+        : x
+    ));
+    router.refresh();
+  }
+
+  const contasFiltradas = listaContas.filter((c) => {
     if (filtro === "sem" && c.id_assinatura) return false;
     if (filtro === "com" && !c.id_assinatura) return false;
     if (busca.trim()) {
@@ -189,7 +201,7 @@ export default function VinculacaoAssinaturaClient({
     return true;
   });
 
-  const paineis = [...new Set(contas.map((c) => c.nome_painel))];
+  const paineis = [...new Set(listaContas.map((c) => c.nome_painel))];
 
   // Mapa tipo → cor do cabeçalho (mesmo esquema do card /conexoes)
   const COR_HEADER: Record<string, string> = {
@@ -204,7 +216,7 @@ export default function VinculacaoAssinaturaClient({
 
   // tipo por nome (para lookup de cor)
   const tipoPorNome: Record<string, string> = {};
-  contas.forEach((c) => { tipoPorNome[c.nome_painel] = c.tipo_painel; });
+  listaContas.forEach((c) => { tipoPorNome[c.nome_painel] = c.tipo_painel; });
 
   function handleDesvincular(idConta: number) {
     if (!confirm("Remover vínculo desta conta?")) return;
@@ -300,7 +312,7 @@ export default function VinculacaoAssinaturaClient({
                         ) : c.sugestao_id_assinatura ? (
                           <SugestaoInline
                             conta={c}
-                            onDone={() => router.refresh()}
+                            onDone={() => confirmarOtimista(c.id_conta, c)}
                             onEditar={() => setVinculandoId(c.id_conta)}
                           />
                         ) : (
