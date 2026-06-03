@@ -58,12 +58,14 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
       FROM public.assinaturas a
       JOIN public.clientes cl ON cl.id_cliente = a.id_cliente
       JOIN public.pacote pk ON pk.id_pacote = a.id_pacote
-      WHERE a.venc_contas = c.vencimento_real_painel
-        AND a.status IN ('ativo', 'atrasado')
+      WHERE a.status IN ('ativo', 'atrasado', 'pendente')
         AND lower(pk.contrato) ILIKE '%' || lower(ps.nome) || '%'
-      ORDER BY similarity(cl.nome, COALESCE(NULLIF(c.rotulo, ''), c.usuario)) DESC
+        AND similarity(cl.nome, COALESCE(NULLIF(c.rotulo, ''), c.usuario)) > 0.3
+      ORDER BY
+        similarity(cl.nome, COALESCE(NULLIF(c.rotulo, ''), c.usuario)) DESC,
+        (a.venc_contas = c.vencimento_real_painel) DESC
       LIMIT 1
-    ) best ON c.vencimento_real_painel IS NOT NULL AND c.id_assinatura IS NULL
+    ) best ON c.id_assinatura IS NULL
     WHERE c.removido_em IS NULL
     ORDER BY
       (c.id_assinatura IS NOT NULL) ASC,
