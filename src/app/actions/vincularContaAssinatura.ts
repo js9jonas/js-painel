@@ -62,7 +62,7 @@ export async function buscarAssinaturas(q: string): Promise<AssinaturaBuscaRow[]
             a.venc_contas::text, a.status
      FROM public.assinaturas a
      JOIN public.clientes cl ON cl.id_cliente = a.id_cliente
-     WHERE cl.nome ILIKE $1 AND a.status IN ('ativo', 'atrasado')
+     WHERE cl.nome ILIKE $1 AND a.status IN ('ativo', 'atrasado', 'pendente')
      ORDER BY cl.nome ASC
      LIMIT 20`,
     [`%${q}%`]
