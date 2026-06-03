@@ -42,6 +42,7 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
       best.score::float   AS score
     FROM public.contas c
     JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
+    WHERE c.removido_em IS NULL
     LEFT JOIN LATERAL (
       SELECT cl2.id_cliente, cl2.nome
       FROM public.assinaturas a2
