@@ -42,7 +42,6 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
       best.score::float   AS score
     FROM public.contas c
     JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
-    WHERE c.removido_em IS NULL
     LEFT JOIN LATERAL (
       SELECT cl2.id_cliente, cl2.nome
       FROM public.assinaturas a2
@@ -65,6 +64,7 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
       ORDER BY similarity(cl.nome, COALESCE(NULLIF(c.rotulo, ''), c.usuario)) DESC
       LIMIT 1
     ) best ON c.vencimento_real_painel IS NOT NULL AND c.id_assinatura IS NULL
+    WHERE c.removido_em IS NULL
     ORDER BY
       (c.id_assinatura IS NOT NULL) ASC,
       best.score DESC NULLS LAST,
