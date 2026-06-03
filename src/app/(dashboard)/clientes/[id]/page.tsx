@@ -295,7 +295,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
                       c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
                       "bg-red-100 text-red-600"
-                    }`}>{c.status_conta}</span>
+                    }`}>
+                      {c.vencimento_real_painel
+                        ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
+                        : c.status_conta}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -438,7 +442,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                           c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
                           c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
                           "bg-red-100 text-red-600"
-                        }`}>{c.status_conta}</span>
+                        }`}>
+                          {c.vencimento_real_painel
+                            ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
+                            : c.status_conta}
+                        </span>
                       </div>
                     </td>
                   </tr>

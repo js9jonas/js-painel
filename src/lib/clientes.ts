@@ -64,12 +64,14 @@ export type ContaPainelVinculada = {
   status_conta: string;
   nome_painel: string;
   tipo_painel: string;
+  vencimento_real_painel: string | null;
 };
 
 export async function getContasPainelByClienteId(id: string): Promise<ContaPainelVinculada[]> {
   const { rows } = await pool.query<ContaPainelVinculada>(
     `SELECT c.id_conta::text, c.id_assinatura::text, c.usuario, c.senha,
-            c.rotulo, c.status_conta, ps.nome AS nome_painel, ps.tipo AS tipo_painel
+            c.rotulo, c.status_conta, ps.nome AS nome_painel, ps.tipo AS tipo_painel,
+            c.vencimento_real_painel::text AS vencimento_real_painel
      FROM public.contas c
      JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
      WHERE c.id_assinatura IN (
