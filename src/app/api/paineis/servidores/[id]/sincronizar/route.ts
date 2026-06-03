@@ -29,6 +29,15 @@ export async function POST(
     return NextResponse.json({ erro: msg }, { status: 502 });
   }
 
+  // Guarda de segurança: se o retorno for vazio ou menor que 50% do que está ativo,
+  // abortamos a etapa de remoção para não apagar dados por falha parcial da API.
+  const { rows: countRows } = await pool.query<{ total: string }>(
+    `SELECT COUNT(*) AS total FROM public.contas WHERE id_painel_servidor = $1 AND removido_em IS NULL`,
+    [idPainel]
+  );
+  const totalAtivos = Number(countRows[0]?.total ?? 0);
+  const syncConfiavel = contas.length > 0 && (totalAtivos === 0 || contas.length >= totalAtivos * 0.5);
+
   let inseridas = 0;
   let atualizadas = 0;
 
@@ -41,15 +50,15 @@ export async function POST(
     if (rows.length === 0) {
       await pool.query(
         `INSERT INTO public.contas
-           (id_painel_servidor, id_servidor, usuario, rotulo, vencimento_real_painel, status_conta, status_sinc)
-         VALUES ($1, $1, $2, $3, $4, $5, 'pendente')`,
+           (id_painel_servidor, id_servidor, usuario, rotulo, vencimento_real_painel, status_conta, status_sinc, removido_em)
+         VALUES ($1, $1, $2, $3, $4, $5, 'pendente', NULL)`,
         [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status]
       );
       inseridas++;
     } else {
       await pool.query(
         `UPDATE public.contas
-         SET rotulo = $3, vencimento_real_painel = $4, status_conta = $5
+         SET rotulo = $3, vencimento_real_painel = $4, status_conta = $5, removido_em = NULL
          WHERE id_painel_servidor = $1 AND usuario = $2`,
         [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status]
       );
@@ -57,9 +66,24 @@ export async function POST(
     }
   }
 
+  let removidas = 0;
+  if (syncConfiavel) {
+    const usuarios = contas.map(c => c.usuario);
+    const { rowCount } = await pool.query(
+      `UPDATE public.contas
+       SET removido_em = NOW()
+       WHERE id_painel_servidor = $1
+         AND usuario != ALL($2::text[])
+         AND removido_em IS NULL`,
+      [idPainel, usuarios]
+    );
+    removidas = rowCount ?? 0;
+  }
+
   return NextResponse.json({
     ok: true,
-    mensagem: `${inseridas} inseridas, ${atualizadas} atualizadas.`,
+    mensagem: `${inseridas} inseridas, ${atualizadas} atualizadas, ${removidas} removidas.`,
     total: contas.length,
+    aviso: syncConfiavel ? null : "Sync com retorno insuficiente — remoções ignoradas por segurança.",
   });
 }

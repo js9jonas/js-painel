@@ -37,6 +37,7 @@ export async function autoVincularSugeridos(): Promise<{ vinculados: number }> {
     WHERE a.id_conta IS NULL
       AND c.rotulo IS NOT NULL
       AND c.rotulo != ''
+      AND c.removido_em IS NULL
     AND (
       SELECT COUNT(*) FROM public.clientes cl2
       WHERE lower(cl2.nome) = lower(c.rotulo)

@@ -19,6 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       LEFT JOIN public.aplicativos a ON a.id_conta = c.id_conta
       LEFT JOIN public.clientes cl ON cl.id_cliente = a.id_cliente
       WHERE c.id_servidor = $1
+        AND c.removido_em IS NULL
     `;
     const values: any[] = [idServidor];
 

@@ -75,6 +75,7 @@ export async function getContasPainelByClienteId(id: string): Promise<ContaPaine
      WHERE c.id_assinatura IN (
        SELECT id_assinatura FROM public.assinaturas WHERE id_cliente = $1::bigint
      )
+       AND c.removido_em IS NULL
      ORDER BY ps.nome, c.usuario`,
     [id]
   );
@@ -374,11 +375,11 @@ export async function getAssinaturasByClienteId(id: string): Promise<AssinaturaR
       pl.valor::text        AS plano_valor,
       pl.descricao::text    AS plano_descricao,
       EXISTS (
-        SELECT 1 FROM public.contas c WHERE c.id_assinatura = a.id_assinatura
+        SELECT 1 FROM public.contas c WHERE c.id_assinatura = a.id_assinatura AND c.removido_em IS NULL
       ) AS tem_vinculo_painel,
       (SELECT ps.nome FROM public.contas c
        JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
-       WHERE c.id_assinatura = a.id_assinatura LIMIT 1) AS nome_painel_vinculado
+       WHERE c.id_assinatura = a.id_assinatura AND c.removido_em IS NULL LIMIT 1) AS nome_painel_vinculado
     FROM public.assinaturas a
     LEFT JOIN public.pacote p  ON p.id_pacote = a.id_pacote
     LEFT JOIN public.planos pl ON pl.id_plano  = a.id_plano

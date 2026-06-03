@@ -52,7 +52,7 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'pendente')::int   AS contas_pendentes,
       COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'confirmado')::int AS contas_confirmadas
     FROM public.painel_servidores ps
-    LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id
+    LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
     GROUP BY ps.id
     ORDER BY ps.nome
   `);
@@ -80,7 +80,7 @@ export async function getPainelServidorById(id: number): Promise<PainelServidorR
       COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'pendente')::int   AS contas_pendentes,
       COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'confirmado')::int AS contas_confirmadas
     FROM public.painel_servidores ps
-    LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id
+    LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
     WHERE ps.id = $1
     GROUP BY ps.id
   `, [id]);

@@ -34,6 +34,7 @@ export async function autoVincularConfiantes(): Promise<{ vinculados: number }> 
       JOIN public.pacote pk ON pk.id_pacote = a.id_pacote
       WHERE c2.id_assinatura IS NULL
         AND c2.vencimento_real_painel IS NOT NULL
+        AND c2.removido_em IS NULL
         AND a.status IN ('ativo', 'atrasado')
         AND lower(pk.contrato) ILIKE '%' || lower(ps.nome) || '%'
         AND similarity(cl.nome, COALESCE(NULLIF(c2.rotulo, ''), c2.usuario)) >= 0.7
