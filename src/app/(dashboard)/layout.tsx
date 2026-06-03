@@ -6,7 +6,7 @@ import NavDropdown from "@/components/NavDropdown";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white shadow-sm sticky top-0 z-20">
+      <header className="border-b border-zinc-200 bg-white shadow-sm sticky top-0 z-30">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
           <Link href="/dashboard" className="font-bold text-zinc-900 text-base tracking-tight">
             JS Painel
