@@ -152,7 +152,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
       </div>
 
       {/* Cabecalho do cliente */}
-      <div className="rounded-xl border bg-white px-4 py-3 sticky top-2 z-20">
+      <div className="rounded-xl border bg-white px-4 py-3 sticky top-16 z-20">
         <div className="flex items-center justify-between gap-3">
           {/* Esquerda: nome + dados inline */}
           <div className="min-w-0">
