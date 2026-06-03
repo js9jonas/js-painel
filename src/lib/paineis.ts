@@ -18,6 +18,13 @@ export type PainelServidorRow = {
   total_contas: number;
   contas_pendentes: number;
   contas_confirmadas: number;
+  id_servidor: number | null;
+};
+
+export type ServidorVinculoRow = {
+  id_servidor: number;
+  codigo_publico: string;
+  nome_interno: string;
 };
 
 export type PainelAppRow = {
@@ -50,11 +57,22 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       (ps.api_token IS NOT NULL)      AS tem_api_token,
       COUNT(c.id_conta)::int          AS total_contas,
       COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'pendente')::int   AS contas_pendentes,
-      COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'confirmado')::int AS contas_confirmadas
+      COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'confirmado')::int AS contas_confirmadas,
+      ps.id_servidor
     FROM public.painel_servidores ps
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
     GROUP BY ps.id
     ORDER BY ps.nome
+  `);
+  return rows;
+}
+
+export async function getServidoresParaVinculo(): Promise<ServidorVinculoRow[]> {
+  const { rows } = await pool.query<ServidorVinculoRow>(`
+    SELECT id_servidor, codigo_publico, nome_interno
+    FROM public.servidores
+    WHERE ativo = true
+    ORDER BY codigo_publico
   `);
   return rows;
 }

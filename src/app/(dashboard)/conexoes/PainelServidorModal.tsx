@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import type { PainelServidorRow } from "@/lib/paineis";
+import type { PainelServidorRow, ServidorVinculoRow } from "@/lib/paineis";
 import { salvarPainelServidor } from "@/app/actions/paineis";
 
 const TIPOS_SERVIDOR = [
@@ -8,7 +8,8 @@ const TIPOS_SERVIDOR = [
 ];
 
 type Props = {
-  painel: PainelServidorRow | null; // null = novo
+  painel: PainelServidorRow | null;
+  servidores: ServidorVinculoRow[];
   onClose: () => void;
   onSalvo: () => void;
 };
@@ -16,10 +17,10 @@ type Props = {
 const VAZIO = {
   nome: "", tipo: "club", url_painel: "", url_api: "",
   usuario: "", senha: "", master: "", contato_master: "",
-  padrao_usuario: "", padrao_senha: "", ativo: true,
+  padrao_usuario: "", padrao_senha: "", ativo: true, id_servidor: null as number | null,
 };
 
-export default function PainelServidorModal({ painel, onClose, onSalvo }: Props) {
+export default function PainelServidorModal({ painel, servidores, onClose, onSalvo }: Props) {
   const [form, setForm] = useState({ ...VAZIO });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export default function PainelServidorModal({ painel, onClose, onSalvo }: Props)
         padrao_usuario: painel.padrao_usuario ?? "",
         padrao_senha:   painel.padrao_senha ?? "",
         ativo:          painel.ativo,
+        id_servidor:    painel.id_servidor ?? null,
       });
     } else {
       setForm({ ...VAZIO });
@@ -57,7 +59,7 @@ export default function PainelServidorModal({ painel, onClose, onSalvo }: Props)
     }
     setSalvando(true);
     setErro(null);
-    const result = await salvarPainelServidor({ ...form, id: painel?.id });
+    const result = await salvarPainelServidor({ ...form, id: painel?.id, id_servidor: form.id_servidor });
     setSalvando(false);
     if (result.ok) {
       onSalvo();
@@ -126,6 +128,21 @@ export default function PainelServidorModal({ painel, onClose, onSalvo }: Props)
           <input type="checkbox" checked={form.ativo} onChange={(e) => set("ativo", e.target.checked)} className="rounded" />
           Ativo
         </label>
+
+        <Field label="Servidor vinculado (saldo automático)">
+          <select
+            className={input}
+            value={form.id_servidor ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, id_servidor: e.target.value ? Number(e.target.value) : null }))}
+          >
+            <option value="">— Nenhum —</option>
+            {servidores.map((s) => (
+              <option key={s.id_servidor} value={s.id_servidor}>
+                {s.codigo_publico} — {s.nome_interno}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         {erro && <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">{erro}</p>}
 

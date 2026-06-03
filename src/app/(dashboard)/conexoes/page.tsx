@@ -1,11 +1,12 @@
 export const dynamic = "force-dynamic";
-import { getPainelServidores, getPainelApps } from "@/lib/paineis";
+import { getPainelServidores, getPainelApps, getServidoresParaVinculo } from "@/lib/paineis";
 import ConexoesClient from "./ConexoesClient";
 
 export default async function ConexoesPage() {
-  const [servidores, apps] = await Promise.all([
+  const [servidores, apps, servidoresVinculo] = await Promise.all([
     getPainelServidores(),
     getPainelApps(),
+    getServidoresParaVinculo(),
   ]);
 
   return (
@@ -16,7 +17,7 @@ export default async function ConexoesPage() {
           Painéis IPTV externos — gerenciamento de contas e aplicativos
         </p>
       </div>
-      <ConexoesClient servidores={servidores} apps={apps} />
+      <ConexoesClient servidores={servidores} apps={apps} servidoresVinculo={servidoresVinculo} />
     </div>
   );
 }

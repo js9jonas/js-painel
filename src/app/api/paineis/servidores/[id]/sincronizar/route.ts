@@ -80,10 +80,61 @@ export async function POST(
     removidas = rowCount ?? 0;
   }
 
+  // Atualização automática de saldo — se o painel tiver id_servidor vinculado
+  let saldoAtualizado = false;
+  try {
+    const { rows: painelRows } = await pool.query<{ id_servidor: number | null }>(
+      `SELECT id_servidor FROM public.painel_servidores WHERE id = $1`,
+      [idPainel]
+    );
+    const idServidor = painelRows[0]?.id_servidor ?? null;
+
+    if (idServidor !== null) {
+      const creditos = adapter.getCreditos ? await adapter.getCreditos() : null;
+      if (creditos !== null) {
+        const creditosInt = Math.round(creditos);
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(
+            `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
+             VALUES ($1, 0) ON CONFLICT (id_servidor) DO NOTHING`,
+            [idServidor]
+          );
+          const { rows: saldoRows } = await client.query(
+            `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
+            [idServidor]
+          );
+          const saldoAnterior: number = saldoRows[0]?.saldo_atual ?? 0;
+          const delta = creditosInt - saldoAnterior;
+          await client.query(
+            `UPDATE public.saldo_servidor SET saldo_atual = $1, atualizado_em = NOW() WHERE id_servidor = $2`,
+            [creditosInt, idServidor]
+          );
+          await client.query(
+            `INSERT INTO public.saldo_servidor_historico
+               (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao)
+             VALUES ($1, 'ajuste', $2, $3, $4, 'Sync automático via painel')`,
+            [idServidor, delta, saldoAnterior, creditosInt]
+          );
+          await client.query("COMMIT");
+          saldoAtualizado = true;
+        } catch {
+          await client.query("ROLLBACK");
+        } finally {
+          client.release();
+        }
+      }
+    }
+  } catch {
+    // Falha no saldo não interrompe o sync
+  }
+
   return NextResponse.json({
     ok: true,
     mensagem: `${inseridas} inseridas, ${atualizadas} atualizadas, ${removidas} removidas.`,
     total: contas.length,
+    saldo_atualizado: saldoAtualizado,
     aviso: syncConfiavel ? null : "Sync com retorno insuficiente — remoções ignoradas por segurança.",
   });
 }

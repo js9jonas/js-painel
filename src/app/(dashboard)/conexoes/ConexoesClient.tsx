@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { PainelServidorRow, PainelAppRow } from "@/lib/paineis";
+import type { PainelServidorRow, PainelAppRow, ServidorVinculoRow } from "@/lib/paineis";
 import PainelServidorCard from "./PainelServidorCard";
 import PainelAppCard from "./PainelAppCard";
 import PainelServidorModal from "./PainelServidorModal";
@@ -12,9 +12,10 @@ type Tab = "contas" | "apps";
 type Props = {
   servidores: PainelServidorRow[];
   apps: PainelAppRow[];
+  servidoresVinculo: ServidorVinculoRow[];
 };
 
-export default function ConexoesClient({ servidores, apps }: Props) {
+export default function ConexoesClient({ servidores, apps, servidoresVinculo }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("contas");
   const [modalServidor, setModalServidor] = useState<PainelServidorRow | null | "novo">(null);
@@ -107,6 +108,7 @@ export default function ConexoesClient({ servidores, apps }: Props) {
       {modalServidor !== null && (
         <PainelServidorModal
           painel={modalServidor === "novo" ? null : modalServidor}
+          servidores={servidoresVinculo}
           onClose={() => setModalServidor(null)}
           onSalvo={onSalvo}
         />

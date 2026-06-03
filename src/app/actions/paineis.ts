@@ -16,6 +16,7 @@ export type PainelServidorInput = {
   padrao_usuario: string;
   padrao_senha: string;
   ativo: boolean;
+  id_servidor: number | null;
 };
 
 export type PainelAppInput = {
@@ -41,7 +42,7 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
            usuario = $6, senha = CASE WHEN $7 = '' THEN senha ELSE $7 END,
            master = $8, contato_master = $9,
            padrao_usuario = NULLIF($10, ''), padrao_senha = NULLIF($11, ''),
-           ativo = $12
+           ativo = $12, id_servidor = $13
          WHERE id = $1`,
         [
           input.id,
@@ -56,13 +57,14 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
           input.padrao_usuario.trim(),
           input.padrao_senha.trim(),
           input.ativo,
+          input.id_servidor ?? null,
         ]
       );
     } else {
       await pool.query(
         `INSERT INTO public.painel_servidores
-           (nome, tipo, url_painel, url_api, usuario, senha, master, contato_master, padrao_usuario, padrao_senha, ativo)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),NULLIF($10,''),$11)`,
+           (nome, tipo, url_painel, url_api, usuario, senha, master, contato_master, padrao_usuario, padrao_senha, ativo, id_servidor)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),NULLIF($10,''),$11,$12)`,
         [
           input.nome.trim(),
           input.tipo.trim(),
@@ -75,6 +77,7 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
           input.padrao_usuario.trim(),
           input.padrao_senha.trim(),
           input.ativo,
+          input.id_servidor ?? null,
         ]
       );
     }
