@@ -1,5 +1,6 @@
 import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { impitFetch } from "./proxy-retry";
 
 // API base: https://gesapioffice.com/api
 // Auth: JWT Bearer — auto-login com TLS Chrome (via impit)
@@ -32,7 +33,7 @@ function parseSession(cookie: string | null): UniplaySession | null {
 }
 
 async function login(usuario: string, senha: string): Promise<UniplaySession> {
-  const res = await impit.fetch(`${API_BASE}/login`, {
+  const res = await impitFetch(impit, `${API_BASE}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...ORIGIN_HEADERS },
     body: JSON.stringify({ username: usuario, password: senha, code: "" }),
@@ -62,7 +63,7 @@ async function freshLogin(onSaveSession: SaveSession, usuario: string, senha: st
 }
 
 async function authFetch(token: string, path: string, init: { method?: HttpMethod; body?: string } = {}) {
-  return impit.fetch(`${API_BASE}/${path}`, {
+  return impitFetch(impit, `${API_BASE}/${path}`, {
     method: init.method ?? "GET",
     body: init.body,
     headers: {

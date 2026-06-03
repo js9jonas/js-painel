@@ -1,5 +1,6 @@
 import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { impitFetch } from "./proxy-retry";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
 // Login: 2captcha (HCaptchaTask+proxy) → POST pdcapi.io/login (URL-encoded)
@@ -113,33 +114,18 @@ function getSession(creds: ServidorCredenciais): string {
 }
 
 async function apiFetch(token: string, path: string, options: { method?: HttpMethod; body?: URLSearchParams | string } = {}) {
-  const MAX_TENTATIVAS = 4; // proxy rotativo: IPs diferentes a cada tentativa
-  let ultimoErro: Error | null = null;
-
-  for (let t = 1; t <= MAX_TENTATIVAS; t++) {
-    try {
-      const res = await impit.fetch(API_URL + path, {
-        method: options.method ?? "GET",
-        body: options.body instanceof URLSearchParams ? options.body.toString() : options.body,
-        headers: {
-          "X-ACCESS-TOKEN": token,
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Origin": "https://dashboard.bz",
-          "Referer": "https://dashboard.bz/",
-        },
-      });
-      if (!res.ok) throw new Error(`pdcapi.io/${path} → ${res.status}`);
-      return res.json();
-    } catch (err: any) {
-      ultimoErro = err;
-      // Retry apenas em falha de proxy (IP bloqueado pelo destino) — outros erros sobem direto
-      const eProxyError = err.message?.includes("502") || err.message?.toLowerCase().includes("proxy") || err.message?.toLowerCase().includes("connect");
-      if (!eProxyError || t === MAX_TENTATIVAS) throw err;
-      // Aguarda brevemente para o pool rotativo sortear outro IP
-      await new Promise(r => setTimeout(r, 800 * t));
-    }
-  }
-  throw ultimoErro;
+  const res = await impitFetch(impit, API_URL + path, {
+    method: options.method ?? "GET",
+    body: options.body instanceof URLSearchParams ? options.body.toString() : options.body,
+    headers: {
+      "X-ACCESS-TOKEN": token,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Origin": "https://dashboard.bz",
+      "Referer": "https://dashboard.bz/",
+    },
+  });
+  if (!res.ok) throw new Error(`pdcapi.io/${path} → ${res.status}`);
+  return res.json();
 }
 
 function mapStatus(s: string | number): ContaPainel["status"] {
@@ -189,27 +175,18 @@ export function criarClubAdapter(
     async getCreditos(): Promise<number | null> {
       try {
         const token = obterToken();
-        for (let t = 1; t <= 4; t++) {
-          try {
-            const res = await impit.fetch(`${API_URL}stats`, {
-              method: "GET",
-              headers: {
-                "X-ACCESS-TOKEN": token,
-                "X_FILTRO": "1",
-                "Origin": "https://dashboard.bz",
-                "Referer": "https://dashboard.bz/",
-              },
-            });
-            if (!res.ok) return null;
-            const data = await res.json() as any;
-            return data?.data?.credits != null ? parseFloat(data.data.credits) : null;
-          } catch (err: any) {
-            const eProxyError = err.message?.includes("502") || err.message?.toLowerCase().includes("proxy") || err.message?.toLowerCase().includes("connect");
-            if (!eProxyError || t === 4) return null;
-            await new Promise(r => setTimeout(r, 800 * t));
-          }
-        }
-        return null;
+        const res = await impitFetch(impit, `${API_URL}stats`, {
+          method: "GET",
+          headers: {
+            "X-ACCESS-TOKEN": token,
+            "X_FILTRO": "1",
+            "Origin": "https://dashboard.bz",
+            "Referer": "https://dashboard.bz/",
+          },
+        });
+        if (!res.ok) return null;
+        const data = await res.json() as any;
+        return data?.data?.credits != null ? parseFloat(data.data.credits) : null;
       } catch {
         return null;
       }
