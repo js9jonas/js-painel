@@ -59,7 +59,12 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
          'nome_painel',           ps.nome,
          'status_conta',          ct.status_conta
        ) ORDER BY ct.vencimento_real_painel ASC NULLS LAST
-     ) FILTER (WHERE ct.id_conta IS NOT NULL AND ct.vencimento_real_painel IS NOT NULL AND ct.removido_em IS NULL),
+     ) FILTER (
+       WHERE ct.id_conta IS NOT NULL
+         AND ct.vencimento_real_painel IS NOT NULL
+         AND ct.removido_em IS NULL
+         AND ct.vencimento_real_painel::date >= CURRENT_DATE - 1
+     ),
      '[]'::json
    )                                             AS sub_contas
  FROM public.assinaturas a
@@ -70,18 +75,20 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
  LEFT JOIN public.painel_servidores ps ON ps.id = ct.id_painel_servidor
  WHERE lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
    AND a.venc_contrato IS NOT NULL
+   AND a.venc_contrato::date >= CURRENT_DATE
    AND (
-     -- assinatura vence em ≤ N dias
+     -- assinatura vence entre ontem e +N dias
      (a.venc_contas IS NOT NULL
-       AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
-       AND a.venc_contrato::date > a.venc_contas::date)
+       AND a.venc_contas::date >= CURRENT_DATE - 1
+       AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval)
      OR
-     -- ou tem conta com vencimento_real_painel ≤ N dias
+     -- ou tem conta com vencimento_real_painel entre ontem e +N dias
      EXISTS (
        SELECT 1 FROM public.contas ct2
        WHERE ct2.id_assinatura = a.id_assinatura
          AND ct2.removido_em IS NULL
          AND ct2.vencimento_real_painel IS NOT NULL
+         AND ct2.vencimento_real_painel::date >= CURRENT_DATE - 1
          AND ct2.vencimento_real_painel::date <= CURRENT_DATE + ($1::int || ' days')::interval
      )
    )
