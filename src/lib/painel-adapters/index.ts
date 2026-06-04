@@ -5,6 +5,7 @@ import { criarFastAdapter } from "./fast";
 import { criarUniplayAdapter } from "./uniplay";
 import { criarNowAdapter } from "./now";
 import { criarUnitvAdapter } from "./unitv";
+import { criarLiebeAdapter } from "./liebe";
 import type { PainelAdapter, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // Lê credenciais de painel_servidores (nova arquitetura)
@@ -80,6 +81,7 @@ function buildAdapter(
     case "uniplay": return criarUniplayAdapter(creds, id, onSaveSession, onSaveContas);
     case "now":     return criarNowAdapter(creds, id, onSaveSession, onSaveContas);
     case "unitv":   return criarUnitvAdapter(creds, id, onSaveSession, onSaveContas);
+    case "liebe":   return criarLiebeAdapter(creds, id, onSaveSession, onSaveContas);
     default:
       throw new Error(`Adapter para "${creds.painel_tipo}" ainda não implementado.`);
   }
