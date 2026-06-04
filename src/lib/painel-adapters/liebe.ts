@@ -1,14 +1,16 @@
 import { Impit } from "impit";
+import { impitFetch } from "./proxy-retry";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // LIEBE (liebeapp.sigma.vin) — Laravel Sanctum Bearer token
 // Auto-login: POST /api/auth/login → token longa duração
 // Re-login automático em 401
+// proxyUrl obrigatório — liebeapp.sigma.vin bloqueia IP do datacenter
 
 const API_BASE   = "https://liebeapp.sigma.vin/api";
 const ORIGIN     = "https://painel.liebeapp.me";
 
-const impit = new Impit({ browser: "chrome" });
+const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
 
 function baseHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
@@ -21,7 +23,7 @@ function baseHeaders(token?: string): Record<string, string> {
 }
 
 async function loginLiebe(usuario: string, senha: string): Promise<string> {
-  const res = await impit.fetch(`${API_BASE}/auth/login`, {
+  const res = await impitFetch(impit, `${API_BASE}/auth/login`, {
     method: "POST",
     headers: baseHeaders(),
     body: JSON.stringify({ username: usuario, password: senha }),
@@ -35,14 +37,14 @@ async function loginLiebe(usuario: string, senha: string): Promise<string> {
 class LiebeUnauthorizedError extends Error {}
 
 async function liebeGet(token: string, path: string): Promise<any> {
-  const res = await impit.fetch(`${API_BASE}${path}`, { headers: baseHeaders(token) });
+  const res = await impitFetch(impit, `${API_BASE}${path}`, { headers: baseHeaders(token) });
   if (res.status === 401) throw new LiebeUnauthorizedError();
   if (!res.ok) throw new Error(`LIEBE GET ${path} → ${res.status}`);
   return res.json();
 }
 
 async function liebePost(token: string, path: string, body?: object): Promise<any> {
-  const res = await impit.fetch(`${API_BASE}${path}`, {
+  const res = await impitFetch(impit, `${API_BASE}${path}`, {
     method: "POST",
     headers: baseHeaders(token),
     body: body ? JSON.stringify(body) : undefined,
