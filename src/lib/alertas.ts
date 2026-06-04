@@ -1,15 +1,26 @@
 // src/lib/alertas.ts
 import { pool } from "@/lib/db";
 
+export type AlertaSubConta = {
+    id_conta: string;
+    usuario: string;
+    vencimento_real_painel: string;
+    id_painel_servidor: number | null;
+    nome_painel: string | null;
+    status_conta: string | null;
+};
+
 export type AlertaContaRow = {
     id_cliente: string;
     nome: string;
     id_assinatura: string;
-    venc_contas: string;
+    venc_contas: string | null;
     venc_contrato: string;
     pacote_contrato: string | null;
     pacote_telas: number | null;
     status: string | null;
+    contas_vinculadas_total: number;
+    sub_contas: AlertaSubConta[];
 };
 
 export type AlertaAppRow = {
@@ -34,19 +45,52 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
    a.venc_contas::text,
    a.venc_contrato::text,
    a.status,
-   p.contrato::text AS pacote_contrato,
-   p.telas::int AS pacote_telas
+   p.contrato::text                              AS pacote_contrato,
+   p.telas::int                                  AS pacote_telas,
+   COUNT(ct.id_conta)
+     FILTER (WHERE ct.removido_em IS NULL)::int  AS contas_vinculadas_total,
+   COALESCE(
+     json_agg(
+       json_build_object(
+         'id_conta',              ct.id_conta::text,
+         'usuario',               ct.usuario,
+         'vencimento_real_painel',ct.vencimento_real_painel::text,
+         'id_painel_servidor',    ct.id_painel_servidor,
+         'nome_painel',           ps.nome,
+         'status_conta',          ct.status_conta
+       ) ORDER BY ct.vencimento_real_painel ASC NULLS LAST
+     ) FILTER (WHERE ct.id_conta IS NOT NULL AND ct.vencimento_real_painel IS NOT NULL AND ct.removido_em IS NULL),
+     '[]'::json
+   )                                             AS sub_contas
  FROM public.assinaturas a
  JOIN public.clientes c ON c.id_cliente = a.id_cliente
  LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
- LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
-WHERE lower(btrim(a.status)) IN ('ativo', 'atrasado', 'pendente')
-   AND a.venc_contas IS NOT NULL
+ LEFT JOIN public.contas ct
+        ON ct.id_assinatura = a.id_assinatura AND ct.removido_em IS NULL
+ LEFT JOIN public.painel_servidores ps ON ps.id = ct.id_painel_servidor
+ WHERE lower(btrim(a.status)) IN ('ativo','atrasado','pendente')
    AND a.venc_contrato IS NOT NULL
-   AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
-   AND a.venc_contrato::date > a.venc_contas::date
- ORDER BY a.venc_contas ASC`,
-         [dias]
+   AND (
+     -- assinatura vence em ≤ N dias
+     (a.venc_contas IS NOT NULL
+       AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
+       AND a.venc_contrato::date > a.venc_contas::date)
+     OR
+     -- ou tem conta com vencimento_real_painel ≤ N dias
+     EXISTS (
+       SELECT 1 FROM public.contas ct2
+       WHERE ct2.id_assinatura = a.id_assinatura
+         AND ct2.removido_em IS NULL
+         AND ct2.vencimento_real_painel IS NOT NULL
+         AND ct2.vencimento_real_painel::date <= CURRENT_DATE + ($1::int || ' days')::interval
+     )
+   )
+ GROUP BY a.id_assinatura, c.id_cliente, c.nome, a.venc_contas, a.venc_contrato, a.status, p.contrato, p.telas
+ ORDER BY LEAST(
+   a.venc_contas::date,
+   MIN(ct.vencimento_real_painel)::date
+ ) ASC NULLS LAST`,
+        [dias]
     );
     return rows;
 }

@@ -1,6 +1,7 @@
 // src/app/(dashboard)/alertas/page.tsx
 export const dynamic = "force-dynamic";
 
+import React from "react";
 import Link from "next/link";
 import { getAlertasContas, getAlertasApps } from "@/lib/alertas";
 import { getSaldosServidores, getPrevisaoEsgotamento, getConsumoMensal } from "@/lib/saldoServidor";
@@ -9,6 +10,7 @@ import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
 import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
 import SecaoRecolhivel from "@/components/alertas/SecaoRecolhivel";
 import DefinirDataContaButton from "@/components/alertas/DefinirDataContaButton";
+import RenovarViaAPIButton from "@/components/alertas/RenovarViaAPIButton";
 import AutoRefresh from "@/components/AutoRefresh";
 
 function diasRestantes(data: string): number {
@@ -135,54 +137,119 @@ export default async function AlertasPage() {
                             </thead>
                             <tbody className="divide-y divide-zinc-100">
                                 {contas.map((r) => {
-                                    const dias = diasRestantes(r.venc_contas);
+                                    const diasContas = r.venc_contas ? diasRestantes(r.venc_contas.split("T")[0]) : null;
+                                    const vinculado = r.pacote_telas !== null && r.contas_vinculadas_total === r.pacote_telas;
                                     return (
-                                        <tr key={r.id_assinatura} className="hover:bg-zinc-50/50">
-                                            <td className="px-4 py-3">
-                                                <Link
-                                                    href={`/clientes/${r.id_cliente}`}
-                                                    className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
-                                                >
-                                                    {r.nome}
-                                                </Link>
-                                                <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
-                                            </td>
-                                            <td className="px-4 py-3 text-zinc-600">
-                                                {r.pacote_contrato ?? "—"}
-                                                {r.pacote_telas ? <span className="text-zinc-400"> • {r.pacote_telas} tela{r.pacote_telas !== 1 ? "s" : ""}</span> : null}
-                                                {r.status && (
-                                                    <div className="text-xs mt-0.5">
-                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize ${r.status.toLowerCase() === "ativo" ? "bg-emerald-50 text-emerald-700" :
-                                                            r.status.toLowerCase() === "pendente" ? "bg-blue-50 text-blue-700" :
-                                                                r.status.toLowerCase() === "atrasado" ? "bg-yellow-50 text-yellow-700" :
-                                                                    "bg-zinc-100 text-zinc-500"
-                                                            }`}>
-                                                            {r.status}
-                                                        </span>
+                                        <React.Fragment key={r.id_assinatura}>
+                                            {/* Linha da assinatura */}
+                                            <tr className="hover:bg-zinc-50/50 bg-white">
+                                                <td className="px-4 py-3">
+                                                    <Link
+                                                        href={`/clientes/${r.id_cliente}`}
+                                                        className="font-medium text-zinc-900 hover:underline hover:text-zinc-600"
+                                                    >
+                                                        {r.nome}
+                                                    </Link>
+                                                    <div className="text-xs text-zinc-400">ID {r.id_cliente}</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-zinc-600">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        {r.pacote_contrato ?? "—"}
+                                                        {r.pacote_telas ? (
+                                                            <span className="text-zinc-400">
+                                                                · {r.pacote_telas} tela{r.pacote_telas !== 1 ? "s" : ""}
+                                                            </span>
+                                                        ) : null}
+                                                        {vinculado && (
+                                                            <span
+                                                                className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                                                                title="Todas as contas vinculadas"
+                                                            >
+                                                                🔗
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 font-medium text-zinc-900">
-                                                {r.venc_contas.split("T")[0].split("-").reverse().join("/")}
-                                            </td>
-                                            <td className="px-4 py-3 text-zinc-600">
-                                                {r.venc_contrato.split("T")[0].split("-").reverse().join("/")}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
-                                                    {labelDias(dias)}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
-                                                    <DefinirDataContaButton
-                                                        idAssinatura={r.id_assinatura}
-                                                        vencContas={r.venc_contas.split("T")[0]}
-                                                    />
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                    {r.status && (
+                                                        <div className="text-xs mt-0.5">
+                                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize ${
+                                                                r.status.toLowerCase() === "ativo" ? "bg-emerald-50 text-emerald-700" :
+                                                                r.status.toLowerCase() === "pendente" ? "bg-blue-50 text-blue-700" :
+                                                                r.status.toLowerCase() === "atrasado" ? "bg-yellow-50 text-yellow-700" :
+                                                                "bg-zinc-100 text-zinc-500"
+                                                            }`}>
+                                                                {r.status}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 font-medium text-zinc-900">
+                                                    {r.venc_contas ? r.venc_contas.split("T")[0].split("-").reverse().join("/") : "—"}
+                                                </td>
+                                                <td className="px-4 py-3 text-zinc-600">
+                                                    {r.venc_contrato.split("T")[0].split("-").reverse().join("/")}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {diasContas !== null && (
+                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasContas)}`}>
+                                                            {labelDias(diasContas)}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
+                                                        <DefinirDataContaButton
+                                                            idAssinatura={r.id_assinatura}
+                                                            vencContas={r.venc_contas?.split("T")[0] ?? ""}
+                                                        />
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            {/* Sub-linhas das contas IPTV */}
+                                            {r.sub_contas.map((ct) => {
+                                                const diasCt = diasRestantes(ct.vencimento_real_painel.split("T")[0]);
+                                                const dataFmt = ct.vencimento_real_painel.split("T")[0].split("-").reverse().join("/");
+                                                return (
+                                                    <tr key={ct.id_conta} className="bg-zinc-50/60 hover:bg-zinc-100/60">
+                                                        {/* Indentação na col cliente */}
+                                                        <td className="px-4 py-2 pl-8">
+                                                            <span className="text-xs text-zinc-400">↳ conta IPTV</span>
+                                                        </td>
+                                                        {/* Coluna pacote: painel da conta */}
+                                                        <td className="px-4 py-2">
+                                                            {ct.nome_painel && (
+                                                                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                                                    🔗 {ct.nome_painel}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        {/* Coluna Venc. Conta: badge data + usuario */}
+                                                        <td className="px-4 py-2" colSpan={2}>
+                                                            <div className="inline-flex flex-col items-start gap-0.5">
+                                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasCt)}`}>
+                                                                    {dataFmt}
+                                                                </span>
+                                                                <span className="text-xs text-zinc-400 pl-1 underline">{ct.usuario}</span>
+                                                            </div>
+                                                        </td>
+                                                        {/* Prazo */}
+                                                        <td className="px-4 py-2">
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasCt)}`}>
+                                                                {labelDias(diasCt)}
+                                                            </span>
+                                                        </td>
+                                                        {/* Ação */}
+                                                        <td className="px-4 py-2">
+                                                            <RenovarViaAPIButton
+                                                                idPainelServidor={ct.id_painel_servidor}
+                                                                usuario={ct.usuario}
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>
