@@ -7,18 +7,10 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 const BASE_URL = "https://pnw7.cc/painel";
 
 function getSession(creds: ServidorCredenciais): string {
-  if (!creds.session_cookie) {
-    throw new Error(
-      'NOW: sessão expirada. Faça login em https://pnw7.cc/painel/z=EmRthTY3kTO ' +
-      'e atualize via POST /api/servidores/4/atualizar-token com { token: "PHPSESSID=..." }'
-    );
-  }
-  if (creds.session_expiry && new Date(creds.session_expiry) < new Date()) {
-    throw new Error(
-      'NOW: sessão expirada. Faça login em https://pnw7.cc/painel/z=EmRthTY3kTO ' +
-      'e atualize via POST /api/servidores/4/atualizar-token com { token: "PHPSESSID=..." }'
-    );
-  }
+  const painelUrl = creds.painel_url ?? "https://pnw7.cc/painel";
+  const msg = `NOW: sessão expirada. Faça login em ${painelUrl} e atualize via modal "Atualizar token" colando "PHPSESSID=<valor>"`;
+  if (!creds.session_cookie) throw new Error(msg);
+  if (creds.session_expiry && new Date(creds.session_expiry) < new Date()) throw new Error(msg);
   return creds.session_cookie;
 }
 
