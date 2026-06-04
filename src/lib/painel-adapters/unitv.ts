@@ -217,7 +217,10 @@ export function criarUnitvAdapter(
         dealer_token: token,
         dealer_name: usuario,
       }));
-      return Number(data.dealerInfo?.points ?? 0);
+      // dealerInfo.points é um agregado geral — usar package_objs[package_id=1].points
+      const pkgObjs: any[] = data.dealerInfo?.package_objs ?? [];
+      const pkg = pkgObjs.find((p: any) => p.package_obj?.package_id === 1) ?? pkgObjs[0];
+      return Number(pkg?.points ?? data.dealerInfo?.points ?? 0);
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
