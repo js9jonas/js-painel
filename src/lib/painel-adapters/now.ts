@@ -164,6 +164,18 @@ export function criarNowAdapter(
       })).filter((c) => c.usuario !== "");
     },
 
+    async getCreditos(): Promise<number | null> {
+      const session = await getSession();
+      const codrev  = getCodrev(creds.painel_url ?? "");
+      const res = await fetch(`${BASE_URL}/index.php?p=inicio`, {
+        headers: { Cookie: cookieHeader(session, codrev) },
+      });
+      if (!res.ok) return null;
+      const html = await res.text();
+      const m = html.match(/(\d+)\s*créditos/);
+      return m ? Number(m[1]) : null;
+    },
+
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
       const session = await getSession();
       const codrev  = getCodrev(creds.painel_url ?? "");
