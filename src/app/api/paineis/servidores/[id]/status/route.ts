@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdapterPainel } from "@/lib/painel-adapters";
 
-const TIMEOUT_MS = 12_000;
+const TIMEOUT_MS = 30_000;
 
 function comTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
