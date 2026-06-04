@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { Impit } from "impit";
+import { impitFetch } from "./proxy-retry";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // UNITV (ResellerSystem) — https://panel-web.revenda.watch/
@@ -15,7 +16,8 @@ const DEVICE_NAME = "Linux_x86_64";
 const AES_KEY = Buffer.from("93403d3aa2ec48b4", "utf8");
 const AES_IV  = Buffer.from("7cf0127d190cb909", "utf8");
 
-const impit = new Impit({ browser: "chrome" });
+// proxyUrl residencial bypassa bloqueio de IP do datacenter no Cloudflare
+const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
 
 interface UnitvSession { token: string }
 
@@ -53,7 +55,7 @@ const BASE_HEADERS = {
 
 async function apiCall(token: string, action: string, bodyObj: object): Promise<any> {
   const encrypted = aesEncrypt(JSON.stringify(bodyObj));
-  const res = await impit.fetch(`${API_BASE}/${action}`, {
+  const res = await impitFetch(impit, `${API_BASE}/${action}`, {
     method: "POST",
     headers: { ...BASE_HEADERS, authorization: token, token },
     body: encrypted,
@@ -102,7 +104,7 @@ async function loginUnitv(usuario: string, senha: string): Promise<string> {
   // 1. Busca captcha — validate-code vem no header da resposta
   const randHex = randomBytes(16).toString("hex").toUpperCase();
   const captchaUrl = `${API_BASE}/validateCodeServlet?unixTime=${Date.now()}&0=${randHex}`;
-  const captchaRes = await impit.fetch(captchaUrl, { headers: BASE_HEADERS });
+  const captchaRes = await impitFetch(impit, captchaUrl, { headers: BASE_HEADERS });
   if (!captchaRes.ok) throw new Error(`UNITV: falha ao buscar captcha (${captchaRes.status})`);
 
   const validateKey = captchaRes.headers.get("validate-code");
@@ -137,7 +139,7 @@ async function loginUnitv(usuario: string, senha: string): Promise<string> {
   };
 
   const encrypted = aesEncrypt(JSON.stringify(loginBody));
-  const res = await impit.fetch(`${API_BASE}/login/saveLogin`, {
+  const res = await impitFetch(impit, `${API_BASE}/login/saveLogin`, {
     method: "POST",
     headers: BASE_HEADERS,
     body: encrypted,
