@@ -76,17 +76,22 @@ async function resolverCaptcha(imageB64: string): Promise<string> {
   const apiKey = process.env.CAPSOLVER_API_KEY;
   if (!apiKey) throw new Error("CAPSOLVER_API_KEY não definida.");
 
-  const { taskId, errorId, errorDescription } = await fetch("https://api.capsolver.com/createTask", {
+  const created = await fetch("https://api.capsolver.com/createTask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       clientKey: apiKey,
-      task: { type: "ImageToTextTask", body: imageB64, score: 0.8 },
+      task: { type: "ImageToTextTask", body: imageB64 },
     }),
   }).then(r => r.json()) as any;
 
-  if (errorId) throw new Error(`CapSolver erro ao criar tarefa: ${errorDescription}`);
+  if (created.errorId) throw new Error(`CapSolver erro: ${created.errorDescription}`);
 
+  // ImageToTextTask é resolvido de forma síncrona — resultado já vem no createTask
+  if (created.status === "ready") return created.solution.text as string;
+
+  // Fallback: polling para tarefas assíncronas
+  const { taskId } = created;
   for (let i = 0; i < 10; i++) {
     await new Promise(r => setTimeout(r, 2000));
     const result = await fetch("https://api.capsolver.com/getTaskResult", {
