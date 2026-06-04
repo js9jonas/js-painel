@@ -10,7 +10,8 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 const API_BASE    = "https://panel-web.revenda.watch/api";
 const DOMAIN      = "https://panel-web.revenda.watch";
 const DEALER_NAME = "jonas55";
-const DEVICE_CODE = "js-painel-server-unitv-001";
+// Device code registrado pelo browser de Jonas — necessário para o servidor não pedir verificação
+const DEVICE_CODE = "bw6Oe063D1qAsbbnQHSRJ9Jxqt0";
 const DEVICE_NAME = "Linux_x86_64";
 
 const AES_KEY = Buffer.from("93403d3aa2ec48b4", "utf8");
