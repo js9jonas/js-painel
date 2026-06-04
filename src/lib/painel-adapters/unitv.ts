@@ -203,6 +203,15 @@ export function criarUnitvAdapter(
       }));
     },
 
+    async getCreditos(): Promise<number> {
+      const token = await ensureToken();
+      const data = await callWithRelogin("getDealerInfo", () => ({
+        dealer_token: token,
+        dealer_name: usuario,
+      }));
+      return Number(data.dealerInfo?.points ?? 0);
+    },
+
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
       // Busca id interno
       const listData = await callWithRelogin("account", (token) => ({
