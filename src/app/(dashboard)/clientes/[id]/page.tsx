@@ -21,6 +21,9 @@ import IndicadorInfo from "@/components/clientes/IndicadorInfo";
 import { getParceiroByIndicadoId } from "@/lib/indicacoes";
 import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
 import HistoricoAudit from "@/components/clientes/HistoricoAudit";
+import DesvincularContaButton from "@/components/clientes/DesvincularContaButton";
+import AdicionarContaModal from "@/components/clientes/AdicionarContaModal";
+import { pool } from "@/lib/db";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -98,7 +101,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro, auditLog, contasPainel] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro, auditLog, contasPainel, paineisList] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
@@ -110,6 +113,9 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getParceiroByIndicadoId(id),
     getAuditLogByClienteId(id),
     getContasPainelByClienteId(id),
+    pool.query<{ id: number; nome: string; tipo: string }>(
+      `SELECT id, nome, tipo FROM public.painel_servidores WHERE ativo = true ORDER BY nome`
+    ).then(r => r.rows),
   ]);
 
   const contasPorAssinatura = new Map<string, ContaPainelVinculada[]>();
@@ -300,12 +306,18 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
                         : c.status_conta}
                     </span>
+                    <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
                   </div>
                 ))}
               </div>
             )}
 
             <div className="flex justify-end gap-2 mt-2">
+              <AdicionarContaModal
+                idAssinatura={String(ativa.id_assinatura)}
+                idCliente={id}
+                paineis={paineisList}
+              />
               <EditAssinaturaButton
                 idCliente={id}
                 assinatura={{
@@ -422,6 +434,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         planoValor={a.plano_valor ?? null}
                         status={a.status ?? null}
                       />
+                      <AdicionarContaModal
+                        idAssinatura={String(a.id_assinatura)}
+                        idCliente={id}
+                        paineis={paineisList}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -447,6 +464,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                             ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
                             : c.status_conta}
                         </span>
+                        <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
                       </div>
                     </td>
                   </tr>
