@@ -139,10 +139,13 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       });
       if (!res.ok) throw new Error(`UNIPLAY renovar → ${res.status}`);
 
-      // Resposta é "DD/MM/YYYY HH:mm:ss" → converte para YYYY-MM-DD
-      const text = (await res.text()).replace(/"/g, "").trim();
-      const match = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      const novoVenc = match ? `${match[3]}-${match[2]}-${match[1]}` : undefined;
+      // Resposta é string JSON "DD\/MM\/YYYY HH:mm:ss" — JSON.parse desescapa as barras
+      let novoVenc: string | undefined;
+      try {
+        const dateStr: string = JSON.parse(await res.text());
+        const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) novoVenc = `${m[3]}-${m[2]}-${m[1]}`;
+      } catch { /* sem data — segue sem novoVencimento */ }
 
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
