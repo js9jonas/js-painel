@@ -206,8 +206,15 @@ export function criarClubAdapter(
       });
       if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao renovar no CLUB." };
 
-      if (result.exp_date) {
-        const novoVenc = new Date(Number(result.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      // exp_date pode vir na resposta do renovar OU precisar ser buscado na listagem atualizada
+      const expRaw = result.exp_date
+        ?? (await fetchComRetry("listas/minhas", {
+             method: "POST",
+             body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
+           })).data?.find((l: any) => l.username === usuario)?.exp_date;
+
+      if (expRaw) {
+        const novoVenc = new Date(Number(expRaw) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
         await onSaveContas(usuario, novoVenc);
         return { ok: true, novoVencimento: novoVenc };
       }
