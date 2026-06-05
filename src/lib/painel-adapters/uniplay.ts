@@ -131,16 +131,23 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       const user = users.find((u: any) => u.username === usuario);
       if (!user) throw new Error(`UNIPLAY: usuário "${usuario}" não encontrado`);
 
-      const res = await authFetch(session.token, `users-iptv/${user.id}`, {
-        method: "POST",
+      // PUT funciona sem proxy (POST retorna 405 — endpoint mudou)
+      // Resposta: string "DD/MM/YYYY HH:mm:ss" com novo vencimento
+      const res = await fetch(`${API_BASE}/users-iptv/${user.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+          ...ORIGIN_HEADERS,
+        },
         body: JSON.stringify({ action: 1, credits: meses, reg_password: session.cryptPass }),
       });
       if (!res.ok) throw new Error(`UNIPLAY renovar → ${res.status}`);
 
-      const updated = (await listar(session)).find((u: any) => u.username === usuario);
-      const novoVenc = updated?.exp_date_timestamp
-        ? new Date(updated.exp_date_timestamp * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-        : undefined;
+      // Resposta é "DD/MM/YYYY HH:mm:ss" → converte para YYYY-MM-DD
+      const text = (await res.text()).replace(/"/g, "").trim();
+      const match = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      const novoVenc = match ? `${match[3]}-${match[2]}-${match[1]}` : undefined;
 
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };

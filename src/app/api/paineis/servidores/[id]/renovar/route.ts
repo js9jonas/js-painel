@@ -11,7 +11,13 @@ export async function POST(
   const idPainel = parseInt(id, 10);
   if (isNaN(idPainel)) return NextResponse.json({ erro: "ID inválido." }, { status: 400 });
 
-  const { usuario } = await req.json();
+  let usuario: string;
+  try {
+    const body = await req.json();
+    usuario = body?.usuario;
+  } catch {
+    return NextResponse.json({ erro: "Body inválido." }, { status: 400 });
+  }
   if (!usuario) return NextResponse.json({ erro: "Campo 'usuario' obrigatório." }, { status: 400 });
 
   let adapter;
