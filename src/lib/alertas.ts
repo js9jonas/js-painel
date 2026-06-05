@@ -77,12 +77,13 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
    AND a.venc_contrato IS NOT NULL
    AND a.venc_contrato::date >= CURRENT_DATE
    AND (
-     -- assinatura vence entre ontem e +N dias
+     -- assinatura vence entre ontem e +N dias, e o contrato ainda cobre período após o vencimento
      (a.venc_contas IS NOT NULL
        AND a.venc_contas::date >= CURRENT_DATE - 1
-       AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval)
+       AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
+       AND a.venc_contrato::date > a.venc_contas::date)
      OR
-     -- ou tem conta com vencimento_real_painel entre ontem e +N dias
+     -- ou tem conta com vencimento_real_painel entre ontem e +N dias, e o contrato cobre além dele
      EXISTS (
        SELECT 1 FROM public.contas ct2
        WHERE ct2.id_assinatura = a.id_assinatura
@@ -90,6 +91,7 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
          AND ct2.vencimento_real_painel IS NOT NULL
          AND ct2.vencimento_real_painel::date >= CURRENT_DATE - 1
          AND ct2.vencimento_real_painel::date <= CURRENT_DATE + ($1::int || ' days')::interval
+         AND a.venc_contrato::date > ct2.vencimento_real_painel::date
      )
    )
  GROUP BY a.id_assinatura, c.id_cliente, c.nome, a.venc_contas, a.venc_contrato, a.status, p.contrato, p.telas
