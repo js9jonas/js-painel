@@ -253,6 +253,9 @@ export function criarUnitvAdapter(
         dealer_name: DEALER_NAME,
       }), false); // account/renew retorna data:null em caso de sucesso
 
+      // Aguarda o painel processar a renovação antes de buscar o novo vencimento
+      await new Promise(r => setTimeout(r, 5000));
+
       // Busca novo vencimento
       const updatedData = await callWithRelogin("account", (token) => ({
         package_id: 1,
