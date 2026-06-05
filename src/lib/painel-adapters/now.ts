@@ -116,86 +116,116 @@ function buildDataTablesParams(length = 5000): URLSearchParams {
   return p;
 }
 
+class NowSessionExpiredError extends Error {}
+
+// Verifica se a resposta é HTML de login (sessão PHP expirada no servidor)
+function assertJson(res: Response, text: string): void {
+  if (text.trimStart().startsWith("<")) throw new NowSessionExpiredError();
+}
+
 export function criarNowAdapter(
   creds: ServidorCredenciais,
   _id: number,
   onSaveSession: SaveSession,
   onSaveContas: SaveContaVencimento,
 ): PainelAdapter {
-  // Sessão pode estar em cache no objeto — atualizada após auto-login
   let sessionCache = creds.session_cookie ?? "";
+
+  const usuario = creds.painel_usuario ?? "";
+  const senha   = creds.painel_senha   ?? "";
+  const painelUrl = creds.painel_url ?? BASE_URL;
+
+  async function doLogin(): Promise<string> {
+    if (!usuario || !senha) throw new Error("NOW: usuário/senha não configurados.");
+    const nova = await loginNow(painelUrl, usuario, senha);
+    sessionCache = nova;
+    await onSaveSession(nova, new Date(Date.now() + 23 * 60 * 60 * 1000));
+    return nova;
+  }
 
   async function getSession(): Promise<string> {
     const expirado = creds.session_expiry && new Date(creds.session_expiry) < new Date();
     if (sessionCache && !expirado) return sessionCache;
+    return doLogin();
+  }
 
-    // Auto-login via CapSolver
-    const usuario = creds.painel_usuario ?? "";
-    const senha   = creds.painel_senha   ?? "";
-    if (!usuario || !senha) throw new Error("NOW: usuário/senha não configurados.");
-
-    const novaSession = await loginNow(creds.painel_url ?? BASE_URL, usuario, senha);
-    sessionCache = novaSession;
-    const expiry = new Date(Date.now() + 23 * 60 * 60 * 1000); // 23h (margem)
-    await onSaveSession(novaSession, expiry);
-    return novaSession;
+  async function withRelogin<T>(fn: (session: string) => Promise<T>): Promise<T> {
+    const session = await getSession();
+    try {
+      return await fn(session);
+    } catch (err) {
+      if (!(err instanceof NowSessionExpiredError)) throw err;
+      // Sessão PHP expirou no servidor — força re-login via CapSolver
+      const nova = await doLogin();
+      return fn(nova);
+    }
   }
 
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const session = await getSession();
-      const codrev  = getCodrev(creds.painel_url ?? "");
-      const usuario = creds.painel_usuario ?? "";
-
-      const res = await phpFetch(
-        session, codrev,
-        `usuario-status-processo.php?usuario=${usuario}&status=Todos&perfil=`,
-        buildDataTablesParams()
-      );
-      if (!res.ok) throw new Error(`NOW listarContas → ${res.status}`);
-      const json = await res.json();
-      const rows: string[][] = json.data ?? [];
-
-      return rows.map((row) => ({
-        usuario:   parseUsername(row[0]),
-        rotulo:    parseNome(row[1]),
-        vencimento: parseVencimento(row[3]),
-        status:    parseStatus(row[3]),
-      })).filter((c) => c.usuario !== "");
+      return withRelogin(async (session) => {
+        const codrev = getCodrev(painelUrl);
+        const res = await phpFetch(
+          session, codrev,
+          `usuario-status-processo.php?usuario=${usuario}&status=Todos&perfil=`,
+          buildDataTablesParams()
+        );
+        if (!res.ok) throw new Error(`NOW listarContas → ${res.status}`);
+        const text = await res.text();
+        assertJson(res, text);
+        const json = JSON.parse(text);
+        const rows: string[][] = json.data ?? [];
+        return rows.map((row) => ({
+          usuario:    parseUsername(row[0]),
+          rotulo:     parseNome(row[1]),
+          vencimento: parseVencimento(row[3]),
+          status:     parseStatus(row[3]),
+        })).filter((c) => c.usuario !== "");
+      });
     },
 
     async getCreditos(): Promise<number | null> {
-      const session = await getSession();
-      const codrev  = getCodrev(creds.painel_url ?? "");
-      const res = await fetch(`${BASE_URL}/index.php?p=inicio`, {
-        headers: { Cookie: cookieHeader(session, codrev) },
-      });
-      if (!res.ok) return null;
-      const html = await res.text();
-      const m = html.match(/(\d+)\s*créditos/);
-      return m ? Number(m[1]) : null;
+      try {
+        return await withRelogin(async (session) => {
+          const codrev = getCodrev(painelUrl);
+          const res = await fetch(`${BASE_URL}/index.php?p=inicio`, {
+            headers: { Cookie: cookieHeader(session, codrev) },
+          });
+          if (!res.ok) return null;
+          const html = await res.text();
+          if (html.trimStart().startsWith("<script")) throw new NowSessionExpiredError();
+          const m = html.match(/(\d+)\s*créditos/);
+          return m ? Number(m[1]) : null;
+        });
+      } catch { return null; }
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
-      const session = await getSession();
-      const codrev  = getCodrev(creds.painel_url ?? "");
+      return withRelogin(async (session) => {
+        const codrev = getCodrev(painelUrl);
 
-      const body = new URLSearchParams({ id: usuario, qtdMes: String(meses) });
-      const res = await phpFetch(session, codrev, "EnviarRenovarUsuario.php", body);
-      if (!res.ok) throw new Error(`NOW renovar → ${res.status}`);
+        const res = await phpFetch(session, codrev, "EnviarRenovarUsuario.php",
+          new URLSearchParams({ id: usuario, qtdMes: String(meses) })
+        );
+        if (!res.ok) throw new Error(`NOW renovar → ${res.status}`);
+        const resText = await res.text();
+        assertJson(res, resText);
 
-      const listaRes = await phpFetch(
-        session, codrev,
-        `usuario-status-processo.php?usuario=${creds.painel_usuario}&status=Todos&perfil=`,
-        buildDataTablesParams()
-      );
-      const lista = await listaRes.json();
-      const rows: string[][] = lista.data ?? [];
-      const row = rows.find((r) => parseUsername(r[0]) === usuario);
-      const novoVenc = row ? parseVencimento(row[3]) ?? undefined : undefined;
+        const listaRes = await phpFetch(
+          session, codrev,
+          `usuario-status-processo.php?usuario=${creds.painel_usuario}&status=Todos&perfil=`,
+          buildDataTablesParams()
+        );
+        const listaText = await listaRes.text();
+        assertJson(listaRes, listaText);
+        const lista = JSON.parse(listaText);
+        const rows: string[][] = lista.data ?? [];
+        const row = rows.find((r) => parseUsername(r[0]) === usuario);
+        const novoVenc = row ? parseVencimento(row[3]) ?? undefined : undefined;
 
-      if (novoVenc) await onSaveContas(usuario, novoVenc);
-      return { ok: true, novoVencimento: novoVenc };
+        if (novoVenc) await onSaveContas(usuario, novoVenc);
+        return { ok: true, novoVencimento: novoVenc };
+      });
     },
   };
 }
