@@ -6,6 +6,21 @@ import { useRouter } from "next/navigation";
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 type StatusFinal = "ativo" | "pendente";
 
+type ContaVinculada = {
+    id_painel_servidor: number | null;
+    usuario: string;
+    vencimento_real_painel: string | null;
+    nome_painel: string;
+};
+
+type ResultadoConta = {
+    usuario: string;
+    nome_painel: string;
+    ok: boolean;
+    mensagem: string;
+    novoVencimento?: string | null;
+};
+
 const FORMAS_PGTO = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
 
@@ -51,6 +66,42 @@ function vencContasVencida(vencContasAtual: string | null | undefined): boolean 
     return venc <= hoje;
 }
 
+function contasExpiradas(contas: ContaVinculada[]): ContaVinculada[] {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return contas.filter(c => {
+        if (!c.vencimento_real_painel || c.id_painel_servidor === null) return false;
+        return new Date(c.vencimento_real_painel.split("T")[0] + "T00:00:00") <= hoje;
+    });
+}
+
+async function renovarContasViaAPI(contas: ContaVinculada[]): Promise<ResultadoConta[]> {
+    return Promise.all(
+        contas.map(async (c) => {
+            try {
+                const res = await fetch(`/api/paineis/servidores/${c.id_painel_servidor}/renovar`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ usuario: c.usuario }),
+                });
+                const json = await res.json();
+                if (!res.ok || json.erro) {
+                    return { usuario: c.usuario, nome_painel: c.nome_painel, ok: false, mensagem: json.erro ?? "Erro ao renovar." };
+                }
+                return {
+                    usuario: c.usuario,
+                    nome_painel: c.nome_painel,
+                    ok: true,
+                    mensagem: json.mensagem ?? "Renovado!",
+                    novoVencimento: json.novoVencimento ?? null,
+                };
+            } catch {
+                return { usuario: c.usuario, nome_painel: c.nome_painel, ok: false, mensagem: "Erro de rede." };
+            }
+        })
+    );
+}
+
 export default function RenovarAssinatura({
     idAssinatura,
     vencAtual,
@@ -64,6 +115,7 @@ export default function RenovarAssinatura({
     planoTipo,
     planoTelas,
     status,
+    contasVinculadas,
 }: {
     idAssinatura: string;
     vencAtual?: string | null;
@@ -77,6 +129,7 @@ export default function RenovarAssinatura({
     planoTipo?: string | null;
     planoTelas?: number | null;
     status?: string | null;
+    contasVinculadas?: ContaVinculada[];
 }) {
     const router = useRouter();
     const isPendente = (status ?? "").toLowerCase().trim() === "pendente";
@@ -107,6 +160,7 @@ export default function RenovarAssinatura({
             : (vencContasAtual?.split("T")[0] ?? "")
     );
     const [vencContratoEditado, setVencContratoEditado] = useState(false);
+    const [resultadosContas, setResultadosContas] = useState<ResultadoConta[]>([]);
 
     function handlePeriodoChange(p: Periodo) {
         setPeriodo(p);
@@ -123,7 +177,14 @@ export default function RenovarAssinatura({
         setVencContratoEditado(false);
         setVencContas(contasVencida ? addMeses(undefined, 1) : (vencContasAtual?.split("T")[0] ?? ""));
         setStatusFinal("ativo");
+        setResultadosContas([]);
         setOpen(true);
+    }
+
+    function fecharComRefresh() {
+        setOpen(false);
+        router.refresh();
+        setResultadosContas([]);
     }
 
     async function executarPendente() {
@@ -182,15 +243,25 @@ export default function RenovarAssinatura({
         const text = await resp.text();
         let j: any = {};
         try { j = JSON.parse(text); } catch { }
-        setLoading(false);
 
         if (!resp.ok || j?.ok === false) {
+            setLoading(false);
             alert(j?.error ?? text ?? `Erro HTTP ${resp.status}`);
             return;
         }
 
-        setOpen(false);
-        router.refresh();
+        const expiradas = contasExpiradas(contasVinculadas ?? []);
+
+        if (expiradas.length === 0) {
+            setLoading(false);
+            setOpen(false);
+            router.refresh();
+            return;
+        }
+
+        const resultados = await renovarContasViaAPI(expiradas);
+        setLoading(false);
+        setResultadosContas(resultados);
     }
 
     const inputClass = "h-9 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
@@ -223,176 +294,210 @@ export default function RenovarAssinatura({
                             )}
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-
-                            {/* Modo normal: mostra período e datas */}
-                            {!isPendente && (
-                                <>
-                                    {/* Alerta de urgência em venc_contas */}
-                                    {contasVencida && (
-                                        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-start gap-3">
-                                            <span className="text-red-500 text-base mt-0.5">⚠️</span>
-                                            <div>
-                                                <p className="text-sm font-semibold text-red-800">Renovação urgente necessária</p>
-                                                <p className="text-xs text-red-600 mt-0.5">
-                                                    O vencimento de contas (
-                                                    <span className="font-medium">
-                                                        {vencContasAtual!.split("T")[0].split("-").reverse().join("/")}
-                                                    </span>
-                                                    ) já passou. O cliente pode estar sem acesso. Faça a renovação no painel do servidor o quanto antes.
-                                                </p>
+                        {/* Resultados da renovação via API */}
+                        {resultadosContas.length > 0 ? (
+                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                                <p className="text-sm font-semibold text-emerald-700">✓ Assinatura salva</p>
+                                <p className="text-xs text-zinc-500 -mt-1">Resultado da renovação das contas no painel:</p>
+                                <div className="space-y-2">
+                                    {resultadosContas.map((r, i) => (
+                                        <div key={i} className={`rounded-xl px-3 py-2.5 text-xs border ${r.ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-medium text-zinc-800">
+                                                    {r.nome_painel} · <span className="font-mono">{r.usuario}</span>
+                                                </span>
+                                                <span className={`font-semibold ${r.ok ? "text-emerald-700" : "text-red-600"}`}>
+                                                    {r.ok ? "✓ Renovado" : "✗ Erro"}
+                                                </span>
+                                            </div>
+                                            <div className={`mt-0.5 ${r.ok ? "text-emerald-600" : "text-red-500"}`}>
+                                                {r.ok && r.novoVencimento
+                                                    ? `Novo vencimento: ${r.novoVencimento.split("-").reverse().join("/")}`
+                                                    : r.mensagem}
                                             </div>
                                         </div>
-                                    )}
-
-                                    <div className="space-y-1.5">
-                                        <label className={labelClass}>Periodo</label>
-                                        <select className={inputClass} value={periodo} onChange={(e) => handlePeriodoChange(e.target.value as Periodo)}>
-                                            <option value="mensal">Mensal (1 mes)</option>
-                                            <option value="trimestral">Trimestral (3 meses)</option>
-                                            <option value="semestral">Semestral (6 meses)</option>
-                                            <option value="anual">Anual (12 meses)</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className={labelClass}>Venc. contrato</label>
-                                            <input
-                                                type="date"
-                                                className={inputClass}
-                                                value={vencContrato}
-                                                onChange={(e) => {
-                                                    setVencContrato(e.target.value);
-                                                    setVencContratoEditado(true);
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className={`${labelClass} flex items-center gap-1.5`}>
-                                                Venc. contas
-                                                <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${contasVencida
-                                                        ? "bg-red-100 text-red-600"
-                                                        : "bg-zinc-100 text-zinc-400"
-                                                    }`}>
-                                                    {contasVencida ? "⚠️ vencida" : "não alterada"}
-                                                </span>
-                                            </label>
-                                            <input
-                                                type="date"
-                                                className={`${inputClass} ${contasVencida ? "border-red-300 focus:ring-red-400" : ""}`}
-                                                value={vencContas}
-                                                onChange={(e) => setVencContas(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-zinc-400">
-                                        Apenas o vencimento do contrato é ajustado aqui. A renovação do acesso é feita pela página de Alertas.
-                                    </p>
-
-                                    {/* Seleção de status */}
-                                    <div className="space-y-1.5">
-                                        <label className={labelClass}>Marcar status como</label>
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setStatusFinal("ativo")}
-                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${statusFinal === "ativo"
-                                                        ? "bg-emerald-600 border-emerald-600 text-white"
-                                                        : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
-                                                    }`}
-                                            >
-                                                ✓ Ativo
-                                                {statusFinal === "ativo" && <span className="ml-1.5 text-xs opacity-75">(padrão)</span>}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setStatusFinal("pendente")}
-                                                className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${statusFinal === "pendente"
-                                                        ? "bg-amber-500 border-amber-500 text-white"
-                                                        : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
-                                                    }`}
-                                            >
-                                                ⏳ Pendente
-                                            </button>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Datas somente leitura para pendente */}
-                            {isPendente && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <label className={labelClass}>Venc. contrato atual</label>
-                                        <input
-                                            type="date"
-                                            className={`${inputClass} bg-zinc-50 text-zinc-400 cursor-not-allowed`}
-                                            value={vencAtual?.split("T")[0] ?? ""}
-                                            readOnly
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className={labelClass}>Venc. contas atual</label>
-                                        <input
-                                            type="date"
-                                            className={`${inputClass} bg-zinc-50 text-zinc-400 cursor-not-allowed`}
-                                            value={vencContasAtual?.split("T")[0] ?? ""}
-                                            readOnly
-                                        />
-                                    </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
 
-                            {/* Pagamento — visível somente se status = ativo */}
-                            {(isPendente || statusFinal === "ativo") && (
-                                <div className={isPendente ? "" : "border-t pt-4"}>
-                                    {!isPendente && (
-                                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Dados do pagamento</p>
-                                    )}
-                                    <div className="grid grid-cols-2 gap-3">
+                                {/* Modo normal: mostra período e datas */}
+                                {!isPendente && (
+                                    <>
+                                        {/* Alerta de urgência em venc_contas */}
+                                        {contasVencida && (
+                                            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-start gap-3">
+                                                <span className="text-red-500 text-base mt-0.5">⚠️</span>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-red-800">Renovação urgente necessária</p>
+                                                    <p className="text-xs text-red-600 mt-0.5">
+                                                        O vencimento de contas (
+                                                        <span className="font-medium">
+                                                            {vencContasAtual!.split("T")[0].split("-").reverse().join("/")}
+                                                        </span>
+                                                        ) já passou. A conta no painel será renovada automaticamente ao salvar.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="space-y-1.5">
-                                            <label className={labelClass}>Forma</label>
-                                            <select className={inputClass} value={forma} onChange={(e) => setForma(e.target.value)}>
-                                                {FORMAS_PGTO.map((f) => <option key={f} value={f}>{f}</option>)}
+                                            <label className={labelClass}>Periodo</label>
+                                            <select className={inputClass} value={periodo} onChange={(e) => handlePeriodoChange(e.target.value as Periodo)}>
+                                                <option value="mensal">Mensal (1 mes)</option>
+                                                <option value="trimestral">Trimestral (3 meses)</option>
+                                                <option value="semestral">Semestral (6 meses)</option>
+                                                <option value="anual">Anual (12 meses)</option>
                                             </select>
                                         </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <label className={labelClass}>Venc. contrato</label>
+                                                <input
+                                                    type="date"
+                                                    className={inputClass}
+                                                    value={vencContrato}
+                                                    onChange={(e) => {
+                                                        setVencContrato(e.target.value);
+                                                        setVencContratoEditado(true);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className={`${labelClass} flex items-center gap-1.5`}>
+                                                    Venc. contas
+                                                    <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${contasVencida
+                                                            ? "bg-red-100 text-red-600"
+                                                            : "bg-zinc-100 text-zinc-400"
+                                                        }`}>
+                                                        {contasVencida ? "⚠️ vencida" : "não alterada"}
+                                                    </span>
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    className={`${inputClass} ${contasVencida ? "border-red-300 focus:ring-red-400" : ""}`}
+                                                    value={vencContas}
+                                                    onChange={(e) => setVencContas(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Seleção de status */}
                                         <div className="space-y-1.5">
-                                            <label className={labelClass}>Valor (R$)</label>
+                                            <label className={labelClass}>Marcar status como</label>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setStatusFinal("ativo")}
+                                                    className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${statusFinal === "ativo"
+                                                            ? "bg-emerald-600 border-emerald-600 text-white"
+                                                            : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
+                                                        }`}
+                                                >
+                                                    ✓ Ativo
+                                                    {statusFinal === "ativo" && <span className="ml-1.5 text-xs opacity-75">(padrão)</span>}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setStatusFinal("pendente")}
+                                                    className={`flex-1 h-9 rounded-xl border text-sm font-medium transition-colors ${statusFinal === "pendente"
+                                                            ? "bg-amber-500 border-amber-500 text-white"
+                                                            : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
+                                                        }`}
+                                                >
+                                                    ⏳ Pendente
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Datas somente leitura para pendente */}
+                                {isPendente && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className={labelClass}>Venc. contrato atual</label>
                                             <input
-                                                type="number"
-                                                step="0.01"
-                                                className={inputClass}
-                                                value={valor}
-                                                onChange={(e) => setValor(e.target.value)}
-                                                placeholder="0.00"
+                                                type="date"
+                                                className={`${inputClass} bg-zinc-50 text-zinc-400 cursor-not-allowed`}
+                                                value={vencAtual?.split("T")[0] ?? ""}
+                                                readOnly
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className={labelClass}>Venc. contas atual</label>
+                                            <input
+                                                type="date"
+                                                className={`${inputClass} bg-zinc-50 text-zinc-400 cursor-not-allowed`}
+                                                value={vencContasAtual?.split("T")[0] ?? ""}
+                                                readOnly
                                             />
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Aviso quando pendente selecionado */}
-                            {!isPendente && statusFinal === "pendente" && (
-                                <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                                    As datas serão atualizadas normalmente, mas nenhum pagamento será registrado e o status ficará como <b>pendente</b>.
-                                </div>
-                            )}
-                        </div>
+                                {/* Pagamento — visível somente se status = ativo */}
+                                {(isPendente || statusFinal === "ativo") && (
+                                    <div className={isPendente ? "" : "border-t pt-4"}>
+                                        {!isPendente && (
+                                            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Dados do pagamento</p>
+                                        )}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <label className={labelClass}>Forma</label>
+                                                <select className={inputClass} value={forma} onChange={(e) => setForma(e.target.value)}>
+                                                    {FORMAS_PGTO.map((f) => <option key={f} value={f}>{f}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className={labelClass}>Valor (R$)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    className={inputClass}
+                                                    value={valor}
+                                                    onChange={(e) => setValor(e.target.value)}
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Aviso quando pendente selecionado */}
+                                {!isPendente && statusFinal === "pendente" && (
+                                    <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                                        As datas serão atualizadas normalmente, mas nenhum pagamento será registrado e o status ficará como <b>pendente</b>.
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="px-6 py-4 border-t flex justify-end gap-2">
-                            <button type="button" onClick={() => setOpen(false)} disabled={loading}
-                                className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
-                                Cancelar
-                            </button>
-
-                            {isPendente ? (
-                                <button type="button" onClick={executarPendente} disabled={loading}
-                                    className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
-                                    {loading ? "Salvando..." : "Confirmar pagamento"}
+                            {resultadosContas.length > 0 ? (
+                                <button type="button" onClick={fecharComRefresh}
+                                    className="h-9 rounded-xl bg-zinc-900 px-4 text-sm text-white font-medium hover:bg-zinc-800">
+                                    Fechar
                                 </button>
+                            ) : isPendente ? (
+                                <>
+                                    <button type="button" onClick={() => setOpen(false)} disabled={loading}
+                                        className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
+                                        Cancelar
+                                    </button>
+                                    <button type="button" onClick={executarPendente} disabled={loading}
+                                        className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
+                                        {loading ? "Salvando..." : "Confirmar pagamento"}
+                                    </button>
+                                </>
                             ) : (
                                 <>
+                                    <button type="button" onClick={() => setOpen(false)} disabled={loading}
+                                        className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
+                                        Cancelar
+                                    </button>
                                     <button type="button" onClick={() => executar(false)} disabled={loading}
                                         className="h-9 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50">
                                         {loading ? "..." : "Alterar"}

@@ -345,6 +345,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 planoTipo={ativa.plano_tipo ?? null}
                 planoTelas={ativa.pacote_telas ?? null}
                 status={ativa.status ?? null}
+                contasVinculadas={contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []}
                 planos={planos.map(p => ({
                   id_plano: String(p.id_plano),
                   tipo: p.tipo ?? "",
@@ -433,6 +434,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         pacoteNome={a.pacote_contrato ?? null}
                         planoValor={a.plano_valor ?? null}
                         status={a.status ?? null}
+                        contasVinculadas={contasPorAssinatura.get(String(a.id_assinatura)) ?? []}
                       />
                       <AdicionarContaModal
                         idAssinatura={String(a.id_assinatura)}
