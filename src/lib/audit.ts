@@ -37,7 +37,9 @@ export type AuditTipo =
   | "troca_plano"
   | "cancelamento"
   | "edicao_cadastro"
-  | "alteracao_app";
+  | "alteracao_app"
+  | "vinculo_conta"
+  | "desvinculo_conta";
 
 export async function registrarAudit(
   client: PoolClient,

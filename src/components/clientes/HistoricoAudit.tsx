@@ -8,7 +8,9 @@ const TIPO_CONFIG: Record<string, { label: string; classes: string }> = {
   troca_plano:    { label: "Troca de plano",     classes: "bg-purple-50 text-purple-700" },
   cancelamento:   { label: "Cancelamento",       classes: "bg-red-50 text-red-700" },
   edicao_cadastro:{ label: "Edição de cadastro", classes: "bg-zinc-100 text-zinc-600" },
-  alteracao_app:  { label: "Alteração de app",   classes: "bg-amber-50 text-amber-700" },
+  alteracao_app:   { label: "Alteração de app",    classes: "bg-amber-50 text-amber-700" },
+  vinculo_conta:   { label: "Conta vinculada",     classes: "bg-emerald-50 text-emerald-700" },
+  desvinculo_conta:{ label: "Conta desvinculada",  classes: "bg-orange-50 text-orange-700" },
 };
 
 function formatarDataHora(iso: string): string {
