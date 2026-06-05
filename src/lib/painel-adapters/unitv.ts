@@ -54,7 +54,7 @@ const BASE_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 };
 
-async function apiCall(token: string, action: string, bodyObj: object): Promise<any> {
+async function apiCall(token: string, action: string, bodyObj: object, requireData = true): Promise<any> {
   const encrypted = aesEncrypt(JSON.stringify(bodyObj));
   const res = await impitFetch(impit, `${API_BASE}/${action}`, {
     method: "POST",
@@ -65,7 +65,10 @@ async function apiCall(token: string, action: string, bodyObj: object): Promise<
   const json = await res.json() as any;
   if (json.returnCode === 300) throw new UnitvSessionExpiredError();
   if (json.returnCode !== 0) throw new Error(`UNITV ${action} returnCode ${json.returnCode}: ${json.errorMessage}`);
-  if (!json.data) throw new Error(`UNITV ${action}: resposta sem data`);
+  if (!json.data) {
+    if (requireData) throw new Error(`UNITV ${action}: resposta sem data`);
+    return null;
+  }
   return JSON.parse(aesDecrypt(json.data));
 }
 
@@ -178,17 +181,17 @@ export function criarUnitvAdapter(
     return session.token;
   }
 
-  async function callWithRelogin(action: string, bodyFn: (token: string) => object): Promise<any> {
+  async function callWithRelogin(action: string, bodyFn: (token: string) => object, requireData = true): Promise<any> {
     let token = await ensureToken();
     try {
-      return await apiCall(token, action, bodyFn(token));
+      return await apiCall(token, action, bodyFn(token), requireData);
     } catch (err) {
       if (!(err instanceof UnitvSessionExpiredError)) throw err;
       // Re-login automático
       token = await loginUnitv(usuario, senha);
       session = { token };
       await onSaveSession(JSON.stringify(session));
-      return await apiCall(token, action, bodyFn(token));
+      return await apiCall(token, action, bodyFn(token), requireData);
     }
   }
 
@@ -248,7 +251,7 @@ export function criarUnitvAdapter(
         sign,
         dealer_token: token,
         dealer_name: DEALER_NAME,
-      }));
+      }), false); // account/renew retorna data:null em caso de sucesso
 
       // Busca novo vencimento
       const updatedData = await callWithRelogin("account", (token) => ({
