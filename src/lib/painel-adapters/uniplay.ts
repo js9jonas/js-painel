@@ -131,15 +131,10 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       const user = users.find((u: any) => u.username === usuario);
       if (!user) throw new Error(`UNIPLAY: usuário "${usuario}" não encontrado`);
 
-      // PUT funciona sem proxy (POST retorna 405 — endpoint mudou)
+      // Endpoint mudou de POST para PUT. PUT via proxy Webshare funciona (POST dava timeout).
       // Resposta: string "DD/MM/YYYY HH:mm:ss" com novo vencimento
-      const res = await fetch(`${API_BASE}/users-iptv/${user.id}`, {
+      const res = await authFetch(session.token, `users-iptv/${user.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.token}`,
-          ...ORIGIN_HEADERS,
-        },
         body: JSON.stringify({ action: 1, credits: meses, reg_password: session.cryptPass }),
       });
       if (!res.ok) throw new Error(`UNIPLAY renovar → ${res.status}`);
