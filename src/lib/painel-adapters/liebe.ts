@@ -38,8 +38,11 @@ class LiebeUnauthorizedError extends Error {}
 
 async function liebeGet(token: string, path: string): Promise<any> {
   const res = await impitFetch(impit, `${API_BASE}${path}`, { headers: baseHeaders(token) });
-  if (res.status === 401) throw new LiebeUnauthorizedError();
-  if (!res.ok) throw new Error(`LIEBE GET ${path} → ${res.status}`);
+  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`LIEBE GET ${path} → ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`);
+  }
   return res.json();
 }
 
@@ -49,8 +52,11 @@ async function liebePost(token: string, path: string, body?: object): Promise<an
     headers: baseHeaders(token),
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) throw new LiebeUnauthorizedError();
-  if (!res.ok) throw new Error(`LIEBE POST ${path} → ${res.status}`);
+  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`LIEBE POST ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
+  }
   return res.json();
 }
 
