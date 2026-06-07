@@ -90,6 +90,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Encaminha evento para n8n (fire-and-forget)
+    fetch('https://js-n8n.l1fcxz.easypanel.host/webhook/whatsapp-cloud', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(err => console.error('[WhatsApp] Erro ao encaminhar para n8n:', err))
+
     return NextResponse.json({ status: 'ok' })
   } catch (err) {
     console.error('[WhatsApp] Erro no webhook:', err)
