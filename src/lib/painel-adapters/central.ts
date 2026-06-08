@@ -165,12 +165,19 @@ export function criarCentralAdapter(
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
 
       // mounth (typo intencional do servidor)
-      const result = await fetchComRetry(`users/${conta.id}/renew`, {
+      await fetchComRetry(`users/${conta.id}/renew`, {
         method: "POST",
         body: JSON.stringify({ mounth: 1 }),
       });
-      const novoVenc = result.exp_date
-        ? new Date(Number(result.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+
+      // Ajusta o horário de vencimento para 23:59:59 BRT após a renovação
+      const adjusted = await fetchComRetry(`users/${conta.id}/set-expiry-time`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const expTs = adjusted?.data?.new_expiry_timestamp ?? adjusted?.user?.exp_date;
+      const novoVenc = expTs
+        ? new Date(Number(expTs) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
         : undefined;
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };

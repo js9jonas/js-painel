@@ -139,10 +139,17 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       });
       if (!res.ok) throw new Error(`UNIPLAY renovar → ${res.status}`);
 
-      // Resposta é string JSON "DD\/MM\/YYYY HH:mm:ss" — JSON.parse desescapa as barras
+      // Ajusta o horário de vencimento para 23:59:59 BRT após a renovação
+      const resAjuste = await authFetch(session.token, `users-iptv/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ action: 10 }),
+      });
+
+      // Usa a data da resposta do ajuste (já em 23:59); cai de volta na renovação se falhar
       let novoVenc: string | undefined;
+      const resTexto = resAjuste.ok ? await resAjuste.text() : await res.text();
       try {
-        const dateStr: string = JSON.parse(await res.text());
+        const dateStr: string = JSON.parse(resTexto);
         const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
         if (m) novoVenc = `${m[3]}-${m[2]}-${m[1]}`;
       } catch { /* sem data — segue sem novoVencimento */ }
