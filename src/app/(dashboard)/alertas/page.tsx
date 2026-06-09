@@ -195,13 +195,15 @@ export default async function AlertasPage() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
-                                                        <DefinirDataContaButton
-                                                            idAssinatura={r.id_assinatura}
-                                                            vencContas={r.venc_contas?.split("T")[0] ?? ""}
-                                                        />
-                                                    </div>
+                                                    {subContasHoje.length === 0 && (
+                                                        <div className="flex items-center gap-2">
+                                                            <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
+                                                            <DefinirDataContaButton
+                                                                idAssinatura={r.id_assinatura}
+                                                                vencContas={r.venc_contas?.split("T")[0] ?? ""}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
 
