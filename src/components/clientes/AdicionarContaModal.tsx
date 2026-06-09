@@ -9,9 +9,10 @@ type Props = {
   idAssinatura: string;
   idCliente: string;
   paineis: Painel[];
+  compact?: boolean;
 };
 
-export default function AdicionarContaModal({ idAssinatura, idCliente, paineis }: Props) {
+export default function AdicionarContaModal({ idAssinatura, idCliente, paineis, compact }: Props) {
   const [aberto, setAberto] = useState(false);
   const [idPainel, setIdPainel] = useState<number | "">(paineis[0]?.id ?? "");
   const [query, setQuery] = useState("");
@@ -70,13 +71,23 @@ export default function AdicionarContaModal({ idAssinatura, idCliente, paineis }
 
   return (
     <>
-      <button
-        onClick={() => setAberto(true)}
-        title="Adicionar conta IPTV"
-        className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
-      >
-        + Conta
-      </button>
+      {compact ? (
+        <button
+          onClick={() => setAberto(true)}
+          title="Adicionar conta IPTV"
+          className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200 transition-colors text-xs font-bold leading-none"
+        >
+          +
+        </button>
+      ) : (
+        <button
+          onClick={() => setAberto(true)}
+          title="Adicionar conta IPTV"
+          className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+        >
+          + Conta
+        </button>
+      )}
 
       {aberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

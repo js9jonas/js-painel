@@ -324,6 +324,12 @@ export default async function ClienteDetalhePage({ params }: Props) {
                         </span>
                       </>
                     )}
+                    <AdicionarContaModal
+                      idAssinatura={String(ativa.id_assinatura)}
+                      idCliente={id}
+                      paineis={paineisList}
+                      compact
+                    />
                   </div>
                 )
               }
@@ -388,7 +394,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <th className="px-3 py-2 text-left font-medium">ID</th>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
                 <th className="px-3 py-2 text-left font-medium">Venc. contrato</th>
-                <th className="px-3 py-2 text-left font-medium">Venc. contas</th>
                 <th className="px-3 py-2 text-left font-medium">Identificacao</th>
                 <th className="px-3 py-2 text-left font-medium">Pacote</th>
                 <th className="px-3 py-2 text-left font-medium">Plano</th>
@@ -406,11 +411,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-zinc-700">{a.venc_contrato ? a.venc_contrato.split("T")[0].split("-").reverse().join("/") : "--"}</td>
-                  <td className="px-3 py-2 text-zinc-700">
-                    {(contasPorAssinatura.get(String(a.id_assinatura)) ?? []).length === 0
-                      ? (a.venc_contas ? a.venc_contas.split("T")[0].split("-").reverse().join("/") : "--")
-                      : "--"}
-                  </td>
                   <td className="px-3 py-2 text-zinc-700">{a.identificacao ?? "--"}</td>
                   <td className="px-3 py-2">
                     <span className="flex items-center gap-1.5 flex-wrap">
@@ -473,38 +473,63 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     </div>
                   </td>
                 </tr>
-                {(contasPorAssinatura.get(String(a.id_assinatura)) ?? []).map((c) => (
-                  <tr key={`conta-${c.id_conta}`} className="bg-zinc-50/70">
-                    <td colSpan={8} className="px-3 py-1.5">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="font-medium text-zinc-400">{c.nome_painel}</span>
-                        <span className="text-zinc-300">·</span>
-                        <span className="font-mono font-semibold text-zinc-700 select-all">{c.usuario}</span>
-                        {c.senha && (
-                          <>
-                            <span className="text-zinc-300">/</span>
-                            <span className="font-mono text-zinc-500 select-all">{c.senha}</span>
-                          </>
-                        )}
-                        <span className={`rounded-full px-1.5 py-0.5 ${
-                          c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
-                          c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
-                          "bg-red-100 text-red-600"
-                        }`}>
-                          {c.vencimento_real_painel
-                            ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
-                            : c.status_conta}
-                        </span>
-                        <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {(contasPorAssinatura.get(String(a.id_assinatura)) ?? []).length > 0
+                  ? (contasPorAssinatura.get(String(a.id_assinatura)) ?? []).map((c) => (
+                    <tr key={`conta-${c.id_conta}`} className="bg-zinc-50/70">
+                      <td colSpan={7} className="px-3 py-1.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-medium text-zinc-400">{c.nome_painel}</span>
+                          <span className="text-zinc-300">·</span>
+                          <span className="font-mono font-semibold text-zinc-700 select-all">{c.usuario}</span>
+                          {c.senha && (
+                            <>
+                              <span className="text-zinc-300">/</span>
+                              <span className="font-mono text-zinc-500 select-all">{c.senha}</span>
+                            </>
+                          )}
+                          <span className={`rounded-full px-1.5 py-0.5 ${
+                            c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
+                            c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
+                            "bg-red-100 text-red-600"
+                          }`}>
+                            {c.vencimento_real_painel
+                              ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
+                              : c.status_conta}
+                          </span>
+                          <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                  : (
+                    <tr className="bg-zinc-50/40">
+                      <td colSpan={7} className="px-3 py-1.5">
+                        <div className="inline-flex items-center gap-2 rounded-lg bg-zinc-50 border border-dashed border-zinc-300 px-3 py-1 text-xs text-zinc-400">
+                          <span className="font-medium">Conta sem vínculo</span>
+                          {a.venc_contas && (
+                            <>
+                              <span className="text-zinc-300">·</span>
+                              <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
+                                {a.venc_contas.split("T")[0].split("-").reverse().join("/")}
+                              </span>
+                            </>
+                          )}
+                          <AdicionarContaModal
+                            idAssinatura={String(a.id_assinatura)}
+                            idCliente={id}
+                            paineis={paineisList}
+                            compact
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
                 </Fragment>
               ))}
               {outras.length === 0 && (
                 <tr>
-                  <td className="px-3 py-6 text-center text-zinc-500" colSpan={8}>
+                  <td className="px-3 py-6 text-center text-zinc-500" colSpan={7}>
                     Nenhuma assinatura encontrada.
                   </td>
                 </tr>
