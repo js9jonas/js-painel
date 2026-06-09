@@ -77,7 +77,8 @@ export async function POST(req: NextRequest) {
 
         } else if (change.field === 'smb_message_echoes') {
           // Mensagens enviadas pelo Jonas via celular ou WhatsApp Web
-          const messages = value.messages ?? []
+          // Payload usa "message_echoes" (não "messages")
+          const messages = value.message_echoes ?? []
 
           for (const msg of messages) {
             const to        = msg.to     // número do cliente destinatário
