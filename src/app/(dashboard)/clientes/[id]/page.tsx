@@ -235,8 +235,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
             )}
           </div>
           <div className="px-3 py-2">
-            {/* Todos os campos em uma única grade horizontal */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-2 text-sm">
+            {/* Grade de campos fixos — sempre 5 colunas */}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-4 gap-y-2 text-sm">
               <div>
                 <div className="text-xs text-zinc-500">ID</div>
                 <div className="font-medium text-zinc-900">{ativa.id_assinatura}</div>
@@ -247,14 +247,6 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   {ativa.venc_contrato ? ativa.venc_contrato.split("T")[0].split("-").reverse().join("/") : "--"}
                 </div>
               </div>
-              {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length === 0 && (
-                <div>
-                  <div className="text-xs text-zinc-500">Venc. contas</div>
-                  <div className="font-medium text-zinc-900">
-                    {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}
-                  </div>
-                </div>
-              )}
               <div>
                 <div className="text-xs text-zinc-500">Status</div>
                 <div className={`font-medium ${corStatusDestaque(ativa.status)}`}>{ativa.status}</div>
@@ -294,9 +286,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 {ativa.observacao && <span>Obs.: <span className="text-zinc-800">{ativa.observacao}</span></span>}
               </div>
             )}
-            {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-zinc-100">
-                {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).map((c) => (
+
+            {/* Contas: vinculadas ou balão de sem vínculo */}
+            <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-zinc-100">
+              {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length > 0
+                ? (contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).map((c) => (
                   <div key={c.id_conta} className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-1.5 text-xs">
                     <span className="font-medium text-zinc-500">{c.nome_painel}</span>
                     <span className="text-zinc-300">·</span>
@@ -318,9 +312,22 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     </span>
                     <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+                : (
+                  <div className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-dashed border-zinc-300 px-3 py-1.5 text-xs text-zinc-400">
+                    <span className="font-medium">Conta sem vínculo</span>
+                    {ativa.venc_contas && (
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
+                          {ativa.venc_contas.split("T")[0].split("-").reverse().join("/")}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )
+              }
+            </div>
 
             <div className="flex justify-end gap-2 mt-2">
               <AdicionarContaModal
