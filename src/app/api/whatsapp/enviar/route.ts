@@ -1,11 +1,13 @@
 // src/app/api/whatsapp/enviar/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { auth } from '@/auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth()
     const { telefone, mensagem, sugestao_ia, foi_aceita } = await req.json()
 
     if (!telefone || !mensagem) {
@@ -43,15 +45,16 @@ export async function POST(req: NextRequest) {
     // Salva no banco
     await pool.query(`
       INSERT INTO public.whatsapp_mensagens
-        (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, mensagem_final, recebida_em)
-      VALUES ($1, $2, 'text', $3, 'jonas', $4, $5, $3, NOW())
+        (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, mensagem_final, source, recebida_em)
+      VALUES ($1, $2, 'text', $3, 'jonas', $4, $5, $3, $6, NOW())
       ON CONFLICT (wa_msg_id) DO NOTHING
     `, [
       data.messages?.[0]?.id ?? `sent_${Date.now()}`,
       telefone,
       mensagem,
       sugestao_ia ?? null,
-      foi_aceita ?? null
+      foi_aceita ?? null,
+      session?.user?.email ? `chat:${session.user.email}` : 'chat',
     ])
 
     return NextResponse.json({ success: true, message_id: data.messages?.[0]?.id })

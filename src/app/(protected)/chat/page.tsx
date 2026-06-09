@@ -26,6 +26,7 @@ interface Mensagem {
   foi_aceita: boolean | null
   mensagem_final: string | null
   status: string | null
+  source: string | null
   recebida_em: string
 }
 
@@ -83,6 +84,14 @@ function statusColor(s: string | null) {
 function scoreStars(score: number | null) {
   const n = Math.min(5, Math.max(0, Math.round((score ?? 0) / 20)))
   return '★'.repeat(n) + '☆'.repeat(5 - n)
+}
+
+function sourceLabel(source: string | null) {
+  if (!source) return null
+  if (source.startsWith('chat:')) return { icon: '💬', text: source.slice(5) }
+  if (source === 'chat') return { icon: '💬', text: 'Chat' }
+  if (source === 'n8n') return { icon: '🤖', text: 'Automático' }
+  return { icon: '💬', text: source }
 }
 
 function nomeInicial(nome: string | null, tel: string) {
@@ -436,6 +445,14 @@ export default function ChatPage() {
                           {msg.foi_aceita && (
                             <span style={{ color: '#00a884', fontSize: 10 }}>✦ IA</span>
                           )}
+                          {!isCliente && (() => {
+                            const sl = sourceLabel(msg.source)
+                            return sl ? (
+                              <span style={{ color: '#4a7a6a', fontSize: 10 }} title={sl.text}>
+                                {sl.icon} {sl.text}
+                              </span>
+                            ) : null
+                          })()}
                           <span style={{ color: '#8696a0', fontSize: 11 }}>
                             {new Date(msg.recebida_em).toLocaleTimeString('pt-BR', {
                               hour: '2-digit', minute: '2-digit'

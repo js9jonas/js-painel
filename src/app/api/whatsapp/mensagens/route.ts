@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       SELECT
         id, wa_msg_id, telefone, nome_contato, tipo,
         conteudo, origem, sugestao_ia, foi_aceita, mensagem_final,
-        status, recebida_em
+        status, source, recebida_em
       FROM public.whatsapp_mensagens
       WHERE telefone = $1
       ORDER BY recebida_em ASC
