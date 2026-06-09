@@ -139,6 +139,10 @@ export default async function AlertasPage() {
                                 {contas.map((r) => {
                                     const diasContas = r.venc_contas ? diasRestantes(r.venc_contas.split("T")[0]) : null;
                                     const vinculado = r.pacote_telas !== null && r.contas_vinculadas_total === r.pacote_telas;
+                                    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                                    const subContasHoje = r.sub_contas.filter(ct =>
+                                        ct.vencimento_real_painel.split("T")[0] >= hojeStr
+                                    );
                                     return (
                                         <React.Fragment key={r.id_assinatura}>
                                             {/* Linha da assinatura */}
@@ -201,49 +205,63 @@ export default async function AlertasPage() {
                                                 </td>
                                             </tr>
 
-                                            {/* Sub-linhas das contas IPTV */}
-                                            {r.sub_contas.map((ct) => {
-                                                const diasCt = diasRestantes(ct.vencimento_real_painel.split("T")[0]);
-                                                const dataFmt = ct.vencimento_real_painel.split("T")[0].split("-").reverse().join("/");
-                                                return (
-                                                    <tr key={ct.id_conta} className="bg-zinc-50/60 hover:bg-zinc-100/60">
-                                                        {/* Indentação na col cliente */}
-                                                        <td className="px-4 py-2 pl-8">
-                                                            <span className="text-xs text-zinc-400">↳ conta IPTV</span>
-                                                        </td>
-                                                        {/* Coluna pacote: painel da conta */}
-                                                        <td className="px-4 py-2">
-                                                            {ct.nome_painel && (
-                                                                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                                                    🔗 {ct.nome_painel}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        {/* Coluna Venc. Conta: badge data + usuario */}
-                                                        <td className="px-4 py-2" colSpan={2}>
-                                                            <div className="inline-flex flex-col items-start gap-0.5">
+                                            {/* Sub-linhas: contas com validade >= hoje ou balão sem vínculo */}
+                                            {subContasHoje.length > 0
+                                                ? subContasHoje.map((ct) => {
+                                                    const diasCt = diasRestantes(ct.vencimento_real_painel.split("T")[0]);
+                                                    const dataFmt = ct.vencimento_real_painel.split("T")[0].split("-").reverse().join("/");
+                                                    return (
+                                                        <tr key={ct.id_conta} className="bg-zinc-50/60 hover:bg-zinc-100/60">
+                                                            <td className="px-4 py-2 pl-8">
+                                                                <span className="text-xs text-zinc-400">↳ conta IPTV</span>
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                {ct.nome_painel && (
+                                                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                                                        🔗 {ct.nome_painel}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-2" colSpan={2}>
+                                                                <div className="inline-flex flex-col items-start gap-0.5">
+                                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasCt)}`}>
+                                                                        {dataFmt}
+                                                                    </span>
+                                                                    <span className="text-xs text-zinc-400 pl-1 underline">{ct.usuario}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2">
                                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasCt)}`}>
-                                                                    {dataFmt}
+                                                                    {labelDias(diasCt)}
                                                                 </span>
-                                                                <span className="text-xs text-zinc-400 pl-1 underline">{ct.usuario}</span>
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                <RenovarViaAPIButton
+                                                                    idPainelServidor={ct.id_painel_servidor}
+                                                                    usuario={ct.usuario}
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                                : (
+                                                    <tr className="bg-zinc-50/40">
+                                                        <td colSpan={6} className="px-4 py-2 pl-8">
+                                                            <div className="inline-flex items-center gap-2 rounded-lg bg-zinc-50 border border-dashed border-zinc-300 px-3 py-1 text-xs text-zinc-400">
+                                                                <span className="font-medium">Conta sem vínculo</span>
+                                                                {r.venc_contas && (
+                                                                    <>
+                                                                        <span className="text-zinc-300">·</span>
+                                                                        <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
+                                                                            {r.venc_contas.split("T")[0].split("-").reverse().join("/")}
+                                                                        </span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </td>
-                                                        {/* Prazo */}
-                                                        <td className="px-4 py-2">
-                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasCt)}`}>
-                                                                {labelDias(diasCt)}
-                                                            </span>
-                                                        </td>
-                                                        {/* Ação */}
-                                                        <td className="px-4 py-2">
-                                                            <RenovarViaAPIButton
-                                                                idPainelServidor={ct.id_painel_servidor}
-                                                                usuario={ct.usuario}
-                                                            />
-                                                        </td>
                                                     </tr>
-                                                );
-                                            })}
+                                                )
+                                            }
                                         </React.Fragment>
                                     );
                                 })}
