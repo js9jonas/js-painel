@@ -186,39 +186,39 @@ async function abaterCreditoRenovacaoCortesia(
   idAssinatura: string,
 ): Promise<void> {
   const { rows } = await client.query(
-    `SELECT cs.id_servidor, cs.creditos_mensal
-     FROM public.assinaturas a
-     JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
-     WHERE a.id_assinatura = $1::bigint`,
+    `SELECT id_servidor, COUNT(*)::int AS creditos_mensal
+     FROM public.contas
+     WHERE id_assinatura = $1::bigint AND removido_em IS NULL
+     GROUP BY id_servidor`,
     [idAssinatura]
   );
   if (rows.length === 0) return;
 
-  const { id_servidor, creditos_mensal } = rows[0];
+  for (const { id_servidor, creditos_mensal } of rows) {
+    await client.query(
+      `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
+       VALUES ($1, 0) ON CONFLICT (id_servidor) DO NOTHING`,
+      [id_servidor]
+    );
 
-  await client.query(
-    `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
-     VALUES ($1, 0) ON CONFLICT (id_servidor) DO NOTHING`,
-    [id_servidor]
-  );
+    const { rows: saldoRows } = await client.query(
+      `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
+      [id_servidor]
+    );
 
-  const { rows: saldoRows } = await client.query(
-    `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
-    [id_servidor]
-  );
+    const saldoAnterior = saldoRows[0]?.saldo_atual ?? 0;
+    const saldoNovo = saldoAnterior - creditos_mensal;
 
-  const saldoAnterior = saldoRows[0]?.saldo_atual ?? 0;
-  const saldoNovo = saldoAnterior - creditos_mensal;
+    await client.query(
+      `UPDATE public.saldo_servidor SET saldo_atual = $1, atualizado_em = NOW() WHERE id_servidor = $2`,
+      [saldoNovo, id_servidor]
+    );
 
-  await client.query(
-    `UPDATE public.saldo_servidor SET saldo_atual = $1, atualizado_em = NOW() WHERE id_servidor = $2`,
-    [saldoNovo, id_servidor]
-  );
-
-  await client.query(
-    `INSERT INTO public.saldo_servidor_historico
-     (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao, id_assinatura)
-     VALUES ($1, 'abatimento', $2, $3, $4, 'Cortesia de indicacao', $5::bigint)`,
-    [id_servidor, -creditos_mensal, saldoAnterior, saldoNovo, idAssinatura]
-  );
+    await client.query(
+      `INSERT INTO public.saldo_servidor_historico
+       (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao, id_assinatura)
+       VALUES ($1, 'abatimento', $2, $3, $4, 'Cortesia de indicacao', $5::bigint)`,
+      [id_servidor, -creditos_mensal, saldoAnterior, saldoNovo, idAssinatura]
+    );
+  }
 }

@@ -45,7 +45,8 @@ export async function getSaldosServidores(): Promise<SaldoServidorRow[]> {
     LEFT JOIN public.saldo_servidor ss ON ss.id_servidor = s.id_servidor
     WHERE s.ativo = true
       AND EXISTS (
-        SELECT 1 FROM public.consumo_servidor cs WHERE cs.id_servidor = s.id_servidor
+        SELECT 1 FROM public.contas c
+        WHERE c.id_servidor = s.id_servidor AND c.removido_em IS NULL
       )
     ORDER BY s.codigo_publico ASC
   `);
@@ -60,13 +61,13 @@ export async function getPrevisaoEsgotamento(): Promise<PrevisaoRow[]> {
   const { rows } = await pool.query<PrevisaoRow>(`
     WITH consumo_por_dia AS (
       SELECT
-        cs.id_servidor,
-        EXTRACT(DAY FROM a.venc_contas)::int AS dia_mes,
-        SUM(cs.creditos_mensal)              AS creditos_dia
-      FROM public.assinaturas a
-      JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
-      WHERE a.status IN ('ativo', 'atrasado')
-      GROUP BY cs.id_servidor, EXTRACT(DAY FROM a.venc_contas)
+        c.id_servidor,
+        EXTRACT(DAY FROM c.vencimento_real_painel)::int AS dia_mes,
+        COUNT(*)::int                                   AS creditos_dia
+      FROM public.contas c
+      WHERE c.removido_em IS NULL
+        AND c.vencimento_real_painel IS NOT NULL
+      GROUP BY c.id_servidor, EXTRACT(DAY FROM c.vencimento_real_painel)
     ),
     datas AS (
       SELECT generate_series(
@@ -103,12 +104,11 @@ export async function getPrevisaoEsgotamento(): Promise<PrevisaoRow[]> {
 export async function getConsumoMensal(): Promise<ConsumoMensalRow[]> {
   const { rows } = await pool.query<ConsumoMensalRow>(`
     SELECT
-      cs.id_servidor::text,
-      SUM(cs.creditos_mensal)::int AS creditos_mensal
-    FROM public.assinaturas a
-    JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
-    WHERE a.status IN ('ativo', 'atrasado')
-    GROUP BY cs.id_servidor
+      c.id_servidor::text,
+      COUNT(*)::int AS creditos_mensal
+    FROM public.contas c
+    WHERE c.removido_em IS NULL
+    GROUP BY c.id_servidor
   `);
   return rows;
 }
@@ -159,43 +159,43 @@ export async function abaterCreditoRenovacao(
   }
 
   const { rows } = await client.query(
-    `SELECT cs.id_servidor, cs.creditos_mensal
-     FROM public.assinaturas a
-     JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
-     WHERE a.id_assinatura = $1::bigint`,
+    `SELECT id_servidor, COUNT(*)::int AS creditos_mensal
+     FROM public.contas
+     WHERE id_assinatura = $1::bigint AND removido_em IS NULL
+     GROUP BY id_servidor`,
     [idAssinatura]
   );
 
   if (rows.length === 0) return;
 
-  const { id_servidor, creditos_mensal } = rows[0];
+  for (const { id_servidor, creditos_mensal } of rows) {
+    await client.query(
+      `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
+       VALUES ($1, 0)
+       ON CONFLICT (id_servidor) DO NOTHING`,
+      [id_servidor]
+    );
 
-  await client.query(
-    `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
-     VALUES ($1, 0)
-     ON CONFLICT (id_servidor) DO NOTHING`,
-    [id_servidor]
-  );
+    const { rows: saldoRows } = await client.query(
+      `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
+      [id_servidor]
+    );
 
-  const { rows: saldoRows } = await client.query(
-    `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
-    [id_servidor]
-  );
+    const saldoAnterior: number = saldoRows[0]?.saldo_atual ?? 0;
+    const saldoNovo = saldoAnterior - creditos_mensal;
 
-  const saldoAnterior: number = saldoRows[0]?.saldo_atual ?? 0;
-  const saldoNovo = saldoAnterior - creditos_mensal;
+    await client.query(
+      `UPDATE public.saldo_servidor
+       SET saldo_atual = $1, atualizado_em = NOW()
+       WHERE id_servidor = $2`,
+      [saldoNovo, id_servidor]
+    );
 
-  await client.query(
-    `UPDATE public.saldo_servidor
-     SET saldo_atual = $1, atualizado_em = NOW()
-     WHERE id_servidor = $2`,
-    [saldoNovo, id_servidor]
-  );
-
-  await client.query(
-    `INSERT INTO public.saldo_servidor_historico
-     (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao, id_assinatura)
-     VALUES ($1, 'abatimento', $2, $3, $4, 'Renovação automática', $5::bigint)`,
-    [id_servidor, -creditos_mensal, saldoAnterior, saldoNovo, idAssinatura]
-  );
+    await client.query(
+      `INSERT INTO public.saldo_servidor_historico
+       (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao, id_assinatura)
+       VALUES ($1, 'abatimento', $2, $3, $4, 'Renovação automática', $5::bigint)`,
+      [id_servidor, -creditos_mensal, saldoAnterior, saldoNovo, idAssinatura]
+    );
+  }
 }

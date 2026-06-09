@@ -196,20 +196,18 @@ export async function getPacotesStats(): Promise<PacoteStats[]> {
 export async function getContasAtivasPorServidor(): Promise<ServidorContasStats[]> {
   const sql = `
     WITH total AS (
-      SELECT COUNT(DISTINCT a.id_assinatura)::numeric AS total
-      FROM public.assinaturas a
-      JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
-      WHERE lower(btrim(a.status)) IN ('ativo','atrasado')
+      SELECT COUNT(DISTINCT c.id_assinatura)::numeric AS total
+      FROM public.contas c
+      WHERE c.removido_em IS NULL AND c.id_assinatura IS NOT NULL
     )
     SELECT
       COALESCE(s.codigo_publico, s.nome_interno, 'Sem servidor') AS servidor,
-      COUNT(DISTINCT a.id_assinatura)::int AS quantidade,
-      ROUND((COUNT(DISTINCT a.id_assinatura)::numeric / t.total * 100), 1)::numeric AS percentual
-    FROM public.assinaturas a
-    JOIN public.consumo_servidor cs ON cs.id_pacote = a.id_pacote
-    JOIN public.servidores s ON s.id_servidor = cs.id_servidor
+      COUNT(DISTINCT c.id_assinatura)::int AS quantidade,
+      ROUND((COUNT(DISTINCT c.id_assinatura)::numeric / t.total * 100), 1)::numeric AS percentual
+    FROM public.contas c
+    JOIN public.servidores s ON s.id_servidor = c.id_servidor
     CROSS JOIN total t
-    WHERE lower(btrim(a.status)) IN ('ativo','atrasado')
+    WHERE c.removido_em IS NULL AND c.id_assinatura IS NOT NULL
     GROUP BY s.id_servidor, s.codigo_publico, s.nome_interno, t.total
     ORDER BY quantidade DESC;
   `;
@@ -366,22 +364,20 @@ ORDER BY DATE_TRUNC('month', venc_contas) ASC
   return rows.map((r) => ({ mes: r.mes, mes_num: r.mes_num, ano: r.ano, quantidade: r.quantidade }));
 }
 
-/** Uso real por servidor baseado em consumo_servidor + assinaturas ativas */
+/** Uso real por servidor baseado em contas ativas */
 export async function getServidoresUso(): Promise<ServidorUso[]> {
   const { rows } = await pool.query(`
     SELECT
       s.id_servidor::text,
       s.codigo_publico,
       s.nome_interno,
-      COUNT(DISTINCT a.id_assinatura)::int       AS qtd_assinaturas,
-      COALESCE(SUM(cs.creditos_mensal), 0)::int  AS creditos_mensal,
-      COALESCE(ss.saldo_atual, 0)::int           AS saldo_atual
+      COUNT(DISTINCT c.id_assinatura)::int AS qtd_assinaturas,
+      COUNT(c.id_conta)::int               AS creditos_mensal,
+      COALESCE(ss.saldo_atual, 0)::int     AS saldo_atual
     FROM public.servidores s
-    JOIN public.consumo_servidor cs ON cs.id_servidor = s.id_servidor
-    JOIN public.assinaturas a ON a.id_pacote = cs.id_pacote
+    JOIN public.contas c ON c.id_servidor = s.id_servidor AND c.removido_em IS NULL
     LEFT JOIN public.saldo_servidor ss ON ss.id_servidor = s.id_servidor
     WHERE s.ativo = true
-      AND lower(btrim(a.status)) IN ('ativo','atrasado')
     GROUP BY s.id_servidor, s.codigo_publico, s.nome_interno, ss.saldo_atual
     ORDER BY creditos_mensal DESC
   `);
