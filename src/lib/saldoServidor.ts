@@ -46,7 +46,10 @@ export async function getSaldosServidores(): Promise<SaldoServidorRow[]> {
     WHERE s.ativo = true
       AND EXISTS (
         SELECT 1 FROM public.contas c
-        WHERE c.id_servidor = s.id_servidor AND c.removido_em IS NULL
+        WHERE c.id_servidor = s.id_servidor
+          AND c.removido_em IS NULL
+          AND c.id_assinatura IS NOT NULL
+          AND c.vencimento_real_painel >= CURRENT_DATE
       )
     ORDER BY s.codigo_publico ASC
   `);
@@ -66,7 +69,8 @@ export async function getPrevisaoEsgotamento(): Promise<PrevisaoRow[]> {
         COUNT(*)::int                                   AS creditos_dia
       FROM public.contas c
       WHERE c.removido_em IS NULL
-        AND c.vencimento_real_painel IS NOT NULL
+        AND c.id_assinatura IS NOT NULL
+        AND c.vencimento_real_painel >= CURRENT_DATE
       GROUP BY c.id_servidor, EXTRACT(DAY FROM c.vencimento_real_painel)
     ),
     datas AS (
@@ -108,6 +112,8 @@ export async function getConsumoMensal(): Promise<ConsumoMensalRow[]> {
       COUNT(*)::int AS creditos_mensal
     FROM public.contas c
     WHERE c.removido_em IS NULL
+      AND c.id_assinatura IS NOT NULL
+      AND c.vencimento_real_painel >= CURRENT_DATE
     GROUP BY c.id_servidor
   `);
   return rows;
