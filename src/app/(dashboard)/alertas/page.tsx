@@ -155,11 +155,6 @@ export default async function AlertasPage() {
                                                 <td className="px-4 py-3 text-zinc-600">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         {r.pacote_contrato ?? "—"}
-                                                        {r.pacote_telas ? (
-                                                            <span className="text-zinc-400">
-                                                                · {r.pacote_telas} tela{r.pacote_telas !== 1 ? "s" : ""}
-                                                            </span>
-                                                        ) : null}
                                                         {vinculado && (
                                                             <span
                                                                 className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"

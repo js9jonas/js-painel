@@ -261,12 +261,20 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 <div className="text-xs text-zinc-500">Pacote</div>
                 <div className="font-medium text-zinc-900 flex items-center gap-1.5">
                   {ativa.pacote_contrato ?? <span className="text-zinc-400">--</span>}
-                  {ativa.pacote_telas ? <span className="text-zinc-500 font-normal"> · {ativa.pacote_telas}t</span> : null}
-                  {ativa.tem_vinculo_painel && (
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700" title={`Vinculada ao painel ${ativa.nome_painel_vinculado}`}>
-                      🔗 {ativa.nome_painel_vinculado}
-                    </span>
-                  )}
+                  {ativa.pacote_telas != null && (() => {
+                    const n = (contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length;
+                    const t = ativa.pacote_telas!;
+                    const [bg, fg] = n === t
+                      ? ["bg-emerald-100", "text-emerald-700"]
+                      : n < t
+                      ? ["bg-amber-100", "text-amber-700"]
+                      : ["bg-red-100", "text-red-700"];
+                    return (
+                      <span className={`inline-flex rounded-full ${bg} ${fg} px-1.5 py-0.5 text-xs font-semibold`} title={`${n} de ${t} contas vinculadas`}>
+                        {n}/{t}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <div>
@@ -394,12 +402,20 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   <td className="px-3 py-2">
                     <span className="flex items-center gap-1.5 flex-wrap">
                       {a.pacote_contrato ?? "--"}
-                      {a.pacote_telas ? <span className="text-zinc-500"> · {a.pacote_telas}t</span> : null}
-                      {a.tem_vinculo_painel && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700" title={`Vinculada ao painel ${a.nome_painel_vinculado}`}>
-                          🔗 {a.nome_painel_vinculado}
-                        </span>
-                      )}
+                      {a.pacote_telas != null && (() => {
+                        const n = (contasPorAssinatura.get(String(a.id_assinatura)) ?? []).length;
+                        const t = a.pacote_telas!;
+                        const [bg, fg] = n === t
+                          ? ["bg-emerald-100", "text-emerald-700"]
+                          : n < t
+                          ? ["bg-amber-100", "text-amber-700"]
+                          : ["bg-red-100", "text-red-700"];
+                        return (
+                          <span className={`inline-flex rounded-full ${bg} ${fg} px-1.5 py-0.5 text-xs font-semibold`} title={`${n} de ${t} contas vinculadas`}>
+                            {n}/{t}
+                          </span>
+                        );
+                      })()}
                     </span>
                   </td>
                   <td className="px-3 py-2">

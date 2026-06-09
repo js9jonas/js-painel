@@ -37,18 +37,13 @@ export async function GET(req: NextRequest) {
     a.status,
     a.venc_contrato,
     a.venc_contas,
-    pl.valor,
-    s.nome_interno AS servidor
+    pl.valor
   FROM public.clientes c
   LEFT JOIN public.assinaturas a
     ON a.id_cliente = c.id_cliente
     AND a.status NOT IN ('cancelado', 'inativo')
   LEFT JOIN public.planos pl
     ON pl.id_plano = a.id_plano
-  LEFT JOIN public.consumo_servidor cs
-    ON cs.id_pacote = a.id_pacote
-  LEFT JOIN public.servidores s
-    ON s.id_servidor = cs.id_servidor
   WHERE c.id_cliente = (
     SELECT id_cliente
     FROM public.whatsapp_mensagens
@@ -56,7 +51,7 @@ export async function GET(req: NextRequest) {
       AND id_cliente IS NOT NULL
     LIMIT 1
   )
-  ORDER BY a.venc_contas ASC
+  ORDER BY a.venc_contrato ASC
   LIMIT 1
 `, [telefone])
 
