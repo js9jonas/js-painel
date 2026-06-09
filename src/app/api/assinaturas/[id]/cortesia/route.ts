@@ -67,7 +67,7 @@ export async function PUT(
 
       const whatsapp = enviarMensagem
         ? await enviarMensagensCortesia({
-            idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, idsIndicacoes,
+            idCliente, nomeCliente, vencContrato: assinatura.venc_contrato,
           }).catch(() => ({ ok: false as const, reason: "erro_envio" }))
         : null;
 
@@ -86,21 +86,32 @@ export async function PUT(
 
 type WhatsappResult = { ok: true } | { ok: false; reason: string };
 
+// Template Meta: nome "js_cortesia_indicacao", categoria UTILITY, idioma pt_BR
+// Corpo do template (submeter para aprovação):
+//
+//   Parabéns, {{1}}! 🎁
+//
+//   Você ganhou 1 mês de cortesia na sua assinatura JS Sistemas
+//   pelas suas indicações.
+//
+//   Novo vencimento do contrato: {{2}}
+//
+//   Obrigado por confiar na JS Sistemas e por nos indicar! 🙏
+//
+// Parâmetros: {{1}} = primeiro nome do cliente  {{2}} = data de vencimento (dd/mm/aaaa)
+
 async function enviarMensagensCortesia({
   idCliente,
   nomeCliente,
   vencContrato,
-  idsIndicacoes,
 }: {
   idCliente: string;
   nomeCliente: string | null;
   vencContrato: string | null;
-  idsIndicacoes: string[];
 }): Promise<WhatsappResult> {
-  const evolutionUrl = process.env.EVOLUTION_URL ?? process.env.EVOLUTION_API_URL ?? process.env.NEXT_PUBLIC_EVOLUTION_URL;
-  const evolutionKey = process.env.EVOLUTION_KEY ?? process.env.EVOLUTION_API_KEY ?? process.env.NEXT_PUBLIC_EVOLUTION_KEY;
-  const instance = process.env.EVOLUTION_INSTANCE ?? "jsevolution";
-  if (!evolutionUrl || !evolutionKey) return { ok: false, reason: "sem_config" };
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneId) return { ok: false, reason: "sem_config" };
 
   const { rows } = await pool.query(
     `SELECT ct.telefone::text AS telefone
@@ -119,64 +130,44 @@ async function enviarMensagensCortesia({
   const numero = digits.startsWith("55") ? digits : `55${digits}`;
 
   const nome = nomeCliente ? nomeCliente.split(" ")[0] : "cliente";
-
   const vencFormatado = vencContrato
     ? new Date(vencContrato + "T00:00:00").toLocaleDateString("pt-BR")
-    : null;
+    : "—";
 
-  const msg1 =
-    `Olá! Sabia que você pode ganhar meses gratuitos na sua assinatura indicando amigos e familiares para a JS Sistemas? 🎉\n\n` +
-    `Funciona assim: a cada 2 pessoas que você indicar e que ativarem a assinatura, você ganha *1 mês de cortesia* no seu plano — sem pagar nada!\n\n` +
-    `Quanto mais indicações, mais meses você acumula. Não há limite! 😊\n\n` +
-    `Continue indicando e aproveite esse benefício exclusivo para nossos clientes parceiros.`;
+  const res = await fetch(
+    `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: numero,
+        type: "template",
+        template: {
+          name: "js_cortesia_indicacao",
+          language: { code: "pt_BR" },
+          components: [
+            {
+              type: "body",
+              parameters: [
+                { type: "text", text: nome },
+                { type: "text", text: vencFormatado },
+              ],
+            },
+          ],
+        },
+      }),
+    }
+  );
 
-  let nomesIndicados: string[] = [];
-  if (idsIndicacoes.length > 0) {
-    const { rows: indicadosRows } = await pool.query(
-      `SELECT c.nome
-       FROM public.indicacoes i
-       JOIN public.clientes c ON c.id_cliente = i.id_indicado
-       WHERE i.id_indicacao = ANY($1::bigint[])
-       ORDER BY c.nome ASC`,
-      [idsIndicacoes]
-    );
-    nomesIndicados = indicadosRows.map((r: { nome: string }) => r.nome);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error("[Cortesia] Erro ao enviar WA:", err);
+    return { ok: false, reason: "erro_envio" };
   }
-
-  const linhaIndicados = nomesIndicados.length > 0
-    ? `• Indicações: *${nomesIndicados.join(", ")}*\n`
-    : "";
-  const linhaVenc = vencFormatado
-    ? `• Novo vencimento do contrato: *${vencFormatado}*\n`
-    : "";
-
-  const msg2 =
-    `*Parabéns, ${nome}!* 🎁\n\n` +
-    `Você acaba de ganhar *1 mês de cortesia* na sua assinatura como agradecimento pelas suas indicações!\n\n` +
-    `${linhaIndicados}${linhaVenc}\n` +
-    `Muito obrigado por confiar na JS Sistemas e por nos indicar! Continue assim 🙏`;
-
-  const headers = {
-    "Content-Type": "application/json",
-    apikey: evolutionKey,
-  };
-  const endpoint = `${evolutionUrl.replace(/\/$/, "")}/message/sendText/${instance}`;
-
-  const r1 = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ number: numero, text: msg1 }),
-  });
-  if (!r1.ok) return { ok: false, reason: "erro_envio" };
-
-  await new Promise((r) => setTimeout(r, 1500));
-
-  const r2 = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ number: numero, text: msg2 }),
-  });
-  if (!r2.ok) return { ok: false, reason: "erro_envio" };
 
   return { ok: true };
 }
