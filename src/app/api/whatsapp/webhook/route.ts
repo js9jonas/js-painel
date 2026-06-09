@@ -33,59 +33,75 @@ export async function POST(req: NextRequest) {
 
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
-        if (change.field !== 'messages') continue
-
         const value    = change.value
-        const messages = value.messages ?? []
-        const contacts = value.contacts ?? []
         const metadata = value.metadata  // phone_number_id, display_phone_number
 
-        for (const msg of messages) {
-          const from    = msg.from        // número do cliente (pode ser LID ou telefone)
-          const msgId   = msg.id
-          const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+        if (change.field === 'messages') {
+          const messages = value.messages ?? []
+          const contacts = value.contacts ?? []
 
-          // Nome do contato se disponível
-          const contact = contacts.find((c: any) => c.wa_id === from)
-          const nome    = contact?.profile?.name ?? null
+          for (const msg of messages) {
+            const from      = msg.from   // número do cliente
+            const msgId     = msg.id
+            const timestamp = new Date(parseInt(msg.timestamp) * 1000)
 
-          // Tipo e conteúdo da mensagem
-          let tipo     = msg.type
-          let conteudo = ''
+            const contact = contacts.find((c: any) => c.wa_id === from)
+            const nome    = contact?.profile?.name ?? null
 
-          if (msg.type === 'text') {
-            conteudo = msg.text?.body ?? ''
-          } else if (msg.type === 'audio') {
-            conteudo = msg.audio?.id ?? '' // ID da mídia para download posterior
-          } else if (msg.type === 'image') {
-            conteudo = msg.image?.id ?? ''
-          } else if (msg.type === 'document') {
-            conteudo = msg.document?.id ?? ''
-          } else if (msg.type === 'video') {
-            conteudo = msg.video?.id ?? ''
+            let tipo     = msg.type
+            let conteudo = ''
+            if (msg.type === 'text')     conteudo = msg.text?.body ?? ''
+            else if (msg.type === 'audio')    conteudo = msg.audio?.id ?? ''
+            else if (msg.type === 'image')    conteudo = msg.image?.id ?? ''
+            else if (msg.type === 'document') conteudo = msg.document?.id ?? ''
+            else if (msg.type === 'video')    conteudo = msg.video?.id ?? ''
+
+            console.log(`[WhatsApp] Recebido de ${from}: ${tipo}`)
+
+            await pool.query(
+              `INSERT INTO public.whatsapp_mensagens
+                (wa_msg_id, telefone, nome_contato, tipo, conteudo, origem, recebida_em, phone_number_id)
+               VALUES ($1, $2, $3, $4, $5, 'cliente', $6, $7)
+               ON CONFLICT (wa_msg_id) DO NOTHING`,
+              [msgId, from, nome, tipo, conteudo, timestamp, metadata?.phone_number_id]
+            )
           }
 
-          console.log(`[WhatsApp] Mensagem recebida de ${from}: ${tipo} — ${conteudo}`)
+          // Status updates (sent, delivered, read, failed)
+          for (const status of value.statuses ?? []) {
+            await pool.query(
+              `UPDATE public.whatsapp_mensagens SET status = $1, status_at = NOW() WHERE wa_msg_id = $2`,
+              [status.status, status.id]
+            )
+          }
 
-          // Salva no banco
-          await pool.query(
-            `INSERT INTO public.whatsapp_mensagens
-              (wa_msg_id, telefone, nome_contato, tipo, conteudo, origem, recebida_em, phone_number_id)
-             VALUES ($1, $2, $3, $4, $5, 'cliente', $6, $7)
-             ON CONFLICT (wa_msg_id) DO NOTHING`,
-            [msgId, from, nome, tipo, conteudo, timestamp, metadata.phone_number_id]
-          )
-        }
+        } else if (change.field === 'smb_message_echoes') {
+          // Mensagens enviadas pelo Jonas via celular ou WhatsApp Web
+          const messages = value.messages ?? []
 
-        // Confirmações de leitura (status updates)
-        for (const status of value.statuses ?? []) {
-          // sent, delivered, read, failed
-          await pool.query(
-            `UPDATE public.whatsapp_mensagens
-             SET status = $1, status_at = NOW()
-             WHERE wa_msg_id = $2`,
-            [status.status, status.id]
-          )
+          for (const msg of messages) {
+            const to        = msg.to     // número do cliente destinatário
+            const msgId     = msg.id
+            const timestamp = new Date(parseInt(msg.timestamp) * 1000)
+
+            let tipo     = msg.type
+            let conteudo = ''
+            if (msg.type === 'text')     conteudo = msg.text?.body ?? ''
+            else if (msg.type === 'audio')    conteudo = msg.audio?.id ?? ''
+            else if (msg.type === 'image')    conteudo = msg.image?.id ?? ''
+            else if (msg.type === 'document') conteudo = msg.document?.id ?? ''
+            else if (msg.type === 'video')    conteudo = msg.video?.id ?? ''
+
+            console.log(`[WhatsApp] Echo (phone) para ${to}: ${tipo}`)
+
+            await pool.query(
+              `INSERT INTO public.whatsapp_mensagens
+                (wa_msg_id, telefone, tipo, conteudo, origem, source, recebida_em, phone_number_id)
+               VALUES ($1, $2, $3, $4, 'jonas', 'phone', $5, $6)
+               ON CONFLICT (wa_msg_id) DO NOTHING`,
+              [msgId, to, tipo, conteudo, timestamp, metadata?.phone_number_id]
+            )
+          }
         }
       }
     }
