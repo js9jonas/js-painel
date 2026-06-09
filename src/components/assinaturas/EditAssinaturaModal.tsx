@@ -43,6 +43,17 @@ export default function EditAssinaturaModal({
 }: Props) {
   const [idPlano, setIdPlano]               = useState(assinatura.id_plano ?? "");
   const [idPacote, setIdPacote]             = useState(assinatura.id_pacote ?? "");
+
+  const pacoteSelecionado = pacotes.find(p => p.id_pacote === idPacote);
+  const planosFiltrados = planos.filter(p =>
+    p.meses === 1 &&
+    (pacoteSelecionado ? p.telas === pacoteSelecionado.telas : true)
+  );
+
+  function handlePacoteChange(novoId: string) {
+    setIdPacote(novoId);
+    setIdPlano("");
+  }
   const [vencContrato, setVencContrato]     = useState(toDateInput(assinatura.venc_contrato));
   const [vencContas, setVencContas]         = useState(toDateInput(assinatura.venc_contas));
   const [status, setStatus]                 = useState(assinatura.status ?? "ativo");
@@ -120,7 +131,7 @@ export default function EditAssinaturaModal({
             </label>
             <select
               value={idPacote}
-              onChange={(e) => setIdPacote(e.target.value)}
+              onChange={(e) => handlePacoteChange(e.target.value)}
               className={selectClass}
             >
               <option value="">— Nenhum —</option>
@@ -137,6 +148,11 @@ export default function EditAssinaturaModal({
           <div>
             <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
               Plano
+              {pacoteSelecionado && (
+                <span className="ml-1 text-zinc-400 font-normal">
+                  ({pacoteSelecionado.telas} tela{pacoteSelecionado.telas !== 1 ? "s" : ""}, mensal)
+                </span>
+              )}
             </label>
             <select
               value={idPlano}
@@ -144,10 +160,9 @@ export default function EditAssinaturaModal({
               className={selectClass}
             >
               <option value="">— Nenhum —</option>
-              {planos.map((p) => (
+              {planosFiltrados.map((p) => (
                 <option key={p.id_plano} value={p.id_plano}>
                   {p.tipo ?? `Plano #${p.id_plano}`}
-                  {p.meses ? ` — ${p.meses} ${p.meses === 1 ? "mês" : "meses"}` : ""}
                   {p.valor ? ` — R$ ${parseFloat(p.valor).toFixed(2).replace(".", ",")}` : ""}
                 </option>
               ))}

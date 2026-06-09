@@ -23,6 +23,17 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
 
   const [idPacote, setIdPacote]           = useState("");
   const [idPlano, setIdPlano]             = useState("");
+
+  const pacoteSelecionado = pacotes.find(p => p.id_pacote === idPacote);
+  const planosFiltrados = planos.filter(p =>
+    p.meses === 1 &&
+    (pacoteSelecionado ? p.telas === pacoteSelecionado.telas : true)
+  );
+
+  function handlePacoteChange(novoId: string) {
+    setIdPacote(novoId);
+    setIdPlano("");
+  }
   const [vencContrato, setVencContrato]   = useState("");
   const [vencContas, setVencContas]       = useState("");
   const [status, setStatus]               = useState("ativo");
@@ -99,7 +110,7 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Pacote</label>
-                  <select value={idPacote} onChange={(e) => setIdPacote(e.target.value)} className={selectClass}>
+                  <select value={idPacote} onChange={(e) => handlePacoteChange(e.target.value)} className={selectClass}>
                     <option value="">— Nenhum —</option>
                     {pacotes.map((p) => (
                       <option key={p.id_pacote} value={p.id_pacote}>
@@ -116,13 +127,19 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
               </div>
 
               <div>
-                <label className={labelClass}>Plano</label>
+                <label className={labelClass}>
+                  Plano
+                  {pacoteSelecionado && (
+                    <span className="ml-1 text-zinc-400 font-normal">
+                      ({pacoteSelecionado.telas} tela{pacoteSelecionado.telas !== 1 ? "s" : ""}, mensal)
+                    </span>
+                  )}
+                </label>
                 <select value={idPlano} onChange={(e) => setIdPlano(e.target.value)} className={selectClass}>
                   <option value="">— Nenhum —</option>
-                  {planos.map((p) => (
+                  {planosFiltrados.map((p) => (
                     <option key={p.id_plano} value={p.id_plano}>
                       {p.tipo ?? `Plano #${p.id_plano}`}
-                      {p.meses ? ` — ${p.meses} ${p.meses === 1 ? "mês" : "meses"}` : ""}
                       {p.valor ? ` — R$ ${parseFloat(p.valor).toFixed(2).replace(".", ",")}` : ""}
                     </option>
                   ))}

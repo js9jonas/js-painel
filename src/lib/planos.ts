@@ -20,7 +20,18 @@ export async function getPlanos(): Promise<PlanoRow[]> {
       valor::text,
       descricao
     FROM public.planos
-    ORDER BY tipo ASC NULLS LAST, meses ASC NULLS LAST
+    ORDER BY
+      CASE tipo
+        WHEN 'Padrão'   THEN 1
+        WHEN 'Promo'    THEN 2
+        WHEN 'Especial' THEN 3
+        WHEN 'VIP'      THEN 4
+        WHEN 'Slim'     THEN 5
+        WHEN 'Cortesia' THEN 6
+        ELSE 7
+      END,
+      telas ASC NULLS LAST,
+      meses ASC NULLS LAST
   `);
   return rows;
 }
