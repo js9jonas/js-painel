@@ -9,10 +9,10 @@ export async function GET() {
     const result = await pool.query(`
       SELECT
         wm.telefone,
-        wm.nome_contato,
-        c.id_cliente,
-        c.nome AS nome_cliente,
-        MAX(wm.recebida_em) AS ultima_mensagem_em,
+        MAX(wm.nome_contato) AS nome_contato,
+        MAX(wm.id_cliente)   AS id_cliente,
+        MAX(c.nome)          AS nome_cliente,
+        MAX(wm.recebida_em)  AS ultima_mensagem_em,
         (
           SELECT conteudo FROM public.whatsapp_mensagens
           WHERE telefone = wm.telefone
@@ -23,10 +23,16 @@ export async function GET() {
           WHERE telefone = wm.telefone
           ORDER BY recebida_em DESC LIMIT 1
         ) AS ultimo_tipo,
-        COUNT(*) FILTER (WHERE wm.origem = 'cliente' AND wm.foi_aceita IS NULL) AS nao_lidas
+        COUNT(*) FILTER (
+          WHERE wm.origem = 'cliente'
+            AND wm.recebida_em > COALESCE((
+              SELECT MAX(m2.recebida_em) FROM public.whatsapp_mensagens m2
+              WHERE m2.telefone = wm.telefone AND m2.origem != 'cliente'
+            ), '1970-01-01')
+        ) AS nao_lidas
       FROM public.whatsapp_mensagens wm
       LEFT JOIN public.clientes c ON c.id_cliente = wm.id_cliente
-      GROUP BY wm.telefone, wm.nome_contato, c.id_cliente, c.nome
+      GROUP BY wm.telefone
       ORDER BY ultima_mensagem_em DESC
     `)
 

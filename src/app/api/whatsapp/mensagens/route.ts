@@ -37,7 +37,15 @@ export async function GET(req: NextRequest) {
     a.status,
     a.venc_contrato,
     a.venc_contas,
-    pl.valor
+    pl.valor,
+    (
+      SELECT s.codigo_publico
+      FROM public.contas ct
+      JOIN public.servidores s ON s.id_servidor = ct.id_servidor
+      WHERE ct.id_assinatura = a.id_assinatura
+        AND ct.removido_em IS NULL
+      LIMIT 1
+    ) AS servidor
   FROM public.clientes c
   LEFT JOIN public.assinaturas a
     ON a.id_cliente = c.id_cliente
