@@ -247,12 +247,14 @@ export default async function ClienteDetalhePage({ params }: Props) {
                   {ativa.venc_contrato ? ativa.venc_contrato.split("T")[0].split("-").reverse().join("/") : "--"}
                 </div>
               </div>
-              <div>
-                <div className="text-xs text-zinc-500">Venc. contas</div>
-                <div className="font-medium text-zinc-900">
-                  {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}
+              {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length === 0 && (
+                <div>
+                  <div className="text-xs text-zinc-500">Venc. contas</div>
+                  <div className="font-medium text-zinc-900">
+                    {ativa.venc_contas ? ativa.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <div className="text-xs text-zinc-500">Status</div>
                 <div className={`font-medium ${corStatusDestaque(ativa.status)}`}>{ativa.status}</div>
@@ -397,7 +399,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-zinc-700">{a.venc_contrato ? a.venc_contrato.split("T")[0].split("-").reverse().join("/") : "--"}</td>
-                  <td className="px-3 py-2 text-zinc-700">{a.venc_contas ? a.venc_contas.split("T")[0].split("-").reverse().join("/") : "--"}</td>
+                  <td className="px-3 py-2 text-zinc-700">
+                    {(contasPorAssinatura.get(String(a.id_assinatura)) ?? []).length === 0
+                      ? (a.venc_contas ? a.venc_contas.split("T")[0].split("-").reverse().join("/") : "--")
+                      : "--"}
+                  </td>
                   <td className="px-3 py-2 text-zinc-700">{a.identificacao ?? "--"}</td>
                   <td className="px-3 py-2">
                     <span className="flex items-center gap-1.5 flex-wrap">
