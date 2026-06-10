@@ -9,10 +9,10 @@ export async function GET() {
     const result = await pool.query(`
       SELECT
         wm.telefone,
-        MAX(wm.nome_contato) AS nome_contato,
-        MAX(wm.id_cliente)   AS id_cliente,
-        MAX(c.nome)          AS nome_cliente,
-        MAX(wm.recebida_em)  AS ultima_mensagem_em,
+        MAX(wm.nome_contato)  AS nome_contato,
+        MAX(ct.id_cliente)    AS id_cliente,
+        MAX(c.nome)           AS nome_cliente,
+        MAX(wm.recebida_em)   AS ultima_mensagem_em,
         (
           SELECT conteudo FROM public.whatsapp_mensagens
           WHERE telefone = wm.telefone
@@ -31,7 +31,12 @@ export async function GET() {
             ), '1970-01-01')
         ) AS nao_lidas
       FROM public.whatsapp_mensagens wm
-      LEFT JOIN public.clientes c ON c.id_cliente = wm.id_cliente
+      LEFT JOIN public.contatos ct ON (
+        ct.telefone = wm.telefone
+        OR ct.telefone = SUBSTRING(wm.telefone, 3)
+        OR ct.telefone = SUBSTRING(wm.telefone, 3, 2) || '9' || SUBSTRING(wm.telefone, 5)
+      )
+      LEFT JOIN public.clientes c ON c.id_cliente = ct.id_cliente
       GROUP BY wm.telefone
       ORDER BY ultima_mensagem_em DESC
     `)

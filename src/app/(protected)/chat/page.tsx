@@ -127,6 +127,7 @@ export default function ChatPage() {
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const prevMsgCountRef = useRef(0)
 
   const carregarConversas = useCallback(async () => {
     const res = await fetch('/api/whatsapp/conversas')
@@ -158,7 +159,10 @@ export default function ChatPage() {
   }, [selecionado, carregarMensagens])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (mensagens.length > prevMsgCountRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevMsgCountRef.current = mensagens.length
   }, [mensagens])
 
   async function gerarSugestao() {

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       LIMIT 200
     `, [telefone])
 
-    // Dados do cliente vinculado
+    // Dados do cliente vinculado via contatos
     const cliente = await pool.query(`
   SELECT
     c.id_cliente,
@@ -40,24 +40,23 @@ export async function GET(req: NextRequest) {
     pl.valor,
     (
       SELECT s.codigo_publico
-      FROM public.contas ct
-      JOIN public.servidores s ON s.id_servidor = ct.id_servidor
-      WHERE ct.id_assinatura = a.id_assinatura
-        AND ct.removido_em IS NULL
+      FROM public.contas cn
+      JOIN public.servidores s ON s.id_servidor = cn.id_servidor
+      WHERE cn.id_assinatura = a.id_assinatura
+        AND cn.removido_em IS NULL
       LIMIT 1
     ) AS servidor
-  FROM public.clientes c
+  FROM public.contatos ct
+  JOIN public.clientes c ON c.id_cliente = ct.id_cliente
   LEFT JOIN public.assinaturas a
     ON a.id_cliente = c.id_cliente
     AND a.status NOT IN ('cancelado', 'inativo')
   LEFT JOIN public.planos pl
     ON pl.id_plano = a.id_plano
-  WHERE c.id_cliente = (
-    SELECT id_cliente
-    FROM public.whatsapp_mensagens
-    WHERE telefone = $1
-      AND id_cliente IS NOT NULL
-    LIMIT 1
+  WHERE (
+    ct.telefone = $1
+    OR ct.telefone = SUBSTRING($1, 3)
+    OR ct.telefone = SUBSTRING($1, 3, 2) || '9' || SUBSTRING($1, 5)
   )
   ORDER BY a.venc_contrato ASC
   LIMIT 1
