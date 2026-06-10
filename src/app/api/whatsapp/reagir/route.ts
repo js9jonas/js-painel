@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { auth } from '@/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +8,9 @@ const TOKEN         = process.env.WHATSAPP_TOKEN!
 const PHONE_ID      = process.env.WHATSAPP_PHONE_NUMBER_ID!
 
 export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
   const { telefone, wa_msg_id, emoji } = await req.json()
   if (!telefone || !wa_msg_id || !emoji)
     return NextResponse.json({ error: 'telefone, wa_msg_id e emoji obrigatórios' }, { status: 400 })

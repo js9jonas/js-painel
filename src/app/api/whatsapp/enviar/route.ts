@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
+    if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
     const { telefone, mensagem, sugestao_ia, foi_aceita, reply_msg_id, reply_conteudo, reply_origem } = await req.json()
 
     if (!telefone || !mensagem) {
