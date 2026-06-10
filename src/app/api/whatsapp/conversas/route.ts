@@ -12,6 +12,7 @@ export async function GET() {
         MAX(wm.nome_contato)  AS nome_contato,
         MAX(ct.id_cliente)    AS id_cliente,
         MAX(c.nome)           AS nome_cliente,
+        MAX(ct.foto_url)      AS foto_url,
         MAX(wm.recebida_em)   AS ultima_mensagem_em,
         (
           SELECT conteudo FROM public.whatsapp_mensagens

@@ -8,6 +8,7 @@ interface Conversa {
   nome_contato: string | null
   id_cliente: number | null
   nome_cliente: string | null
+  foto_url: string | null
   ultima_mensagem_em: string
   ultima_mensagem: string | null
   ultimo_tipo: string | null
@@ -98,6 +99,49 @@ function sourceLabel(source: string | null) {
 function nomeInicial(nome: string | null, tel: string) {
   const n = nome ?? formatTel(tel)
   return n.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase()
+}
+
+function Avatar({
+  fotoUrl, nome, tel, size, hasClient
+}: {
+  fotoUrl?: string | null
+  nome: string | null
+  tel: string
+  size: number
+  hasClient?: boolean
+}) {
+  if (fotoUrl) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden'
+      }}>
+        <img
+          src={fotoUrl}
+          alt={nome ?? tel}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={e => {
+            const el = e.currentTarget
+            el.style.display = 'none'
+            el.parentElement!.style.background = hasClient ? '#00a884' : '#adbac1'
+            el.parentElement!.style.display = 'flex'
+            el.parentElement!.style.alignItems = 'center'
+            el.parentElement!.style.justifyContent = 'center'
+            el.parentElement!.innerHTML = `<span style="color:#fff;font-size:${Math.round(size * 0.38)}px;font-weight:700">${nomeInicial(nome, tel)}</span>`
+          }}
+        />
+      </div>
+    )
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: hasClient ? '#00a884' : '#adbac1',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: Math.round(size * 0.38), fontWeight: 700, color: '#fff'
+    }}>
+      {nomeInicial(nome, tel)}
+    </div>
+  )
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -296,7 +340,6 @@ export default function ChatPage() {
           {conversasFiltradas.map(conv => {
             const ativo = conv.telefone === selecionado
             const nome = conv.nome_cliente ?? conv.nome_contato ?? formatTel(conv.telefone)
-            const inicial = nomeInicial(nome, conv.telefone)
             const preview = conv.ultimo_tipo === 'audio' ? '🎵 Áudio'
               : conv.ultimo_tipo === 'image' ? '📷 Imagem'
               : conv.ultimo_tipo === 'video' ? '🎥 Vídeo'
@@ -314,12 +357,13 @@ export default function ChatPage() {
                   transition: 'background 0.1s'
                 }}
               >
-                <div style={{
-                  width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                  background: conv.id_cliente ? '#00a884' : '#adbac1',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, fontWeight: 700, color: '#fff'
-                }}>{inicial}</div>
+                <Avatar
+                  fotoUrl={conv.foto_url}
+                  nome={nome}
+                  tel={conv.telefone}
+                  size={46}
+                  hasClient={!!conv.id_cliente}
+                />
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -381,14 +425,13 @@ export default function ChatPage() {
               display: 'flex', alignItems: 'center', gap: 12,
               borderBottom: '1px solid #d1d7db'
             }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: '50%',
-                background: conversaAtual?.id_cliente ? '#00a884' : '#adbac1',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 15, fontWeight: 700, color: '#fff'
-              }}>
-                {nomeInicial(nomeExibido, selecionado)}
-              </div>
+              <Avatar
+                fotoUrl={conversaAtual?.foto_url}
+                nome={nomeExibido}
+                tel={selecionado}
+                size={40}
+                hasClient={!!conversaAtual?.id_cliente}
+              />
               <div>
                 <div style={{ color: '#111b21', fontWeight: 600, fontSize: 15 }}>{nomeExibido}</div>
                 <div style={{ color: '#667781', fontSize: 12 }}>{formatTel(selecionado)}</div>
@@ -579,13 +622,14 @@ export default function ChatPage() {
             background: '#f0f2f5', padding: '24px 20px', textAlign: 'center',
             borderBottom: '1px solid #e9edef'
           }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: '50%', margin: '0 auto 12px',
-              background: cliente ? '#00a884' : '#adbac1',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 22, fontWeight: 700, color: '#fff'
-            }}>
-              {nomeInicial(nomeExibido, selecionado)}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <Avatar
+                fotoUrl={conversaAtual?.foto_url}
+                nome={nomeExibido}
+                tel={selecionado}
+                size={64}
+                hasClient={!!cliente}
+              />
             </div>
             <div style={{ color: '#111b21', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</div>
             <div style={{ color: '#667781', fontSize: 13, marginTop: 4 }}>{formatTel(selecionado)}</div>
