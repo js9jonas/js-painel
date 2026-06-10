@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { pool } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,5 +24,12 @@ export async function POST(req: NextRequest) {
 
   const data = await res.json()
   if (!res.ok) return NextResponse.json({ error: data.error?.message }, { status: 500 })
+
+  // Persiste reação localmente para exibição imediata
+  await pool.query(
+    `UPDATE public.whatsapp_mensagens SET reacao = $1 WHERE wa_msg_id = $2`,
+    [emoji || null, wa_msg_id]
+  )
+
   return NextResponse.json({ success: true })
 }

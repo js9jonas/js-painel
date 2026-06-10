@@ -12,21 +12,24 @@ type Props = {
   pacotes: PacoteRow[];
   onClose: () => void;
   onSuccess?: (id: string, nome: string) => void;
+  initialNome?: string;
+  initialTelefone?: string;
+  initialNomeContato?: string;
 };
 
 const STATUS_OPTIONS = ["ativo", "inativo", "cancelado", "suspenso", "pendente"];
 type Step = "cliente" | "assinatura";
 
-export default function NovoClienteModal({ planos, pacotes, onClose, onSuccess }: Props) {
+export default function NovoClienteModal({ planos, pacotes, onClose, onSuccess, initialNome = "", initialTelefone = "", initialNomeContato = "" }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("cliente");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(initialNome);
   const [observacao, setObservacao] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [nomeContato, setNomeContato] = useState("");
+  const [telefone, setTelefone] = useState(initialTelefone);
+  const [nomeContato, setNomeContato] = useState(initialNomeContato);
 
   const [criarAssinatura, setCriarAssinatura] = useState(true);
   const [idPacote, setIdPacote] = useState("");

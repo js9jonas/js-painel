@@ -49,6 +49,18 @@ export async function POST(req: NextRequest) {
             const contact = contacts.find((c: any) => c.wa_id === from)
             const nome    = contact?.profile?.name ?? null
 
+            // Reação de cliente a uma mensagem
+            if (msg.type === 'reaction') {
+              const { message_id, emoji } = msg.reaction ?? {}
+              if (message_id) {
+                await pool.query(
+                  `UPDATE public.whatsapp_mensagens SET reacao = $1 WHERE wa_msg_id = $2`,
+                  [emoji || null, message_id]
+                )
+              }
+              continue
+            }
+
             let tipo        = msg.type
             let conteudo    = ''
             let media_mime  = null as string | null
@@ -69,14 +81,32 @@ export async function POST(req: NextRequest) {
               media_mime = msg.video?.mime_type ?? null
             }
 
+            // Captura reply context (cliente respondeu alguma mensagem)
+            const replyToId = msg.context?.id ?? null
+            let replyToConteudo: string | null = null
+            let replyToOrigem: string | null = null
+            if (replyToId) {
+              const orig = await pool.query(
+                `SELECT conteudo, tipo, origem FROM public.whatsapp_mensagens WHERE wa_msg_id = $1 LIMIT 1`,
+                [replyToId]
+              )
+              if (orig.rows[0]) {
+                const r = orig.rows[0]
+                replyToConteudo = r.tipo === 'text' ? (r.conteudo ?? null) : `[${r.tipo}]`
+                replyToOrigem = r.origem
+              }
+            }
+
             console.log(`[WhatsApp] Recebido de ${from}: ${tipo}`)
 
             await pool.query(
               `INSERT INTO public.whatsapp_mensagens
-                (wa_msg_id, telefone, nome_contato, tipo, conteudo, media_mime, nome_arquivo, origem, recebida_em, phone_number_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, 'cliente', $8, $9)
+                (wa_msg_id, telefone, nome_contato, tipo, conteudo, media_mime, nome_arquivo, origem,
+                 reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem, recebida_em, phone_number_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'cliente', $8, $9, $10, $11, $12)
                ON CONFLICT (wa_msg_id) DO NOTHING`,
-              [msgId, from, nome, tipo, conteudo, media_mime, nome_arquivo, timestamp, metadata?.phone_number_id]
+              [msgId, from, nome, tipo, conteudo, media_mime, nome_arquivo,
+               replyToId, replyToConteudo, replyToOrigem, timestamp, metadata?.phone_number_id]
             )
 
             // Sync de etiquetas WA — fire-and-forget, no máximo 1x/dia por contato

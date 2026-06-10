@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
       SELECT
         id, wa_msg_id, telefone, nome_contato, tipo,
         conteudo, media_mime, nome_arquivo, origem, sugestao_ia, foi_aceita, mensagem_final,
-        status, source, recebida_em
+        reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem,
+        reacao, status, source, recebida_em
       FROM public.whatsapp_mensagens
       WHERE telefone = $1
       ORDER BY recebida_em ASC
@@ -33,7 +34,12 @@ export async function GET(req: NextRequest) {
     c.observacao,
     c.score_fidelidade,
     a.id_assinatura,
+    a.id_plano,
+    a.id_pacote,
+    a.identificacao,
+    a.observacao   AS assinatura_observacao,
     pl.tipo        AS plano,
+    pac.contrato   AS pacote,
     a.status,
     a.venc_contrato,
     a.venc_contas,
@@ -53,6 +59,8 @@ export async function GET(req: NextRequest) {
     AND a.status NOT IN ('cancelado', 'inativo')
   LEFT JOIN public.planos pl
     ON pl.id_plano = a.id_plano
+  LEFT JOIN public.pacote pac
+    ON pac.id_pacote = a.id_pacote
   WHERE (
     ct.telefone = $1
     OR ct.telefone = SUBSTRING($1, 3)

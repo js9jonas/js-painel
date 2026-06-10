@@ -2,6 +2,13 @@
 
 import React from 'react'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import ContasCards from '@/components/clientes/ContasCards'
+import type { ContaPainelVinculada } from '@/lib/clientes'
+import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
+import EditClienteModal from '@/components/clientes/EditClienteModal'
+import NovoClienteModal from '@/components/clientes/NovoClienteModal'
+import type { PlanoRow } from '@/lib/planos'
+import type { PacoteRow } from '@/lib/pacotes'
 
 interface Conversa {
   telefone: string
@@ -28,6 +35,10 @@ interface Mensagem {
   sugestao_ia: string | null
   foi_aceita: boolean | null
   mensagem_final: string | null
+  reply_to_wa_msg_id: string | null
+  reply_to_conteudo: string | null
+  reply_to_origem: string | null
+  reacao: string | null
   status: string | null
   source: string | null
   recebida_em: string
@@ -39,7 +50,12 @@ interface Cliente {
   observacao: string | null
   score_fidelidade: number | null
   id_assinatura: number | null
+  id_plano: number | null
+  id_pacote: number | null
+  identificacao: string | null
+  assinatura_observacao: string | null
   plano: string | null
+  pacote: string | null
   status: string | null
   venc_contrato: string | null
   venc_contas: string | null
@@ -162,41 +178,70 @@ function Avatar({
 }
 
 const QUICK_EMOJIS = ['👍', '🤝', '🙌', '😅', '🙏', '😉']
-const MORE_EMOJIS  = [
-  '😀','😂','🤣','😍','🥰','😘','😎','🤩',
-  '😭','😢','😤','😡','🤔','😶','🤐','😴',
-  '👏','✌️','🤞','💪','👎','🫶','🤜','🤛',
-  '❤️','💔','🔥','✨','💯','🎉','💀','👀',
+
+const MORE_EMOJIS = [
+  '😂','🥰','😊','😎','🤣','😮','😢','😡',
+  '🥳','😇','💪','👏','🤦','🫶','❤️','🔥',
+  '💯','🎉','💀','🤔','👀','😴','😜','🙄',
+  '🫡','😬','🥹','🫠','🤯','🎶','👋','✨',
 ]
 
-function EmojiPicker({ side, onPick, onClose }: { side: 'left' | 'right'; onPick: (e: string) => void; onClose: () => void }) {
-  const [showMore, setShowMore] = React.useState(false)
+function QuickEmojiStrip({ side, onPick, showLib, onOpenLib }: {
+  side: 'left' | 'right'
+  onPick: (e: string) => void
+  showLib: boolean
+  onOpenLib: () => void
+}) {
+  const mkBtn = (e: string, handler: () => void, extraStyle?: React.CSSProperties) => (
+    <button key={e}
+      onMouseDown={ev => { ev.preventDefault(); ev.stopPropagation(); handler() }}
+      style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        fontSize: 18, padding: '4px 6px', borderRadius: 8, lineHeight: 1,
+        transition: 'background 0.1s', ...extraStyle,
+      }}
+      onMouseEnter={ev => (ev.currentTarget.style.background = '#f0f2f5')}
+      onMouseLeave={ev => (ev.currentTarget.style.background = 'none')}
+    >{e}</button>
+  )
+
   return (
     <div style={{
-      position: 'absolute', bottom: 32, [side === 'left' ? 'left' : 'right']: 0,
-      background: '#fff', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-      border: '1px solid #e9edef', zIndex: 50, padding: 8, width: showMore ? 244 : 'auto'
+      position: 'absolute', bottom: '100%', marginBottom: 4,
+      [side === 'left' ? 'left' : 'right']: 0,
+      background: '#fff', borderRadius: showLib ? 12 : 20,
+      boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+      border: '1px solid #e9edef',
+      padding: showLib ? 8 : '4px 2px',
+      zIndex: 60,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        {QUICK_EMOJIS.map(e => (
-          <button key={e} onClick={() => onPick(e)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4, borderRadius: 6 }}>{e}</button>
-        ))}
-        <button onClick={() => setShowMore(v => !v)} style={{ background: showMore ? '#f0f2f5' : 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px 6px', borderRadius: 6, color: '#667781' }}>+</button>
-      </div>
-      {showMore && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 6, borderTop: '1px solid #f0f2f5', paddingTop: 6 }}>
-          {MORE_EMOJIS.map(e => (
-            <button key={e} onClick={() => onPick(e)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 3, borderRadius: 4 }}>{e}</button>
-          ))}
+      {showLib ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 2 }}>
+          {MORE_EMOJIS.map(e => mkBtn(e, () => onPick(e)))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {QUICK_EMOJIS.map(e => mkBtn(e, () => onPick(e), { borderRadius: 12 }))}
+          <button
+            onMouseDown={ev => { ev.preventDefault(); ev.stopPropagation(); onOpenLib() }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, color: '#667781',
+              padding: '4px 6px', borderRadius: 8, lineHeight: 1,
+              borderTop: '1px solid #f0f2f5', marginTop: 1,
+            }}
+            onMouseEnter={ev => (ev.currentTarget.style.background = '#f0f2f5')}
+            onMouseLeave={ev => (ev.currentTarget.style.background = 'none')}
+          >＋</button>
         </div>
       )}
     </div>
   )
 }
 
-function MsgMenu({ msg, isCliente, side, onReply, onForward, onDelete, onReact }: {
+function MsgMenu({ msg, isCliente, side, onReply, onForward, onDelete }: {
   msg: Mensagem; isCliente: boolean; side: 'left' | 'right'
-  onReply: () => void; onForward: () => void; onDelete: () => void; onReact: () => void
+  onReply: () => void; onForward: () => void; onDelete: () => void
 }) {
   const item = (icon: string, label: string, onClick: () => void, danger = false) => (
     <button key={label} onClick={onClick} style={{
@@ -214,7 +259,6 @@ function MsgMenu({ msg, isCliente, side, onReply, onForward, onDelete, onReact }
       background: '#fff', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
       border: '1px solid #e9edef', zIndex: 50, overflow: 'hidden', minWidth: 160
     }}>
-      {item('😊', 'Reagir', onReact)}
       {item('↩️', 'Responder', onReply)}
       {item('↗️', 'Encaminhar', onForward)}
       {!isCliente && item('🗑️', 'Apagar', onDelete, true)}
@@ -250,14 +294,22 @@ export default function ChatPage() {
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [hoveredMsg, setHoveredMsg] = useState<number | null>(null)
   const [activeMenu, setActiveMenu] = useState<number | null>(null)
-  const [emojiPickerMsg, setEmojiPickerMsg] = useState<number | null>(null)
+  const [hoverMenuMsg, setHoverMenuMsg] = useState<number | null>(null)
   const [replyTo, setReplyTo] = useState<Mensagem | null>(null)
   const [forwardMsg, setForwardMsg] = useState<Mensagem | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [contas, setContas] = useState<ContaPainelVinculada[]>([])
+  const [planos, setPlanos] = useState<PlanoRow[]>([])
+  const [pacotes, setPacotes] = useState<PacoteRow[]>([])
+  const [editAssinaturaOpen, setEditAssinaturaOpen] = useState(false)
+  const [editClienteOpen, setEditClienteOpen] = useState(false)
+  const [novoClienteOpen, setNovoClienteOpen] = useState(false)
+  const [emojiLibMsg, setEmojiLibMsg] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
+  const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const carregarConversas = useCallback(async () => {
     const res = await fetch('/api/whatsapp/conversas')
@@ -269,6 +321,13 @@ export default function ChatPage() {
     const interval = setInterval(carregarConversas, 10000)
     return () => clearInterval(interval)
   }, [carregarConversas])
+
+  useEffect(() => {
+    fetch('/api/assinaturas/opcoes')
+      .then(r => r.ok ? r.json() : { planos: [], pacotes: [] })
+      .then(d => { setPlanos(d.planos); setPacotes(d.pacotes) })
+      .catch(() => {})
+  }, [])
 
   const carregarMensagens = useCallback(async (tel: string) => {
     setLoadingMsgs(true)
@@ -290,10 +349,33 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (mensagens.length > prevMsgCountRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      const isInitial = prevMsgCountRef.current === 0
+      bottomRef.current?.scrollIntoView({ behavior: isInitial ? 'instant' : 'smooth' })
     }
     prevMsgCountRef.current = mensagens.length
   }, [mensagens])
+
+  // Limpa modo de seleção e outros estados transientes ao trocar de conversa
+  useEffect(() => {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+    setReplyTo(null)
+    setSugestao('')
+    setActiveMenu(null)
+    setHoverMenuMsg(null)
+    setHoveredMsg(null)
+    setEmojiLibMsg(null)
+    prevMsgCountRef.current = 0
+  }, [selecionado])
+
+  // Carrega contas vinculadas quando cliente é identificado
+  useEffect(() => {
+    if (!cliente?.id_cliente) { setContas([]); return }
+    fetch(`/api/clientes/${cliente.id_cliente}/contas`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setContas)
+      .catch(() => setContas([]))
+  }, [cliente?.id_cliente])
 
   async function gerarSugestao() {
     if (!selecionado || mensagens.length === 0) return
@@ -329,8 +411,10 @@ export default function ChatPage() {
   async function enviar(usouSugestao = false) {
     if (!texto.trim() || !selecionado || enviando) return
     setEnviando(true)
-    const msgFinal = texto.trim()
-    const replyId  = replyTo?.wa_msg_id ?? null
+    const msgFinal     = texto.trim()
+    const replyId      = replyTo?.wa_msg_id ?? null
+    const replyConteudo = replyTo ? (replyTo.tipo === 'text' ? (replyTo.conteudo ?? null) : `[${replyTo.tipo}]`) : null
+    const replyOrigem  = replyTo?.origem ?? null
     setTexto('')
     setSugestao('')
     setReplyTo(null)
@@ -344,6 +428,8 @@ export default function ChatPage() {
           sugestao_ia: usouSugestao ? sugestao : null,
           foi_aceita: usouSugestao ? true : null,
           reply_msg_id: replyId,
+          reply_conteudo: replyConteudo,
+          reply_origem: replyOrigem,
         })
       })
       await carregarMensagens(selecionado)
@@ -355,8 +441,11 @@ export default function ChatPage() {
 
   async function reagir(msg: Mensagem, emoji: string) {
     setActiveMenu(null)
-    setEmojiPickerMsg(null)
+    setHoverMenuMsg(null)
+    setEmojiLibMsg(null)
     if (!selecionado) return
+    // Optimistic update
+    setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, reacao: emoji } : m))
     await fetch('/api/whatsapp/reagir', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -408,7 +497,8 @@ export default function ChatPage() {
 
   function fecharMenus() {
     setActiveMenu(null)
-    setEmojiPickerMsg(null)
+    setHoverMenuMsg(null)
+    setEmojiLibMsg(null)
   }
 
   const conversasFiltradas = conversas.filter(c => {
@@ -585,7 +675,7 @@ export default function ChatPage() {
 
             {/* Mensagens */}
             <div style={{
-              flex: 1, overflowY: 'auto', padding: '16px 20px',
+              flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px',
               display: 'flex', flexDirection: 'column', gap: 4
             }}>
               {loadingMsgs && mensagens.length === 0 && (
@@ -618,11 +708,11 @@ export default function ChatPage() {
                     <div
                       style={{
                         display: 'flex', justifyContent: isCliente ? 'flex-start' : 'flex-end',
-                        marginBottom: 2, alignItems: 'flex-end', gap: 4,
+                        marginBottom: msg.reacao ? 14 : 2, alignItems: 'flex-end', gap: 4,
                         ...(selectMode ? { cursor: 'pointer', padding: '2px 0', borderRadius: 6, background: isSelected ? 'rgba(0,168,132,0.08)' : 'transparent' } : {})
                       }}
                       onMouseEnter={() => !selectMode && setHoveredMsg(msg.id)}
-                      onMouseLeave={() => { if (activeMenu !== msg.id && emojiPickerMsg !== msg.id) setHoveredMsg(null) }}
+                      onMouseLeave={() => { if (activeMenu !== msg.id) setHoveredMsg(null) }}
                       onClick={() => selectMode && toggleSelecao(msg.id)}
                     >
                       {/* Checkbox no modo de seleção */}
@@ -639,10 +729,17 @@ export default function ChatPage() {
                         </div>
                       )}
                       {/* Botão de ação — lado esquerdo para mensagens enviadas */}
-                      {!selectMode && !isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
-                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {!selectMode && !isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || hoverMenuMsg === msg.id || emojiLibMsg === msg.id) && (
+                        <div
+                          style={{ position: 'relative', flexShrink: 0 }}
+                          onMouseEnter={() => { if (hoverLeaveTimer.current) { clearTimeout(hoverLeaveTimer.current); hoverLeaveTimer.current = null } setHoverMenuMsg(msg.id) }}
+                          onMouseLeave={() => { hoverLeaveTimer.current = setTimeout(() => setHoverMenuMsg(null), 200) }}
+                        >
+                          {(hoverMenuMsg === msg.id || emojiLibMsg === msg.id) && !activeMenu && (
+                            <QuickEmojiStrip side="left" onPick={e => reagir(msg, e)} showLib={emojiLibMsg === msg.id} onOpenLib={() => setEmojiLibMsg(msg.id)} />
+                          )}
                           <button
-                            onClick={() => { setActiveMenu(activeMenu === msg.id ? null : msg.id); setEmojiPickerMsg(null) }}
+                            onClick={() => setActiveMenu(activeMenu === msg.id ? null : msg.id)}
                             style={{
                               background: 'rgba(255,255,255,0.85)', border: '1px solid #d1d7db',
                               borderRadius: '50%', width: 26, height: 26, cursor: 'pointer',
@@ -650,17 +747,38 @@ export default function ChatPage() {
                               fontSize: 13, color: '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                             }}
                           >▾</button>
-                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="left" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => iniciarSelecao(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
-                          {emojiPickerMsg === msg.id && <EmojiPicker side="left" onPick={e => reagir(msg, e)} onClose={() => setEmojiPickerMsg(null)} />}
+                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="left" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => iniciarSelecao(msg)} />}
                         </div>
                       )}
 
+                      <div style={{ position: 'relative', maxWidth: '65%' }}>
                       <div style={{
-                        maxWidth: '65%', padding: '8px 12px',
+                        padding: '8px 12px',
                         borderRadius: isCliente ? '0 8px 8px 8px' : '8px 0 8px 8px',
                         background: isCliente ? '#ffffff' : '#d9fdd3',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.13)'
                       }}>
+                        {/* Quote de resposta */}
+                        {msg.reply_to_wa_msg_id && (
+                          <div style={{
+                            background: isCliente ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.07)',
+                            borderLeft: '3px solid #00a884',
+                            borderRadius: '0 4px 4px 0',
+                            padding: '5px 8px',
+                            marginBottom: 6,
+                            overflow: 'hidden',
+                          }}>
+                            <div style={{ color: '#00a884', fontSize: 11, fontWeight: 700, marginBottom: 2 }}>
+                              {msg.reply_to_origem === 'jonas' ? 'Você' : (conversaAtual?.nome_cliente ?? conversaAtual?.nome_contato ?? 'Cliente')}
+                            </div>
+                            <div style={{
+                              color: '#667781', fontSize: 12,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                            }}>
+                              {msg.reply_to_conteudo ?? '— mensagem não disponível —'}
+                            </div>
+                          </div>
+                        )}
                         {msg.tipo === 'text' && (
                           <div style={{ color: '#111b21', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                             {msg.conteudo}
@@ -811,12 +929,34 @@ export default function ChatPage() {
                           )}
                         </div>
                       </div>
+                      {/* Badge de reação */}
+                      {msg.reacao && (
+                        <div style={{
+                          position: 'absolute', bottom: -10,
+                          [isCliente ? 'left' : 'right']: 8,
+                          background: '#fff', borderRadius: 10,
+                          padding: '1px 5px', fontSize: 14, lineHeight: 1.3,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                          border: '1px solid rgba(0,0,0,0.06)',
+                          zIndex: 1,
+                        }}>
+                          {msg.reacao}
+                        </div>
+                      )}
+                      </div>
 
                       {/* Botão de ação — lado direito para mensagens do cliente */}
-                      {!selectMode && isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
-                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {!selectMode && isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || hoverMenuMsg === msg.id || emojiLibMsg === msg.id) && (
+                        <div
+                          style={{ position: 'relative', flexShrink: 0 }}
+                          onMouseEnter={() => { if (hoverLeaveTimer.current) { clearTimeout(hoverLeaveTimer.current); hoverLeaveTimer.current = null } setHoverMenuMsg(msg.id) }}
+                          onMouseLeave={() => { hoverLeaveTimer.current = setTimeout(() => setHoverMenuMsg(null), 200) }}
+                        >
+                          {(hoverMenuMsg === msg.id || emojiLibMsg === msg.id) && !activeMenu && (
+                            <QuickEmojiStrip side="right" onPick={e => reagir(msg, e)} showLib={emojiLibMsg === msg.id} onOpenLib={() => setEmojiLibMsg(msg.id)} />
+                          )}
                           <button
-                            onClick={() => { setActiveMenu(activeMenu === msg.id ? null : msg.id); setEmojiPickerMsg(null) }}
+                            onClick={() => setActiveMenu(activeMenu === msg.id ? null : msg.id)}
                             style={{
                               background: 'rgba(255,255,255,0.85)', border: '1px solid #d1d7db',
                               borderRadius: '50%', width: 26, height: 26, cursor: 'pointer',
@@ -824,8 +964,7 @@ export default function ChatPage() {
                               fontSize: 13, color: '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                             }}
                           >▾</button>
-                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="right" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => iniciarSelecao(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
-                          {emojiPickerMsg === msg.id && <EmojiPicker side="right" onPick={e => reagir(msg, e)} onClose={() => setEmojiPickerMsg(null)} />}
+                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="right" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => iniciarSelecao(msg)} />}
                         </div>
                       )}
                     </div>
@@ -836,7 +975,7 @@ export default function ChatPage() {
             </div>
 
             {/* Sugestão de IA */}
-            {sugestao && (
+            {sugestao && !selectMode && (
               <div style={{
                 background: '#e8fce4', borderTop: '1px solid #00a884',
                 padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10
@@ -861,7 +1000,7 @@ export default function ChatPage() {
             )}
 
             {/* Banner de resposta */}
-            {replyTo && (
+            {replyTo && !selectMode && (
               <div style={{
                 background: '#f0f2f5', borderTop: '1px solid #d1d7db',
                 padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10
@@ -988,62 +1127,132 @@ export default function ChatPage() {
                 size={64}
               />
             </div>
-            <div style={{ color: '#111b21', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <span style={{ color: '#111b21', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</span>
+              {cliente ? (
+                <button
+                  onClick={() => setEditClienteOpen(true)}
+                  title="Editar cliente"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: '#adbac1', fontSize: 14, padding: 0, lineHeight: 1,
+                    display: 'flex', alignItems: 'center'
+                  }}
+                >
+                  ⚙️
+                </button>
+              ) : (
+                <button
+                  onClick={() => setNovoClienteOpen(true)}
+                  title="Cadastrar novo cliente"
+                  style={{
+                    background: '#00a884', border: 'none', cursor: 'pointer',
+                    color: '#fff', fontSize: 11, fontWeight: 600, padding: '3px 8px',
+                    borderRadius: 10, lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 3
+                  }}
+                >
+                  + Cadastrar
+                </button>
+              )}
+            </div>
             <div style={{ color: '#667781', fontSize: 13, marginTop: 4 }}>{formatTel(selecionado)}</div>
             {cliente && (
               <div style={{ color: '#f59e0b', fontSize: 16, marginTop: 6, letterSpacing: 2 }}>
                 {scoreStars(cliente.score_fidelidade)}
               </div>
             )}
+            {cliente?.observacao && (
+              <div style={{
+                marginTop: 10, padding: '7px 10px', borderRadius: 6,
+                background: '#fff', border: '1px solid #e9edef',
+                color: '#3b4a54', fontSize: 12, lineHeight: 1.5, textAlign: 'left'
+              }}>
+                {cliente.observacao}
+              </div>
+            )}
           </div>
 
           {/* Assinatura */}
           {cliente ? (
-            <div style={{ padding: '16px 20px' }}>
+            <div style={{ padding: '14px 16px' }}>
               <div style={{
-                color: '#667781', fontSize: 11, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10
               }}>
-                Assinatura
-              </div>
-
-              <InfoRow label="Plano" value={cliente.plano ?? '—'} />
-              <InfoRow label="Servidor" value={cliente.servidor ?? '—'} />
-              <InfoRow label="Valor" value={formatValor(cliente.valor)} />
-              <InfoRow
-                label="Status"
-                value={
-                  <span style={{ color: statusColor(cliente.status), fontWeight: 700 }}>
-                    ● {(cliente.status ?? '—')}
+                <span style={{ color: '#667781', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Assinatura
+                </span>
+                {cliente.pacote && (
+                  <span style={{
+                    background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600,
+                    borderRadius: 4, padding: '1px 6px', border: '1px solid #c8e6c9'
+                  }}>
+                    {cliente.pacote}
                   </span>
-                }
-              />
-              <InfoRow label="Venc. contrato" value={cliente.venc_contrato ? formatData(cliente.venc_contrato) : '—'} />
-              <InfoRow label="Venc. contas" value={cliente.venc_contas ? formatData(cliente.venc_contas) : '—'} />
-
-              {cliente.observacao && (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{
-                    color: '#667781', fontSize: 11, fontWeight: 700,
-                    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6
-                  }}>
-                    Observação
-                  </div>
-                  <div style={{
-                    background: '#f0f2f5', borderRadius: 8, padding: '10px 12px',
-                    color: '#3b4a54', fontSize: 13, lineHeight: 1.5
-                  }}>
-                    {cliente.observacao}
-                  </div>
+                )}
+                {cliente.id_assinatura && (
+                  <button
+                    onClick={() => setEditAssinaturaOpen(true)}
+                    title="Editar assinatura"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#adbac1', fontSize: 14, padding: 0, lineHeight: 1,
+                      display: 'flex', alignItems: 'center'
+                    }}
+                  >
+                    ⚙️
+                  </button>
+                )}
+              </div>
+              {cliente.assinatura_observacao && (
+                <div style={{
+                  marginBottom: 10, padding: '6px 10px', borderRadius: 6,
+                  background: '#f0f2f5', border: '1px solid #e9edef',
+                  color: '#3b4a54', fontSize: 12, lineHeight: 1.5
+                }}>
+                  {cliente.assinatura_observacao}
                 </div>
               )}
 
-              <div style={{ marginTop: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 8px' }}>
+                <div>
+                  <div style={{ color: '#667781', fontSize: 11, marginBottom: 2 }}>Plano</div>
+                  <div style={{ color: '#111b21', fontSize: 13, fontWeight: 500 }}>{cliente.plano ?? '—'}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#667781', fontSize: 11, marginBottom: 2 }}>Valor</div>
+                  <div style={{ color: '#111b21', fontSize: 13, fontWeight: 500 }}>{formatValor(cliente.valor)}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#667781', fontSize: 11, marginBottom: 2 }}>Status</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: statusColor(cliente.status) }}>
+                    ● {cliente.status ?? '—'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#667781', fontSize: 11, marginBottom: 2 }}>Venc. contrato</div>
+                  <div style={{ color: '#111b21', fontSize: 13, fontWeight: 500 }}>
+                    {cliente.venc_contrato ? formatData(cliente.venc_contrato) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Contas vinculadas */}
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
+                <div style={{
+                  color: '#667781', fontSize: 11, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8
+                }}>
+                  Contas
+                </div>
+                <ContasCards contas={contas} vencContas={cliente.venc_contas ?? null} />
+              </div>
+
+              <div style={{ marginTop: 14 }}>
                 <a
                   href={`/clientes/${cliente.id_cliente}`}
                   style={{
                     background: '#f0f2f5', color: '#111b21', textDecoration: 'none',
-                    borderRadius: 8, padding: '10px 16px', textAlign: 'center',
+                    borderRadius: 8, padding: '8px 16px', textAlign: 'center',
                     fontSize: 13, fontWeight: 600, display: 'block',
                     border: '1px solid #d1d7db'
                   }}
@@ -1059,22 +1268,54 @@ export default function ChatPage() {
               <div style={{ fontSize: 12, marginTop: 4 }}>{formatTel(selecionado)}</div>
             </div>
           )}
-
-          {/* Resumo */}
-          <div style={{ padding: '0 20px 20px', marginTop: 8 }}>
-            <div style={{
-              color: '#667781', fontSize: 11, fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10
-            }}>
-              Resumo
-            </div>
-            <InfoRow label="Total mensagens" value={String(mensagens.length)} />
-            <InfoRow
-              label="Última mensagem"
-              value={conversaAtual ? formatHora(conversaAtual.ultima_mensagem_em) : '—'}
-            />
-          </div>
         </div>
+      )}
+
+      {/* Modal novo cliente */}
+      {novoClienteOpen && selecionado && (
+        <NovoClienteModal
+          planos={planos}
+          pacotes={pacotes}
+          initialNome={conversaAtual?.nome_contato ?? ''}
+          initialTelefone={selecionado.startsWith('55') ? selecionado.slice(2) : selecionado}
+          initialNomeContato={conversaAtual?.nome_contato ?? ''}
+          onClose={() => setNovoClienteOpen(false)}
+          onSuccess={() => { setNovoClienteOpen(false); carregarMensagens(selecionado) }}
+        />
+      )}
+
+      {/* Modal editar cliente */}
+      {editClienteOpen && cliente && (
+        <EditClienteModal
+          idCliente={String(cliente.id_cliente)}
+          nomeAtual={cliente.nome}
+          observacaoAtual={cliente.observacao ?? null}
+          observacaoAssinaturaAtual={cliente.assinatura_observacao ?? null}
+          idAssinaturaPrincipal={cliente.id_assinatura ? String(cliente.id_assinatura) : null}
+          onClose={() => setEditClienteOpen(false)}
+          onSaved={() => { setEditClienteOpen(false); carregarMensagens(selecionado!) }}
+        />
+      )}
+
+      {/* Modal editar assinatura */}
+      {editAssinaturaOpen && cliente?.id_assinatura && (
+        <EditAssinaturaModal
+          idCliente={String(cliente.id_cliente)}
+          assinatura={{
+            id_assinatura: String(cliente.id_assinatura),
+            id_plano: cliente.id_plano ? String(cliente.id_plano) : null,
+            id_pacote: cliente.id_pacote ? String(cliente.id_pacote) : null,
+            venc_contrato: cliente.venc_contrato ?? null,
+            venc_contas: cliente.venc_contas ?? null,
+            status: cliente.status ?? 'ativo',
+            identificacao: cliente.identificacao ?? null,
+            observacao: cliente.assinatura_observacao ?? null,
+          }}
+          planos={planos}
+          pacotes={pacotes}
+          onClose={() => setEditAssinaturaOpen(false)}
+          onSaved={() => { setEditAssinaturaOpen(false); carregarMensagens(selecionado!) }}
+        />
       )}
 
       {/* Modal encaminhar */}
@@ -1101,7 +1342,7 @@ export default function ChatPage() {
       )}
 
       {/* Overlay para fechar menus ao clicar fora */}
-      {(activeMenu !== null || emojiPickerMsg !== null) && (
+      {(activeMenu !== null || emojiLibMsg !== null) && (
         <div onClick={fecharMenus} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
       )}
 

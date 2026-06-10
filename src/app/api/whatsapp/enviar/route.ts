@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
-    const { telefone, mensagem, sugestao_ia, foi_aceita, reply_msg_id } = await req.json()
+    const { telefone, mensagem, sugestao_ia, foi_aceita, reply_msg_id, reply_conteudo, reply_origem } = await req.json()
 
     if (!telefone || !mensagem) {
       return NextResponse.json({ error: 'telefone e mensagem obrigatórios' }, { status: 400 })
@@ -46,8 +46,9 @@ export async function POST(req: NextRequest) {
     // Salva no banco
     await pool.query(`
       INSERT INTO public.whatsapp_mensagens
-        (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, mensagem_final, source, recebida_em)
-      VALUES ($1, $2, 'text', $3, 'jonas', $4, $5, $3, $6, NOW())
+        (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, mensagem_final, source,
+         reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem, recebida_em)
+      VALUES ($1, $2, 'text', $3, 'jonas', $4, $5, $3, $6, $7, $8, $9, NOW())
       ON CONFLICT (wa_msg_id) DO NOTHING
     `, [
       data.messages?.[0]?.id ?? `sent_${Date.now()}`,
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest) {
       sugestao_ia ?? null,
       foi_aceita ?? null,
       session?.user?.email ? `chat:${session.user.email}` : 'chat',
+      reply_msg_id ?? null,
+      reply_conteudo ?? null,
+      reply_origem ?? null,
     ])
 
     return NextResponse.json({ success: true, message_id: data.messages?.[0]?.id })

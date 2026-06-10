@@ -23,6 +23,7 @@ import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
 import HistoricoAudit from "@/components/clientes/HistoricoAudit";
 import DesvincularContaButton from "@/components/clientes/DesvincularContaButton";
 import AdicionarContaModal from "@/components/clientes/AdicionarContaModal";
+import ContasCards from "@/components/clientes/ContasCards";
 import { pool } from "@/lib/db";
 
 type Props = {
@@ -288,51 +289,22 @@ export default async function ClienteDetalhePage({ params }: Props) {
             )}
 
             {/* Contas: vinculadas ou balão de sem vínculo */}
-            <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-zinc-100">
-              {(contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).length > 0
-                ? (contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []).map((c) => (
-                  <div key={c.id_conta} className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-1.5 text-xs">
-                    <span className="font-medium text-zinc-500">{c.nome_painel}</span>
-                    <span className="text-zinc-300">·</span>
-                    <span className="font-mono font-semibold text-zinc-800 select-all">{c.usuario}</span>
-                    {c.senha && (
-                      <>
-                        <span className="text-zinc-300">/</span>
-                        <span className="font-mono text-zinc-600 select-all">{c.senha}</span>
-                      </>
-                    )}
-                    <span className={`rounded-full px-1.5 py-0.5 ${
-                      c.status_conta === "ok" ? "bg-emerald-100 text-emerald-700" :
-                      c.status_conta === "vencida" ? "bg-amber-100 text-amber-700" :
-                      "bg-red-100 text-red-600"
-                    }`}>
-                      {c.vencimento_real_painel
-                        ? c.vencimento_real_painel.split("T")[0].split("-").slice(1).reverse().join("/")
-                        : c.status_conta}
-                    </span>
-                    <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
-                  </div>
-                ))
-                : (
-                  <div className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-dashed border-zinc-300 px-3 py-1.5 text-xs text-zinc-400">
-                    <span className="font-medium">Conta sem vínculo</span>
-                    {ativa.venc_contas && (
-                      <>
-                        <span className="text-zinc-300">·</span>
-                        <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-500">
-                          {ativa.venc_contas.split("T")[0].split("-").reverse().join("/")}
-                        </span>
-                      </>
-                    )}
-                    <AdicionarContaModal
-                      idAssinatura={String(ativa.id_assinatura)}
-                      idCliente={id}
-                      paineis={paineisList}
-                      compact
-                    />
-                  </div>
-                )
-              }
+            <div className="mt-2 pt-2 border-t border-zinc-100">
+              <ContasCards
+                contas={contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []}
+                vencContas={ativa.venc_contas ?? null}
+                contaAction={(c) => (
+                  <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
+                )}
+                emptyAction={
+                  <AdicionarContaModal
+                    idAssinatura={String(ativa.id_assinatura)}
+                    idCliente={id}
+                    paineis={paineisList}
+                    compact
+                  />
+                }
+              />
             </div>
 
             <div className="flex justify-end gap-2 mt-2">
