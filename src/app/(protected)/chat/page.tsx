@@ -253,6 +253,8 @@ export default function ChatPage() {
   const [emojiPickerMsg, setEmojiPickerMsg] = useState<number | null>(null)
   const [replyTo, setReplyTo] = useState<Mensagem | null>(null)
   const [forwardMsg, setForwardMsg] = useState<Mensagem | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
@@ -362,14 +364,36 @@ export default function ChatPage() {
     })
   }
 
-  async function apagar(msg: Mensagem) {
+  function iniciarSelecao(msg: Mensagem) {
     setActiveMenu(null)
-    if (!selecionado || !confirm('Apagar esta mensagem?')) return
-    await fetch('/api/whatsapp/apagar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telefone: selecionado, wa_msg_id: msg.wa_msg_id }),
+    setSelectMode(true)
+    setSelectedIds(new Set([msg.id]))
+  }
+
+  function toggleSelecao(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
     })
+  }
+
+  function cancelarSelecao() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  async function apagarSelecionados() {
+    if (!selecionado || selectedIds.size === 0) return
+    const alvos = mensagens.filter(m => selectedIds.has(m.id))
+    cancelarSelecao()
+    await Promise.all(alvos.map(m =>
+      fetch('/api/whatsapp/apagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado, wa_msg_id: m.wa_msg_id }),
+      })
+    ))
     await carregarMensagens(selecionado)
   }
 
@@ -570,9 +594,10 @@ export default function ChatPage() {
 
               {mensagens.map((msg, i) => {
                 const isCliente = msg.origem === 'cliente'
-                const showData = i === 0 ||
+                const showData  = i === 0 ||
                   new Date(msg.recebida_em).toDateString() !==
                   new Date(mensagens[i - 1].recebida_em).toDateString()
+                const isSelected = selectedIds.has(msg.id)
 
                 return (
                   <div key={msg.id}>
@@ -591,12 +616,30 @@ export default function ChatPage() {
                     )}
 
                     <div
-                      style={{ display: 'flex', justifyContent: isCliente ? 'flex-start' : 'flex-end', marginBottom: 2, alignItems: 'flex-end', gap: 4 }}
-                      onMouseEnter={() => setHoveredMsg(msg.id)}
+                      style={{
+                        display: 'flex', justifyContent: isCliente ? 'flex-start' : 'flex-end',
+                        marginBottom: 2, alignItems: 'flex-end', gap: 4,
+                        ...(selectMode ? { cursor: 'pointer', padding: '2px 0', borderRadius: 6, background: isSelected ? 'rgba(0,168,132,0.08)' : 'transparent' } : {})
+                      }}
+                      onMouseEnter={() => !selectMode && setHoveredMsg(msg.id)}
                       onMouseLeave={() => { if (activeMenu !== msg.id && emojiPickerMsg !== msg.id) setHoveredMsg(null) }}
+                      onClick={() => selectMode && toggleSelecao(msg.id)}
                     >
+                      {/* Checkbox no modo de seleção */}
+                      {selectMode && (
+                        <div style={{
+                          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                          border: `2px solid ${isSelected ? '#00a884' : '#adbac1'}`,
+                          background: isSelected ? '#00a884' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          order: isCliente ? -1 : 1, marginLeft: isCliente ? 0 : 8, marginRight: isCliente ? 8 : 0,
+                          transition: 'all 0.15s'
+                        }}>
+                          {isSelected && <span style={{ color: '#fff', fontSize: 13, lineHeight: 1 }}>✓</span>}
+                        </div>
+                      )}
                       {/* Botão de ação — lado esquerdo para mensagens enviadas */}
-                      {!isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
+                      {!selectMode && !isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           <button
                             onClick={() => { setActiveMenu(activeMenu === msg.id ? null : msg.id); setEmojiPickerMsg(null) }}
@@ -607,7 +650,7 @@ export default function ChatPage() {
                               fontSize: 13, color: '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                             }}
                           >▾</button>
-                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="left" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => apagar(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
+                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="left" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => iniciarSelecao(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
                           {emojiPickerMsg === msg.id && <EmojiPicker side="left" onPick={e => reagir(msg, e)} onClose={() => setEmojiPickerMsg(null)} />}
                         </div>
                       )}
@@ -770,7 +813,7 @@ export default function ChatPage() {
                       </div>
 
                       {/* Botão de ação — lado direito para mensagens do cliente */}
-                      {isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
+                      {!selectMode && isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           <button
                             onClick={() => { setActiveMenu(activeMenu === msg.id ? null : msg.id); setEmojiPickerMsg(null) }}
@@ -781,7 +824,7 @@ export default function ChatPage() {
                               fontSize: 13, color: '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                             }}
                           >▾</button>
-                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="right" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => apagar(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
+                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="right" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => iniciarSelecao(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
                           {emojiPickerMsg === msg.id && <EmojiPicker side="right" onPick={e => reagir(msg, e)} onClose={() => setEmojiPickerMsg(null)} />}
                         </div>
                       )}
@@ -835,7 +878,35 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* Input de envio */}
+            {/* Barra de seleção / Input de envio */}
+            {selectMode ? (
+              <div style={{
+                background: '#fff', padding: '12px 20px', borderTop: '1px solid #d1d7db',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+              }}>
+                <button
+                  onClick={cancelarSelecao}
+                  style={{ background: 'none', border: 'none', color: '#667781', fontSize: 14, cursor: 'pointer', padding: '8px 0' }}
+                >
+                  ✕ Cancelar
+                </button>
+                <span style={{ color: '#111b21', fontSize: 14, fontWeight: 500 }}>
+                  {selectedIds.size} {selectedIds.size === 1 ? 'mensagem selecionada' : 'mensagens selecionadas'}
+                </span>
+                <button
+                  onClick={apagarSelecionados}
+                  disabled={selectedIds.size === 0}
+                  style={{
+                    background: selectedIds.size > 0 ? '#E53935' : '#adbac1',
+                    border: 'none', color: '#fff', borderRadius: 8,
+                    padding: '8px 18px', fontSize: 14, fontWeight: 600,
+                    cursor: selectedIds.size > 0 ? 'pointer' : 'default'
+                  }}
+                >
+                  🗑️ Apagar
+                </button>
+              </div>
+            ) : (
             <div style={{
               background: '#f0f2f5', padding: '10px 16px',
               display: 'flex', alignItems: 'flex-end', gap: 10,
@@ -891,6 +962,7 @@ export default function ChatPage() {
                 {enviando ? '...' : '➤'}
               </button>
             </div>
+            )}
           </>
         )}
       </div>
