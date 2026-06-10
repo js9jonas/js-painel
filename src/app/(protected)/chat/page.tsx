@@ -184,6 +184,7 @@ export default function ChatPage() {
   const [sugestao, setSugestao] = useState('')
   const [loadingSugestao, setLoadingSugestao] = useState(false)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
+  const [lightbox, setLightbox] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
@@ -498,10 +499,46 @@ export default function ChatPage() {
                             {msg.conteudo}
                           </div>
                         )}
-                        {msg.tipo === 'audio' && <div style={{ color: '#667781', fontSize: 13 }}>🎵 Áudio</div>}
-                        {msg.tipo === 'image' && <div style={{ color: '#667781', fontSize: 13 }}>📷 Imagem</div>}
-                        {msg.tipo === 'document' && <div style={{ color: '#667781', fontSize: 13 }}>📄 Documento</div>}
-                        {msg.tipo === 'video' && <div style={{ color: '#667781', fontSize: 13 }}>🎥 Vídeo</div>}
+                        {msg.tipo === 'audio' && msg.conteudo && (
+                          <audio
+                            controls
+                            src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                            style={{ maxWidth: '100%', height: 36, display: 'block' }}
+                          />
+                        )}
+                        {msg.tipo === 'image' && msg.conteudo && (
+                          <img
+                            src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                            alt="Imagem"
+                            onClick={() => setLightbox(`/api/whatsapp/media?id=${msg.conteudo}`)}
+                            style={{
+                              maxWidth: '100%', maxHeight: 220, borderRadius: 6,
+                              display: 'block', cursor: 'zoom-in', objectFit: 'cover'
+                            }}
+                          />
+                        )}
+                        {msg.tipo === 'video' && msg.conteudo && (
+                          <video
+                            controls
+                            src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                            style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 6, display: 'block' }}
+                          />
+                        )}
+                        {msg.tipo === 'document' && msg.conteudo && (
+                          <a
+                            href={`/api/whatsapp/media?id=${msg.conteudo}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              color: '#1E88E5', textDecoration: 'none', fontSize: 13,
+                              background: 'rgba(0,0,0,0.04)', borderRadius: 6, padding: '8px 10px'
+                            }}
+                          >
+                            <span style={{ fontSize: 20 }}>📄</span>
+                            <span>Baixar documento</span>
+                          </a>
+                        )}
 
                         <div style={{
                           display: 'flex', justifyContent: 'flex-end',
@@ -729,6 +766,34 @@ export default function ChatPage() {
               value={conversaAtual ? formatHora(conversaAtual.ultima_mensagem_em) : '—'}
             />
           </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={lightbox}
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 4 }}
+          />
+          <button
+            onClick={() => setLightbox(null)}
+            style={{
+              position: 'absolute', top: 20, right: 24,
+              background: 'rgba(255,255,255,0.15)', border: 'none',
+              color: '#fff', fontSize: 24, cursor: 'pointer',
+              borderRadius: '50%', width: 40, height: 40,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >✕</button>
         </div>
       )}
     </div>
