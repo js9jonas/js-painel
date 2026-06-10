@@ -96,37 +96,52 @@ function sourceLabel(source: string | null) {
   return { icon: '💬', text: source }
 }
 
+const AVATAR_COLORS = [
+  '#E53935', '#D81B60', '#8E24AA', '#5E35B1',
+  '#1E88E5', '#00897B', '#43A047', '#FB8C00',
+  '#F4511E', '#6D4C41', '#546E7A', '#039BE5',
+]
+
+function avatarColor(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
 function nomeInicial(nome: string | null, tel: string) {
   const n = nome ?? formatTel(tel)
   return n.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase()
 }
 
 function Avatar({
-  fotoUrl, nome, tel, size, hasClient
+  fotoUrl, nome, tel, size
 }: {
   fotoUrl?: string | null
   nome: string | null
   tel: string
   size: number
-  hasClient?: boolean
 }) {
+  const label = nome ?? formatTel(tel)
+  const bg    = avatarColor(label)
+  const ini   = nomeInicial(nome, tel)
+
   if (fotoUrl) {
     return (
-      <div style={{
-        width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden'
-      }}>
+      <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden' }}>
         <img
           src={fotoUrl}
-          alt={nome ?? tel}
+          alt={label}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           onError={e => {
             const el = e.currentTarget
             el.style.display = 'none'
-            el.parentElement!.style.background = hasClient ? '#00a884' : '#adbac1'
+            el.parentElement!.style.background = bg
             el.parentElement!.style.display = 'flex'
             el.parentElement!.style.alignItems = 'center'
             el.parentElement!.style.justifyContent = 'center'
-            el.parentElement!.innerHTML = `<span style="color:#fff;font-size:${Math.round(size * 0.38)}px;font-weight:700">${nomeInicial(nome, tel)}</span>`
+            el.parentElement!.innerHTML = `<span style="color:#fff;font-size:${Math.round(size * 0.38)}px;font-weight:700">${ini}</span>`
           }}
         />
       </div>
@@ -135,11 +150,11 @@ function Avatar({
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: hasClient ? '#00a884' : '#adbac1',
+      background: bg,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: Math.round(size * 0.38), fontWeight: 700, color: '#fff'
     }}>
-      {nomeInicial(nome, tel)}
+      {ini}
     </div>
   )
 }
@@ -362,8 +377,7 @@ export default function ChatPage() {
                   nome={nome}
                   tel={conv.telefone}
                   size={46}
-                  hasClient={!!conv.id_cliente}
-                />
+                  />
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -430,7 +444,6 @@ export default function ChatPage() {
                 nome={nomeExibido}
                 tel={selecionado}
                 size={40}
-                hasClient={!!conversaAtual?.id_cliente}
               />
               <div>
                 <div style={{ color: '#111b21', fontWeight: 600, fontSize: 15 }}>{nomeExibido}</div>
@@ -628,7 +641,6 @@ export default function ChatPage() {
                 nome={nomeExibido}
                 tel={selecionado}
                 size={64}
-                hasClient={!!cliente}
               />
             </div>
             <div style={{ color: '#111b21', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</div>
