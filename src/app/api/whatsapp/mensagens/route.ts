@@ -1,7 +1,6 @@
 // src/app/api/whatsapp/mensagens/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
-import { fetchFotoPerfil } from '@/lib/foto-perfil'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,9 +61,6 @@ export async function GET(req: NextRequest) {
   ORDER BY a.venc_contrato ASC
   LIMIT 1
 `, [telefone])
-
-    // Busca foto de perfil em background (atualiza cache se necessário)
-    fetchFotoPerfil(telefone).catch(() => null)
 
     return NextResponse.json({
       mensagens: mensagens.rows,
