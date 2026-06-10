@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const mensagens = await pool.query(`
       SELECT
         id, wa_msg_id, telefone, nome_contato, tipo,
-        conteudo, origem, sugestao_ia, foi_aceita, mensagem_final,
+        conteudo, media_mime, nome_arquivo, origem, sugestao_ia, foi_aceita, mensagem_final,
         status, source, recebida_em
       FROM public.whatsapp_mensagens
       WHERE telefone = $1

@@ -49,22 +49,34 @@ export async function POST(req: NextRequest) {
             const contact = contacts.find((c: any) => c.wa_id === from)
             const nome    = contact?.profile?.name ?? null
 
-            let tipo     = msg.type
-            let conteudo = ''
+            let tipo        = msg.type
+            let conteudo    = ''
+            let media_mime  = null as string | null
+            let nome_arquivo = null as string | null
             if (msg.type === 'text')     conteudo = msg.text?.body ?? ''
-            else if (msg.type === 'audio')    conteudo = msg.audio?.id ?? ''
-            else if (msg.type === 'image')    conteudo = msg.image?.id ?? ''
-            else if (msg.type === 'document') conteudo = msg.document?.id ?? ''
-            else if (msg.type === 'video')    conteudo = msg.video?.id ?? ''
+            else if (msg.type === 'audio') {
+              conteudo = msg.audio?.id ?? ''
+              media_mime = msg.audio?.mime_type ?? null
+            } else if (msg.type === 'image') {
+              conteudo = msg.image?.id ?? ''
+              media_mime = msg.image?.mime_type ?? null
+            } else if (msg.type === 'document') {
+              conteudo = msg.document?.id ?? ''
+              media_mime = msg.document?.mime_type ?? null
+              nome_arquivo = msg.document?.filename ?? null
+            } else if (msg.type === 'video') {
+              conteudo = msg.video?.id ?? ''
+              media_mime = msg.video?.mime_type ?? null
+            }
 
             console.log(`[WhatsApp] Recebido de ${from}: ${tipo}`)
 
             await pool.query(
               `INSERT INTO public.whatsapp_mensagens
-                (wa_msg_id, telefone, nome_contato, tipo, conteudo, origem, recebida_em, phone_number_id)
-               VALUES ($1, $2, $3, $4, $5, 'cliente', $6, $7)
+                (wa_msg_id, telefone, nome_contato, tipo, conteudo, media_mime, nome_arquivo, origem, recebida_em, phone_number_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'cliente', $8, $9)
                ON CONFLICT (wa_msg_id) DO NOTHING`,
-              [msgId, from, nome, tipo, conteudo, timestamp, metadata?.phone_number_id]
+              [msgId, from, nome, tipo, conteudo, media_mime, nome_arquivo, timestamp, metadata?.phone_number_id]
             )
 
             // Sync de etiquetas WA — fire-and-forget, no máximo 1x/dia por contato

@@ -22,6 +22,8 @@ interface Mensagem {
   nome_contato: string | null
   tipo: string
   conteudo: string | null
+  media_mime: string | null
+  nome_arquivo: string | null
   origem: 'cliente' | 'jonas' | 'ia'
   sugestao_ia: string | null
   foi_aceita: boolean | null
@@ -524,21 +526,98 @@ export default function ChatPage() {
                             style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 6, display: 'block' }}
                           />
                         )}
-                        {msg.tipo === 'document' && msg.conteudo && (
-                          <a
-                            href={`/api/whatsapp/media?id=${msg.conteudo}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              color: '#1E88E5', textDecoration: 'none', fontSize: 13,
-                              background: 'rgba(0,0,0,0.04)', borderRadius: 6, padding: '8px 10px'
-                            }}
-                          >
-                            <span style={{ fontSize: 20 }}>📄</span>
-                            <span>Baixar documento</span>
-                          </a>
-                        )}
+                        {msg.tipo === 'document' && msg.conteudo && (() => {
+                          const url  = `/api/whatsapp/media?id=${msg.conteudo}`
+                          const mime = msg.media_mime ?? ''
+                          const nome = msg.nome_arquivo ?? 'documento'
+                          const ext  = nome.split('.').pop()?.toUpperCase() ?? ''
+
+                          const extColors: Record<string, string> = {
+                            PDF: '#E53935', DOC: '#1E88E5', DOCX: '#1E88E5',
+                            XLS: '#43A047', XLSX: '#43A047', PPT: '#FB8C00',
+                            PPTX: '#FB8C00', ZIP: '#8E24AA', RAR: '#8E24AA',
+                          }
+                          const extColor = extColors[ext] ?? '#546E7A'
+
+                          // Imagem enviada como documento
+                          if (mime.startsWith('image/')) {
+                            return (
+                              <img
+                                src={url}
+                                alt={nome}
+                                onClick={() => setLightbox(url)}
+                                style={{
+                                  maxWidth: '100%', maxHeight: 220, borderRadius: 6,
+                                  display: 'block', cursor: 'zoom-in', objectFit: 'cover'
+                                }}
+                              />
+                            )
+                          }
+
+                          // PDF com preview inline
+                          if (mime === 'application/pdf') {
+                            return (
+                              <div>
+                                <div style={{
+                                  width: '100%', height: 180, overflow: 'hidden',
+                                  borderRadius: 6, border: '1px solid #e9edef',
+                                  position: 'relative', background: '#f8f9fa'
+                                }}>
+                                  <iframe
+                                    src={`${url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                                    style={{ width: '100%', height: 260, border: 'none', marginTop: -40, pointerEvents: 'none' }}
+                                    title={nome}
+                                  />
+                                  <div style={{ position: 'absolute', inset: 0 }} />
+                                </div>
+                                <a
+                                  href={url} target="_blank" rel="noopener noreferrer"
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    marginTop: 6, textDecoration: 'none', fontSize: 12,
+                                    color: '#667781'
+                                  }}
+                                >
+                                  <span style={{
+                                    background: extColor, color: '#fff', borderRadius: 4,
+                                    padding: '2px 5px', fontSize: 10, fontWeight: 700
+                                  }}>PDF</span>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {nome}
+                                  </span>
+                                </a>
+                              </div>
+                            )
+                          }
+
+                          // Outros tipos — card com ícone de extensão
+                          return (
+                            <a
+                              href={url} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10,
+                                textDecoration: 'none', padding: '8px 10px',
+                                background: 'rgba(0,0,0,0.04)', borderRadius: 8
+                              }}
+                            >
+                              <div style={{
+                                width: 36, height: 36, borderRadius: 6, flexShrink: 0,
+                                background: extColor,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#fff', fontSize: 10, fontWeight: 700
+                              }}>{ext || '?'}</div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{
+                                  color: '#111b21', fontSize: 13, fontWeight: 500,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                }}>{nome}</div>
+                                <div style={{ color: '#667781', fontSize: 11, marginTop: 1 }}>
+                                  {ext || mime || 'Arquivo'}
+                                </div>
+                              </div>
+                            </a>
+                          )
+                        })()}
 
                         <div style={{
                           display: 'flex', justifyContent: 'flex-end',
