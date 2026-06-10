@@ -30,13 +30,17 @@ export async function POST(req: NextRequest) {
     const rawBody = await req.text()
 
     // Verifica assinatura HMAC-SHA256 enviada pela Meta
-    const sig = req.headers.get('x-hub-signature-256') ?? ''
-    const expected = 'sha256=' + createHmac('sha256', APP_SECRET).update(rawBody).digest('hex')
-    const sigBuf  = Buffer.from(sig)
-    const expBuf  = Buffer.from(expected)
-    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
-      console.warn('[WhatsApp] Assinatura inválida no webhook')
-      return new NextResponse('Forbidden', { status: 403 })
+    if (!APP_SECRET) {
+      console.warn('[WhatsApp] WHATSAPP_APP_SECRET não definida — verificação HMAC desativada')
+    } else {
+      const sig = req.headers.get('x-hub-signature-256') ?? ''
+      const expected = 'sha256=' + createHmac('sha256', APP_SECRET).update(rawBody).digest('hex')
+      const sigBuf  = Buffer.from(sig)
+      const expBuf  = Buffer.from(expected)
+      if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+        console.warn('[WhatsApp] Assinatura inválida no webhook')
+        return new NextResponse('Forbidden', { status: 403 })
+      }
     }
 
     const body = JSON.parse(rawBody)

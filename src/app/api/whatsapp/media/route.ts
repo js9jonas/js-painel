@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 
 export const dynamic = 'force-dynamic'
 
 const TOKEN = process.env.WHATSAPP_TOKEN!
 
 export async function GET(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
