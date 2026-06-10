@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { maybeSyncLabels } from '@/lib/label-sync'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,11 @@ export async function POST(req: NextRequest) {
                VALUES ($1, $2, $3, $4, $5, 'cliente', $6, $7)
                ON CONFLICT (wa_msg_id) DO NOTHING`,
               [msgId, from, nome, tipo, conteudo, timestamp, metadata?.phone_number_id]
+            )
+
+            // Sync de etiquetas WA — fire-and-forget, no máximo 1x/dia por contato
+            maybeSyncLabels(from).catch(err =>
+              console.error('[WhatsApp] label-sync error:', err)
             )
           }
 
