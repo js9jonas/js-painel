@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { pool } from '@/lib/db'
 import { maybeSyncLabels } from '@/lib/label-sync'
 
 export const dynamic = 'force-dynamic'
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN!
+const APP_SECRET   = process.env.WHATSAPP_APP_SECRET!
 
 // GET — verificação do webhook pela Meta
 export async function GET(req: NextRequest) {
@@ -25,7 +27,19 @@ export async function GET(req: NextRequest) {
 // POST — recebe mensagens e eventos da Meta
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+
+    // Verifica assinatura HMAC-SHA256 enviada pela Meta
+    const sig = req.headers.get('x-hub-signature-256') ?? ''
+    const expected = 'sha256=' + createHmac('sha256', APP_SECRET).update(rawBody).digest('hex')
+    const sigBuf  = Buffer.from(sig)
+    const expBuf  = Buffer.from(expected)
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+      console.warn('[WhatsApp] Assinatura inválida no webhook')
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    const body = JSON.parse(rawBody)
 
     // Ignora eventos que não são do WhatsApp Business
     if (body.object !== 'whatsapp_business_account') {

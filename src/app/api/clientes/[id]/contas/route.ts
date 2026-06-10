@@ -9,6 +9,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { id } = await params
-  const contas = await getContasPainelByClienteId(id)
-  return NextResponse.json(contas)
+  try {
+    const contas = await getContasPainelByClienteId(id)
+    return NextResponse.json(contas)
+  } catch (err) {
+    console.error('[contas] Erro ao buscar contas:', err)
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+  }
 }

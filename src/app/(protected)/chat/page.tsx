@@ -311,6 +311,10 @@ export default function ChatPage() {
   const prevMsgCountRef = useRef(0)
   const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => {
+    return () => { if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current) }
+  }, [])
+
   const carregarConversas = useCallback(async () => {
     const res = await fetch('/api/whatsapp/conversas')
     if (res.ok) setConversas(await res.json())
