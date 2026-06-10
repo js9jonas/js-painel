@@ -104,10 +104,10 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '7px 0', borderBottom: '1px solid #1f2c34'
+      padding: '7px 0', borderBottom: '1px solid #e9edef'
     }}>
-      <span style={{ color: '#8696a0', fontSize: 13 }}>{label}</span>
-      <span style={{ color: '#d1d7db', fontSize: 13, fontWeight: 500, textAlign: 'right' }}>
+      <span style={{ color: '#667781', fontSize: 13 }}>{label}</span>
+      <span style={{ color: '#111b21', fontSize: 13, fontWeight: 500, textAlign: 'right' }}>
         {value}
       </span>
     </div>
@@ -230,20 +230,21 @@ export default function ChatPage() {
 
   return (
     <div style={{
-      display: 'flex', height: '100vh', background: '#111b21',
+      display: 'flex', height: '100vh', background: '#f0f2f5',
       fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden'
     }}>
 
       {/* ── Painel esquerdo ── */}
       <div style={{
         width: 360, minWidth: 300, display: 'flex', flexDirection: 'column',
-        borderRight: '1px solid #2a3942', background: '#111b21'
+        borderRight: '1px solid #d1d7db', background: '#ffffff'
       }}>
 
         {/* Header esquerdo */}
         <div style={{
-          padding: '16px 20px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', background: '#202c33'
+          padding: '10px 16px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', background: '#f0f2f5',
+          borderBottom: '1px solid #e9edef'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
@@ -251,42 +252,43 @@ export default function ChatPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 15, fontWeight: 700, color: '#fff'
             }}>JS</div>
-            <span style={{ color: '#e9edef', fontWeight: 600, fontSize: 16 }}>Atendimento</span>
+            <span style={{ color: '#111b21', fontWeight: 600, fontSize: 16 }}>Atendimento</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: '#8696a0', fontSize: 12 }}>{conversas.length} conv.</span>
+            <span style={{ color: '#667781', fontSize: 12 }}>{conversas.length} conv.</span>
             <a
               href="/dashboard"
               style={{
-                color: '#8696a0', fontSize: 12, textDecoration: 'none',
-                background: '#2a3942', borderRadius: 6, padding: '4px 8px',
-                border: '1px solid #374151'
+                color: '#667781', fontSize: 12, textDecoration: 'none',
+                background: '#e9edef', borderRadius: 6, padding: '4px 8px',
+                border: '1px solid #d1d7db'
               }}
             >← Voltar</a>
           </div>
         </div>
 
         {/* Busca */}
-        <div style={{ padding: '8px 12px', background: '#111b21' }}>
+        <div style={{ padding: '8px 12px', background: '#f0f2f5', borderBottom: '1px solid #e9edef' }}>
           <div style={{
-            background: '#202c33', borderRadius: 8, padding: '8px 14px',
-            display: 'flex', alignItems: 'center', gap: 8
+            background: '#ffffff', borderRadius: 8, padding: '8px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            border: '1px solid #e9edef'
           }}>
-            <span style={{ color: '#8696a0', fontSize: 16 }}>🔍</span>
+            <span style={{ color: '#adbac1', fontSize: 16 }}>🔍</span>
             <input
               value={filtro}
               onChange={e => setFiltro(e.target.value)}
               placeholder="Buscar conversa..."
               style={{
                 background: 'transparent', border: 'none', outline: 'none',
-                color: '#d1d7db', fontSize: 14, width: '100%'
+                color: '#111b21', fontSize: 14, width: '100%'
               }}
             />
           </div>
         </div>
 
         {/* Lista */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', background: '#ffffff' }}>
           {conversasFiltradas.map(conv => {
             const ativo = conv.telefone === selecionado
             const nome = conv.nome_cliente ?? conv.nome_contato ?? formatTel(conv.telefone)
@@ -303,14 +305,14 @@ export default function ChatPage() {
                 onClick={() => setSelecionado(conv.telefone)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                  cursor: 'pointer', borderBottom: '1px solid #1f2c34',
-                  background: ativo ? '#2a3942' : 'transparent',
+                  cursor: 'pointer', borderBottom: '1px solid #f0f2f5',
+                  background: ativo ? '#f0f2f5' : 'transparent',
                   transition: 'background 0.1s'
                 }}
               >
                 <div style={{
                   width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                  background: conv.id_cliente ? '#00a884' : '#374151',
+                  background: conv.id_cliente ? '#00a884' : '#adbac1',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 16, fontWeight: 700, color: '#fff'
                 }}>{inicial}</div>
@@ -318,17 +320,17 @@ export default function ChatPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{
-                      color: '#e9edef', fontWeight: 600, fontSize: 15,
+                      color: '#111b21', fontWeight: 600, fontSize: 15,
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       maxWidth: 180
                     }}>{nome}</span>
-                    <span style={{ color: '#8696a0', fontSize: 11, flexShrink: 0, marginLeft: 8 }}>
+                    <span style={{ color: '#667781', fontSize: 11, flexShrink: 0, marginLeft: 8 }}>
                       {formatHora(conv.ultima_mensagem_em)}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
                     <span style={{
-                      color: '#8696a0', fontSize: 13,
+                      color: '#667781', fontSize: 13,
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       maxWidth: 200
                     }}>{preview}</span>
@@ -345,7 +347,7 @@ export default function ChatPage() {
           })}
 
           {conversasFiltradas.length === 0 && (
-            <div style={{ padding: 32, textAlign: 'center', color: '#8696a0', fontSize: 14 }}>
+            <div style={{ padding: 32, textAlign: 'center', color: '#667781', fontSize: 14 }}>
               Nenhuma conversa encontrada
             </div>
           )}
@@ -355,36 +357,37 @@ export default function ChatPage() {
       {/* ── Painel central: chat ── */}
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column',
-        background: '#0b141a', position: 'relative', overflow: 'hidden'
+        background: '#efeae2', position: 'relative', overflow: 'hidden'
       }}>
         {!selecionado ? (
           <div style={{
             flex: 1, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', color: '#8696a0'
+            alignItems: 'center', justifyContent: 'center', color: '#667781',
+            background: '#f8f9fa'
           }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>💬</div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: '#d1d7db' }}>JS Sistemas — Atendimento</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: '#3b4a54' }}>JS Sistemas — Atendimento</div>
             <div style={{ fontSize: 14, marginTop: 8 }}>Selecione uma conversa para começar</div>
           </div>
         ) : (
           <>
             {/* Header do chat */}
             <div style={{
-              background: '#202c33', padding: '10px 20px',
+              background: '#f0f2f5', padding: '10px 20px',
               display: 'flex', alignItems: 'center', gap: 12,
-              borderBottom: '1px solid #2a3942'
+              borderBottom: '1px solid #d1d7db'
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: '50%',
-                background: conversaAtual?.id_cliente ? '#00a884' : '#374151',
+                background: conversaAtual?.id_cliente ? '#00a884' : '#adbac1',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 15, fontWeight: 700, color: '#fff'
               }}>
                 {nomeInicial(nomeExibido, selecionado)}
               </div>
               <div>
-                <div style={{ color: '#e9edef', fontWeight: 600, fontSize: 15 }}>{nomeExibido}</div>
-                <div style={{ color: '#8696a0', fontSize: 12 }}>{formatTel(selecionado)}</div>
+                <div style={{ color: '#111b21', fontWeight: 600, fontSize: 15 }}>{nomeExibido}</div>
+                <div style={{ color: '#667781', fontSize: 12 }}>{formatTel(selecionado)}</div>
               </div>
             </div>
 
@@ -394,7 +397,7 @@ export default function ChatPage() {
               display: 'flex', flexDirection: 'column', gap: 4
             }}>
               {loadingMsgs && mensagens.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#8696a0', marginTop: 40 }}>Carregando...</div>
+                <div style={{ textAlign: 'center', color: '#667781', marginTop: 40 }}>Carregando...</div>
               )}
 
               {mensagens.map((msg, i) => {
@@ -408,8 +411,9 @@ export default function ChatPage() {
                     {showData && (
                       <div style={{ textAlign: 'center', margin: '12px 0 8px' }}>
                         <span style={{
-                          background: '#182229', color: '#8696a0', fontSize: 12,
-                          padding: '4px 12px', borderRadius: 8
+                          background: 'rgba(255,255,255,0.88)', color: '#54656f', fontSize: 12,
+                          padding: '4px 12px', borderRadius: 8,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
                         }}>
                           {new Date(msg.recebida_em).toLocaleDateString('pt-BR', {
                             weekday: 'long', day: '2-digit', month: 'long'
@@ -426,18 +430,18 @@ export default function ChatPage() {
                       <div style={{
                         maxWidth: '65%', padding: '8px 12px',
                         borderRadius: isCliente ? '0 8px 8px 8px' : '8px 0 8px 8px',
-                        background: isCliente ? '#202c33' : '#005c4b',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                        background: isCliente ? '#ffffff' : '#d9fdd3',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.13)'
                       }}>
                         {msg.tipo === 'text' && (
-                          <div style={{ color: '#e9edef', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                          <div style={{ color: '#111b21', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                             {msg.conteudo}
                           </div>
                         )}
-                        {msg.tipo === 'audio' && <div style={{ color: '#8696a0', fontSize: 13 }}>🎵 Áudio</div>}
-                        {msg.tipo === 'image' && <div style={{ color: '#8696a0', fontSize: 13 }}>📷 Imagem</div>}
-                        {msg.tipo === 'document' && <div style={{ color: '#8696a0', fontSize: 13 }}>📄 Documento</div>}
-                        {msg.tipo === 'video' && <div style={{ color: '#8696a0', fontSize: 13 }}>🎥 Vídeo</div>}
+                        {msg.tipo === 'audio' && <div style={{ color: '#667781', fontSize: 13 }}>🎵 Áudio</div>}
+                        {msg.tipo === 'image' && <div style={{ color: '#667781', fontSize: 13 }}>📷 Imagem</div>}
+                        {msg.tipo === 'document' && <div style={{ color: '#667781', fontSize: 13 }}>📄 Documento</div>}
+                        {msg.tipo === 'video' && <div style={{ color: '#667781', fontSize: 13 }}>🎥 Vídeo</div>}
 
                         <div style={{
                           display: 'flex', justifyContent: 'flex-end',
@@ -449,18 +453,18 @@ export default function ChatPage() {
                           {!isCliente && (() => {
                             const sl = sourceLabel(msg.source)
                             return sl ? (
-                              <span style={{ color: '#4a7a6a', fontSize: 10 }} title={sl.text}>
+                              <span style={{ color: '#008069', fontSize: 10 }} title={sl.text}>
                                 {sl.icon} {sl.text}
                               </span>
                             ) : null
                           })()}
-                          <span style={{ color: '#8696a0', fontSize: 11 }}>
+                          <span style={{ color: '#667781', fontSize: 11 }}>
                             {new Date(msg.recebida_em).toLocaleTimeString('pt-BR', {
                               hour: '2-digit', minute: '2-digit'
                             })}
                           </span>
                           {!isCliente && (
-                            <span style={{ color: msg.status === 'read' ? '#53bdeb' : '#8696a0', fontSize: 13 }}>
+                            <span style={{ color: msg.status === 'read' ? '#53bdeb' : '#667781', fontSize: 13 }}>
                               {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
                             </span>
                           )}
@@ -476,11 +480,11 @@ export default function ChatPage() {
             {/* Sugestão de IA */}
             {sugestao && (
               <div style={{
-                background: '#1a2e2a', borderTop: '1px solid #00a884',
+                background: '#e8fce4', borderTop: '1px solid #00a884',
                 padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10
               }}>
                 <span style={{ color: '#00a884', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>✦ IA</span>
-                <span style={{ color: '#d1d7db', fontSize: 13, flex: 1 }}>{sugestao}</span>
+                <span style={{ color: '#3b4a54', fontSize: 13, flex: 1 }}>{sugestao}</span>
                 <button
                   onClick={() => { setTexto(sugestao); inputRef.current?.focus() }}
                   style={{
@@ -491,7 +495,7 @@ export default function ChatPage() {
                 <button
                   onClick={() => setSugestao('')}
                   style={{
-                    background: 'transparent', color: '#8696a0', border: 'none',
+                    background: 'transparent', color: '#667781', border: 'none',
                     fontSize: 16, cursor: 'pointer', padding: '0 4px'
                   }}
                 >✕</button>
@@ -500,16 +504,16 @@ export default function ChatPage() {
 
             {/* Input de envio */}
             <div style={{
-              background: '#202c33', padding: '10px 16px',
+              background: '#f0f2f5', padding: '10px 16px',
               display: 'flex', alignItems: 'flex-end', gap: 10,
-              borderTop: '1px solid #2a3942'
+              borderTop: '1px solid #d1d7db'
             }}>
               <button
                 onClick={gerarSugestao}
                 disabled={loadingSugestao}
                 title="Gerar sugestão com IA"
                 style={{
-                  background: loadingSugestao ? '#374151' : '#1a2e2a',
+                  background: loadingSugestao ? '#e9edef' : '#e8fce4',
                   border: '1px solid #00a884', color: '#00a884',
                   borderRadius: 8, padding: '8px 12px', fontSize: 13,
                   cursor: loadingSugestao ? 'wait' : 'pointer',
@@ -532,8 +536,8 @@ export default function ChatPage() {
                 placeholder="Digite uma mensagem..."
                 rows={1}
                 style={{
-                  flex: 1, background: '#2a3942', border: 'none', outline: 'none',
-                  borderRadius: 8, padding: '10px 14px', color: '#d1d7db',
+                  flex: 1, background: '#ffffff', border: '1px solid #e9edef', outline: 'none',
+                  borderRadius: 8, padding: '10px 14px', color: '#111b21',
                   fontSize: 14, resize: 'none', lineHeight: 1.5,
                   maxHeight: 120, overflowY: 'auto',
                   fontFamily: "'Segoe UI', system-ui, sans-serif"
@@ -544,7 +548,7 @@ export default function ChatPage() {
                 onClick={() => enviar(texto === sugestao)}
                 disabled={!texto.trim() || enviando}
                 style={{
-                  background: texto.trim() ? '#00a884' : '#374151',
+                  background: texto.trim() ? '#00a884' : '#adbac1',
                   border: 'none', color: '#fff', borderRadius: 8,
                   padding: '10px 16px', fontSize: 16,
                   cursor: texto.trim() ? 'pointer' : 'default',
@@ -561,26 +565,26 @@ export default function ChatPage() {
       {/* ── Painel direito: info do cliente ── */}
       {selecionado && (
         <div style={{
-          width: 300, minWidth: 260, background: '#111b21',
-          borderLeft: '1px solid #2a3942', display: 'flex', flexDirection: 'column',
+          width: 300, minWidth: 260, background: '#ffffff',
+          borderLeft: '1px solid #d1d7db', display: 'flex', flexDirection: 'column',
           overflowY: 'auto'
         }}>
 
           {/* Avatar e nome */}
           <div style={{
-            background: '#202c33', padding: '24px 20px', textAlign: 'center',
-            borderBottom: '1px solid #2a3942'
+            background: '#f0f2f5', padding: '24px 20px', textAlign: 'center',
+            borderBottom: '1px solid #e9edef'
           }}>
             <div style={{
               width: 64, height: 64, borderRadius: '50%', margin: '0 auto 12px',
-              background: cliente ? '#00a884' : '#374151',
+              background: cliente ? '#00a884' : '#adbac1',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 22, fontWeight: 700, color: '#fff'
             }}>
               {nomeInicial(nomeExibido, selecionado)}
             </div>
-            <div style={{ color: '#e9edef', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</div>
-            <div style={{ color: '#8696a0', fontSize: 13, marginTop: 4 }}>{formatTel(selecionado)}</div>
+            <div style={{ color: '#111b21', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</div>
+            <div style={{ color: '#667781', fontSize: 13, marginTop: 4 }}>{formatTel(selecionado)}</div>
             {cliente && (
               <div style={{ color: '#f59e0b', fontSize: 16, marginTop: 6, letterSpacing: 2 }}>
                 {scoreStars(cliente.score_fidelidade)}
@@ -592,7 +596,7 @@ export default function ChatPage() {
           {cliente ? (
             <div style={{ padding: '16px 20px' }}>
               <div style={{
-                color: '#8696a0', fontSize: 11, fontWeight: 700,
+                color: '#667781', fontSize: 11, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12
               }}>
                 Assinatura
@@ -615,14 +619,14 @@ export default function ChatPage() {
               {cliente.observacao && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{
-                    color: '#8696a0', fontSize: 11, fontWeight: 700,
+                    color: '#667781', fontSize: 11, fontWeight: 700,
                     textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6
                   }}>
                     Observação
                   </div>
                   <div style={{
-                    background: '#202c33', borderRadius: 8, padding: '10px 12px',
-                    color: '#d1d7db', fontSize: 13, lineHeight: 1.5
+                    background: '#f0f2f5', borderRadius: 8, padding: '10px 12px',
+                    color: '#3b4a54', fontSize: 13, lineHeight: 1.5
                   }}>
                     {cliente.observacao}
                   </div>
@@ -633,9 +637,10 @@ export default function ChatPage() {
                 <a
                   href={`/clientes/${cliente.id_cliente}`}
                   style={{
-                    background: '#2a3942', color: '#e9edef', textDecoration: 'none',
+                    background: '#f0f2f5', color: '#111b21', textDecoration: 'none',
                     borderRadius: 8, padding: '10px 16px', textAlign: 'center',
-                    fontSize: 13, fontWeight: 600, display: 'block'
+                    fontSize: 13, fontWeight: 600, display: 'block',
+                    border: '1px solid #d1d7db'
                   }}
                 >
                   Ver ficha completa
@@ -643,7 +648,7 @@ export default function ChatPage() {
               </div>
             </div>
           ) : (
-            <div style={{ padding: 24, textAlign: 'center', color: '#8696a0', fontSize: 13 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: '#667781', fontSize: 13 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
               <div>Cliente não vinculado</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>{formatTel(selecionado)}</div>
@@ -653,7 +658,7 @@ export default function ChatPage() {
           {/* Resumo */}
           <div style={{ padding: '0 20px 20px', marginTop: 8 }}>
             <div style={{
-              color: '#8696a0', fontSize: 11, fontWeight: 700,
+              color: '#667781', fontSize: 11, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10
             }}>
               Resumo
