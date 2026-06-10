@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
-    const { telefone, mensagem, sugestao_ia, foi_aceita } = await req.json()
+    const { telefone, mensagem, sugestao_ia, foi_aceita, reply_msg_id } = await req.json()
 
     if (!telefone || !mensagem) {
       return NextResponse.json({ error: 'telefone e mensagem obrigatórios' }, { status: 400 })
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           to: telefone,
+          ...(reply_msg_id ? { context: { message_id: reply_msg_id } } : {}),
           type: 'text',
           text: { body: mensagem }
         })

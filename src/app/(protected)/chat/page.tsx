@@ -161,6 +161,67 @@ function Avatar({
   )
 }
 
+const QUICK_EMOJIS = ['👍', '🤝', '🙌', '😅', '🙏', '😉']
+const MORE_EMOJIS  = [
+  '😀','😂','🤣','😍','🥰','😘','😎','🤩',
+  '😭','😢','😤','😡','🤔','😶','🤐','😴',
+  '👏','✌️','🤞','💪','👎','🫶','🤜','🤛',
+  '❤️','💔','🔥','✨','💯','🎉','💀','👀',
+]
+
+function EmojiPicker({ side, onPick, onClose }: { side: 'left' | 'right'; onPick: (e: string) => void; onClose: () => void }) {
+  const [showMore, setShowMore] = React.useState(false)
+  return (
+    <div style={{
+      position: 'absolute', bottom: 32, [side === 'left' ? 'left' : 'right']: 0,
+      background: '#fff', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+      border: '1px solid #e9edef', zIndex: 50, padding: 8, width: showMore ? 244 : 'auto'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {QUICK_EMOJIS.map(e => (
+          <button key={e} onClick={() => onPick(e)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4, borderRadius: 6 }}>{e}</button>
+        ))}
+        <button onClick={() => setShowMore(v => !v)} style={{ background: showMore ? '#f0f2f5' : 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px 6px', borderRadius: 6, color: '#667781' }}>+</button>
+      </div>
+      {showMore && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', marginTop: 6, borderTop: '1px solid #f0f2f5', paddingTop: 6 }}>
+          {MORE_EMOJIS.map(e => (
+            <button key={e} onClick={() => onPick(e)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 3, borderRadius: 4 }}>{e}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MsgMenu({ msg, isCliente, side, onReply, onForward, onDelete, onReact }: {
+  msg: Mensagem; isCliente: boolean; side: 'left' | 'right'
+  onReply: () => void; onForward: () => void; onDelete: () => void; onReact: () => void
+}) {
+  const item = (icon: string, label: string, onClick: () => void, danger = false) => (
+    <button key={label} onClick={onClick} style={{
+      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+      background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer',
+      fontSize: 13, color: danger ? '#E53935' : '#111b21', textAlign: 'left',
+      whiteSpace: 'nowrap'
+    }}>
+      <span style={{ fontSize: 15 }}>{icon}</span> {label}
+    </button>
+  )
+  return (
+    <div style={{
+      position: 'absolute', bottom: 32, [side === 'left' ? 'left' : 'right']: 0,
+      background: '#fff', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+      border: '1px solid #e9edef', zIndex: 50, overflow: 'hidden', minWidth: 160
+    }}>
+      {item('😊', 'Reagir', onReact)}
+      {item('↩️', 'Responder', onReply)}
+      {item('↗️', 'Encaminhar', onForward)}
+      {!isCliente && item('🗑️', 'Apagar', onDelete, true)}
+    </div>
+  )
+}
+
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{
@@ -187,6 +248,11 @@ export default function ChatPage() {
   const [loadingSugestao, setLoadingSugestao] = useState(false)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [hoveredMsg, setHoveredMsg] = useState<number | null>(null)
+  const [activeMenu, setActiveMenu] = useState<number | null>(null)
+  const [emojiPickerMsg, setEmojiPickerMsg] = useState<number | null>(null)
+  const [replyTo, setReplyTo] = useState<Mensagem | null>(null)
+  const [forwardMsg, setForwardMsg] = useState<Mensagem | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
@@ -262,8 +328,10 @@ export default function ChatPage() {
     if (!texto.trim() || !selecionado || enviando) return
     setEnviando(true)
     const msgFinal = texto.trim()
+    const replyId  = replyTo?.wa_msg_id ?? null
     setTexto('')
     setSugestao('')
+    setReplyTo(null)
     try {
       await fetch('/api/whatsapp/enviar', {
         method: 'POST',
@@ -272,7 +340,8 @@ export default function ChatPage() {
           telefone: selecionado,
           mensagem: msgFinal,
           sugestao_ia: usouSugestao ? sugestao : null,
-          foi_aceita: usouSugestao ? true : null
+          foi_aceita: usouSugestao ? true : null,
+          reply_msg_id: replyId,
         })
       })
       await carregarMensagens(selecionado)
@@ -280,6 +349,42 @@ export default function ChatPage() {
       setEnviando(false)
       inputRef.current?.focus()
     }
+  }
+
+  async function reagir(msg: Mensagem, emoji: string) {
+    setActiveMenu(null)
+    setEmojiPickerMsg(null)
+    if (!selecionado) return
+    await fetch('/api/whatsapp/reagir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefone: selecionado, wa_msg_id: msg.wa_msg_id, emoji }),
+    })
+  }
+
+  async function apagar(msg: Mensagem) {
+    setActiveMenu(null)
+    if (!selecionado || !confirm('Apagar esta mensagem?')) return
+    await fetch('/api/whatsapp/apagar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefone: selecionado, wa_msg_id: msg.wa_msg_id }),
+    })
+    await carregarMensagens(selecionado)
+  }
+
+  async function encaminhar(msg: Mensagem, destTelefone: string) {
+    setForwardMsg(null)
+    await fetch('/api/whatsapp/enviar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefone: destTelefone, mensagem: msg.conteudo ?? '' }),
+    })
+  }
+
+  function fecharMenus() {
+    setActiveMenu(null)
+    setEmojiPickerMsg(null)
   }
 
   const conversasFiltradas = conversas.filter(c => {
@@ -485,11 +590,28 @@ export default function ChatPage() {
                       </div>
                     )}
 
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: isCliente ? 'flex-start' : 'flex-end',
-                      marginBottom: 2
-                    }}>
+                    <div
+                      style={{ display: 'flex', justifyContent: isCliente ? 'flex-start' : 'flex-end', marginBottom: 2, alignItems: 'flex-end', gap: 4 }}
+                      onMouseEnter={() => setHoveredMsg(msg.id)}
+                      onMouseLeave={() => { if (activeMenu !== msg.id && emojiPickerMsg !== msg.id) setHoveredMsg(null) }}
+                    >
+                      {/* Botão de ação — lado esquerdo para mensagens enviadas */}
+                      {!isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <button
+                            onClick={() => { setActiveMenu(activeMenu === msg.id ? null : msg.id); setEmojiPickerMsg(null) }}
+                            style={{
+                              background: 'rgba(255,255,255,0.85)', border: '1px solid #d1d7db',
+                              borderRadius: '50%', width: 26, height: 26, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 13, color: '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                            }}
+                          >▾</button>
+                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="left" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => apagar(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
+                          {emojiPickerMsg === msg.id && <EmojiPicker side="left" onPick={e => reagir(msg, e)} onClose={() => setEmojiPickerMsg(null)} />}
+                        </div>
+                      )}
+
                       <div style={{
                         maxWidth: '65%', padding: '8px 12px',
                         borderRadius: isCliente ? '0 8px 8px 8px' : '8px 0 8px 8px',
@@ -646,6 +768,23 @@ export default function ChatPage() {
                           )}
                         </div>
                       </div>
+
+                      {/* Botão de ação — lado direito para mensagens do cliente */}
+                      {isCliente && (hoveredMsg === msg.id || activeMenu === msg.id || emojiPickerMsg === msg.id) && (
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <button
+                            onClick={() => { setActiveMenu(activeMenu === msg.id ? null : msg.id); setEmojiPickerMsg(null) }}
+                            style={{
+                              background: 'rgba(255,255,255,0.85)', border: '1px solid #d1d7db',
+                              borderRadius: '50%', width: 26, height: 26, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 13, color: '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                            }}
+                          >▾</button>
+                          {activeMenu === msg.id && <MsgMenu msg={msg} isCliente={isCliente} side="right" onReply={() => { setReplyTo(msg); setActiveMenu(null); inputRef.current?.focus() }} onForward={() => { setForwardMsg(msg); setActiveMenu(null) }} onDelete={() => apagar(msg)} onReact={() => { setEmojiPickerMsg(msg.id); setActiveMenu(null) }} />}
+                          {emojiPickerMsg === msg.id && <EmojiPicker side="right" onPick={e => reagir(msg, e)} onClose={() => setEmojiPickerMsg(null)} />}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -675,6 +814,24 @@ export default function ChatPage() {
                     fontSize: 16, cursor: 'pointer', padding: '0 4px'
                   }}
                 >✕</button>
+              </div>
+            )}
+
+            {/* Banner de resposta */}
+            {replyTo && (
+              <div style={{
+                background: '#f0f2f5', borderTop: '1px solid #d1d7db',
+                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10
+              }}>
+                <div style={{ flex: 1, borderLeft: '3px solid #00a884', paddingLeft: 8, minWidth: 0 }}>
+                  <div style={{ color: '#00a884', fontSize: 12, fontWeight: 600 }}>
+                    {replyTo.origem === 'cliente' ? (conversaAtual?.nome_cliente ?? conversaAtual?.nome_contato ?? 'Cliente') : 'Você'}
+                  </div>
+                  <div style={{ color: '#667781', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {replyTo.tipo === 'text' ? replyTo.conteudo : `[${replyTo.tipo}]`}
+                  </div>
+                </div>
+                <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#667781', cursor: 'pointer', fontSize: 18 }}>✕</button>
               </div>
             )}
 
@@ -846,6 +1003,34 @@ export default function ChatPage() {
             />
           </div>
         </div>
+      )}
+
+      {/* Modal encaminhar */}
+      {forwardMsg && (
+        <div onClick={() => setForwardMsg(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 340, maxHeight: '70vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9edef', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: '#111b21' }}>Encaminhar para</span>
+              <button onClick={() => setForwardMsg(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#667781' }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {conversas.filter(c => c.telefone !== selecionado).map(c => {
+                const nome = c.nome_cliente ?? c.nome_contato ?? formatTel(c.telefone)
+                return (
+                  <div key={c.telefone} onClick={() => encaminhar(forwardMsg, c.telefone)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f2f5' }}>
+                    <Avatar fotoUrl={c.foto_url} nome={nome} tel={c.telefone} size={38} />
+                    <span style={{ fontSize: 14, color: '#111b21' }}>{nome}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay para fechar menus ao clicar fora */}
+      {(activeMenu !== null || emojiPickerMsg !== null) && (
+        <div onClick={fecharMenus} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
       )}
 
       {/* Lightbox */}
