@@ -883,7 +883,7 @@ export default function ChatPage() {
                               <hr style={{ border: 'none', borderTop: '1px solid #e9edef', margin: '0 0 6px 0' }} />
                               <button
                                 onClick={() => {
-                                  navigator.clipboard.writeText(code)
+                                  navigator.clipboard.writeText(code.replace(/\D/g, ''))
                                   setCopiedId(msg.id)
                                   setTimeout(() => setCopiedId(prev => prev === msg.id ? null : prev), 2000)
                                 }}
@@ -915,7 +915,7 @@ export default function ChatPage() {
                             <hr style={{ border: 'none', borderTop: '1px solid #e9edef', margin: '0 0 6px 0' }} />
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText('40.827.286/0001-06')
+                                navigator.clipboard.writeText('40827286000106')
                                 setCopiedId(msg.id)
                                 setTimeout(() => setCopiedId(prev => prev === msg.id ? null : prev), 2000)
                               }}
