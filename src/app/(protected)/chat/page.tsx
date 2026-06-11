@@ -592,7 +592,19 @@ export default function ChatPage() {
             return (
               <div
                 key={conv.telefone}
-                onClick={() => setSelecionado(conv.telefone)}
+                onClick={() => {
+                  setSelecionado(conv.telefone)
+                  if (conv.nao_lidas > 0) {
+                    setConversas(prev => prev.map(c =>
+                      c.telefone === conv.telefone ? { ...c, nao_lidas: 0 } : c
+                    ))
+                    fetch('/api/whatsapp/marcar-lida', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ telefone: conv.telefone }),
+                    }).catch(() => {})
+                  }
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
                   cursor: 'pointer', borderBottom: '1px solid #f0f2f5',

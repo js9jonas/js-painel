@@ -29,10 +29,15 @@ export async function GET() {
         ) AS ultimo_tipo,
         COUNT(*) FILTER (
           WHERE wm.origem = 'cliente'
-            AND wm.recebida_em > COALESCE((
-              SELECT MAX(m2.recebida_em) FROM public.whatsapp_mensagens m2
-              WHERE m2.telefone = wm.telefone AND m2.origem != 'cliente'
-            ), '1970-01-01')
+            AND wm.recebida_em > COALESCE(
+              GREATEST(
+                (SELECT MAX(m2.recebida_em) FROM public.whatsapp_mensagens m2
+                 WHERE m2.telefone = wm.telefone AND m2.origem != 'cliente'),
+                (SELECT lido_em FROM public.whatsapp_leituras
+                 WHERE telefone = wm.telefone)
+              ),
+              '1970-01-01'
+            )
         ) AS nao_lidas
       FROM public.whatsapp_mensagens wm
       LEFT JOIN public.contatos ct ON (
