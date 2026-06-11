@@ -21,11 +21,13 @@ export default function VincularClienteModal({ telefone, nomeContato, onClose, o
   const [referencia, setReferencia] = useState('')
   const [isPending, startTransition] = useTransition()
   const [erro, setErro] = useState<string | null>(null)
+  const [itemAtivo, setItemAtivo] = useState(-1)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function handleBusca(valor: string) {
     setBusca(valor)
     setClienteSelecionado(null)
+    setItemAtivo(-1)
     setDropdownAberto(true)
     if (!valor.trim()) { setResultados([]); return }
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -41,6 +43,24 @@ export default function VincularClienteModal({ telefone, nomeContato, onClose, o
     setBusca(c.nome)
     setResultados([])
     setDropdownAberto(false)
+    setItemAtivo(-1)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!dropdownAberto || resultados.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setItemAtivo(prev => Math.min(prev + 1, resultados.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setItemAtivo(prev => Math.max(prev - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (itemAtivo >= 0 && resultados[itemAtivo]) selecionar(resultados[itemAtivo])
+    } else if (e.key === 'Escape') {
+      setDropdownAberto(false)
+      setItemAtivo(-1)
+    }
   }
 
   function handleVincular() {
@@ -108,6 +128,7 @@ export default function VincularClienteModal({ telefone, nomeContato, onClose, o
             onChange={e => handleBusca(e.target.value)}
             onFocus={() => busca && setDropdownAberto(true)}
             onBlur={() => setTimeout(() => setDropdownAberto(false), 150)}
+            onKeyDown={handleKeyDown}
             placeholder="Buscar por nome..."
             autoComplete="off"
             style={{
@@ -136,27 +157,27 @@ export default function VincularClienteModal({ telefone, nomeContato, onClose, o
               {buscando ? (
                 <div style={{ padding: '10px 12px', fontSize: 12, color: '#8696a0' }}>Buscando...</div>
               ) : resultados.length > 0 ? (
-                resultados.map(c => (
+                resultados.map((c, i) => (
                   <button
                     key={c.id_cliente}
                     type="button"
                     onMouseDown={() => selecionar(c)}
+                    onMouseEnter={() => setItemAtivo(i)}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       width: '100%', padding: '9px 12px', border: 'none',
-                      background: 'none', cursor: 'pointer', textAlign: 'left',
+                      background: i === itemAtivo ? '#1565c0' : 'none',
+                      cursor: 'pointer', textAlign: 'left',
                       borderBottom: '1px solid #f0f2f5'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f0f2f5')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   >
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#111b21' }}>{c.nome}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: i === itemAtivo ? '#fff' : '#111b21' }}>{c.nome}</div>
                       {c.observacao && (
-                        <div style={{ fontSize: 11, color: '#8696a0', marginTop: 1 }}>{c.observacao}</div>
+                        <div style={{ fontSize: 11, color: i === itemAtivo ? '#bbdefb' : '#8696a0', marginTop: 1 }}>{c.observacao}</div>
                       )}
                     </div>
-                    <span style={{ fontSize: 11, color: '#adbac1', flexShrink: 0, marginLeft: 8 }}>
+                    <span style={{ fontSize: 11, color: i === itemAtivo ? '#bbdefb' : '#adbac1', flexShrink: 0, marginLeft: 8 }}>
                       ID {c.id_cliente}
                     </span>
                   </button>
