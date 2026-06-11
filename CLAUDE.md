@@ -67,4 +67,5 @@ WHATSAPP_PHONE_NUMBER_ID # 234653083067380 (+55 51 8468-3468)
 WHATSAPP_WABA_ID         # 265749013278174
 WHATSAPP_VERIFY_TOKEN    # token de verificação do webhook
 WHATSAPP_APP_SECRET      # App Secret do app jswhats (ID 1060517628167041) — usado para verificar assinatura HMAC-SHA256 do webhook
+WHATSAPP_INTERNAL_KEY    # chave secreta para o endpoint POST /api/whatsapp/registrar (usado pelo n8n para salvar mensagens de automação no chat)
 ```

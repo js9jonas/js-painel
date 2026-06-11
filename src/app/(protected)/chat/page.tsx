@@ -109,7 +109,7 @@ function sourceLabel(source: string | null) {
   if (!source) return null
   if (source.startsWith('chat:')) return { icon: '💬', text: source.slice(5) }
   if (source === 'chat') return { icon: '💬', text: 'Chat' }
-  if (source === 'n8n') return { icon: '🤖', text: 'Automático' }
+  if (source === 'n8n' || source.startsWith('n8n:')) return { icon: '🤖', text: 'Automação' }
   if (source === 'phone') return { icon: '📱', text: 'Celular' }
   return { icon: '💬', text: source }
 }
