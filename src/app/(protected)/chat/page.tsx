@@ -637,20 +637,19 @@ export default function ChatPage() {
     rec.lang = 'pt-BR'
     rec.continuous = true
     rec.interimResults = true
-    let finalAcumulado = ''
+    // Captura o texto já digitado para preservar como prefixo fixo
+    const baseText = texto
     rec.onstart = () => setTranscrevendo(true)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (e: any) => {
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript
-        if (e.results[i].isFinal) finalAcumulado += t
-        else interim = t
+      // Reconstrói do zero a partir de todos os resultados acumulados
+      let finalText = ''
+      let interimText = ''
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript
+        else interimText += e.results[i][0].transcript
       }
-      setTexto(prev => {
-        const base = prev.endsWith(interim) ? prev.slice(0, prev.length - interim.length) : prev
-        return base + finalAcumulado + interim
-      })
+      setTexto(baseText + finalText + interimText)
     }
     rec.onerror = () => { setTranscrevendo(false); speechRecRef.current = null }
     rec.onend = () => { setTranscrevendo(false); speechRecRef.current = null }
