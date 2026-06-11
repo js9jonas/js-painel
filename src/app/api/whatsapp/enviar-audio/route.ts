@@ -6,6 +6,7 @@ import { join } from 'path'
 import { writeFile, readFile, unlink } from 'fs/promises'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+const ffmpegPath = join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg')
 
 const execFileAsync = promisify(execFile)
 
@@ -29,7 +30,6 @@ async function converterParaOgg(inputBuffer: Buffer, inputMime: string): Promise
   try {
     await writeFile(entrada, inputBuffer)
 
-    const ffmpegPath = require('ffmpeg-static') as string
     await execFileAsync(ffmpegPath, [
       '-y',
       '-i', entrada,
