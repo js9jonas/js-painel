@@ -390,6 +390,8 @@ export default function ChatPage() {
   const [tempoGravacao, setTempoGravacao] = useState(0)
   const [enviandoAudio, setEnviandoAudio] = useState(false)
   const [erroAudio, setErroAudio] = useState<string | null>(null)
+  const [transcrevendo, setTranscrevendo] = useState(false)
+  const speechRecRef = useRef<{ stop(): void } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
@@ -624,6 +626,43 @@ export default function ChatPage() {
     setGravando(false)
     setPausado(false)
     setTempoGravacao(0)
+  }
+
+  function iniciarTranscricao() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
+    if (!SR) { setErroAudio('Transcrição por voz não suportada neste navegador.'); return }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec: any = new SR()
+    rec.lang = 'pt-BR'
+    rec.continuous = true
+    rec.interimResults = true
+    let finalAcumulado = ''
+    rec.onstart = () => setTranscrevendo(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) finalAcumulado += t
+        else interim = t
+      }
+      setTexto(prev => {
+        const base = prev.endsWith(interim) ? prev.slice(0, prev.length - interim.length) : prev
+        return base + finalAcumulado + interim
+      })
+    }
+    rec.onerror = () => { setTranscrevendo(false); speechRecRef.current = null }
+    rec.onend = () => { setTranscrevendo(false); speechRecRef.current = null }
+    speechRecRef.current = rec
+    rec.start()
+  }
+
+  function pararTranscricao() {
+    speechRecRef.current?.stop()
+    speechRecRef.current = null
+    setTranscrevendo(false)
+    setTimeout(() => inputRef.current?.focus(), 50)
   }
 
   function carregarAplicativosCliente(id: number) {
@@ -1643,6 +1682,26 @@ export default function ChatPage() {
                   fontFamily: "'Segoe UI', system-ui, sans-serif"
                 }}
               />
+
+              <button
+                onClick={transcrevendo ? pararTranscricao : iniciarTranscricao}
+                disabled={gravando}
+                title={transcrevendo ? 'Parar transcrição' : 'Digitar por voz'}
+                style={{
+                  background: transcrevendo ? '#fee2e2' : '#fff',
+                  border: `1px solid ${transcrevendo ? '#fca5a5' : '#d1d7db'}`,
+                  color: transcrevendo ? '#ef4444' : '#54656f',
+                  borderRadius: 8, padding: '7px 9px', flexShrink: 0,
+                  cursor: gravando ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 2,
+                  fontSize: 13, lineHeight: 1,
+                  animation: transcrevendo ? 'pulse-red 1.2s infinite' : 'none',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <span style={{ fontSize: 15 }}>🎙️</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.5, opacity: 0.85 }}>A-Z</span>
+              </button>
 
               <button
                 onClick={() => enviar(texto === sugestao)}
