@@ -385,11 +385,19 @@ export default function ChatPage() {
   const [rrEditando, setRrEditando] = useState<RespostaRapida | null>(null)
   const [rrNovo, setRrNovo] = useState(false)
   const [rrForm, setRrForm] = useState({ atalho: '', titulo: '', texto: '', ordem: 0 })
+  const [gravando, setGravando] = useState(false)
+  const [pausado, setPausado] = useState(false)
+  const [tempoGravacao, setTempoGravacao] = useState(0)
+  const [enviandoAudio, setEnviandoAudio] = useState(false)
+  const [erroAudio, setErroAudio] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
   const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mensagensAbortRef = useRef<AbortController | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<BlobPart[]>([])
+  const gravarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     return () => { if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current) }
@@ -524,6 +532,98 @@ export default function ChatPage() {
     setQrFiltro('')
     setQrIdx(0)
     setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  async function iniciarGravacao() {
+    setErroAudio(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : 'audio/webm'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      mediaRecorderRef.current = recorder
+      audioChunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      recorder.start()
+      setGravando(true)
+      setPausado(false)
+      setTempoGravacao(0)
+      gravarTimerRef.current = setInterval(() => setTempoGravacao(t => t + 1), 1000)
+    } catch {
+      setErroAudio('Permissão de microfone negada ou indisponível.')
+    }
+  }
+
+  function pausarGravacao() {
+    const recorder = mediaRecorderRef.current
+    if (!recorder || recorder.state !== 'recording') return
+    recorder.pause()
+    clearInterval(gravarTimerRef.current!)
+    setPausado(true)
+  }
+
+  function retomarGravacao() {
+    const recorder = mediaRecorderRef.current
+    if (!recorder || recorder.state !== 'paused') return
+    recorder.resume()
+    gravarTimerRef.current = setInterval(() => setTempoGravacao(t => t + 1), 1000)
+    setPausado(false)
+  }
+
+  async function pararEEnviarGravacao() {
+    const recorder = mediaRecorderRef.current
+    if (!recorder || !selecionado) return
+    clearInterval(gravarTimerRef.current!)
+    setGravando(false)
+    setPausado(false)
+    setTempoGravacao(0)
+    const tel = selecionado
+    recorder.onstop = async () => {
+      recorder.stream.getTracks().forEach(t => t.stop())
+      const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+      audioChunksRef.current = []
+      mediaRecorderRef.current = null
+      setEnviandoAudio(true)
+      try {
+        const fd = new FormData()
+        fd.append('audio', blob, 'audio')
+        fd.append('telefone', tel)
+        const res = await fetch('/api/whatsapp/enviar-audio', { method: 'POST', body: fd })
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: 'Erro ao enviar áudio' }))
+          setErroAudio(error ?? 'Erro ao enviar áudio')
+        } else {
+          await carregarMensagens(tel, true)
+        }
+      } catch {
+        setErroAudio('Falha de conexão ao enviar áudio.')
+      } finally {
+        setEnviandoAudio(false)
+      }
+    }
+    // Se estiver pausado, retoma antes de parar para garantir flush dos dados
+    if (recorder.state === 'paused') recorder.resume()
+    recorder.stop()
+  }
+
+  function cancelarGravacao() {
+    const recorder = mediaRecorderRef.current
+    if (!recorder) return
+    clearInterval(gravarTimerRef.current!)
+    // onstop sem envio: apenas libera a stream
+    recorder.onstop = () => {
+      recorder.stream.getTracks().forEach(t => t.stop())
+      audioChunksRef.current = []
+      mediaRecorderRef.current = null
+    }
+    if (recorder.state === 'paused') recorder.resume()
+    recorder.stop()
+    setGravando(false)
+    setPausado(false)
+    setTempoGravacao(0)
   }
 
   function carregarAplicativosCliente(id: number) {
@@ -693,6 +793,12 @@ export default function ChatPage() {
       display: 'flex', height: '100vh', background: '#f0f2f5',
       fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden'
     }}>
+      <style>{`
+        @keyframes pulse-red {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+      `}</style>
 
       {/* ── Painel esquerdo ── */}
       <div style={{
@@ -1540,17 +1646,90 @@ export default function ChatPage() {
 
               <button
                 onClick={() => enviar(texto === sugestao)}
-                disabled={!texto.trim() || enviando}
+                disabled={!texto.trim() || enviando || gravando}
                 style={{
-                  background: texto.trim() ? '#00a884' : '#adbac1',
+                  background: texto.trim() && !gravando ? '#00a884' : '#adbac1',
                   border: 'none', color: '#fff', borderRadius: 8,
                   padding: '10px 16px', fontSize: 16,
-                  cursor: texto.trim() ? 'pointer' : 'default',
+                  cursor: texto.trim() && !gravando ? 'pointer' : 'default',
                   flexShrink: 0, transition: 'background 0.2s'
                 }}
               >
                 {enviando ? '...' : '➤'}
               </button>
+
+              {/* Microfone */}
+              {gravando ? (
+                <>
+                  <button
+                    onClick={cancelarGravacao}
+                    title="Cancelar gravação"
+                    style={{
+                      background: '#fee2e2', border: '1px solid #fecaca',
+                      color: '#ef4444', borderRadius: 8, padding: '8px 10px',
+                      fontSize: 13, cursor: 'pointer', flexShrink: 0
+                    }}
+                  >✕</button>
+                  <button
+                    onClick={pausado ? retomarGravacao : pausarGravacao}
+                    title={pausado ? 'Retomar gravação' : 'Pausar gravação'}
+                    style={{
+                      background: '#fff', border: '1px solid #d1d7db',
+                      color: '#54656f', borderRadius: 8, padding: '8px 10px',
+                      fontSize: 14, cursor: 'pointer', flexShrink: 0
+                    }}
+                  >{pausado ? '▶' : '⏸'}</button>
+                  <button
+                    onClick={pararEEnviarGravacao}
+                    title="Enviar áudio"
+                    style={{
+                      background: pausado ? '#667781' : '#ef4444',
+                      border: 'none', color: '#fff', borderRadius: 8,
+                      padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                      flexShrink: 0, fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      animation: pausado ? 'none' : 'pulse-red 1.2s infinite'
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontVariantNumeric: 'tabular-nums',
+                      opacity: pausado ? 0.7 : 1
+                    }}>
+                      {pausado ? '⏸ ' : '● '}
+                      {String(Math.floor(tempoGravacao / 60)).padStart(2, '0')}:{String(tempoGravacao % 60).padStart(2, '0')}
+                    </span>
+                    ⏹
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={iniciarGravacao}
+                  disabled={enviandoAudio}
+                  title={enviandoAudio ? 'Enviando áudio...' : 'Gravar áudio'}
+                  style={{
+                    background: enviandoAudio ? '#f0f2f5' : '#fff',
+                    border: '1px solid #d1d7db', color: '#54656f',
+                    borderRadius: 8, padding: '8px 10px', fontSize: 17,
+                    cursor: enviandoAudio ? 'wait' : 'pointer',
+                    flexShrink: 0, transition: 'all 0.15s'
+                  }}
+                >
+                  {enviandoAudio ? '...' : '🎙️'}
+                </button>
+              )}
+              {erroAudio && (
+                <div style={{
+                  position: 'absolute', bottom: '100%', right: 0,
+                  background: '#fee2e2', border: '1px solid #fecaca',
+                  color: '#991b1b', fontSize: 12, borderRadius: 6,
+                  padding: '6px 10px', marginBottom: 4, whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 6
+                }}>
+                  {erroAudio}
+                  <button onClick={() => setErroAudio(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+                </div>
+              )}
             </div>
             )}
           </>
