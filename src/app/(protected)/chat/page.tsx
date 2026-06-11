@@ -685,6 +685,14 @@ export default function ChatPage() {
       .catch(() => setPagamentos([]))
   }, [cliente?.id_cliente])
 
+  // Auto-resize da textarea: cresce com o conteúdo até 15 linhas
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 335) + 'px'
+  }, [texto])
+
   async function gerarSugestao() {
     if (!selecionado || mensagens.length === 0) return
     setLoadingSugestao(true)
@@ -1677,7 +1685,7 @@ export default function ChatPage() {
                   flex: 1, background: '#ffffff', border: '1px solid #e9edef', outline: 'none',
                   borderRadius: 8, padding: '10px 14px', color: '#111b21',
                   fontSize: 14, resize: 'none', lineHeight: 1.5,
-                  maxHeight: 120, overflowY: 'auto',
+                  maxHeight: 335, overflowY: 'auto',
                   fontFamily: "'Segoe UI', system-ui, sans-serif"
                 }}
               />
