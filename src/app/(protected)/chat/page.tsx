@@ -4,7 +4,8 @@ import React from 'react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import ContasCards from '@/components/clientes/ContasCards'
 import type { ContaPainelVinculada } from '@/lib/clientes'
-import type { AplicativoRow } from '@/lib/aplicativos'
+import type { AplicativoRow, AppRow } from '@/lib/aplicativos'
+import AplicativoModal from '@/components/aplicativos/AplicativoModal'
 import type { PagamentoFullRow } from '@/lib/pagamentos'
 import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
 import EditClienteModal from '@/components/clientes/EditClienteModal'
@@ -360,6 +361,8 @@ export default function ChatPage() {
   const [contas, setContas] = useState<ContaPainelVinculada[]>([])
   const [aplicativos, setAplicativos] = useState<AplicativoRow[]>([])
   const [appsRecolhidos, setAppsRecolhidos] = useState(false)
+  const [apps, setApps] = useState<AppRow[]>([])
+  const [appEditando, setAppEditando] = useState<AplicativoRow | null>(null)
   const [pagamentos, setPagamentos] = useState<PagamentoFullRow[]>([])
   const [pgtsRecolhidos, setPgtsRecolhidos] = useState(true)
   const [planos, setPlanos] = useState<PlanoRow[]>([])
@@ -410,6 +413,10 @@ export default function ChatPage() {
     fetch('/api/assinaturas/opcoes')
       .then(r => r.ok ? r.json() : { planos: [], pacotes: [] })
       .then(d => { setPlanos(d.planos); setPacotes(d.pacotes) })
+      .catch(() => {})
+    fetch('/api/apps')
+      .then(r => r.ok ? r.json() : [])
+      .then(setApps)
       .catch(() => {})
   }, [])
 
@@ -519,17 +526,21 @@ export default function ChatPage() {
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
-  // Carrega contas e aplicativos quando cliente é identificado
+  function carregarAplicativosCliente(id: number) {
+    fetch(`/api/clientes/${id}/aplicativos`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setAplicativos)
+      .catch(() => setAplicativos([]))
+  }
+
+  // Carrega contas, aplicativos e pagamentos quando cliente é identificado
   useEffect(() => {
     if (!cliente?.id_cliente) { setContas([]); setAplicativos([]); setPagamentos([]); return }
     fetch(`/api/clientes/${cliente.id_cliente}/contas`)
       .then(r => r.ok ? r.json() : [])
       .then(setContas)
       .catch(() => setContas([]))
-    fetch(`/api/clientes/${cliente.id_cliente}/aplicativos`)
-      .then(r => r.ok ? r.json() : [])
-      .then(setAplicativos)
-      .catch(() => setAplicativos([]))
+    carregarAplicativosCliente(cliente.id_cliente)
     fetch(`/api/clientes/${cliente.id_cliente}/pagamentos`)
       .then(r => r.ok ? r.json() : [])
       .then(setPagamentos)
@@ -1549,7 +1560,7 @@ export default function ChatPage() {
       {/* ── Painel direito: info do cliente ── */}
       {selecionado && (
         <div style={{
-          width: 300, minWidth: 260, background: '#ffffff',
+          width: 390, minWidth: 340, background: '#ffffff',
           borderLeft: '1px solid #d1d7db', display: 'flex', flexDirection: 'column',
           overflowY: 'auto'
         }}>
@@ -1761,12 +1772,15 @@ export default function ChatPage() {
                     </div>
 
                     {!outrasRecolhidas && outras.map(a => {
+                      const inativa = ['cancelado', 'inativo'].includes((a.status ?? '').toLowerCase())
                       const contasA = contas.filter(c => c.id_assinatura === String(a.id_assinatura))
                       const telas = a.id_pacote
                         ? (pacotes.find(p => p.id_pacote === String(a.id_pacote))?.telas ?? null)
                         : null
                       const n = contasA.length
-                      const [bg, cor, bord] = telas == null || n === telas
+                      const [bg, cor, bord] = inativa
+                        ? ['#f3f4f6', '#9ca3af', '#d1d5db']
+                        : telas == null || n === telas
                         ? ['#e8f5e9', '#2e7d32', '#c8e6c9']
                         : n < telas
                         ? ['#fff8e1', '#f57f17', '#ffe082']
@@ -1784,23 +1798,24 @@ export default function ChatPage() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: 5,
                               padding: '4px 7px', borderRadius: expandida ? '6px 6px 0 0' : 6,
-                              background: expandida ? '#edf2f7' : '#f8f9fa',
-                              border: '1px solid #e9edef',
-                              borderBottom: expandida ? 'none' : '1px solid #e9edef',
+                              background: inativa ? '#f9fafb' : expandida ? '#edf2f7' : '#f8f9fa',
+                              border: `1px solid ${inativa ? '#e5e7eb' : '#e9edef'}`,
+                              borderBottom: expandida ? 'none' : undefined,
                               fontSize: 11, cursor: 'pointer', userSelect: 'none',
+                              opacity: inativa ? 0.7 : 1,
                             }}
                           >
                             <span style={{ color: '#adbac1', fontSize: 9, flexShrink: 0 }}>
                               {expandida ? '▾' : '▸'}
                             </span>
-                            <span style={{ color: statusColor(a.status), fontSize: 9, flexShrink: 0 }}>●</span>
-                            <span style={{ color: '#111b21', fontWeight: 500, flexShrink: 0, fontSize: 11 }}>
+                            <span style={{ color: inativa ? '#9ca3af' : statusColor(a.status), fontSize: 9, flexShrink: 0 }}>●</span>
+                            <span style={{ color: inativa ? '#9ca3af' : '#111b21', fontWeight: 500, flexShrink: 0, fontSize: 11 }}>
                               {a.plano ?? '—'}
                             </span>
                             <span style={{ color: '#adbac1' }}>·</span>
-                            <span style={{ color: '#667781', flexShrink: 0 }}>{formatValor(a.valor)}</span>
+                            <span style={{ color: inativa ? '#9ca3af' : '#667781', flexShrink: 0 }}>{formatValor(a.valor)}</span>
                             <span style={{ color: '#adbac1' }}>·</span>
-                            <span style={{ color: '#667781', flexShrink: 0 }}>
+                            <span style={{ color: inativa ? '#9ca3af' : '#667781', flexShrink: 0 }}>
                               {a.venc_contrato ? formatData(a.venc_contrato) : '—'}
                             </span>
                             {a.pacote && (
@@ -1899,31 +1914,35 @@ export default function ChatPage() {
                   {!appsRecolhidos && <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {aplicativos.map(a => {
                       const vencida = a.validade ? new Date(a.validade) < new Date() : false
-                      const [badgeBg, badgeFg] = (() => {
+                      const [cardBg, cardBorder, nomeColor] = (() => {
                         const s = (a.status ?? '').toLowerCase()
-                        if (s === 'ativa' || s === 'ativo') return ['#dcfce7', '#16a34a']
-                        if (s === 'pendente') return ['#fef9c3', '#854d0e']
-                        if (s === 'bloqueado') return ['#ffedd5', '#9a3412']
-                        return ['#fee2e2', '#991b1b']
+                        if (s === 'ativa' || s === 'ativo') return ['#f0fdf4', '#bbf7d0', '#16a34a']
+                        if (s === 'pendente') return ['#fefce8', '#fde68a', '#92400e']
+                        if (s === 'bloqueado') return ['#fff7ed', '#fed7aa', '#9a3412']
+                        return ['#fef2f2', '#fecaca', '#991b1b']
                       })()
                       return (
                         <div key={a.id_app_registro} style={{
-                          background: '#f8f9fa', border: '1px solid #e9edef',
+                          background: cardBg, border: `1px solid ${cardBorder}`,
                           borderRadius: 6, padding: '5px 8px', fontSize: 11,
                           display: 'flex', flexDirection: 'column', gap: 2
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ fontWeight: 600, color: '#111b21', flex: 1 }}>
+                          {/* Linha superior: nome + obs */}
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                            <span style={{ fontWeight: 700, color: nomeColor, flexShrink: 0 }}>
                               {a.nome_app ?? `App #${a.id_app}`}
                             </span>
-                            <span style={{
-                              background: badgeBg, color: badgeFg, fontSize: 9,
-                              fontWeight: 700, borderRadius: 4, padding: '1px 5px'
-                            }}>
-                              {a.status ?? '—'}
-                            </span>
+                            {a.observacao && (
+                              <span style={{
+                                color: '#667781', fontSize: 10, flex: 1,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                              }}>
+                                {a.observacao}
+                              </span>
+                            )}
                           </div>
-                          <div style={{ display: 'flex', gap: 6, color: '#667781', flexWrap: 'wrap' }}>
+                          {/* Linha inferior: validade, mac, chave + ícone editar */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             {a.validade && (
                               <span style={{ color: vencida ? '#ef4444' : '#667781' }}>
                                 {vencida ? '⚠️ ' : ''}
@@ -1940,6 +1959,15 @@ export default function ChatPage() {
                                 {a.chave}
                               </span>
                             )}
+                            <button
+                              onClick={() => setAppEditando(a)}
+                              title="Editar aplicativo"
+                              style={{
+                                marginLeft: 'auto', background: 'none', border: 'none',
+                                cursor: 'pointer', color: '#adbac1', fontSize: 12,
+                                padding: '0 2px', lineHeight: 1, flexShrink: 0
+                              }}
+                            >✏️</button>
                           </div>
                         </div>
                       )
@@ -2063,6 +2091,20 @@ export default function ChatPage() {
           pacotes={pacotes}
           onClose={() => { setEditAssinaturaOpen(false); setEditAssinaturaAlvo(null) }}
           onSaved={() => { setEditAssinaturaOpen(false); setEditAssinaturaAlvo(null); carregarMensagens(selecionado!) }}
+        />
+      )}
+
+      {/* Modal editar aplicativo */}
+      {appEditando && cliente && (
+        <AplicativoModal
+          idCliente={String(cliente.id_cliente)}
+          aplicativo={appEditando}
+          apps={apps}
+          onClose={() => setAppEditando(null)}
+          onSaved={() => {
+            setAppEditando(null)
+            carregarAplicativosCliente(cliente.id_cliente)
+          }}
         />
       )}
 
