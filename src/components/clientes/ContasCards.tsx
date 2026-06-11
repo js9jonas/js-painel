@@ -23,17 +23,22 @@ type Props = {
   emptyAction?: React.ReactNode;
   /** Mostra data de vencimento no balão "sem vínculo" */
   vencContas?: string | null;
+  /** Versão compacta com padding e fontes menores */
+  small?: boolean;
 };
 
-export default function ContasCards({ contas, contaAction, emptyAction, vencContas }: Props) {
+export default function ContasCards({ contas, contaAction, emptyAction, vencContas, small }: Props) {
+  const card = small
+    ? "flex items-center gap-1.5 rounded bg-zinc-50 border border-zinc-200 px-2 py-1 text-xs"
+    : "flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-1.5 text-xs"
+  const empty = small
+    ? "flex items-center gap-1.5 rounded bg-zinc-50 border border-dashed border-zinc-300 px-2 py-1 text-xs text-zinc-400"
+    : "flex items-center gap-2 rounded-lg bg-zinc-50 border border-dashed border-zinc-300 px-3 py-1.5 text-xs text-zinc-400"
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {contas.length > 0
         ? contas.map((c) => (
-            <div
-              key={c.id_conta}
-              className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-1.5 text-xs"
-            >
+            <div key={c.id_conta} className={card}>
               <span className="font-medium text-zinc-500">{c.nome_painel}</span>
               <span className="text-zinc-300">·</span>
               <span className="font-mono font-semibold text-zinc-800 select-all">{c.usuario}</span>
@@ -48,7 +53,7 @@ export default function ContasCards({ contas, contaAction, emptyAction, vencCont
             </div>
           ))
         : (
-          <div className="flex items-center gap-2 rounded-lg bg-zinc-50 border border-dashed border-zinc-300 px-3 py-1.5 text-xs text-zinc-400">
+          <div className={empty}>
             <span className="font-medium">Conta sem vínculo</span>
             {vencContas && (
               <>

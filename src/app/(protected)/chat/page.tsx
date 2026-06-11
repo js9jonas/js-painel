@@ -326,6 +326,8 @@ export default function ChatPage() {
   const [editAssinaturaOpen, setEditAssinaturaOpen] = useState(false)
   const [editAssinaturaAlvo, setEditAssinaturaAlvo] = useState<AssinaturaResumo | null>(null)
   const [assinaturas, setAssinaturas] = useState<AssinaturaResumo[]>([])
+  const [outrasRecolhidas, setOutrasRecolhidas] = useState(false)
+  const [expandidasAssinaturas, setExpandidasAssinaturas] = useState<Set<number>>(new Set())
   const [editClienteOpen, setEditClienteOpen] = useState(false)
   const [novoClienteOpen, setNovoClienteOpen] = useState(false)
   const [vincularClienteOpen, setVincularClienteOpen] = useState(false)
@@ -405,6 +407,8 @@ export default function ChatPage() {
     setQrFiltro('')
     setPixEnviado(false)
     setAssinaturas([])
+    setOutrasRecolhidas(false)
+    setExpandidasAssinaturas(new Set())
     prevMsgCountRef.current = 0
   }, [selecionado])
 
@@ -1541,29 +1545,48 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* Contas vinculadas */}
+              {/* Contas vinculadas à assinatura principal */}
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
                 <div style={{
                   color: '#667781', fontSize: 11, fontWeight: 700,
-                  textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8
+                  textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6
                 }}>
                   Contas
                 </div>
-                <ContasCards contas={contas} vencContas={cliente.venc_contas ?? null} />
+                <ContasCards
+                  contas={contas.filter(c => c.id_assinatura === String(cliente.id_assinatura))}
+                  vencContas={cliente.venc_contas ?? null}
+                  small
+                />
               </div>
 
               {/* Outras assinaturas */}
-              {assinaturas.filter(a => a.id_assinatura !== cliente.id_assinatura && a.id_assinatura != null).length > 0 && (
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
-                  <div style={{
-                    color: '#667781', fontSize: 11, fontWeight: 700,
-                    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8
-                  }}>
-                    Outras assinaturas
-                  </div>
-                  {assinaturas
-                    .filter(a => a.id_assinatura !== cliente.id_assinatura && a.id_assinatura != null)
-                    .map(a => {
+              {(() => {
+                const outras = assinaturas.filter(a => a.id_assinatura !== cliente.id_assinatura && a.id_assinatura != null)
+                if (outras.length === 0) return null
+                return (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
+                    {/* Cabeçalho com contador e toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{
+                        color: '#667781', fontSize: 11, fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: 1, flex: 1
+                      }}>
+                        Outras {outras.length}
+                      </span>
+                      <button
+                        onClick={() => setOutrasRecolhidas(v => !v)}
+                        title={outrasRecolhidas ? 'Expandir' : 'Recolher'}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: '#adbac1', fontSize: 13, padding: '0 2px', lineHeight: 1
+                        }}
+                      >
+                        {outrasRecolhidas ? '▸' : '▾'}
+                      </button>
+                    </div>
+
+                    {!outrasRecolhidas && outras.map(a => {
                       const contasA = contas.filter(c => c.id_assinatura === String(a.id_assinatura))
                       const telas = a.id_pacote
                         ? (pacotes.find(p => p.id_pacote === String(a.id_pacote))?.telas ?? null)
@@ -1574,45 +1597,109 @@ export default function ChatPage() {
                         : n < telas
                         ? ['#fff8e1', '#f57f17', '#ffe082']
                         : ['#ffebee', '#c62828', '#ffcdd2']
+                      const expandida = expandidasAssinaturas.has(a.id_assinatura!)
                       return (
-                        <div key={a.id_assinatura} style={{
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          padding: '6px 8px', borderRadius: 6, marginBottom: 4,
-                          background: '#f8f9fa', border: '1px solid #e9edef',
-                          fontSize: 12,
-                        }}>
-                          <span style={{ color: statusColor(a.status), fontSize: 10, flexShrink: 0 }}>●</span>
-                          <span style={{ color: '#111b21', fontWeight: 500, flexShrink: 0 }}>{a.plano ?? '—'}</span>
-                          <span style={{ color: '#adbac1' }}>·</span>
-                          <span style={{ color: '#667781', flexShrink: 0 }}>{formatValor(a.valor)}</span>
-                          <span style={{ color: '#adbac1' }}>·</span>
-                          <span style={{ color: '#667781', flexShrink: 0 }}>
-                            {a.venc_contrato ? formatData(a.venc_contrato) : '—'}
-                          </span>
-                          {a.pacote && (
-                            <span style={{
-                              background: bg, color: cor, fontSize: 10, fontWeight: 600,
-                              borderRadius: 4, padding: '1px 5px', border: `1px solid ${bord}`,
-                              flexShrink: 0, marginLeft: 'auto'
-                            }}>
-                              {a.pacote}{telas != null ? ` ${n}/${telas}` : ''}
-                            </span>
-                          )}
-                          <button
-                            onClick={() => { setEditAssinaturaAlvo(a); setEditAssinaturaOpen(true) }}
-                            title="Editar assinatura"
+                        <div key={a.id_assinatura} style={{ marginBottom: 3 }}>
+                          {/* Linha principal clicável */}
+                          <div
+                            onClick={() => setExpandidasAssinaturas(prev => {
+                              const next = new Set(prev)
+                              expandida ? next.delete(a.id_assinatura!) : next.add(a.id_assinatura!)
+                              return next
+                            })}
                             style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#adbac1', fontSize: 13, padding: 0, lineHeight: 1,
-                              flexShrink: 0, display: 'flex', alignItems: 'center'
+                              display: 'flex', alignItems: 'center', gap: 5,
+                              padding: '4px 7px', borderRadius: expandida ? '6px 6px 0 0' : 6,
+                              background: expandida ? '#edf2f7' : '#f8f9fa',
+                              border: '1px solid #e9edef',
+                              borderBottom: expandida ? 'none' : '1px solid #e9edef',
+                              fontSize: 11, cursor: 'pointer', userSelect: 'none',
                             }}
-                          >⚙️</button>
+                          >
+                            <span style={{ color: '#adbac1', fontSize: 9, flexShrink: 0 }}>
+                              {expandida ? '▾' : '▸'}
+                            </span>
+                            <span style={{ color: statusColor(a.status), fontSize: 9, flexShrink: 0 }}>●</span>
+                            <span style={{ color: '#111b21', fontWeight: 500, flexShrink: 0, fontSize: 11 }}>
+                              {a.plano ?? '—'}
+                            </span>
+                            <span style={{ color: '#adbac1' }}>·</span>
+                            <span style={{ color: '#667781', flexShrink: 0 }}>{formatValor(a.valor)}</span>
+                            <span style={{ color: '#adbac1' }}>·</span>
+                            <span style={{ color: '#667781', flexShrink: 0 }}>
+                              {a.venc_contrato ? formatData(a.venc_contrato) : '—'}
+                            </span>
+                            {a.pacote && (
+                              <span style={{
+                                background: bg, color: cor, fontSize: 9, fontWeight: 600,
+                                borderRadius: 4, padding: '1px 4px', border: `1px solid ${bord}`,
+                                flexShrink: 0, marginLeft: 'auto'
+                              }}>
+                                {a.pacote}{telas != null ? ` ${n}/${telas}` : ''}
+                              </span>
+                            )}
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditAssinaturaAlvo(a); setEditAssinaturaOpen(true) }}
+                              title="Editar assinatura"
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: '#adbac1', fontSize: 11, padding: 0, lineHeight: 1,
+                                flexShrink: 0, display: 'flex', alignItems: 'center'
+                              }}
+                            >⚙️</button>
+                          </div>
+
+                          {/* Sub-linhas de contas */}
+                          {expandida && (
+                            <div style={{
+                              background: '#f0f4f8', border: '1px solid #e9edef',
+                              borderTop: 'none', borderRadius: '0 0 6px 6px',
+                              padding: '5px 7px', display: 'flex', flexDirection: 'column', gap: 3
+                            }}>
+                              {contasA.length > 0 ? contasA.map(c => {
+                                const label = c.vencimento_real_painel
+                                  ? c.vencimento_real_painel.split('T')[0].split('-').slice(1).reverse().join('/')
+                                  : c.status_conta
+                                const [badgeBg, badgeFg] = c.status_conta === 'ok'
+                                  ? ['#dcfce7', '#16a34a']
+                                  : c.status_conta === 'vencida'
+                                  ? ['#fef9c3', '#a16207']
+                                  : ['#fee2e2', '#dc2626']
+                                return (
+                                  <div key={c.id_conta} style={{
+                                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 11
+                                  }}>
+                                    <span style={{ color: '#adbac1', fontSize: 9 }}>└</span>
+                                    <span style={{ color: '#667781', fontWeight: 500 }}>{c.nome_painel}</span>
+                                    <span style={{ color: '#adbac1' }}>·</span>
+                                    <span style={{ fontFamily: 'monospace', color: '#111b21', fontWeight: 600 }} className="select-all">
+                                      {c.usuario}
+                                    </span>
+                                    {c.senha && (
+                                      <>
+                                        <span style={{ color: '#adbac1' }}>/</span>
+                                        <span style={{ fontFamily: 'monospace', color: '#54656f' }} className="select-all">
+                                          {c.senha}
+                                        </span>
+                                      </>
+                                    )}
+                                    <span style={{
+                                      marginLeft: 'auto', background: badgeBg, color: badgeFg,
+                                      fontSize: 9, fontWeight: 600, borderRadius: 10, padding: '1px 5px', flexShrink: 0
+                                    }}>{label}</span>
+                                  </div>
+                                )
+                              }) : (
+                                <span style={{ color: '#adbac1', fontSize: 11 }}>Sem contas vinculadas</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
-                    })
-                  }
-                </div>
-              )}
+                    })}
+                  </div>
+                )
+              })()}
 
               <div style={{ marginTop: 14 }}>
                 <a
