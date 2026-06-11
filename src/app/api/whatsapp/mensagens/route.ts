@@ -71,12 +71,12 @@ export async function GET(req: NextRequest) {
     OR ct.telefone = SUBSTRING($1, 3, 2) || '9' || SUBSTRING($1, 5)
   )
   ORDER BY a.venc_contrato ASC
-  LIMIT 1
 `, [telefone])
 
     return NextResponse.json({
       mensagens: mensagens.rows,
-      cliente: cliente.rows[0] ?? null
+      cliente: cliente.rows[0] ?? null,
+      assinaturas: cliente.rows,
     })
   } catch (err) {
     console.error('[Chat] Erro ao buscar mensagens:', err)

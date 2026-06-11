@@ -64,6 +64,18 @@ interface Cliente {
   servidor: string | null
 }
 
+interface AssinaturaResumo {
+  id_assinatura: number | null
+  id_plano: number | null
+  id_pacote: number | null
+  plano: string | null
+  pacote: string | null
+  status: string | null
+  venc_contrato: string | null
+  venc_contas: string | null
+  valor: number | null
+}
+
 function formatTel(tel: string) {
   const d = tel.replace(/\D/g, '')
   if (d.length === 13) return `(${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9)}`
@@ -312,6 +324,8 @@ export default function ChatPage() {
   const [planos, setPlanos] = useState<PlanoRow[]>([])
   const [pacotes, setPacotes] = useState<PacoteRow[]>([])
   const [editAssinaturaOpen, setEditAssinaturaOpen] = useState(false)
+  const [editAssinaturaAlvo, setEditAssinaturaAlvo] = useState<AssinaturaResumo | null>(null)
+  const [assinaturas, setAssinaturas] = useState<AssinaturaResumo[]>([])
   const [editClienteOpen, setEditClienteOpen] = useState(false)
   const [novoClienteOpen, setNovoClienteOpen] = useState(false)
   const [vincularClienteOpen, setVincularClienteOpen] = useState(false)
@@ -356,6 +370,7 @@ export default function ChatPage() {
       const data = await res.json()
       setMensagens(data.mensagens)
       setCliente(data.cliente)
+      setAssinaturas(data.assinaturas ?? [])
     }
     setLoadingMsgs(false)
   }, [])
@@ -389,6 +404,7 @@ export default function ChatPage() {
     setQrOpen(false)
     setQrFiltro('')
     setPixEnviado(false)
+    setAssinaturas([])
     prevMsgCountRef.current = 0
   }, [selecionado])
 
@@ -1480,7 +1496,7 @@ export default function ChatPage() {
                 })()}
                 {cliente.id_assinatura && (
                   <button
-                    onClick={() => setEditAssinaturaOpen(true)}
+                    onClick={() => { setEditAssinaturaAlvo(cliente); setEditAssinaturaOpen(true) }}
                     title="Editar assinatura"
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
@@ -1535,6 +1551,68 @@ export default function ChatPage() {
                 </div>
                 <ContasCards contas={contas} vencContas={cliente.venc_contas ?? null} />
               </div>
+
+              {/* Outras assinaturas */}
+              {assinaturas.filter(a => a.id_assinatura !== cliente.id_assinatura && a.id_assinatura != null).length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
+                  <div style={{
+                    color: '#667781', fontSize: 11, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8
+                  }}>
+                    Outras assinaturas
+                  </div>
+                  {assinaturas
+                    .filter(a => a.id_assinatura !== cliente.id_assinatura && a.id_assinatura != null)
+                    .map(a => {
+                      const contasA = contas.filter(c => c.id_assinatura === String(a.id_assinatura))
+                      const telas = a.id_pacote
+                        ? (pacotes.find(p => p.id_pacote === String(a.id_pacote))?.telas ?? null)
+                        : null
+                      const n = contasA.length
+                      const [bg, cor, bord] = telas == null || n === telas
+                        ? ['#e8f5e9', '#2e7d32', '#c8e6c9']
+                        : n < telas
+                        ? ['#fff8e1', '#f57f17', '#ffe082']
+                        : ['#ffebee', '#c62828', '#ffcdd2']
+                      return (
+                        <div key={a.id_assinatura} style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '6px 8px', borderRadius: 6, marginBottom: 4,
+                          background: '#f8f9fa', border: '1px solid #e9edef',
+                          fontSize: 12,
+                        }}>
+                          <span style={{ color: statusColor(a.status), fontSize: 10, flexShrink: 0 }}>●</span>
+                          <span style={{ color: '#111b21', fontWeight: 500, flexShrink: 0 }}>{a.plano ?? '—'}</span>
+                          <span style={{ color: '#adbac1' }}>·</span>
+                          <span style={{ color: '#667781', flexShrink: 0 }}>{formatValor(a.valor)}</span>
+                          <span style={{ color: '#adbac1' }}>·</span>
+                          <span style={{ color: '#667781', flexShrink: 0 }}>
+                            {a.venc_contrato ? formatData(a.venc_contrato) : '—'}
+                          </span>
+                          {a.pacote && (
+                            <span style={{
+                              background: bg, color: cor, fontSize: 10, fontWeight: 600,
+                              borderRadius: 4, padding: '1px 5px', border: `1px solid ${bord}`,
+                              flexShrink: 0, marginLeft: 'auto'
+                            }}>
+                              {a.pacote}{telas != null ? ` ${n}/${telas}` : ''}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => { setEditAssinaturaAlvo(a); setEditAssinaturaOpen(true) }}
+                            title="Editar assinatura"
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: '#adbac1', fontSize: 13, padding: 0, lineHeight: 1,
+                              flexShrink: 0, display: 'flex', alignItems: 'center'
+                            }}
+                          >⚙️</button>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              )}
 
               <div style={{ marginTop: 14 }}>
                 <a
@@ -1597,23 +1675,23 @@ export default function ChatPage() {
       )}
 
       {/* Modal editar assinatura */}
-      {editAssinaturaOpen && cliente?.id_assinatura && (
+      {editAssinaturaOpen && editAssinaturaAlvo?.id_assinatura && cliente && (
         <EditAssinaturaModal
           idCliente={String(cliente.id_cliente)}
           assinatura={{
-            id_assinatura: String(cliente.id_assinatura),
-            id_plano: cliente.id_plano ? String(cliente.id_plano) : null,
-            id_pacote: cliente.id_pacote ? String(cliente.id_pacote) : null,
-            venc_contrato: cliente.venc_contrato ?? null,
-            venc_contas: cliente.venc_contas ?? null,
-            status: cliente.status ?? 'ativo',
-            identificacao: cliente.identificacao ?? null,
-            observacao: cliente.assinatura_observacao ?? null,
+            id_assinatura: String(editAssinaturaAlvo.id_assinatura),
+            id_plano: editAssinaturaAlvo.id_plano ? String(editAssinaturaAlvo.id_plano) : null,
+            id_pacote: editAssinaturaAlvo.id_pacote ? String(editAssinaturaAlvo.id_pacote) : null,
+            venc_contrato: editAssinaturaAlvo.venc_contrato ?? null,
+            venc_contas: editAssinaturaAlvo.venc_contas ?? null,
+            status: editAssinaturaAlvo.status ?? 'ativo',
+            identificacao: (editAssinaturaAlvo as Cliente).identificacao ?? null,
+            observacao: (editAssinaturaAlvo as Cliente).assinatura_observacao ?? null,
           }}
           planos={planos}
           pacotes={pacotes}
-          onClose={() => setEditAssinaturaOpen(false)}
-          onSaved={() => { setEditAssinaturaOpen(false); carregarMensagens(selecionado!) }}
+          onClose={() => { setEditAssinaturaOpen(false); setEditAssinaturaAlvo(null) }}
+          onSaved={() => { setEditAssinaturaOpen(false); setEditAssinaturaAlvo(null); carregarMensagens(selecionado!) }}
         />
       )}
 
