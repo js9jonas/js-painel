@@ -4,6 +4,8 @@ import React from 'react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import ContasCards from '@/components/clientes/ContasCards'
 import type { ContaPainelVinculada } from '@/lib/clientes'
+import type { AplicativoRow } from '@/lib/aplicativos'
+import type { PagamentoFullRow } from '@/lib/pagamentos'
 import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
 import EditClienteModal from '@/components/clientes/EditClienteModal'
 import NovoClienteModal from '@/components/clientes/NovoClienteModal'
@@ -291,15 +293,50 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-// Respostas rápidas — adicione/edite aqui conforme necessário
-const RESPOSTAS_RAPIDAS: { atalho: string; titulo: string; texto: string }[] = [
-  { atalho: 'p',    titulo: 'Chave PIX',       texto: 'Segue nossa chave PIX (CNPJ): 40.827.286/0001-06' },
-  { atalho: 'oi',   titulo: 'Saudação',         texto: 'Olá! Aqui é o Jonas da JS Sistemas. Como posso ajudar? 👋' },
-  { atalho: 'ok',   titulo: 'Confirmação',      texto: 'Perfeito! Qualquer dúvida é só chamar. 😊' },
-  { atalho: 'ag',   titulo: 'Aguarde',          texto: 'Olá! Já vou verificar para você, um momento por favor. 🔎' },
-  { atalho: 'ren',  titulo: 'Renovado',         texto: 'Confirmado! Sua assinatura foi renovada. Aproveite! 🎉' },
-  { atalho: 'ven',  titulo: 'Vencendo',         texto: 'Olá! Sua assinatura está próxima do vencimento. Entre em contato para renovar. 📅' },
-]
+interface RespostaRapida {
+  id: number
+  atalho: string
+  titulo: string
+  texto: string
+  ordem: number
+  ativo: boolean
+}
+
+function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boolean }) {
+  const data = p.data_pgto ? p.data_pgto.split('T')[0].split('-').reverse().join('/') : '—'
+  const valor = p.valor
+    ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : '—'
+  const ok = (p.detalhes ?? '').toUpperCase() === 'OK'
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: destaque ? '5px 8px' : '4px 8px',
+      marginBottom: 3,
+      background: destaque ? '#f0fdf4' : '#f8f9fa',
+      border: `1px solid ${destaque ? '#bbf7d0' : '#e9edef'}`,
+      borderRadius: 6, fontSize: 11,
+    }}>
+      <span style={{ color: '#667781', flexShrink: 0 }}>{data}</span>
+      <span style={{ color: '#111b21', fontWeight: 600, flexShrink: 0 }}>{valor}</span>
+      {p.forma && (
+        <span style={{ color: '#54656f', flexShrink: 0 }}>{p.forma}</span>
+      )}
+      {p.tipo_pagamento && (
+        <span style={{
+          color: '#667781', fontSize: 10, background: '#f0f2f5',
+          borderRadius: 4, padding: '1px 5px', flexShrink: 0
+        }}>{p.tipo_pagamento}</span>
+      )}
+      <span style={{
+        marginLeft: 'auto', flexShrink: 0,
+        color: ok ? '#16a34a' : '#adbac1', fontWeight: 700, fontSize: 11
+      }}>
+        {ok ? '✓' : p.detalhes ?? ''}
+      </span>
+    </div>
+  )
+}
 
 export default function ChatPage() {
   const [conversas, setConversas] = useState<Conversa[]>([])
@@ -321,6 +358,10 @@ export default function ChatPage() {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [contas, setContas] = useState<ContaPainelVinculada[]>([])
+  const [aplicativos, setAplicativos] = useState<AplicativoRow[]>([])
+  const [appsRecolhidos, setAppsRecolhidos] = useState(false)
+  const [pagamentos, setPagamentos] = useState<PagamentoFullRow[]>([])
+  const [pgtsRecolhidos, setPgtsRecolhidos] = useState(true)
   const [planos, setPlanos] = useState<PlanoRow[]>([])
   const [pacotes, setPacotes] = useState<PacoteRow[]>([])
   const [editAssinaturaOpen, setEditAssinaturaOpen] = useState(false)
@@ -336,18 +377,23 @@ export default function ChatPage() {
   const [qrOpen, setQrOpen] = useState(false)
   const [qrFiltro, setQrFiltro] = useState('')
   const [qrIdx, setQrIdx] = useState(0)
-  const [enviandoPix, setEnviandoPix] = useState(false)
-  const [pixEnviado, setPixEnviado] = useState(false)
+  const [respostasRapidas, setRespostasRapidas] = useState<RespostaRapida[]>([])
+  const [configOpen, setConfigOpen] = useState(false)
+  const [rrEditando, setRrEditando] = useState<RespostaRapida | null>(null)
+  const [rrNovo, setRrNovo] = useState(false)
+  const [rrForm, setRrForm] = useState({ atalho: '', titulo: '', texto: '', ordem: 0 })
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
   const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mensagensAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     return () => { if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current) }
   }, [])
 
   const carregarConversas = useCallback(async () => {
+    if (document.visibilityState === 'hidden') return
     const res = await fetch('/api/whatsapp/conversas')
     if (res.ok) setConversas(await res.json())
   }, [])
@@ -355,7 +401,9 @@ export default function ChatPage() {
   useEffect(() => {
     carregarConversas()
     const interval = setInterval(carregarConversas, 10000)
-    return () => clearInterval(interval)
+    const onVisible = () => { if (document.visibilityState === 'visible') carregarConversas() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [carregarConversas])
 
   useEffect(() => {
@@ -365,23 +413,34 @@ export default function ChatPage() {
       .catch(() => {})
   }, [])
 
-  const carregarMensagens = useCallback(async (tel: string) => {
-    setLoadingMsgs(true)
-    const res = await fetch(`/api/whatsapp/mensagens?telefone=${tel}`)
-    if (res.ok) {
-      const data = await res.json()
-      setMensagens(data.mensagens)
-      setCliente(data.cliente)
-      setAssinaturas(data.assinaturas ?? [])
+  const carregarMensagens = useCallback(async (tel: string, ignorarVisibilidade = false) => {
+    if (!ignorarVisibilidade && document.visibilityState === 'hidden') return
+    mensagensAbortRef.current?.abort()
+    const controller = new AbortController()
+    mensagensAbortRef.current = controller
+    if (ignorarVisibilidade) setLoadingMsgs(true)
+    try {
+      const res = await fetch(`/api/whatsapp/mensagens?telefone=${tel}`, { signal: controller.signal })
+      if (res.ok) {
+        const data = await res.json()
+        setMensagens(data.mensagens)
+        setCliente(data.cliente)
+        setAssinaturas(data.assinaturas ?? [])
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return
+    } finally {
+      setLoadingMsgs(false)
     }
-    setLoadingMsgs(false)
   }, [])
 
   useEffect(() => {
     if (!selecionado) return
-    carregarMensagens(selecionado)
+    carregarMensagens(selecionado, true)
     const interval = setInterval(() => carregarMensagens(selecionado), 5000)
-    return () => clearInterval(interval)
+    const onVisible = () => { if (document.visibilityState === 'visible') carregarMensagens(selecionado, true) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [selecionado, carregarMensagens])
 
   useEffect(() => {
@@ -405,29 +464,51 @@ export default function ChatPage() {
     setCopiedId(null)
     setQrOpen(false)
     setQrFiltro('')
-    setPixEnviado(false)
     setAssinaturas([])
     setOutrasRecolhidas(false)
     setExpandidasAssinaturas(new Set())
     prevMsgCountRef.current = 0
   }, [selecionado])
 
-  async function enviarPix() {
-    if (!selecionado || enviandoPix) return
-    setEnviandoPix(true)
-    try {
-      const res = await fetch('/api/whatsapp/enviar-template', {
+  useEffect(() => {
+    fetch('/api/whatsapp/respostas-rapidas')
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: RespostaRapida[]) => setRespostasRapidas(rows.filter(r => r.ativo)))
+      .catch(() => {})
+  }, [])
+
+  async function carregarRR() {
+    const r = await fetch('/api/whatsapp/respostas-rapidas')
+    if (r.ok) {
+      const rows: RespostaRapida[] = await r.json()
+      setRespostasRapidas(rows.filter(r => r.ativo))
+    }
+  }
+
+  async function salvarRR() {
+    if (!rrForm.atalho.trim() || !rrForm.titulo.trim() || !rrForm.texto.trim()) return
+    if (rrEditando) {
+      await fetch(`/api/whatsapp/respostas-rapidas/${rrEditando.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...rrEditando, ...rrForm }),
+      })
+      setRrEditando(null)
+    } else {
+      await fetch('/api/whatsapp/respostas-rapidas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefone: selecionado, template_name: 'pix_cnpj' }),
+        body: JSON.stringify(rrForm),
       })
-      if (res.ok) {
-        setPixEnviado(true)
-        setTimeout(() => setPixEnviado(false), 3000)
-      }
-    } finally {
-      setEnviandoPix(false)
+      setRrNovo(false)
     }
+    setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0 })
+    carregarRR()
+  }
+
+  async function deletarRR(id: number) {
+    await fetch(`/api/whatsapp/respostas-rapidas/${id}`, { method: 'DELETE' })
+    carregarRR()
   }
 
   function aplicarRR(t: string) {
@@ -438,13 +519,21 @@ export default function ChatPage() {
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
-  // Carrega contas vinculadas quando cliente é identificado
+  // Carrega contas e aplicativos quando cliente é identificado
   useEffect(() => {
-    if (!cliente?.id_cliente) { setContas([]); return }
+    if (!cliente?.id_cliente) { setContas([]); setAplicativos([]); setPagamentos([]); return }
     fetch(`/api/clientes/${cliente.id_cliente}/contas`)
       .then(r => r.ok ? r.json() : [])
       .then(setContas)
       .catch(() => setContas([]))
+    fetch(`/api/clientes/${cliente.id_cliente}/aplicativos`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setAplicativos)
+      .catch(() => setAplicativos([]))
+    fetch(`/api/clientes/${cliente.id_cliente}/pagamentos`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setPagamentos)
+      .catch(() => setPagamentos([]))
   }, [cliente?.id_cliente])
 
   async function gerarSugestao() {
@@ -514,13 +603,18 @@ export default function ChatPage() {
     setHoverMenuMsg(null)
     setEmojiLibMsg(null)
     if (!selecionado) return
-    // Optimistic update
+    const reacaoAnterior = msg.reacao
     setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, reacao: emoji } : m))
-    await fetch('/api/whatsapp/reagir', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telefone: selecionado, wa_msg_id: msg.wa_msg_id, emoji }),
-    })
+    try {
+      const res = await fetch('/api/whatsapp/reagir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado, wa_msg_id: msg.wa_msg_id, emoji }),
+      })
+      if (!res.ok) throw new Error('falha')
+    } catch {
+      setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, reacao: reacaoAnterior } : m))
+    }
   }
 
   function iniciarSelecao(msg: Mensagem) {
@@ -609,8 +703,19 @@ export default function ChatPage() {
             }}>JS</div>
             <span style={{ color: '#111b21', fontWeight: 600, fontSize: 16 }}>Atendimento</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#667781', fontSize: 12 }}>{conversas.length} conv.</span>
+            <button
+              onClick={() => setConfigOpen(o => !o)}
+              title="Configurações"
+              style={{
+                background: configOpen ? '#e8fce4' : '#e9edef',
+                border: `1px solid ${configOpen ? '#00a884' : '#d1d7db'}`,
+                color: configOpen ? '#00a884' : '#667781',
+                borderRadius: 6, padding: '4px 7px', cursor: 'pointer',
+                fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center'
+              }}
+            >⚙</button>
             <a
               href="/dashboard"
               style={{
@@ -622,6 +727,89 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {configOpen ? (
+          /* ── Painel de configurações ── */
+          <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
+            {/* Respostas Rápidas */}
+            <div style={{ padding: '14px 16px 8px', borderBottom: '1px solid #e9edef' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#111b21' }}>Respostas Rápidas</span>
+                <button
+                  onClick={() => { setRrNovo(true); setRrEditando(null); setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0 }) }}
+                  style={{ background: '#e8fce4', border: '1px solid #00a884', color: '#00a884', borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                >+ Nova</button>
+              </div>
+
+              {(rrNovo || rrEditando) && (
+                <div style={{ background: '#f8f9fa', border: '1px solid #e9edef', borderRadius: 8, padding: 12, marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      placeholder="atalho"
+                      value={rrForm.atalho}
+                      onChange={e => setRrForm(f => ({ ...f, atalho: e.target.value }))}
+                      style={{ width: 80, background: '#fff', border: '1px solid #d1d7db', borderRadius: 5, padding: '4px 8px', fontSize: 12, outline: 'none' }}
+                    />
+                    <input
+                      placeholder="título"
+                      value={rrForm.titulo}
+                      onChange={e => setRrForm(f => ({ ...f, titulo: e.target.value }))}
+                      style={{ flex: 1, background: '#fff', border: '1px solid #d1d7db', borderRadius: 5, padding: '4px 8px', fontSize: 12, outline: 'none' }}
+                    />
+                    <input
+                      placeholder="ordem"
+                      type="number"
+                      value={rrForm.ordem}
+                      onChange={e => setRrForm(f => ({ ...f, ordem: Number(e.target.value) }))}
+                      style={{ width: 52, background: '#fff', border: '1px solid #d1d7db', borderRadius: 5, padding: '4px 6px', fontSize: 12, outline: 'none' }}
+                    />
+                  </div>
+                  <textarea
+                    placeholder="texto da resposta"
+                    value={rrForm.texto}
+                    onChange={e => setRrForm(f => ({ ...f, texto: e.target.value }))}
+                    rows={2}
+                    style={{ background: '#fff', border: '1px solid #d1d7db', borderRadius: 5, padding: '4px 8px', fontSize: 12, outline: 'none', resize: 'vertical' }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => { setRrNovo(false); setRrEditando(null); setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0 }) }}
+                      style={{ background: '#e9edef', border: 'none', borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
+                    >Cancelar</button>
+                    <button
+                      onClick={salvarRR}
+                      style={{ background: '#00a884', border: 'none', color: '#fff', borderRadius: 5, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                    >Salvar</button>
+                  </div>
+                </div>
+              )}
+
+              {respostasRapidas.length === 0 && !rrNovo && (
+                <div style={{ color: '#adbac1', fontSize: 12, padding: '8px 0' }}>Nenhuma resposta cadastrada.</div>
+              )}
+
+              {respostasRapidas.map(r => (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 0', borderBottom: '1px solid #f5f5f5' }}>
+                  <span style={{ color: '#00a884', fontWeight: 700, fontSize: 11, background: '#e8fce4', borderRadius: 4, padding: '1px 5px', flexShrink: 0, marginTop: 2 }}>/{r.atalho}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: '#111b21' }}>{r.titulo}</div>
+                    <div style={{ fontSize: 11, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.texto}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button
+                      onClick={() => { setRrEditando(r); setRrNovo(false); setRrForm({ atalho: r.atalho, titulo: r.titulo, texto: r.texto, ordem: r.ordem }) }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#667781', padding: '2px 4px', borderRadius: 4 }}
+                    >✏️</button>
+                    <button
+                      onClick={() => deletarRR(r.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#E53935', padding: '2px 4px', borderRadius: 4 }}
+                    >🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Busca */}
         <div style={{ padding: '8px 12px', background: '#f0f2f5', borderBottom: '1px solid #e9edef' }}>
           <div style={{
@@ -728,6 +916,8 @@ export default function ChatPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* ── Painel central: chat ── */}
@@ -1241,7 +1431,7 @@ export default function ChatPage() {
             }}>
               {/* Popup de respostas rápidas */}
               {qrOpen && (() => {
-                const filtradas = RESPOSTAS_RAPIDAS.filter(r =>
+                const filtradas = respostasRapidas.filter(r =>
                   !qrFiltro || r.atalho.startsWith(qrFiltro) || r.titulo.toLowerCase().includes(qrFiltro)
                 )
                 if (filtradas.length === 0) return null
@@ -1296,22 +1486,6 @@ export default function ChatPage() {
                 {loadingSugestao ? '...' : '✦ IA'}
               </button>
 
-              <button
-                onClick={enviarPix}
-                disabled={enviandoPix}
-                title="Enviar chave PIX (template)"
-                style={{
-                  background: pixEnviado ? '#e8fce4' : '#fff',
-                  border: `1px solid ${pixEnviado ? '#00a884' : '#d1d7db'}`,
-                  color: pixEnviado ? '#00a884' : '#54656f',
-                  borderRadius: 8, padding: '8px 10px', fontSize: 13,
-                  cursor: enviandoPix ? 'wait' : 'pointer',
-                  flexShrink: 0, fontWeight: 600, transition: 'all 0.2s'
-                }}
-              >
-                {enviandoPix ? '...' : pixEnviado ? '✓ PIX' : '🏦 PIX'}
-              </button>
-
               <textarea
                 ref={inputRef}
                 value={texto}
@@ -1329,7 +1503,7 @@ export default function ChatPage() {
                 }}
                 onKeyDown={e => {
                   if (qrOpen) {
-                    const filtradas = RESPOSTAS_RAPIDAS.filter(r =>
+                    const filtradas = respostasRapidas.filter(r =>
                       !qrFiltro || r.atalho.startsWith(qrFiltro) || r.titulo.toLowerCase().includes(qrFiltro)
                     )
                     if (e.key === 'ArrowDown') { e.preventDefault(); setQrIdx(i => Math.min(i + 1, filtradas.length - 1)); return }
@@ -1700,6 +1874,116 @@ export default function ChatPage() {
                   </div>
                 )
               })()}
+
+              {/* Aplicativos */}
+              {aplicativos.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{
+                      color: '#667781', fontSize: 11, fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: 1, flex: 1
+                    }}>
+                      Aplicativos {aplicativos.length}
+                    </span>
+                    <button
+                      onClick={() => setAppsRecolhidos(v => !v)}
+                      title={appsRecolhidos ? 'Expandir' : 'Recolher'}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#adbac1', fontSize: 13, padding: '0 2px', lineHeight: 1
+                      }}
+                    >
+                      {appsRecolhidos ? '▸' : '▾'}
+                    </button>
+                  </div>
+                  {!appsRecolhidos && <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {aplicativos.map(a => {
+                      const vencida = a.validade ? new Date(a.validade) < new Date() : false
+                      const [badgeBg, badgeFg] = (() => {
+                        const s = (a.status ?? '').toLowerCase()
+                        if (s === 'ativa' || s === 'ativo') return ['#dcfce7', '#16a34a']
+                        if (s === 'pendente') return ['#fef9c3', '#854d0e']
+                        if (s === 'bloqueado') return ['#ffedd5', '#9a3412']
+                        return ['#fee2e2', '#991b1b']
+                      })()
+                      return (
+                        <div key={a.id_app_registro} style={{
+                          background: '#f8f9fa', border: '1px solid #e9edef',
+                          borderRadius: 6, padding: '5px 8px', fontSize: 11,
+                          display: 'flex', flexDirection: 'column', gap: 2
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ fontWeight: 600, color: '#111b21', flex: 1 }}>
+                              {a.nome_app ?? `App #${a.id_app}`}
+                            </span>
+                            <span style={{
+                              background: badgeBg, color: badgeFg, fontSize: 9,
+                              fontWeight: 700, borderRadius: 4, padding: '1px 5px'
+                            }}>
+                              {a.status ?? '—'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, color: '#667781', flexWrap: 'wrap' }}>
+                            {a.validade && (
+                              <span style={{ color: vencida ? '#ef4444' : '#667781' }}>
+                                {vencida ? '⚠️ ' : ''}
+                                {a.validade.split('T')[0].split('-').reverse().join('/')}
+                              </span>
+                            )}
+                            {a.mac && (
+                              <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#54656f' }}>
+                                {a.mac}
+                              </span>
+                            )}
+                            {a.chave && (
+                              <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#54656f' }}>
+                                {a.chave}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>}
+                </div>
+              )}
+
+              {/* Pagamentos */}
+              {pagamentos.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #e9edef' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{
+                      color: '#667781', fontSize: 11, fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: 1, flex: 1
+                    }}>
+                      Pagamentos {pagamentos.length}
+                    </span>
+                    <button
+                      onClick={() => setPgtsRecolhidos(v => !v)}
+                      title={pgtsRecolhidos ? 'Expandir' : 'Recolher'}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#adbac1', fontSize: 13, padding: '0 2px', lineHeight: 1
+                      }}
+                    >
+                      {pgtsRecolhidos ? '▸' : '▾'}
+                    </button>
+                  </div>
+
+                  {/* Último pagamento — sempre visível */}
+                  {(() => {
+                    const p = pagamentos[0]
+                    return (
+                      <PagamentoLinha p={p} destaque />
+                    )
+                  })()}
+
+                  {/* Demais pagamentos — visíveis apenas quando expandido */}
+                  {!pgtsRecolhidos && pagamentos.slice(1).map(p => (
+                    <PagamentoLinha key={p.id} p={p} />
+                  ))}
+                </div>
+              )}
 
               <div style={{ marginTop: 14 }}>
                 <a
