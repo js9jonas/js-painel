@@ -97,6 +97,14 @@ export async function POST(req: NextRequest) {
             } else if (msg.type === 'video') {
               conteudo = msg.video?.id ?? ''
               media_mime = msg.video?.mime_type ?? null
+            } else if (msg.type === 'interactive') {
+              const iv = msg.interactive ?? {}
+              const reply = iv.button_reply ?? iv.list_reply ?? {}
+              conteudo = reply.title ?? JSON.stringify(iv).slice(0, 300)
+              tipo = 'interactive_reply'
+            } else {
+              console.log(`[WhatsApp] Tipo desconhecido de cliente: ${msg.type}`, JSON.stringify(msg).slice(0, 1000))
+              conteudo = JSON.stringify(msg[msg.type] ?? {})
             }
 
             // Captura reply context (cliente respondeu alguma mensagem)
@@ -153,11 +161,25 @@ export async function POST(req: NextRequest) {
 
             let tipo     = msg.type
             let conteudo = ''
-            if (msg.type === 'text')     conteudo = msg.text?.body ?? ''
+            if (msg.type === 'text')          conteudo = msg.text?.body ?? ''
             else if (msg.type === 'audio')    conteudo = msg.audio?.id ?? ''
             else if (msg.type === 'image')    conteudo = msg.image?.id ?? ''
             else if (msg.type === 'document') conteudo = msg.document?.id ?? ''
             else if (msg.type === 'video')    conteudo = msg.video?.id ?? ''
+            else if (msg.type === 'template') {
+              const comps = msg.template?.components ?? []
+              const copyBtn = comps.find((c: any) => c.sub_type === 'copy_code')
+              conteudo = JSON.stringify({
+                name: msg.template?.name ?? null,
+                copyCode: copyBtn?.parameters?.[0]?.coupon_code ?? null,
+              })
+            } else if (msg.type === 'interactive') {
+              conteudo = JSON.stringify(msg.interactive ?? {})
+            } else {
+              // Log para identificar tipos novos (ex: PIX nativo do WhatsApp Pay)
+              console.log(`[WhatsApp] Echo tipo desconhecido: ${msg.type}`, JSON.stringify(msg).slice(0, 1000))
+              conteudo = JSON.stringify(msg[msg.type] ?? {})
+            }
 
             console.log(`[WhatsApp] Echo (phone) para ${to}: ${tipo}`)
 

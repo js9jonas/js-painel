@@ -83,9 +83,7 @@ function formatHora(iso: string) {
 }
 
 function formatData(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric'
-  })
+  return iso.split('T')[0].split('-').reverse().join('/')
 }
 
 function formatValor(v: number | null) {
@@ -281,6 +279,16 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+// Respostas rápidas — adicione/edite aqui conforme necessário
+const RESPOSTAS_RAPIDAS: { atalho: string; titulo: string; texto: string }[] = [
+  { atalho: 'p',    titulo: 'Chave PIX',       texto: 'Segue nossa chave PIX (CNPJ): 40.827.286/0001-06' },
+  { atalho: 'oi',   titulo: 'Saudação',         texto: 'Olá! Aqui é o Jonas da JS Sistemas. Como posso ajudar? 👋' },
+  { atalho: 'ok',   titulo: 'Confirmação',      texto: 'Perfeito! Qualquer dúvida é só chamar. 😊' },
+  { atalho: 'ag',   titulo: 'Aguarde',          texto: 'Olá! Já vou verificar para você, um momento por favor. 🔎' },
+  { atalho: 'ren',  titulo: 'Renovado',         texto: 'Confirmado! Sua assinatura foi renovada. Aproveite! 🎉' },
+  { atalho: 'ven',  titulo: 'Vencendo',         texto: 'Olá! Sua assinatura está próxima do vencimento. Entre em contato para renovar. 📅' },
+]
+
 export default function ChatPage() {
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [filtro, setFiltro] = useState('')
@@ -308,6 +316,10 @@ export default function ChatPage() {
   const [novoClienteOpen, setNovoClienteOpen] = useState(false)
   const [vincularClienteOpen, setVincularClienteOpen] = useState(false)
   const [emojiLibMsg, setEmojiLibMsg] = useState<number | null>(null)
+  const [copiedId, setCopiedId] = useState<number | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
+  const [qrFiltro, setQrFiltro] = useState('')
+  const [qrIdx, setQrIdx] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
@@ -371,8 +383,19 @@ export default function ChatPage() {
     setHoverMenuMsg(null)
     setHoveredMsg(null)
     setEmojiLibMsg(null)
+    setCopiedId(null)
+    setQrOpen(false)
+    setQrFiltro('')
     prevMsgCountRef.current = 0
   }, [selecionado])
+
+  function aplicarRR(t: string) {
+    setTexto(t)
+    setQrOpen(false)
+    setQrFiltro('')
+    setQrIdx(0)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
 
   // Carrega contas vinculadas quando cliente é identificado
   useEffect(() => {
@@ -587,6 +610,8 @@ export default function ChatPage() {
               : conv.ultimo_tipo === 'image' ? '📷 Imagem'
               : conv.ultimo_tipo === 'video' ? '🎥 Vídeo'
               : conv.ultimo_tipo === 'document' ? '📄 Documento'
+              : conv.ultimo_tipo === 'template' ? '📋 Template'
+              : conv.ultimo_tipo === 'interactive_reply' ? '🔘 Resposta rápida'
               : (conv.ultima_mensagem ?? '')
 
             return (
@@ -837,6 +862,68 @@ export default function ChatPage() {
                             style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 6, display: 'block' }}
                           />
                         )}
+                        {msg.tipo === 'template' && (() => {
+                          let data: { name?: string | null; copyCode?: string | null } = {}
+                          try { data = JSON.parse(msg.conteudo ?? '{}') } catch {}
+                          const code = data.copyCode ?? '40.827.286/0001-06'
+                          return (
+                            <div style={{ minWidth: 220 }}>
+                              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                                <div style={{
+                                  width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                                  background: '#128c7e', display: 'flex', alignItems: 'center',
+                                  justifyContent: 'center', color: '#fff', fontSize: 18
+                                }}>₽</div>
+                                <div>
+                                  <div style={{ fontWeight: 600, fontSize: 13, color: '#111b21' }}>Js Sistemas - Jonas Eduardo Scheibe</div>
+                                  <div style={{ fontSize: 12, color: '#667781' }}>CNPJ: 40.827.286/0001-06</div>
+                                </div>
+                              </div>
+                              <hr style={{ border: 'none', borderTop: '1px solid #e9edef', margin: '0 0 6px 0' }} />
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(code)
+                                  setCopiedId(msg.id)
+                                  setTimeout(() => setCopiedId(prev => prev === msg.id ? null : prev), 2000)
+                                }}
+                                style={{
+                                  width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                                  color: copiedId === msg.id ? '#128c7e' : '#00a884',
+                                  fontSize: 14, fontWeight: 600, padding: '4px 0',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                                }}
+                              >
+                                {copiedId === msg.id ? '✓ Chave copiada' : '📋 Copiar chave Pix'}
+                              </button>
+                            </div>
+                          )
+                        })()}
+                        {msg.tipo === 'interactive_reply' && (
+                          <div style={{ fontSize: 14, color: '#111b21' }}>
+                            <span style={{
+                              display: 'inline-block', background: 'rgba(0,168,132,0.12)',
+                              color: '#00a884', borderRadius: 12, padding: '3px 12px',
+                              fontSize: 13, fontWeight: 600, border: '1px solid rgba(0,168,132,0.3)'
+                            }}>
+                              🔘 {msg.conteudo}
+                            </span>
+                          </div>
+                        )}
+                        {msg.tipo === 'interactive' && (() => {
+                          let iv: any = {}
+                          try { iv = JSON.parse(msg.conteudo ?? '{}') } catch {}
+                          const label = iv.body?.text ?? iv.header?.text ?? '[Mensagem interativa]'
+                          return (
+                            <div style={{ fontSize: 14, fontStyle: 'italic', color: '#667781' }}>
+                              🔘 {label}
+                            </div>
+                          )
+                        })()}
+                        {!['text','audio','image','video','document','template','interactive','interactive_reply'].includes(msg.tipo) && (
+                          <div style={{ color: '#adbac1', fontSize: 12, fontStyle: 'italic' }}>
+                            [{msg.tipo}]
+                          </div>
+                        )}
                         {msg.tipo === 'document' && msg.conteudo && (() => {
                           const url  = `/api/whatsapp/media?id=${msg.conteudo}`
                           const mime = msg.media_mime ?? ''
@@ -1077,8 +1164,50 @@ export default function ChatPage() {
             <div style={{
               background: '#f0f2f5', padding: '10px 16px',
               display: 'flex', alignItems: 'flex-end', gap: 10,
-              borderTop: '1px solid #d1d7db'
+              borderTop: '1px solid #d1d7db', position: 'relative'
             }}>
+              {/* Popup de respostas rápidas */}
+              {qrOpen && (() => {
+                const filtradas = RESPOSTAS_RAPIDAS.filter(r =>
+                  !qrFiltro || r.atalho.startsWith(qrFiltro) || r.titulo.toLowerCase().includes(qrFiltro)
+                )
+                if (filtradas.length === 0) return null
+                return (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: 0, right: 0,
+                    background: '#fff', borderTop: '1px solid #e9edef',
+                    borderBottom: 'none', boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+                    zIndex: 100, overflow: 'hidden'
+                  }}>
+                    <div style={{ padding: '6px 16px 4px', borderBottom: '1px solid #f0f2f5' }}>
+                      <span style={{ fontSize: 11, color: '#adbac1', fontWeight: 600, letterSpacing: 0.5 }}>RESPOSTAS RÁPIDAS</span>
+                    </div>
+                    {filtradas.map((r, i) => (
+                      <div
+                        key={r.atalho}
+                        onClick={() => aplicarRR(r.texto)}
+                        style={{
+                          padding: '10px 16px',
+                          background: i === qrIdx ? '#f0f2f5' : '#fff',
+                          cursor: 'pointer', borderBottom: '1px solid #f5f5f5',
+                          display: 'flex', alignItems: 'center', gap: 10
+                        }}
+                      >
+                        <span style={{
+                          color: '#00a884', fontWeight: 700, fontSize: 12,
+                          background: '#e8fce4', borderRadius: 4, padding: '1px 6px', flexShrink: 0
+                        }}>/{r.atalho}</span>
+                        <span style={{ color: '#111b21', fontSize: 13, fontWeight: 500, flexShrink: 0 }}>{r.titulo}</span>
+                        <span style={{
+                          color: '#667781', fontSize: 12,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}>{r.texto}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
               <button
                 onClick={gerarSugestao}
                 disabled={loadingSugestao}
@@ -1097,8 +1226,28 @@ export default function ChatPage() {
               <textarea
                 ref={inputRef}
                 value={texto}
-                onChange={e => setTexto(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value
+                  setTexto(val)
+                  if (val.startsWith('/')) {
+                    setQrFiltro(val.slice(1).toLowerCase())
+                    setQrOpen(true)
+                    setQrIdx(0)
+                  } else {
+                    setQrOpen(false)
+                    setQrFiltro('')
+                  }
+                }}
                 onKeyDown={e => {
+                  if (qrOpen) {
+                    const filtradas = RESPOSTAS_RAPIDAS.filter(r =>
+                      !qrFiltro || r.atalho.startsWith(qrFiltro) || r.titulo.toLowerCase().includes(qrFiltro)
+                    )
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setQrIdx(i => Math.min(i + 1, filtradas.length - 1)); return }
+                    if (e.key === 'ArrowUp')   { e.preventDefault(); setQrIdx(i => Math.max(i - 1, 0)); return }
+                    if (e.key === 'Enter')     { e.preventDefault(); if (filtradas[qrIdx]) aplicarRR(filtradas[qrIdx].texto); return }
+                    if (e.key === 'Escape')    { setQrOpen(false); setQrFiltro(''); return }
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     enviar(texto === sugestao)
