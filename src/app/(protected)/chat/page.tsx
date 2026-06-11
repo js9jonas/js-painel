@@ -611,6 +611,7 @@ export default function ChatPage() {
               : conv.ultimo_tipo === 'video' ? '🎥 Vídeo'
               : conv.ultimo_tipo === 'document' ? '📄 Documento'
               : conv.ultimo_tipo === 'template' ? '📋 Template'
+              : conv.ultimo_tipo === 'pix' ? '🏦 Chave PIX'
               : conv.ultimo_tipo === 'interactive_reply' ? '🔘 Resposta rápida'
               : (conv.ultima_mensagem ?? '')
 
@@ -898,6 +899,37 @@ export default function ChatPage() {
                             </div>
                           )
                         })()}
+                        {msg.tipo === 'pix' && (
+                          <div style={{ minWidth: 220 }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                              <div style={{
+                                width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                                background: '#128c7e', display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', color: '#fff', fontSize: 18
+                              }}>₽</div>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: '#111b21' }}>Js Sistemas - Jonas Eduardo Scheibe</div>
+                                <div style={{ fontSize: 12, color: '#667781' }}>CNPJ: 40.827.286/0001-06</div>
+                              </div>
+                            </div>
+                            <hr style={{ border: 'none', borderTop: '1px solid #e9edef', margin: '0 0 6px 0' }} />
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText('40.827.286/0001-06')
+                                setCopiedId(msg.id)
+                                setTimeout(() => setCopiedId(prev => prev === msg.id ? null : prev), 2000)
+                              }}
+                              style={{
+                                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                                color: copiedId === msg.id ? '#128c7e' : '#00a884',
+                                fontSize: 14, fontWeight: 600, padding: '4px 0',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                              }}
+                            >
+                              {copiedId === msg.id ? '✓ Chave copiada' : '📋 Copiar chave Pix'}
+                            </button>
+                          </div>
+                        )}
                         {msg.tipo === 'interactive_reply' && (
                           <div style={{ fontSize: 14, color: '#111b21' }}>
                             <span style={{
@@ -919,7 +951,7 @@ export default function ChatPage() {
                             </div>
                           )
                         })()}
-                        {!['text','audio','image','video','document','template','interactive','interactive_reply'].includes(msg.tipo) && (
+                        {!['text','audio','image','video','document','template','pix','interactive','interactive_reply'].includes(msg.tipo) && (
                           <div style={{ color: '#adbac1', fontSize: 12, fontStyle: 'italic' }}>
                             [{msg.tipo}]
                           </div>

@@ -175,9 +175,22 @@ export async function POST(req: NextRequest) {
               })
             } else if (msg.type === 'interactive') {
               conteudo = JSON.stringify(msg.interactive ?? {})
+            } else if (msg.type === 'reaction') {
+              // Reação enviada pelo Jonas via celular — atualiza a mensagem alvo
+              const { message_id, emoji } = msg.reaction ?? {}
+              if (message_id) {
+                await pool.query(
+                  `UPDATE public.whatsapp_mensagens SET reacao = $1 WHERE wa_msg_id = $2`,
+                  [emoji || null, message_id]
+                )
+              }
+              continue
+            } else if (msg.type === 'unsupported') {
+              // PIX nativo do WhatsApp Pay — Meta não expõe conteúdo no echo
+              tipo = 'pix'
+              conteudo = ''
             } else {
-              // Log para identificar tipos novos (ex: PIX nativo do WhatsApp Pay)
-              console.log(`[WhatsApp] Echo tipo desconhecido: ${msg.type}`, JSON.stringify(msg).slice(0, 1000))
+              console.log(`[WhatsApp] Echo tipo desconhecido: ${msg.type}`, JSON.stringify(msg).slice(0, 500))
               conteudo = JSON.stringify(msg[msg.type] ?? {})
             }
 
