@@ -320,6 +320,8 @@ export default function ChatPage() {
   const [qrOpen, setQrOpen] = useState(false)
   const [qrFiltro, setQrFiltro] = useState('')
   const [qrIdx, setQrIdx] = useState(0)
+  const [enviandoPix, setEnviandoPix] = useState(false)
+  const [pixEnviado, setPixEnviado] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const prevMsgCountRef = useRef(0)
@@ -386,8 +388,27 @@ export default function ChatPage() {
     setCopiedId(null)
     setQrOpen(false)
     setQrFiltro('')
+    setPixEnviado(false)
     prevMsgCountRef.current = 0
   }, [selecionado])
+
+  async function enviarPix() {
+    if (!selecionado || enviandoPix) return
+    setEnviandoPix(true)
+    try {
+      const res = await fetch('/api/whatsapp/enviar-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado, template_name: 'pix_cnpj' }),
+      })
+      if (res.ok) {
+        setPixEnviado(true)
+        setTimeout(() => setPixEnviado(false), 3000)
+      }
+    } finally {
+      setEnviandoPix(false)
+    }
+  }
 
   function aplicarRR(t: string) {
     setTexto(t)
@@ -1253,6 +1274,22 @@ export default function ChatPage() {
                 }}
               >
                 {loadingSugestao ? '...' : '✦ IA'}
+              </button>
+
+              <button
+                onClick={enviarPix}
+                disabled={enviandoPix}
+                title="Enviar chave PIX (template)"
+                style={{
+                  background: pixEnviado ? '#e8fce4' : '#fff',
+                  border: `1px solid ${pixEnviado ? '#00a884' : '#d1d7db'}`,
+                  color: pixEnviado ? '#00a884' : '#54656f',
+                  borderRadius: 8, padding: '8px 10px', fontSize: 13,
+                  cursor: enviandoPix ? 'wait' : 'pointer',
+                  flexShrink: 0, fontWeight: 600, transition: 'all 0.2s'
+                }}
+              >
+                {enviandoPix ? '...' : pixEnviado ? '✓ PIX' : '🏦 PIX'}
               </button>
 
               <textarea
