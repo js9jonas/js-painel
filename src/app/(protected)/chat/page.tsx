@@ -13,6 +13,7 @@ import NovoClienteModal from '@/components/clientes/NovoClienteModal'
 import VincularClienteModal from '@/components/clientes/VincularClienteModal'
 import type { PlanoRow } from '@/lib/planos'
 import type { PacoteRow } from '@/lib/pacotes'
+import RenovarAssinatura from '@/components/clientes/RenovarAssinatura'
 
 interface Conversa {
   telefone: string
@@ -1941,6 +1942,33 @@ export default function ChatPage() {
                     ⚙️
                   </button>
                 )}
+                {cliente.id_assinatura && (() => {
+                  const planoAtual = planos.find(p => p.id_plano === String(cliente.id_plano))
+                  return (
+                    <RenovarAssinatura
+                      idAssinatura={String(cliente.id_assinatura)}
+                      vencAtual={cliente.venc_contrato ?? null}
+                      vencContasAtual={cliente.venc_contas ?? null}
+                      idCliente={String(cliente.id_cliente)}
+                      nomeCliente={cliente.nome}
+                      pacoteNome={cliente.pacote ?? null}
+                      planoValor={cliente.valor != null ? String(cliente.valor) : null}
+                      idPlano={cliente.id_plano != null ? String(cliente.id_plano) : null}
+                      planoTipo={planoAtual?.tipo ?? null}
+                      planoTelas={planoAtual?.telas ?? null}
+                      status={cliente.status ?? null}
+                      contasVinculadas={contas.filter(c => c.id_assinatura === String(cliente.id_assinatura))}
+                      planos={planos.map(p => ({
+                        id_plano: p.id_plano,
+                        tipo: p.tipo ?? '',
+                        telas: p.telas ?? 0,
+                        meses: p.meses ?? 1,
+                        valor: p.valor ?? '0',
+                      }))}
+                      onSuccess={() => selecionado && carregarMensagens(selecionado, true)}
+                    />
+                  )
+                })()}
               </div>
               {cliente.assinatura_observacao && (
                 <div style={{
@@ -2081,6 +2109,35 @@ export default function ChatPage() {
                                 flexShrink: 0, display: 'flex', alignItems: 'center'
                               }}
                             >⚙️</button>
+                            {a.id_assinatura && (() => {
+                              const planoA = planos.find(p => p.id_plano === String(a.id_plano))
+                              return (
+                                <span onClick={e => e.stopPropagation()}>
+                                  <RenovarAssinatura
+                                    idAssinatura={String(a.id_assinatura)}
+                                    vencAtual={a.venc_contrato ?? null}
+                                    vencContasAtual={a.venc_contas ?? null}
+                                    idCliente={cliente ? String(cliente.id_cliente) : undefined}
+                                    nomeCliente={cliente?.nome}
+                                    pacoteNome={a.pacote ?? null}
+                                    planoValor={a.valor != null ? String(a.valor) : null}
+                                    idPlano={a.id_plano != null ? String(a.id_plano) : null}
+                                    planoTipo={planoA?.tipo ?? null}
+                                    planoTelas={planoA?.telas ?? null}
+                                    status={a.status ?? null}
+                                    contasVinculadas={contasA}
+                                    planos={planos.map(p => ({
+                                      id_plano: p.id_plano,
+                                      tipo: p.tipo ?? '',
+                                      telas: p.telas ?? 0,
+                                      meses: p.meses ?? 1,
+                                      valor: p.valor ?? '0',
+                                    }))}
+                                    onSuccess={() => selecionado && carregarMensagens(selecionado, true)}
+                                  />
+                                </span>
+                              )
+                            })()}
                           </div>
 
                           {/* Sub-linhas de contas */}

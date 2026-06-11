@@ -116,6 +116,7 @@ export default function RenovarAssinatura({
     planoTelas,
     status,
     contasVinculadas,
+    onSuccess,
 }: {
     idAssinatura: string;
     vencAtual?: string | null;
@@ -130,6 +131,7 @@ export default function RenovarAssinatura({
     planoTelas?: number | null;
     status?: string | null;
     contasVinculadas?: ContaVinculada[];
+    onSuccess?: () => void;
 }) {
     const router = useRouter();
     const isPendente = (status ?? "").toLowerCase().trim() === "pendente";
@@ -184,6 +186,7 @@ export default function RenovarAssinatura({
     function fecharComRefresh() {
         setOpen(false);
         router.refresh();
+        onSuccess?.();
         setResultadosContas([]);
     }
 
@@ -214,6 +217,7 @@ export default function RenovarAssinatura({
 
         setOpen(false);
         router.refresh();
+        onSuccess?.();
     }
 
     async function executar(registrarPagamento: boolean) {
@@ -256,6 +260,7 @@ export default function RenovarAssinatura({
             setLoading(false);
             setOpen(false);
             router.refresh();
+            onSuccess?.();
             return;
         }
 
