@@ -7,6 +7,7 @@ import type { ContaPainelVinculada } from '@/lib/clientes'
 import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
 import EditClienteModal from '@/components/clientes/EditClienteModal'
 import NovoClienteModal from '@/components/clientes/NovoClienteModal'
+import VincularClienteModal from '@/components/clientes/VincularClienteModal'
 import type { PlanoRow } from '@/lib/planos'
 import type { PacoteRow } from '@/lib/pacotes'
 
@@ -305,6 +306,7 @@ export default function ChatPage() {
   const [editAssinaturaOpen, setEditAssinaturaOpen] = useState(false)
   const [editClienteOpen, setEditClienteOpen] = useState(false)
   const [novoClienteOpen, setNovoClienteOpen] = useState(false)
+  const [vincularClienteOpen, setVincularClienteOpen] = useState(false)
   const [emojiLibMsg, setEmojiLibMsg] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -1157,17 +1159,36 @@ export default function ChatPage() {
                   ⚙️
                 </button>
               ) : (
-                <button
-                  onClick={() => setNovoClienteOpen(true)}
-                  title="Cadastrar novo cliente"
-                  style={{
-                    background: '#00a884', border: 'none', cursor: 'pointer',
-                    color: '#fff', fontSize: 11, fontWeight: 600, padding: '3px 8px',
-                    borderRadius: 10, lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 3
-                  }}
-                >
-                  + Cadastrar
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setNovoClienteOpen(true)}
+                    title="Cadastrar novo Cliente"
+                    style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: '#00a884', border: 'none', cursor: 'pointer',
+                      color: '#fff', fontSize: 18, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      lineHeight: 1, flexShrink: 0
+                    }}
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => setVincularClienteOpen(true)}
+                    title="Vincular a Cliente"
+                    style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: '#1565c0', border: 'none', cursor: 'pointer',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
             {conversaAtual?.nome_cliente && conversaAtual.nome_contato && conversaAtual.nome_cliente !== conversaAtual.nome_contato && (
@@ -1299,6 +1320,16 @@ export default function ChatPage() {
           initialNomeContato={conversaAtual?.nome_contato ?? ''}
           onClose={() => setNovoClienteOpen(false)}
           onSuccess={() => { setNovoClienteOpen(false); carregarMensagens(selecionado) }}
+        />
+      )}
+
+      {/* Modal vincular a cliente existente */}
+      {vincularClienteOpen && selecionado && (
+        <VincularClienteModal
+          telefone={selecionado}
+          nomeContato={conversaAtual?.nome_contato ?? null}
+          onClose={() => setVincularClienteOpen(false)}
+          onSuccess={() => { setVincularClienteOpen(false); carregarMensagens(selecionado) }}
         />
       )}
 
