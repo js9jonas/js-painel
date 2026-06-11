@@ -38,24 +38,8 @@ function addMeses(dataStr: string | null | undefined, meses: number): string {
 function calcVencContrato(
     vencAtual: string | null | undefined,
     periodo: Periodo,
-    vencContasAtual?: string | null
 ): string {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    if (vencAtual) {
-        const venc = new Date(vencAtual + "T00:00:00");
-        if (venc >= hoje) {
-            return addMeses(vencAtual, MESES[periodo]);
-        }
-        if (vencContasAtual) {
-            const vencContas = new Date(vencContasAtual + "T00:00:00");
-            if (vencContas >= hoje) {
-                return addMeses(vencAtual, MESES[periodo]);
-            }
-        }
-        return addMeses(undefined, MESES[periodo]);
-    }
-    return addMeses(undefined, MESES[periodo]);
+    return addMeses(vencAtual ?? undefined, MESES[periodo]);
 }
 
 function vencContasVencida(vencContasAtual: string | null | undefined): boolean {
@@ -155,7 +139,7 @@ export default function RenovarAssinatura({
     const [loading, setLoading] = useState(false);
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
-    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal", vencContasAtual));
+    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal"));
     const [vencContas, setVencContas] = useState(() =>
         contasVencida
             ? addMeses(undefined, 1)
@@ -168,14 +152,14 @@ export default function RenovarAssinatura({
         setPeriodo(p);
         setValor(valorDoPeriodo(p));
         if (!vencContratoEditado) {
-            setVencContrato(calcVencContrato(vencAtual, p, vencContasAtual));
+            setVencContrato(calcVencContrato(vencAtual, p));
         }
     }
 
     function handleOpen() {
         setPeriodo("mensal");
         setValor(valorDoPeriodo("mensal"));
-        setVencContrato(calcVencContrato(vencAtual, "mensal", vencContasAtual));
+        setVencContrato(calcVencContrato(vencAtual, "mensal"));
         setVencContratoEditado(false);
         setVencContas(contasVencida ? addMeses(undefined, 1) : (vencContasAtual?.split("T")[0] ?? ""));
         setStatusFinal("ativo");
