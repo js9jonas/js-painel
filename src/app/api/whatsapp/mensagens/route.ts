@@ -45,8 +45,8 @@ export async function GET(req: NextRequest) {
     pl.tipo        AS plano,
     pac.contrato   AS pacote,
     a.status,
-    a.venc_contrato,
-    a.venc_contas,
+    a.venc_contrato::text,
+    a.venc_contas::text,
     pl.valor,
     (
       SELECT s.codigo_publico
