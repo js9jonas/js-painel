@@ -264,8 +264,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                       : n < t
                       ? ["bg-amber-100", "text-amber-700"]
                       : ["bg-red-100", "text-red-700"];
+                    const tip = n === t ? `Assinatura OK (${n}/${t} contas)`
+                      : n < t ? `Faltam contas na assinatura (${n}/${t})`
+                      : `Conta além do pacote (${n}/${t})`;
                     return (
-                      <span className={`inline-flex rounded-full ${bg} ${fg} px-1.5 py-0.5 text-xs font-semibold`} title={`${n} de ${t} contas vinculadas`}>
+                      <span className={`inline-flex rounded-full ${bg} ${fg} px-1.5 py-0.5 text-xs font-semibold cursor-help`} title={tip}>
                         {n}/{t}
                       </span>
                     );
@@ -395,8 +398,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
                           : n < t
                           ? ["bg-amber-100", "text-amber-700"]
                           : ["bg-red-100", "text-red-700"];
+                        const tip = n === t ? `Assinatura OK (${n}/${t} contas)`
+                          : n < t ? `Faltam contas na assinatura (${n}/${t})`
+                          : `Conta além do pacote (${n}/${t})`;
                         return (
-                          <span className={`inline-flex rounded-full ${bg} ${fg} px-1.5 py-0.5 text-xs font-semibold`} title={`${n} de ${t} contas vinculadas`}>
+                          <span className={`inline-flex rounded-full ${bg} ${fg} px-1.5 py-0.5 text-xs font-semibold cursor-help`} title={tip}>
                             {n}/{t}
                           </span>
                         );

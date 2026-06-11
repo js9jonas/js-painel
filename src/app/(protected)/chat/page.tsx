@@ -1220,14 +1220,34 @@ export default function ChatPage() {
                 <span style={{ color: '#667781', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
                   Assinatura
                 </span>
-                {cliente.pacote && (
-                  <span style={{
-                    background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600,
-                    borderRadius: 4, padding: '1px 6px', border: '1px solid #c8e6c9'
-                  }}>
-                    {cliente.pacote}
-                  </span>
-                )}
+                {cliente.pacote && (() => {
+                  const telas = cliente.id_pacote
+                    ? (pacotes.find(p => p.id_pacote === String(cliente.id_pacote))?.telas ?? null)
+                    : null
+                  const n = contas.length
+                  const t = telas
+                  const [bg, cor, bord] = t == null || n === t
+                    ? ['#e8f5e9', '#2e7d32', '#c8e6c9']
+                    : n < t
+                    ? ['#fff8e1', '#f57f17', '#ffe082']
+                    : ['#ffebee', '#c62828', '#ffcdd2']
+                  const tooltip = t == null ? cliente.pacote!
+                    : n === t ? `Assinatura OK (${n}/${t} contas)`
+                    : n < t  ? `Faltam contas na assinatura (${n}/${t})`
+                    :          `Conta além do pacote (${n}/${t})`
+                  return (
+                    <span
+                      title={tooltip}
+                      style={{
+                        background: bg, color: cor, fontSize: 11, fontWeight: 600,
+                        borderRadius: 4, padding: '1px 6px', border: `1px solid ${bord}`,
+                        cursor: t != null ? 'help' : 'default'
+                      }}
+                    >
+                      {cliente.pacote}{t != null ? ` ${n}/${t}` : ''}
+                    </span>
+                  )
+                })()}
                 {cliente.id_assinatura && (
                   <button
                     onClick={() => setEditAssinaturaOpen(true)}
