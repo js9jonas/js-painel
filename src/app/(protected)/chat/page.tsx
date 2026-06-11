@@ -616,6 +616,13 @@ export default function ChatPage() {
                       {formatHora(conv.ultima_mensagem_em)}
                     </span>
                   </div>
+                  {conv.nome_cliente && conv.nome_contato && conv.nome_cliente !== conv.nome_contato && (
+                    <div style={{
+                      color: '#adbac1', fontSize: 11,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      lineHeight: 1.3
+                    }}>{conv.nome_contato}</div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
                     <span style={{
                       color: '#667781', fontSize: 13,
@@ -674,6 +681,9 @@ export default function ChatPage() {
               <div>
                 <div style={{ color: '#111b21', fontWeight: 600, fontSize: 15 }}>{nomeExibido}</div>
                 <div style={{ color: '#667781', fontSize: 12 }}>{formatTel(selecionado)}</div>
+                {conversaAtual?.nome_cliente && conversaAtual.nome_contato && conversaAtual.nome_cliente !== conversaAtual.nome_contato && (
+                  <div style={{ color: '#adbac1', fontSize: 11 }}>{conversaAtual.nome_contato}</div>
+                )}
               </div>
             </div>
 
@@ -1133,6 +1143,7 @@ export default function ChatPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <span style={{ color: '#111b21', fontWeight: 700, fontSize: 16 }}>{nomeExibido}</span>
+
               {cliente ? (
                 <button
                   onClick={() => setEditClienteOpen(true)}
@@ -1159,6 +1170,9 @@ export default function ChatPage() {
                 </button>
               )}
             </div>
+            {conversaAtual?.nome_cliente && conversaAtual.nome_contato && conversaAtual.nome_cliente !== conversaAtual.nome_contato && (
+              <div style={{ color: '#adbac1', fontSize: 11, marginTop: 2 }}>{conversaAtual.nome_contato}</div>
+            )}
             <div style={{ color: '#667781', fontSize: 13, marginTop: 4 }}>{formatTel(selecionado)}</div>
             {cliente && (
               <div style={{ color: '#f59e0b', fontSize: 16, marginTop: 6, letterSpacing: 2 }}>
