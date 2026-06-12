@@ -392,6 +392,7 @@ export default function ChatPage() {
   const [enviandoAudio, setEnviandoAudio] = useState(false)
   const [erroAudio, setErroAudio] = useState<string | null>(null)
   const [transcrevendo, setTranscrevendo] = useState(false)
+  const [mediaErros, setMediaErros] = useState<Set<number>>(new Set())
   const speechRecRef = useRef<{ stop(): void } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -485,6 +486,7 @@ export default function ChatPage() {
     setAssinaturas([])
     setOutrasRecolhidas(false)
     setExpandidasAssinaturas(new Set())
+    setMediaErros(new Set())
     prevMsgCountRef.current = 0
   }, [selecionado])
 
@@ -1234,29 +1236,38 @@ export default function ChatPage() {
                           </div>
                         )}
                         {msg.tipo === 'audio' && msg.conteudo && (
-                          <audio
-                            controls
-                            src={`/api/whatsapp/media?id=${msg.conteudo}`}
-                            style={{ maxWidth: '100%', height: 36, display: 'block' }}
-                          />
+                          mediaErros.has(msg.id)
+                            ? <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#adbac1', fontSize: 13, fontStyle: 'italic', padding: '4px 0' }}>🎵 Áudio indisponível</div>
+                            : <audio
+                                controls
+                                src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                                style={{ maxWidth: '100%', height: 36, display: 'block' }}
+                                onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
+                              />
                         )}
                         {msg.tipo === 'image' && msg.conteudo && (
-                          <img
-                            src={`/api/whatsapp/media?id=${msg.conteudo}`}
-                            alt="Imagem"
-                            onClick={() => setLightbox(`/api/whatsapp/media?id=${msg.conteudo}`)}
-                            style={{
-                              maxWidth: '100%', maxHeight: 220, borderRadius: 6,
-                              display: 'block', cursor: 'zoom-in', objectFit: 'cover'
-                            }}
-                          />
+                          mediaErros.has(msg.id)
+                            ? <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#adbac1', fontSize: 13, fontStyle: 'italic', padding: '4px 0' }}>🖼️ Imagem indisponível</div>
+                            : <img
+                                src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                                alt="Imagem"
+                                onClick={() => setLightbox(`/api/whatsapp/media?id=${msg.conteudo}`)}
+                                onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
+                                style={{
+                                  maxWidth: '100%', maxHeight: 220, borderRadius: 6,
+                                  display: 'block', cursor: 'zoom-in', objectFit: 'cover'
+                                }}
+                              />
                         )}
                         {msg.tipo === 'video' && msg.conteudo && (
-                          <video
-                            controls
-                            src={`/api/whatsapp/media?id=${msg.conteudo}`}
-                            style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 6, display: 'block' }}
-                          />
+                          mediaErros.has(msg.id)
+                            ? <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#adbac1', fontSize: 13, fontStyle: 'italic', padding: '4px 0' }}>🎥 Vídeo indisponível</div>
+                            : <video
+                                controls
+                                src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                                style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 6, display: 'block' }}
+                                onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
+                              />
                         )}
                         {msg.tipo === 'template' && (() => {
                           let data: { name?: string | null; copyCode?: string | null } = {}
@@ -1366,17 +1377,20 @@ export default function ChatPage() {
 
                           // Imagem enviada como documento
                           if (mime.startsWith('image/')) {
-                            return (
-                              <img
-                                src={url}
-                                alt={nome}
-                                onClick={() => setLightbox(url)}
-                                style={{
-                                  maxWidth: '100%', maxHeight: 220, borderRadius: 6,
-                                  display: 'block', cursor: 'zoom-in', objectFit: 'cover'
-                                }}
-                              />
-                            )
+                            return mediaErros.has(msg.id)
+                              ? <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#adbac1', fontSize: 13, fontStyle: 'italic', padding: '4px 0' }}>🖼️ Imagem indisponível</div>
+                              : (
+                                <img
+                                  src={url}
+                                  alt={nome}
+                                  onClick={() => setLightbox(url)}
+                                  onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
+                                  style={{
+                                    maxWidth: '100%', maxHeight: 220, borderRadius: 6,
+                                    display: 'block', cursor: 'zoom-in', objectFit: 'cover'
+                                  }}
+                                />
+                              )
                           }
 
                           // PDF com preview inline
