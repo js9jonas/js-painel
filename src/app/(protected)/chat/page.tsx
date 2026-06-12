@@ -1689,6 +1689,26 @@ export default function ChatPage() {
                     if (e.key === 'Enter')     { e.preventDefault(); if (filtradas[qrIdx]) aplicarRR(filtradas[qrIdx].texto); return }
                     if (e.key === 'Escape')    { setQrOpen(false); setQrFiltro(''); return }
                   }
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault()
+                    const el = e.currentTarget as HTMLTextAreaElement
+                    const start = el.selectionStart ?? 0
+                    const end = el.selectionEnd ?? 0
+                    const before = texto.slice(0, start)
+                    const selected = texto.slice(start, end)
+                    const after = texto.slice(end)
+                    const novoTexto = before + '**' + selected + '**' + after
+                    setTexto(novoTexto)
+                    // Posiciona cursor: se havia seleção, seleciona o texto entre os asteriscos; senão, coloca cursor entre eles
+                    requestAnimationFrame(() => {
+                      if (selected.length > 0) {
+                        el.setSelectionRange(start + 2, end + 2)
+                      } else {
+                        el.setSelectionRange(start + 2, start + 2)
+                      }
+                    })
+                    return
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     enviar(texto === sugestao)
