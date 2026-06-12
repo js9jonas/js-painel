@@ -340,6 +340,34 @@ function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boole
   )
 }
 
+function boldToHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*(\S(?:[^*\n]*\S)?|\S)\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
+}
+
+function htmlToRaw(html: string): string {
+  return html
+    .replace(/<strong>([\s\S]*?)<\/strong>/gi, '*$1*')
+    .replace(/<b>([\s\S]*?)<\/b>/gi, '*$1*')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/<[^>]+>/g, '')
+    .replace(/​/g, '')
+    .replace(/\n$/, '')
+}
+
+function moveCursorToEnd(el: HTMLDivElement) {
+  const sel = window.getSelection()
+  if (!sel) return
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  range.collapse(false)
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
 export default function ChatPage() {
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [filtro, setFiltro] = useState('')
@@ -347,6 +375,7 @@ export default function ChatPage() {
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [texto, setTexto] = useState('')
+  const [inputVazio, setInputVazio] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const [sugestao, setSugestao] = useState('')
   const [loadingSugestao, setLoadingSugestao] = useState(false)
@@ -395,7 +424,8 @@ export default function ChatPage() {
   const [mediaErros, setMediaErros] = useState<Set<number>>(new Set())
   const speechRecRef = useRef<{ stop(): void } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLDivElement>(null)
+  const lastUserInputRef = useRef('')
   const prevMsgCountRef = useRef(0)
   const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mensagensAbortRef = useRef<AbortController | null>(null)
@@ -688,12 +718,15 @@ export default function ChatPage() {
       .catch(() => setPagamentos([]))
   }, [cliente?.id_cliente])
 
-  // Auto-resize da textarea: cresce com o conteúdo até 15 linhas
+  // Sincroniza texto definido externamente (IA, QR, limpar após envio) com o div contenteditable
   useEffect(() => {
-    const el = inputRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 335) + 'px'
+    if (texto === lastUserInputRef.current) return
+    const div = inputRef.current
+    if (!div) return
+    div.innerHTML = boldToHtml(texto)
+    lastUserInputRef.current = texto
+    setInputVazio(texto === '')
+    if (texto) moveCursorToEnd(div)
   }, [texto])
 
   async function gerarSugestao() {
@@ -728,9 +761,9 @@ export default function ChatPage() {
   }
 
   async function enviar(usouSugestao = false) {
-    if (!texto.trim() || !selecionado || enviando) return
+    const msgFinal = lastUserInputRef.current.trim()
+    if (!msgFinal || !selecionado || enviando) return
     setEnviando(true)
-    const msgFinal     = texto.trim()
     const replyId      = replyTo?.wa_msg_id ?? null
     const replyConteudo = replyTo ? (replyTo.tipo === 'text' ? (replyTo.conteudo ?? null) : `[${replyTo.tipo}]`) : null
     const replyOrigem  = replyTo?.origem ?? null
@@ -1663,67 +1696,127 @@ export default function ChatPage() {
               >
                 {loadingSugestao ? '...' : '✦ IA'}
               </button>
-
-              <textarea
-                ref={inputRef}
-                value={texto}
-                onChange={e => {
-                  const val = e.target.value
-                  setTexto(val)
-                  if (val.startsWith('/')) {
-                    setQrFiltro(val.slice(1).toLowerCase())
-                    setQrOpen(true)
-                    setQrIdx(0)
-                  } else {
-                    setQrOpen(false)
-                    setQrFiltro('')
-                  }
-                }}
-                onKeyDown={e => {
-                  if (qrOpen) {
-                    const filtradas = respostasRapidas.filter(r =>
-                      !qrFiltro || r.atalho.startsWith(qrFiltro) || r.titulo.toLowerCase().includes(qrFiltro)
-                    )
-                    if (e.key === 'ArrowDown') { e.preventDefault(); setQrIdx(i => Math.min(i + 1, filtradas.length - 1)); return }
-                    if (e.key === 'ArrowUp')   { e.preventDefault(); setQrIdx(i => Math.max(i - 1, 0)); return }
-                    if (e.key === 'Enter')     { e.preventDefault(); if (filtradas[qrIdx]) aplicarRR(filtradas[qrIdx].texto); return }
-                    if (e.key === 'Escape')    { setQrOpen(false); setQrFiltro(''); return }
-                  }
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+              <div style={{
+                position: 'relative', flex: 1,
+                background: '#ffffff', border: '1px solid #e9edef', borderRadius: 8,
+                maxHeight: 335, overflowY: 'auto',
+              }}>
+                {inputVazio && (
+                  <div style={{
+                    position: 'absolute', top: '10px', left: '14px',
+                    color: '#adbac1', fontSize: 14, pointerEvents: 'none',
+                    fontFamily: "'Segoe UI', system-ui, sans-serif", lineHeight: 1.5,
+                    userSelect: 'none',
+                  }}>
+                    Digite uma mensagem...
+                  </div>
+                )}
+                <div
+                  ref={inputRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onPaste={e => {
                     e.preventDefault()
-                    const el = e.currentTarget as HTMLTextAreaElement
-                    const start = el.selectionStart ?? 0
-                    const end = el.selectionEnd ?? 0
-                    const before = texto.slice(0, start)
-                    const selected = texto.slice(start, end)
-                    const after = texto.slice(end)
-                    const novoTexto = before + '**' + selected + '**' + after
-                    setTexto(novoTexto)
-                    // Posiciona cursor: se havia seleção, seleciona o texto entre os asteriscos; senão, coloca cursor entre eles
-                    requestAnimationFrame(() => {
-                      if (selected.length > 0) {
-                        el.setSelectionRange(start + 2, end + 2)
-                      } else {
-                        el.setSelectionRange(start + 2, start + 2)
+                    const text = e.clipboardData.getData('text/plain')
+                    document.execCommand('insertText', false, text)
+                  }}
+                  onInput={e => {
+                    const raw = htmlToRaw(e.currentTarget.innerHTML)
+                    lastUserInputRef.current = raw
+                    // Atualiza inputVazio só quando muda de vazio↔preenchido (evita re-render a cada tecla)
+                    const vazio = raw === ''
+                    if (vazio !== inputVazio) setInputVazio(vazio)
+                    if (raw.startsWith('/')) {
+                      setQrFiltro(raw.slice(1).toLowerCase())
+                      setQrOpen(true)
+                      setQrIdx(0)
+                    } else {
+                      setQrOpen(false)
+                      setQrFiltro('')
+                    }
+                  }}
+                  onKeyDown={e => {
+                    if (qrOpen) {
+                      const filtradas = respostasRapidas.filter(r =>
+                        !qrFiltro || r.atalho.startsWith(qrFiltro) || r.titulo.toLowerCase().includes(qrFiltro)
+                      )
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setQrIdx(i => Math.min(i + 1, filtradas.length - 1)); return }
+                      if (e.key === 'ArrowUp')   { e.preventDefault(); setQrIdx(i => Math.max(i - 1, 0)); return }
+                      if (e.key === 'Enter')     { e.preventDefault(); if (filtradas[qrIdx]) aplicarRR(filtradas[qrIdx].texto); return }
+                      if (e.key === 'Escape')    { setQrOpen(false); setQrFiltro(''); return }
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                      e.preventDefault()
+                      const div = e.currentTarget
+                      const sel = window.getSelection()
+                      if (sel && sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0)
+                        if (!range.collapsed) {
+                          // com seleção: envolve em <strong>
+                          const strong = document.createElement('strong')
+                          try { range.surroundContents(strong) }
+                          catch { const f = range.extractContents(); strong.appendChild(f); range.insertNode(strong) }
+                          const r2 = document.createRange()
+                          r2.setStartAfter(strong)
+                          r2.collapse(true)
+                          sel.removeAllRanges()
+                          sel.addRange(r2)
+                        } else {
+                          // sem seleção: toggle — sai do <strong> se já estiver dentro, entra se estiver fora
+                          let node: Node | null = range.startContainer
+                          let strongAncestor: HTMLElement | null = null
+                          while (node && node !== div) {
+                            if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'STRONG') {
+                              strongAncestor = node as HTMLElement
+                              break
+                            }
+                            node = node.parentNode
+                          }
+                          if (strongAncestor) {
+                            // sai do negrito: move cursor para depois do <strong>
+                            const r2 = document.createRange()
+                            r2.setStartAfter(strongAncestor)
+                            r2.collapse(true)
+                            sel.removeAllRanges()
+                            sel.addRange(r2)
+                          } else {
+                            // entra no negrito: insere <strong> com ZWS e cursor dentro
+                            const strong = document.createElement('strong')
+                            const zws = document.createTextNode('​')
+                            strong.appendChild(zws)
+                            range.insertNode(strong)
+                            const r2 = document.createRange()
+                            r2.setStart(zws, 0)
+                            r2.collapse(true)
+                            sel.removeAllRanges()
+                            sel.addRange(r2)
+                          }
+                        }
                       }
-                    })
-                    return
-                  }
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    enviar(texto === sugestao)
-                  }
-                }}
-                placeholder="Digite uma mensagem..."
-                rows={1}
-                style={{
-                  flex: 1, background: '#ffffff', border: '1px solid #e9edef', outline: 'none',
-                  borderRadius: 8, padding: '10px 14px', color: '#111b21',
-                  fontSize: 14, resize: 'none', lineHeight: 1.5,
-                  maxHeight: 335, overflowY: 'auto',
-                  fontFamily: "'Segoe UI', system-ui, sans-serif"
-                }}
-              />
+                      const raw = htmlToRaw(div.innerHTML)
+                      lastUserInputRef.current = raw
+                      setTexto(raw)
+                      return
+                    }
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault()
+                      document.execCommand('insertLineBreak')
+                      return
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      enviar(lastUserInputRef.current === sugestao)
+                    }
+                  }}
+                  style={{
+                    outline: 'none', minHeight: 21, padding: '10px 14px',
+                    fontSize: 14, lineHeight: 1.5,
+                    fontFamily: "'Segoe UI', system-ui, sans-serif",
+                    wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                    color: '#111b21',
+                  }}
+                />
+              </div>
 
               <button
                 onClick={transcrevendo ? pararTranscricao : iniciarTranscricao}
@@ -1746,13 +1839,13 @@ export default function ChatPage() {
               </button>
 
               <button
-                onClick={() => enviar(texto === sugestao)}
-                disabled={!texto.trim() || enviando || gravando}
+                onClick={() => enviar(lastUserInputRef.current === sugestao)}
+                disabled={inputVazio || enviando || gravando}
                 style={{
-                  background: texto.trim() && !gravando ? '#00a884' : '#adbac1',
+                  background: !inputVazio && !gravando ? '#00a884' : '#adbac1',
                   border: 'none', color: '#fff', borderRadius: 8,
                   padding: '10px 16px', fontSize: 16,
-                  cursor: texto.trim() && !gravando ? 'pointer' : 'default',
+                  cursor: !inputVazio && !gravando ? 'pointer' : 'default',
                   flexShrink: 0, transition: 'background 0.2s'
                 }}
               >
