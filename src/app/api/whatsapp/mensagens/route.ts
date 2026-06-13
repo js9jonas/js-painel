@@ -19,15 +19,18 @@ export async function GET(req: NextRequest) {
   try {
     // Mensagens da conversa
     const mensagens = await pool.query(`
-      SELECT
-        id, wa_msg_id, telefone, nome_contato, tipo,
-        conteudo, media_mime, nome_arquivo, origem, sugestao_ia, foi_aceita, mensagem_final,
-        reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem,
-        reacao, status, source, recebida_em
-      FROM public.whatsapp_mensagens
-      WHERE telefone = $1
+      SELECT * FROM (
+        SELECT
+          id, wa_msg_id, telefone, nome_contato, tipo,
+          conteudo, media_mime, nome_arquivo, origem, sugestao_ia, foi_aceita, mensagem_final,
+          reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem,
+          reacao, status, source, recebida_em
+        FROM public.whatsapp_mensagens
+        WHERE telefone = $1
+        ORDER BY recebida_em DESC
+        LIMIT 200
+      ) sub
       ORDER BY recebida_em ASC
-      LIMIT 200
     `, [telefone])
 
     // Dados do cliente vinculado via contatos
