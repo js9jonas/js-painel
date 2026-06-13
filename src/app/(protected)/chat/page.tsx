@@ -770,6 +770,9 @@ export default function ChatPage() {
     setTexto('')
     setSugestao('')
     setReplyTo(null)
+    if (inputRef.current) inputRef.current.innerHTML = ''
+    lastUserInputRef.current = ''
+    setInputVazio(true)
     try {
       await fetch('/api/whatsapp/enviar', {
         method: 'POST',
