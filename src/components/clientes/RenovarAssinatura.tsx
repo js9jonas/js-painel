@@ -139,7 +139,7 @@ export default function RenovarAssinatura({
     const [loading, setLoading] = useState(false);
     const [forma, setForma] = useState("PIX");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
-    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(vencAtual, "mensal"));
+    const [vencContrato, setVencContrato] = useState(() => calcVencContrato(contasVencida ? null : vencAtual, "mensal"));
     const [vencContas, setVencContas] = useState(() =>
         contasVencida
             ? addMeses(undefined, 1)
@@ -152,14 +152,14 @@ export default function RenovarAssinatura({
         setPeriodo(p);
         setValor(valorDoPeriodo(p));
         if (!vencContratoEditado) {
-            setVencContrato(calcVencContrato(vencAtual, p));
+            setVencContrato(calcVencContrato(contasVencida ? null : vencAtual, p));
         }
     }
 
     function handleOpen() {
         setPeriodo("mensal");
         setValor(valorDoPeriodo("mensal"));
-        setVencContrato(calcVencContrato(vencAtual, "mensal"));
+        setVencContrato(calcVencContrato(contasVencida ? null : vencAtual, "mensal"));
         setVencContratoEditado(false);
         setVencContas(contasVencida ? addMeses(undefined, 1) : (vencContasAtual?.split("T")[0] ?? ""));
         setStatusFinal("ativo");
