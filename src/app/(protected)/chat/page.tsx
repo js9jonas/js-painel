@@ -14,6 +14,7 @@ import VincularClienteModal from '@/components/clientes/VincularClienteModal'
 import type { PlanoRow } from '@/lib/planos'
 import type { PacoteRow } from '@/lib/pacotes'
 import RenovarAssinatura from '@/components/clientes/RenovarAssinatura'
+import StickerPicker from '@/components/chat/StickerPicker'
 
 interface Conversa {
   telefone: string
@@ -422,6 +423,7 @@ export default function ChatPage() {
   const [erroAudio, setErroAudio] = useState<string | null>(null)
   const [transcrevendo, setTranscrevendo] = useState(false)
   const [mediaErros, setMediaErros] = useState<Set<number>>(new Set())
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
   const speechRecRef = useRef<{ stop(): void } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLDivElement>(null)
@@ -791,6 +793,36 @@ export default function ChatPage() {
     } finally {
       setEnviando(false)
       inputRef.current?.focus()
+    }
+  }
+
+  async function enviarSticker(url: string) {
+    if (!selecionado || enviando) return
+    setEnviando(true)
+    try {
+      await fetch('/api/whatsapp/enviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado, tipo: 'sticker', url }),
+      })
+      await carregarMensagens(selecionado)
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function enviarGif(gifUrl: string, mp4Url: string) {
+    if (!selecionado || enviando) return
+    setEnviando(true)
+    try {
+      await fetch('/api/whatsapp/enviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado, tipo: 'gif', url: gifUrl, mp4_url: mp4Url }),
+      })
+      await carregarMensagens(selecionado)
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -1393,7 +1425,21 @@ export default function ChatPage() {
                             </div>
                           )
                         })()}
-                        {!['text','audio','image','video','document','template','pix','interactive','interactive_reply'].includes(msg.tipo) && (
+                        {msg.tipo === 'sticker' && msg.conteudo && (
+                          <img
+                            src={msg.conteudo}
+                            alt="Sticker"
+                            style={{ width: 120, height: 120, objectFit: 'contain', display: 'block' }}
+                          />
+                        )}
+                        {msg.tipo === 'gif' && msg.conteudo && (
+                          <img
+                            src={msg.conteudo}
+                            alt="GIF"
+                            style={{ maxWidth: 220, maxHeight: 180, borderRadius: 8, display: 'block' }}
+                          />
+                        )}
+                        {!['text','audio','image','video','document','template','pix','interactive','interactive_reply','sticker','gif'].includes(msg.tipo) && (
                           <div style={{ color: '#adbac1', fontSize: 12, fontStyle: 'italic' }}>
                             [{msg.tipo}]
                           </div>
@@ -1699,6 +1745,28 @@ export default function ChatPage() {
               >
                 {loadingSugestao ? '...' : '✦ IA'}
               </button>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <button
+                  onClick={() => setStickerPickerOpen(v => !v)}
+                  title="Stickers e GIFs"
+                  style={{
+                    background: stickerPickerOpen ? '#e9edef' : 'none',
+                    border: '1px solid #d1d7db', borderRadius: 8,
+                    padding: '8px 10px', fontSize: 18, cursor: 'pointer',
+                    color: '#54656f', display: 'flex', alignItems: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  😊
+                </button>
+                {stickerPickerOpen && (
+                  <StickerPicker
+                    onSendSticker={enviarSticker}
+                    onSendGif={enviarGif}
+                    onClose={() => setStickerPickerOpen(false)}
+                  />
+                )}
+              </div>
               <div style={{
                 position: 'relative', flex: 1,
                 background: '#ffffff', border: '1px solid #e9edef', borderRadius: 8,

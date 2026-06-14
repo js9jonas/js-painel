@@ -10,14 +10,29 @@ export async function POST(req: NextRequest) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    const { telefone, mensagem, sugestao_ia, foi_aceita, reply_msg_id, reply_conteudo, reply_origem } = await req.json()
+    const { telefone, mensagem, tipo, url, mp4_url, sugestao_ia, foi_aceita, reply_msg_id, reply_conteudo, reply_origem } = await req.json()
 
-    if (!telefone || !mensagem) {
-      return NextResponse.json({ error: 'telefone e mensagem obrigatórios' }, { status: 400 })
+    const tipoEnvio = tipo ?? 'text'
+
+    if (!telefone || (tipoEnvio === 'text' && !mensagem) || (['sticker', 'gif'].includes(tipoEnvio) && !url)) {
+      return NextResponse.json({ error: 'Parâmetros insuficientes' }, { status: 400 })
     }
 
     const token = process.env.WHATSAPP_TOKEN
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+    const baseUrl = process.env.NEXTAUTH_URL ?? 'https://painel.jssistemas.online'
+
+    // Monta payload por tipo
+    let waPayload: Record<string, unknown>
+    if (tipoEnvio === 'sticker') {
+      const stickerUrl = url.startsWith('http') ? url : `${baseUrl}${url}`
+      waPayload = { type: 'sticker', sticker: { link: stickerUrl } }
+    } else if (tipoEnvio === 'gif') {
+      const gifMp4 = mp4_url ?? url
+      waPayload = { type: 'video', video: { link: gifMp4 } }
+    } else {
+      waPayload = { type: 'text', text: { body: mensagem } }
+    }
 
     // Envia via WhatsApp Cloud API
     const response = await fetch(
@@ -32,8 +47,7 @@ export async function POST(req: NextRequest) {
           messaging_product: 'whatsapp',
           to: telefone,
           ...(reply_msg_id ? { context: { message_id: reply_msg_id } } : {}),
-          type: 'text',
-          text: { body: mensagem }
+          ...waPayload,
         })
       }
     )
@@ -46,18 +60,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Salva no banco
+    const conteudoSalvo = tipoEnvio === 'text' ? mensagem : url
     await pool.query(`
       INSERT INTO public.whatsapp_mensagens
         (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, mensagem_final, source,
          reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem, recebida_em)
-      VALUES ($1, $2, 'text', $3, 'jonas', $4, $5, $3, $6, $7, $8, $9, NOW())
+      VALUES ($1, $2, $3, $4, 'jonas', $5, $6, $7, $8, $9, $10, $11, NOW())
       ON CONFLICT (wa_msg_id) DO NOTHING
     `, [
       data.messages?.[0]?.id ?? `sent_${Date.now()}`,
       telefone,
-      mensagem,
+      tipoEnvio,
+      conteudoSalvo,
       sugestao_ia ?? null,
       foi_aceita ?? null,
+      tipoEnvio === 'text' ? mensagem : null,
       session?.user?.email ? `chat:${session.user.email}` : 'chat',
       reply_msg_id ?? null,
       reply_conteudo ?? null,
