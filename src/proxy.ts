@@ -19,7 +19,8 @@ export default auth((req) => {
     pathname.startsWith('/api/proxy-test') ||
     pathname.startsWith('/api/whatsapp/webhook') ||
     pathname.startsWith('/api/whatsapp/registrar') ||
-    pathname.startsWith('/api/typebot/')
+    pathname.startsWith('/api/typebot/') ||
+    pathname.startsWith('/stickers/')
   ) {
     return NextResponse.next()
   }

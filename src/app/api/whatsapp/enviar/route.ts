@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     const token = process.env.WHATSAPP_TOKEN
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
-    const baseUrl = process.env.NEXTAUTH_URL ?? 'https://painel.jssistemas.online'
+    const baseUrl = 'https://painel.jssistemas.online'
 
     // Monta payload por tipo
     let waPayload: Record<string, unknown>
@@ -34,6 +34,14 @@ export async function POST(req: NextRequest) {
       waPayload = { type: 'text', text: { body: mensagem } }
     }
 
+    const waBody = {
+      messaging_product: 'whatsapp',
+      to: telefone,
+      ...(reply_msg_id ? { context: { message_id: reply_msg_id } } : {}),
+      ...waPayload,
+    }
+    console.log('[Enviar] payload →', JSON.stringify(waBody))
+
     // Envia via WhatsApp Cloud API
     const response = await fetch(
       `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
@@ -43,12 +51,7 @@ export async function POST(req: NextRequest) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: telefone,
-          ...(reply_msg_id ? { context: { message_id: reply_msg_id } } : {}),
-          ...waPayload,
-        })
+        body: JSON.stringify(waBody)
       }
     )
 
