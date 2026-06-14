@@ -97,6 +97,9 @@ export async function POST(req: NextRequest) {
             } else if (msg.type === 'video') {
               conteudo = msg.video?.id ?? ''
               media_mime = msg.video?.mime_type ?? null
+            } else if (msg.type === 'sticker') {
+              conteudo = msg.sticker?.id ?? ''
+              media_mime = msg.sticker?.mime_type ?? 'image/webp'
             } else if (msg.type === 'interactive') {
               const iv = msg.interactive ?? {}
               const reply = iv.button_reply ?? iv.list_reply ?? {}
@@ -166,6 +169,7 @@ export async function POST(req: NextRequest) {
             else if (msg.type === 'image')    conteudo = msg.image?.id ?? ''
             else if (msg.type === 'document') conteudo = msg.document?.id ?? ''
             else if (msg.type === 'video')    conteudo = msg.video?.id ?? ''
+            else if (msg.type === 'sticker')  conteudo = msg.sticker?.id ?? ''
             else if (msg.type === 'template') {
               const comps = msg.template?.components ?? []
               const copyBtn = comps.find((c: any) => c.sub_type === 'copy_code')

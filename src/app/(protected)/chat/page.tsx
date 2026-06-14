@@ -1425,13 +1425,43 @@ export default function ChatPage() {
                             </div>
                           )
                         })()}
-                        {msg.tipo === 'sticker' && msg.conteudo && (
-                          <img
-                            src={msg.conteudo}
-                            alt="Sticker"
-                            style={{ width: 120, height: 120, objectFit: 'contain', display: 'block' }}
-                          />
-                        )}
+                        {msg.tipo === 'sticker' && msg.conteudo && (() => {
+                          const isLocal = msg.conteudo.startsWith('/') || msg.conteudo.startsWith('http')
+                          const src = isLocal ? msg.conteudo : `/api/whatsapp/media?id=${msg.conteudo}`
+                          return (
+                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <img
+                                src={src}
+                                alt="Sticker"
+                                onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
+                                style={{ width: 120, height: 120, objectFit: 'contain', display: 'block' }}
+                              />
+                              {!isLocal && !mediaErros.has(msg.id) && (
+                                <button
+                                  title="Salvar nos meus stickers"
+                                  onClick={async () => {
+                                    const r = await fetch('/api/whatsapp/stickers/salvar', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ media_id: msg.conteudo, pack: 'recebidos' }),
+                                    })
+                                    if (r.ok) alert('Sticker salvo em "Recebidos"!')
+                                    else alert('Falha ao salvar sticker.')
+                                  }}
+                                  style={{
+                                    position: 'absolute', bottom: 4, right: 4,
+                                    background: 'rgba(0,0,0,0.55)', border: 'none',
+                                    borderRadius: 6, color: '#fff', fontSize: 11,
+                                    padding: '3px 7px', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: 4,
+                                  }}
+                                >
+                                  ⬇ Salvar
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })()}
                         {msg.tipo === 'gif' && msg.conteudo && (
                           <img
                             src={msg.conteudo}
