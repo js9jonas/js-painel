@@ -1944,8 +1944,26 @@ export default function ChatPage() {
           {/* Avatar e nome */}
           <div style={{
             background: '#f0f2f5', padding: '24px 20px', textAlign: 'center',
-            borderBottom: '1px solid #e9edef'
+            borderBottom: '1px solid #e9edef', position: 'relative'
           }}>
+            <button
+              onClick={() => selecionado && carregarMensagens(selecionado, true)}
+              title="Atualizar dados"
+              style={{
+                position: 'absolute', top: 10, right: 10,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#adbac1', padding: 4, borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'color 0.15s'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#54656f')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#adbac1')}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
               <Avatar
                 fotoUrl={conversaAtual?.foto_url}
