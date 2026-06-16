@@ -61,6 +61,7 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       ps.id_servidor
     FROM public.painel_servidores ps
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
+    WHERE ps.tipo NOT IN ('funplays', 'lazerplay', 'coreplayer')
     GROUP BY ps.id
     ORDER BY ps.nome
   `);
@@ -82,6 +83,48 @@ export async function getPainelApps(): Promise<PainelAppRow[]> {
     SELECT id, nome, tipo, url_painel, master, contato_master, modo_acesso, ativo
     FROM public.painel_apps
     ORDER BY nome
+  `);
+  return rows;
+}
+
+export type PainelAppSyncRow = PainelServidorRow & {
+  total_devices: number;
+  devices_vinculados: number;
+  total_playlists: number;
+  playlists_vinculadas: number;
+};
+
+export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
+  const { rows } = await pool.query<PainelAppSyncRow>(`
+    SELECT
+      ps.id,
+      ps.nome,
+      ps.tipo,
+      ps.url_painel,
+      ps.url_api,
+      ps.usuario,
+      ps.master,
+      ps.contato_master,
+      ps.padrao_usuario,
+      ps.padrao_senha,
+      ps.ativo,
+      (ps.session_cookie IS NOT NULL) AS tem_session,
+      ps.session_expiry,
+      (ps.api_token IS NOT NULL)      AS tem_api_token,
+      ps.id_servidor,
+      0::int AS total_contas,
+      0::int AS contas_pendentes,
+      0::int AS contas_confirmadas,
+      COUNT(DISTINCT ap.id_app_registro)::int AS total_devices,
+      COUNT(DISTINCT ap.id_app_registro) FILTER (WHERE ap.id_cliente IS NOT NULL)::int AS devices_vinculados,
+      COUNT(pl.id)::int AS total_playlists,
+      COUNT(pl.id) FILTER (WHERE pl.id_conta IS NOT NULL)::int AS playlists_vinculadas
+    FROM public.painel_servidores ps
+    LEFT JOIN public.aplicativos ap ON ap.id_painel_servidor = ps.id
+    LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
+    WHERE ps.tipo IN ('funplays', 'lazerplay', 'coreplayer')
+    GROUP BY ps.id
+    ORDER BY ps.nome
   `);
   return rows;
 }

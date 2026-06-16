@@ -1,28 +1,33 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { PainelServidorRow, PainelAppRow, ServidorVinculoRow } from "@/lib/paineis";
+import type { PainelServidorRow, PainelAppRow, PainelAppSyncRow, ServidorVinculoRow } from "@/lib/paineis";
 import PainelServidorCard from "./PainelServidorCard";
 import PainelAppCard from "./PainelAppCard";
+import PainelAppSyncCard from "./PainelAppSyncCard";
 import PainelServidorModal from "./PainelServidorModal";
 import PainelAppModal from "./PainelAppModal";
+import PainelAppSyncModal from "./PainelAppSyncModal";
 
 type Tab = "contas" | "apps";
 
 type Props = {
   servidores: PainelServidorRow[];
   apps: PainelAppRow[];
+  appSync: PainelAppSyncRow[];
   servidoresVinculo: ServidorVinculoRow[];
 };
 
-export default function ConexoesClient({ servidores, apps, servidoresVinculo }: Props) {
+export default function ConexoesClient({ servidores, apps, appSync, servidoresVinculo }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("contas");
   const [modalServidor, setModalServidor] = useState<PainelServidorRow | null | "novo">(null);
+  const [modalAppSync, setModalAppSync] = useState<PainelAppSyncRow | null>(null);
   const [modalApp, setModalApp] = useState<PainelAppRow | null | "novo">(null);
 
   function onSalvo() {
     setModalServidor(null);
+    setModalAppSync(null);
     setModalApp(null);
     router.refresh();
   }
@@ -42,7 +47,7 @@ export default function ConexoesClient({ servidores, apps, servidoresVinculo }: 
             <TabButton active={tab === "apps"} onClick={() => setTab("apps")}>
               Painéis de Aplicativo
               <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-                {apps.length}
+                {appSync.length + apps.length}
               </span>
             </TabButton>
           </div>
@@ -86,19 +91,45 @@ export default function ConexoesClient({ servidores, apps, servidoresVinculo }: 
 
         {/* Painéis de Aplicativo */}
         {tab === "apps" && (
-          <div className="space-y-4">
-            {apps.length === 0 ? (
-              <EmptyState mensagem="Nenhum painel de aplicativo cadastrado." />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {apps.map((a) => (
-                  <PainelAppCard
-                    key={a.id}
-                    app={a}
-                    onEditar={() => setModalApp(a)}
-                  />
-                ))}
+          <div className="space-y-6">
+            {/* Cards com API sync (FunPlays, LazerPlay) */}
+            {appSync.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+                  Gerenciados via API
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {appSync.map((a) => (
+                    <PainelAppSyncCard
+                      key={a.id}
+                      painel={a}
+                      onEditar={() => setModalAppSync(a)}
+                    />
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* Cards informativos (painel_apps) */}
+            {apps.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+                  Informativo
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {apps.map((a) => (
+                    <PainelAppCard
+                      key={a.id}
+                      app={a}
+                      onEditar={() => setModalApp(a)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {appSync.length === 0 && apps.length === 0 && (
+              <EmptyState mensagem="Nenhum painel de aplicativo cadastrado." />
             )}
           </div>
         )}
@@ -110,6 +141,13 @@ export default function ConexoesClient({ servidores, apps, servidoresVinculo }: 
           painel={modalServidor === "novo" ? null : modalServidor}
           servidores={servidoresVinculo}
           onClose={() => setModalServidor(null)}
+          onSalvo={onSalvo}
+        />
+      )}
+      {modalAppSync !== null && (
+        <PainelAppSyncModal
+          painel={modalAppSync}
+          onClose={() => setModalAppSync(null)}
           onSalvo={onSalvo}
         />
       )}

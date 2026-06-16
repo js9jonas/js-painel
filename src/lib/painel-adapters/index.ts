@@ -2,6 +2,9 @@ import { pool } from "@/lib/db";
 import { criarClubAdapter } from "./club";
 import { criarCentralAdapter } from "./central";
 import { criarFastAdapter } from "./fast";
+import { criarFunPlaysAdapter } from "./funplays";
+import { criarLazerPlayAdapter } from "./lazerplay";
+import { criarCorePlayerAdapter } from "./coreplayer";
 import { criarUniplayAdapter } from "./uniplay";
 import { criarNowAdapter } from "./now";
 import { criarUnitvAdapter } from "./unitv";
@@ -81,7 +84,10 @@ function buildAdapter(
     case "uniplay": return criarUniplayAdapter(creds, id, onSaveSession, onSaveContas);
     case "now":     return criarNowAdapter(creds, id, onSaveSession, onSaveContas);
     case "unitv":   return criarUnitvAdapter(creds, id, onSaveSession, onSaveContas);
-    case "liebe":   return criarLiebeAdapter(creds, id, onSaveSession, onSaveContas);
+    case "liebe":    return criarLiebeAdapter(creds, id, onSaveSession, onSaveContas);
+    case "funplays":    return criarFunPlaysAdapter(creds, id, onSaveSession, onSaveContas);
+    case "lazerplay":   return criarLazerPlayAdapter(creds, id, onSaveSession, onSaveContas);
+    case "coreplayer":  return criarCorePlayerAdapter(creds, id, onSaveSession, onSaveContas);
     default:
       throw new Error(`Adapter para "${creds.painel_tipo}" ainda não implementado.`);
   }
