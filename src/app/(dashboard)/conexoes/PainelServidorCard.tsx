@@ -1,13 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { PainelServidorRow } from "@/lib/paineis";
-import AtualizarTokenModal from "./AtualizarTokenModal";
-
-const INSTRUCAO_TOKEN: Record<string, string> = {
-  club: "Acesse dashboard.bz e faça login normalmente. Depois abra DevTools (F12) → Application → Local Storage → https://dashboard.bz → chave 'tkn' e cole o valor aqui.",
-};
-
-const TIPOS_TOKEN_MANUAL = Object.keys(INSTRUCAO_TOKEN);
 
 const TIPO_LABEL: Record<string, string> = {
   club:    "CLUB",
@@ -47,7 +40,6 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
-  const [modalToken, setModalToken] = useState(false);
   const [renovandoSessao, setRenovandoSessao] = useState(false);
 
   // Tipos com auto-login via impit (TLS Chrome) — login automático sem sessão salva
@@ -228,16 +220,6 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
       )}
 
 
-      {/* Botão atualizar token — só para painéis com sessão manual */}
-      {TIPOS_TOKEN_MANUAL.includes(painel.tipo) && (
-        <button
-          onClick={() => setModalToken(true)}
-          className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
-        >
-          Atualizar token de sessão
-        </button>
-      )}
-
       {/* Renovar sessão — exclusivo para painéis com captcha longo (CLUB) */}
       {painel.tipo === "club" && (!painel.tem_session || painel.session_expiry && new Date(painel.session_expiry) < new Date()) && (
         <button
@@ -284,17 +266,6 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
           </a>
         )}
       </div>
-
-      {modalToken && (
-        <AtualizarTokenModal
-          painelNome={painel.nome}
-          painelId={painel.id}
-          painelTipo={painel.tipo}
-          instrucao={INSTRUCAO_TOKEN[painel.tipo] ?? "Cole o token de autenticação do painel."}
-          onClose={() => setModalToken(false)}
-          onSalvo={() => { setModalToken(false); buscarStatus(); }}
-        />
-      )}
     </div>
   );
 }

@@ -147,19 +147,3 @@ export async function getPainelServidorById(id: number): Promise<PainelServidorR
   `, [id]);
   return rows[0] ?? null;
 }
-
-export async function atualizarSessionPainelServidor(
-  id: number,
-  sessionCookie: string,
-  expiryHours?: number
-): Promise<void> {
-  const expiry = expiryHours
-    ? new Date(Date.now() + expiryHours * 3600 * 1000)
-    : null;
-  await pool.query(
-    `UPDATE public.painel_servidores
-     SET session_cookie = $2, session_expiry = $3
-     WHERE id = $1`,
-    [id, sessionCookie, expiry]
-  );
-}
