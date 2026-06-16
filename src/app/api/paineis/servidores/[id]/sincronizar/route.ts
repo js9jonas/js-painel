@@ -50,17 +50,19 @@ export async function POST(
     if (rows.length === 0) {
       await pool.query(
         `INSERT INTO public.contas
-           (id_painel_servidor, id_servidor, usuario, rotulo, vencimento_real_painel, status_conta, status_sinc, removido_em)
-         VALUES ($1, $1, $2, $3, $4, $5, 'pendente', NULL)`,
-        [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status]
+           (id_painel_servidor, id_servidor, usuario, rotulo, vencimento_real_painel, status_conta, senha, status_sinc, removido_em)
+         VALUES ($1, $1, $2, $3, $4, $5, $6, 'pendente', NULL)`,
+        [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status, conta.senha ?? null]
       );
       inseridas++;
     } else {
+      // COALESCE pra não apagar a senha já salva quando o painel não retorna esse
+      // campo no bulk (CLUB/CENTRAL) — só sobrescreve quando vem um valor novo.
       await pool.query(
         `UPDATE public.contas
-         SET rotulo = $3, vencimento_real_painel = $4, status_conta = $5, removido_em = NULL
+         SET rotulo = $3, vencimento_real_painel = $4, status_conta = $5, senha = COALESCE($6, senha), removido_em = NULL
          WHERE id_painel_servidor = $1 AND usuario = $2`,
-        [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status]
+        [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status, conta.senha ?? null]
       );
       atualizadas++;
     }

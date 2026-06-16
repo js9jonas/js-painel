@@ -99,6 +99,7 @@ export function criarLiebeAdapter(
           rotulo:     c.note || c.name || "",
           vencimento: c.expires_at_tz ? c.expires_at_tz.slice(0, 10) : null,
           status:     c.status === "ACTIVE" ? "ok" : c.status === "EXPIRED" ? "vencida" : "bloqueada",
+          senha:      c.password ?? null,
         }));
       });
     },

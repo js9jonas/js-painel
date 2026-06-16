@@ -92,6 +92,16 @@ function parseNome(cell1: string): string {
   return cell1.replace(/<br[\s\S]*/, "").replace(/<[^>]+>/g, "").trim();
 }
 
+// col[2] vem como "usuario<br>senha" — pega a parte depois do <br>
+function parseSenha(cell2: string): string | null {
+  const partes = cell2.split(/<br\s*\/?>/i);
+  return partes[1] ? semTags(partes[1]) || null : null;
+}
+
+function semTags(texto: string): string {
+  return texto.replace(/<[^>]+>/g, "").trim();
+}
+
 function parseVencimento(cell3: string): string | null {
   const m = cell3.match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if (!m) return null;
@@ -180,6 +190,7 @@ export function criarNowAdapter(
           rotulo:     parseNome(row[1]),
           vencimento: parseVencimento(row[3]),
           status:     parseStatus(row[3]),
+          senha:      parseSenha(row[2]),
         })).filter((c) => c.usuario !== "");
       });
     },

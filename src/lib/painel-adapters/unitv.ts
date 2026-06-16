@@ -211,6 +211,7 @@ export function criarUnitvAdapter(
         rotulo: u.snName || "",
         vencimento: u.expireTime ? u.expireTime.slice(0, 10) : null,
         status: u.days <= 0 ? "vencida" : u.status === 0 ? "bloqueada" : "ok",
+        senha: u.password ?? u.newPassword ?? null,
       }));
     },
 

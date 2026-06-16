@@ -3,6 +3,9 @@ export interface ContaPainel {
   rotulo: string;
   vencimento: string | null; // ISO date YYYY-MM-DD
   status: "ok" | "vencida" | "bloqueada";
+  // Só preenchido nos painéis cuja listagem em bulk já retorna a senha em texto puro
+  // (FAST, UNIPLAY, NOW, UNITV, LIEBE). CLUB e CENTRAL exigem 1 chamada por conta.
+  senha?: string | null;
 }
 
 export interface ResultadoRenovacao {

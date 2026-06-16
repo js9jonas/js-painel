@@ -122,6 +122,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
           ? new Date(u.exp_date_timestamp * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
           : null,
         status: mapStatus(u.status, u.exp_date_timestamp ?? 0),
+        senha: u.password ?? null,
       }));
     },
 

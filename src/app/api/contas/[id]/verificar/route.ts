@@ -68,8 +68,8 @@ async function executarVerificacao(idConta: number, jobId: string) {
       const match = contasPainel.find((c) => c.usuario === cand.usuario);
       if (!match) continue;
       await pool.query(
-        `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = $2 WHERE id_conta = $3`,
-        [match.vencimento, match.status, cand.id_conta]
+        `UPDATE public.contas SET vencimento_real_painel = $1, status_conta = $2, senha = COALESCE($3, senha) WHERE id_conta = $4`,
+        [match.vencimento, match.status, match.senha ?? null, cand.id_conta]
       );
       atualizados.push({ id_conta: cand.id_conta, vencimento: match.vencimento, status: match.status });
     }

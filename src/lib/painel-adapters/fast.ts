@@ -45,6 +45,7 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
           ? new Date(Number(c.exp_date) * 1000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
           : null,
         status: mapStatus(c.enabled ?? 1, c.exp_date ?? 0),
+        senha: c.password ?? null,
       }));
     },
 
