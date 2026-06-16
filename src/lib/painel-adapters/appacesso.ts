@@ -188,6 +188,50 @@ export async function getPlaylistsDispositivo(
   return Array.isArray(data) ? (data as AppAcessoPlaylist[]) : [];
 }
 
+export async function criarPlaylist(
+  cfg: AppAcessoConfig,
+  token: string,
+  params: { deviceId: number; name: string; url: string; is_protected?: boolean }
+): Promise<void> {
+  await apiFetch(cfg, token, "/reseller/playlist", {
+    method: "POST",
+    body: JSON.stringify({
+      deviceId: params.deviceId,
+      name: params.name,
+      url: params.url,
+      is_protected: params.is_protected ?? false,
+    }),
+  });
+}
+
+export async function editarPlaylist(
+  cfg: AppAcessoConfig,
+  token: string,
+  params: { id: number; deviceId: number; name: string; url: string; is_protected?: boolean }
+): Promise<void> {
+  await apiFetch(cfg, token, "/reseller/playlist", {
+    method: "PUT",
+    body: JSON.stringify({
+      id: params.id,
+      deviceId: params.deviceId,
+      name: params.name,
+      url: params.url,
+      is_protected: params.is_protected ?? false,
+    }),
+  });
+}
+
+export async function excluirPlaylist(
+  cfg: AppAcessoConfig,
+  token: string,
+  params: { id: number; deviceId: number }
+): Promise<void> {
+  await apiFetch(cfg, token, "/reseller/playlist", {
+    method: "DELETE",
+    body: JSON.stringify({ id: params.id, deviceId: params.deviceId }),
+  });
+}
+
 export async function ativarDispositivo(
   cfg: AppAcessoConfig,
   token: string,

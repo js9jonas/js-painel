@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAplicativo } from "@/app/actions/aplicativos";
 import AplicativoModal from "./AplicativoModal";
 import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
+import EditarPlaylistModal from "./EditarPlaylistModal";
+import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
 
 type Props = {
@@ -68,7 +70,98 @@ function extrairUsernameUrl(url: string): string | null {
   }
 }
 
-function PlaylistBadge({ pl }: { pl: PlaylistRow }) {
+function PlaylistOptionsButton({ onEditar, onExcluir, excluindo }: { onEditar: () => void; onExcluir: () => void; excluindo: boolean }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function fechar(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false);
+    }
+    document.addEventListener("mousedown", fechar);
+    return () => document.removeEventListener("mousedown", fechar);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        disabled={excluindo}
+        className="text-zinc-400 hover:text-zinc-700 px-1 disabled:opacity-50"
+        title="Opções da playlist"
+      >
+        {excluindo ? <span className="animate-spin">⟳</span> : "▾"}
+      </button>
+      {aberto && (
+        <div className="absolute right-0 top-full mt-1 w-28 rounded-lg border border-zinc-200 bg-white shadow-lg py-1 z-50 text-left">
+          <button
+            type="button"
+            onClick={() => { setAberto(false); onEditar(); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+          >
+            ✏️ Editar
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAberto(false); onExcluir(); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+          >
+            🗑 Excluir
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlaylistBadge({
+  pl,
+  idAppRegistro,
+  onEditar,
+  onExcluido,
+}: {
+  pl: PlaylistRow;
+  idAppRegistro: number;
+  onEditar: () => void;
+  onExcluido: () => void;
+}) {
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
+
+  async function excluir() {
+    if (!confirm(`Excluir a playlist "${pl.nome || `#${pl.playlist_id_externo}`}"? Isso é feito direto na API do painel e não pode ser desfeito.`)) return;
+    setExcluindo(true);
+    setErroExclusao(null);
+    try {
+      const startRes = await fetch(`/api/aplicativos/${idAppRegistro}/playlists/${pl.playlist_id_externo}?acao=excluir`, { method: "POST" });
+      const { jobId } = await startRes.json();
+      if (!jobId) {
+        setErroExclusao("Erro ao iniciar exclusão.");
+        setExcluindo(false);
+        return;
+      }
+      const inicio = Date.now();
+      const MAX_ESPERA = 5 * 60 * 1000;
+      while (Date.now() - inicio < MAX_ESPERA) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const poll = await fetch(`/api/aplicativos/${idAppRegistro}/playlists/${pl.playlist_id_externo}?jobId=${jobId}`);
+        const job = await poll.json();
+        if (job.done) {
+          if (job.ok) onExcluido();
+          else setErroExclusao(job.erro ?? "Falha ao excluir.");
+          setExcluindo(false);
+          return;
+        }
+      }
+      setErroExclusao("Timeout: exclusão não concluiu a tempo.");
+      setExcluindo(false);
+    } catch {
+      setErroExclusao("Erro de rede.");
+      setExcluindo(false);
+    }
+  }
+
   const status = playlistStatus(pl);
   const classes = {
     vinculada:       "bg-emerald-50 text-emerald-700 border border-emerald-200",
@@ -87,7 +180,7 @@ function PlaylistBadge({ pl }: { pl: PlaylistRow }) {
   return (
     <div className={`flex items-start gap-1.5 rounded-lg px-2 py-1.5 text-xs ${classes}`}>
       <span className="mt-0.5 shrink-0">{icon}</span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="font-medium truncate">{pl.nome || `Playlist #${pl.playlist_id_externo}`}</div>
         {usuario && (
           <div className="text-[10px] opacity-75 font-mono select-all">{usuario}</div>
@@ -105,12 +198,28 @@ function PlaylistBadge({ pl }: { pl: PlaylistRow }) {
             {pl.url}
           </div>
         )}
+        {erroExclusao && (
+          <div className="text-[10px] text-red-600 mt-0.5">{erroExclusao}</div>
+        )}
       </div>
+      {pl.playlist_id_externo != null && (
+        <PlaylistOptionsButton onEditar={onEditar} onExcluir={excluir} excluindo={excluindo} />
+      )}
     </div>
   );
 }
 
-function PlaylistsRow({ playlists }: { playlists: PlaylistRow[] }) {
+function PlaylistsRow({
+  playlists,
+  idAppRegistro,
+  onEditarPlaylist,
+  onPlaylistExcluida,
+}: {
+  playlists: PlaylistRow[];
+  idAppRegistro: number;
+  onEditarPlaylist: (pl: PlaylistRow) => void;
+  onPlaylistExcluida: (pl: PlaylistRow) => void;
+}) {
   if (!playlists.length) return null;
 
   const stats = playlists.reduce(
@@ -139,7 +248,13 @@ function PlaylistsRow({ playlists }: { playlists: PlaylistRow[] }) {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {playlists.map((pl) => (
-            <PlaylistBadge key={pl.id} pl={pl} />
+            <PlaylistBadge
+              key={pl.id}
+              pl={pl}
+              idAppRegistro={idAppRegistro}
+              onEditar={() => onEditarPlaylist(pl)}
+              onExcluido={() => onPlaylistExcluida(pl)}
+            />
           ))}
         </div>
       </td>
@@ -155,26 +270,39 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [playlistsAoVivo, setPlaylistsAoVivo] = useState<Record<number, PlaylistRow[]>>({});
   const [atualizadoAoVivo, setAtualizadoAoVivo] = useState<Set<number>>(new Set());
+  const [editandoPlaylist, setEditandoPlaylist] = useState<{ idAppRegistro: number; pl: PlaylistRow; tipoPainel: string | null } | null>(null);
+  const [criandoPlaylist, setCriandoPlaylist] = useState<{ idAppRegistro: number; tipoPainel: string | null } | null>(null);
   const router = useRouter();
+
+  async function recarregarPlaylistsAoVivo(idAppRegistro: number) {
+    try {
+      const r = await fetch(`/api/clientes/${idCliente}/aplicativos/${idAppRegistro}/playlists-live`);
+      const json = await r.json();
+      if (json.ok) {
+        setPlaylistsAoVivo((prev) => ({ ...prev, [idAppRegistro]: json.playlists }));
+        setAtualizadoAoVivo((prev) => new Set(prev).add(idAppRegistro));
+      }
+    } catch {
+      // silencioso — mantém os dados já exibidos
+    }
+  }
 
   // Ao abrir a página do cliente, busca a playlist mais recente de cada app vinculado
   // a um painel — só usa sessão já em cache (sem forçar relogin síncrono, que pode
   // travar a página por até ~2min em painéis com captcha). Ver feedback_avaliacao_playlist_live.
   useEffect(() => {
     const candidatos = aplicativos.filter((a) => a.id_painel_servidor && a.chave);
-    candidatos.forEach((a) => {
-      fetch(`/api/clientes/${idCliente}/aplicativos/${a.id_app_registro}/playlists-live`)
-        .then((r) => r.json())
-        .then((json) => {
-          if (json.ok) {
-            setPlaylistsAoVivo((prev) => ({ ...prev, [a.id_app_registro]: json.playlists }));
-            setAtualizadoAoVivo((prev) => new Set(prev).add(a.id_app_registro));
-          }
-        })
-        .catch(() => {});
-    });
+    candidatos.forEach((a) => recarregarPlaylistsAoVivo(a.id_app_registro));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idCliente]);
+
+  function handlePlaylistExcluida(idAppRegistro: number, pl: PlaylistRow) {
+    setPlaylistsAoVivo((prev) => {
+      const atual = prev[idAppRegistro] ?? aplicativos.find((a) => a.id_app_registro === idAppRegistro)?.playlists ?? [];
+      return { ...prev, [idAppRegistro]: atual.filter((p) => p.id !== pl.id) };
+    });
+    router.refresh();
+  }
 
   function toggleExpand(id: number) {
     setExpandedIds((prev) => {
@@ -293,28 +421,40 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
 
                       {/* Resumo playlists */}
                       <td className="px-4 py-3">
-                        {hasPlaylists ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(a.id_app_registro)}
-                            className="flex items-center gap-1.5 text-xs hover:text-zinc-900 transition-colors"
-                          >
-                            <span className="text-zinc-400">{isExpanded ? "▲" : "▼"}</span>
-                            <span className="flex gap-1">
-                              {plStats.vinculada > 0 && (
-                                <span className="text-emerald-600">{plStats.vinculada}✓</span>
-                              )}
-                              {plStats.nao_reconhecida > 0 && (
-                                <span className="text-amber-600">{plStats.nao_reconhecida}◌</span>
-                              )}
-                              {plStats.expirada > 0 && (
-                                <span className="text-red-600">{plStats.expirada}⊗</span>
-                              )}
-                            </span>
-                          </button>
-                        ) : (
-                          <span className="text-zinc-300 text-xs">—</span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {hasPlaylists ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(a.id_app_registro)}
+                              className="flex items-center gap-1.5 text-xs hover:text-zinc-900 transition-colors"
+                            >
+                              <span className="text-zinc-400">{isExpanded ? "▲" : "▼"}</span>
+                              <span className="flex gap-1">
+                                {plStats.vinculada > 0 && (
+                                  <span className="text-emerald-600">{plStats.vinculada}✓</span>
+                                )}
+                                {plStats.nao_reconhecida > 0 && (
+                                  <span className="text-amber-600">{plStats.nao_reconhecida}◌</span>
+                                )}
+                                {plStats.expirada > 0 && (
+                                  <span className="text-red-600">{plStats.expirada}⊗</span>
+                                )}
+                              </span>
+                            </button>
+                          ) : (
+                            <span className="text-zinc-300 text-xs">—</span>
+                          )}
+                          {a.id_painel_servidor && a.chave && (
+                            <button
+                              type="button"
+                              onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: a.tipo_painel })}
+                              title="Adicionar playlist"
+                              className="text-zinc-400 hover:text-emerald-600 transition-colors"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       {/* Observação */}
@@ -353,7 +493,12 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                       </td>
                     </tr>
                     {isExpanded && hasPlaylists && (
-                      <PlaylistsRow playlists={playlists} />
+                      <PlaylistsRow
+                        playlists={playlists}
+                        idAppRegistro={a.id_app_registro}
+                        onEditarPlaylist={(pl) => setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
+                        onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
+                      />
                     )}
                   </>
                 );
@@ -386,6 +531,31 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
           onClose={() => {
             setAppPgto(null);
             router.refresh();
+          }}
+        />
+      )}
+
+      {editandoPlaylist && (
+        <EditarPlaylistModal
+          idAppRegistro={editandoPlaylist.idAppRegistro}
+          playlist={editandoPlaylist.pl}
+          tipoPainel={editandoPlaylist.tipoPainel}
+          onClose={() => setEditandoPlaylist(null)}
+          onSaved={() => {
+            recarregarPlaylistsAoVivo(editandoPlaylist.idAppRegistro);
+            setEditandoPlaylist(null);
+          }}
+        />
+      )}
+
+      {criandoPlaylist && (
+        <AdicionarPlaylistModal
+          idAppRegistro={criandoPlaylist.idAppRegistro}
+          tipoPainel={criandoPlaylist.tipoPainel}
+          onClose={() => setCriandoPlaylist(null)}
+          onSaved={() => {
+            router.refresh();
+            setCriandoPlaylist(null);
           }}
         />
       )}

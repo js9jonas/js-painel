@@ -266,6 +266,87 @@ export async function getPlaylistsDispositivo(
   ];
 }
 
+// Cria um SMARTKEY NOVO pro MAC informado — diferente do appacesso (FunPlays/LazerPlay/
+// CorePlayer), o SmartOne não tem "várias playlists num device": cada smartkey é o
+// próprio device. "Adicionar playlist" aqui é o primeiro passo de ativar mais um device
+// pro mesmo MAC/cliente; o novo registro nasce em status "Pending", não "Active".
+export async function criarPlaylist(
+  cookie: string,
+  params: { mac: string; nome: string; host: string; port: string; usuario: string; senha: string; nota?: string }
+): Promise<SmartOneDevice | null> {
+  const path = `/plugin/smart_one/client_main/add_playlist/`;
+  const pageHtml = await getHtml(path, cookie);
+  const csrf = extrairCsrfToken(pageHtml);
+
+  const xtreamPlaylist = `${params.host}:${params.port}/get.php?username=${encodeURIComponent(params.usuario)}&password=${encodeURIComponent(params.senha)}&type=m3u&output=ts`;
+
+  const body = new URLSearchParams({
+    _csrf_token: csrf,
+    form_action: "generate_xtream_playlist",
+    mac: params.mac,
+    xtream_name: params.nome,
+    xtream_playlist: xtreamPlaylist,
+    note: params.nota ?? "",
+  });
+
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", cookie },
+    body: body.toString(),
+    redirect: "manual",
+  });
+
+  if (res.status !== 302) {
+    throw new Error(`SmartOne: criação de playlist falhou (HTTP ${res.status}).`);
+  }
+
+  // A resposta não informa o id do smartkey criado — busca na listagem (ordenada por id
+  // desc, o novo é o primeiro match desse MAC).
+  const listHtml = await getHtml(`/plugin/smart_one/client_main/index/all/?sort=id&order=desc`, cookie);
+  const dispositivos = parseDispositivosPagina(listHtml);
+  return dispositivos.find((d) => d.mac.toUpperCase() === params.mac.toUpperCase()) ?? null;
+}
+
+export async function editarPlaylist(
+  cookie: string,
+  params: { id: number; mac: string; nome: string; host: string; port: string; usuario: string; senha: string; nota?: string }
+): Promise<void> {
+  const path = `/plugin/smart_one/client_main/edit_playlist/${params.id}/`;
+  const pageHtml = await getHtml(path, cookie);
+  const csrf = extrairCsrfToken(pageHtml);
+
+  const body = new URLSearchParams({
+    _csrf_token: csrf,
+    mac: params.mac,
+    server_name: params.nome,
+    server_host: params.host,
+    server_port: params.port,
+    server_username: params.usuario,
+    server_password: params.senha,
+    note: params.nota ?? "",
+  });
+
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", cookie },
+    body: body.toString(),
+    redirect: "manual",
+  });
+
+  if (res.status !== 302) {
+    throw new Error(`SmartOne: edição da playlist ${params.id} falhou (HTTP ${res.status}).`);
+  }
+}
+
+export async function excluirPlaylist(cookie: string, id: number): Promise<void> {
+  const res = await fetch(`${BASE}/plugin/smart_one/client_main/delete_smartkey/${id}/active/`, {
+    headers: { cookie },
+  });
+  if (res.url.includes("/client/login")) {
+    throw new Error("SmartOne: sessão expirada.");
+  }
+}
+
 // ---------- Renovação via giftcode ----------
 
 async function buscarGiftCodeLivre(cookie: string): Promise<string | null> {

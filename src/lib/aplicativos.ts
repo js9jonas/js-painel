@@ -38,6 +38,7 @@ export type AplicativoRow = {
   id_conta: number | null;
   id_dispositivo: number | null;
   id_painel_servidor: number | null;
+  tipo_painel: string | null;
   data_cadastro: string | null;
   atualizado_em: string | null;
   playlists: PlaylistRow[];
@@ -61,6 +62,7 @@ export async function getAplicativosByClienteId(id_cliente: string): Promise<Apl
        ap.id_conta,
        ap.id_dispositivo,
        ap.id_painel_servidor,
+       ps.tipo AS tipo_painel,
        ap.data_cadastro::text,
        ap.atualizado_em::text,
        COALESCE(
@@ -82,10 +84,11 @@ export async function getAplicativosByClienteId(id_cliente: string): Promise<Apl
        ) AS playlists
      FROM public.aplicativos ap
      LEFT JOIN public.apps a ON a.id_app = ap.id_app
+     LEFT JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor
      LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
      LEFT JOIN public.contas c ON c.id_conta = pl.id_conta
      WHERE ap.id_cliente = $1::int
-     GROUP BY ap.id_app_registro, a.nome_app, a.exige_licenca
+     GROUP BY ap.id_app_registro, a.nome_app, a.exige_licenca, ps.tipo
      ORDER BY ap.atualizado_em DESC NULLS LAST, ap.id_app_registro DESC`,
     [id_cliente]
   );

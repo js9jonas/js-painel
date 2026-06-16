@@ -2,6 +2,9 @@ import {
   loginAppAcesso,
   getDispositivos as getDispositivosBase,
   getPlaylistsDispositivo as getPlaylistsDispositivoBase,
+  criarPlaylist as criarPlaylistBase,
+  editarPlaylist as editarPlaylistBase,
+  excluirPlaylist as excluirPlaylistBase,
   criarAppAcessoAdapter,
   type AppAcessoConfig,
 } from "./appacesso";
@@ -23,6 +26,15 @@ export const getDispositivos = (token: string) =>
 
 export const getPlaylistsDispositivo = (token: string, deviceId: number) =>
   getPlaylistsDispositivoBase(CONFIG, token, deviceId);
+
+export const criarPlaylist = (token: string, params: { deviceId: number; name: string; url: string; is_protected?: boolean }) =>
+  criarPlaylistBase(CONFIG, token, params);
+
+export const editarPlaylist = (token: string, params: { id: number; deviceId: number; name: string; url: string; is_protected?: boolean }) =>
+  editarPlaylistBase(CONFIG, token, params);
+
+export const excluirPlaylist = (token: string, params: { id: number; deviceId: number }) =>
+  excluirPlaylistBase(CONFIG, token, params);
 
 export function criarCorePlayerAdapter(
   creds: ServidorCredenciais,

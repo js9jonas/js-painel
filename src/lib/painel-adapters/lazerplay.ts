@@ -5,6 +5,9 @@ import {
   getDispositivos as getDispositivosBase,
   getPlaylistsDispositivo as getPlaylistsBase,
   ativarDispositivo as ativarBase,
+  criarPlaylist as criarPlaylistBase,
+  editarPlaylist as editarPlaylistBase,
+  excluirPlaylist as excluirPlaylistBase,
   type AppAcessoConfig,
   type AppAcessoDevice,
   type AppAcessoPlaylist,
@@ -31,6 +34,15 @@ export const getPlaylistsDispositivo = (token: string, deviceId: number) =>
 
 export const ativarDispositivo = (token: string, mac: string, packageId = 1) =>
   ativarBase(CONFIG, token, mac, packageId);
+
+export const criarPlaylist = (token: string, params: { deviceId: number; name: string; url: string; is_protected?: boolean }) =>
+  criarPlaylistBase(CONFIG, token, params);
+
+export const editarPlaylist = (token: string, params: { id: number; deviceId: number; name: string; url: string; is_protected?: boolean }) =>
+  editarPlaylistBase(CONFIG, token, params);
+
+export const excluirPlaylist = (token: string, params: { id: number; deviceId: number }) =>
+  excluirPlaylistBase(CONFIG, token, params);
 
 export function criarLazerPlayAdapter(
   creds: ServidorCredenciais,
