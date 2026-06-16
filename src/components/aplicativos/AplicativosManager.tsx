@@ -35,20 +35,37 @@ function formatDate(d: string | null) {
   return d.split("T")[0].split("-").reverse().join("/");
 }
 
+// Compara só a data (YYYY-MM-DD), não o timestamp — comparar com `new Date()` direto
+// marca o dia de hoje como vencido a qualquer hora após meia-noite UTC.
+function hojeStr(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+}
+
 function isVencido(validade: string | null) {
   if (!validade) return false;
-  return new Date(validade) < new Date();
+  return validade.slice(0, 10) < hojeStr();
 }
 
 function playlistStatus(pl: PlaylistRow): "vinculada" | "expirada" | "nao_reconhecida" {
+  const hoje = hojeStr();
   if (pl.id_conta) {
     // Quando vinculada a uma conta, usa a validade real do painel — não o expired_date do FunPlays
     const venc = pl.venc_real_conta;
-    if (venc && new Date(venc) < new Date()) return "expirada";
+    if (venc && venc.slice(0, 10) < hoje) return "expirada";
     return "vinculada";
   }
-  if (pl.expired_date && new Date(pl.expired_date) < new Date()) return "expirada";
+  if (pl.expired_date && pl.expired_date.slice(0, 10) < hoje) return "expirada";
   return "nao_reconhecida";
+}
+
+// Username já vem na URL da playlist como query param — extrair pra exibir mesmo
+// quando a playlist não está vinculada a uma conta (id_conta null / "não reconhecida").
+function extrairUsernameUrl(url: string): string | null {
+  try {
+    return new URL(url).searchParams.get("username");
+  } catch {
+    return null;
+  }
 }
 
 function PlaylistBadge({ pl }: { pl: PlaylistRow }) {
@@ -65,21 +82,28 @@ function PlaylistBadge({ pl }: { pl: PlaylistRow }) {
     nao_reconhecida: "◌",
   }[status];
 
+  const usuario = pl.usuario_conta ?? (pl.url ? extrairUsernameUrl(pl.url) : null);
+
   return (
     <div className={`flex items-start gap-1.5 rounded-lg px-2 py-1.5 text-xs ${classes}`}>
       <span className="mt-0.5 shrink-0">{icon}</span>
       <div className="min-w-0">
         <div className="font-medium truncate">{pl.nome || `Playlist #${pl.playlist_id_externo}`}</div>
-        {pl.usuario_conta && (
-          <div className="text-[10px] opacity-75 font-mono">{pl.usuario_conta}</div>
+        {usuario && (
+          <div className="text-[10px] opacity-75 font-mono select-all">{usuario}</div>
         )}
         {(pl.venc_real_conta ?? pl.expired_date) && (
           <div className="text-[10px] opacity-60">
             venc. {(pl.venc_real_conta ?? pl.expired_date)!.slice(0, 10).split("-").reverse().join("/")}
           </div>
         )}
-        {pl.is_selected && (
-          <div className="text-[10px] opacity-60">✓ ativa</div>
+        {pl.url && (
+          <div
+            className="text-[10px] opacity-60 font-mono truncate max-w-[220px] select-all"
+            title={pl.url}
+          >
+            {pl.url}
+          </div>
         )}
       </div>
     </div>
