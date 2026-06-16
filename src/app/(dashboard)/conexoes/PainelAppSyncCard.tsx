@@ -46,7 +46,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
   useEffect(() => {
     if (sessionAtiva) buscarStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [painel.id]);
+  }, [painel.id, sessionAtiva]);
 
   async function buscarStatus() {
     setCarregandoStatus(true);
@@ -63,23 +63,40 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
 
   async function sincronizar() {
     setSincronizando(true);
-    setMensagem("Sincronizando devices e playlists...");
+    setMensagem("Sincronizando devices e playlists... (pode levar alguns minutos em painéis grandes)");
     try {
       const res = await fetch(`/api/paineis/servidores/${painel.id}/sync-aplicativos`, {
         method: "POST",
       });
       const json = await res.json();
-      if (res.ok) {
-        setMensagem(
-          `✅ ${json.total_devices} devices · ${json.playlists_sincronizadas} playlists · ${json.inseridos} novos · ${json.atualizados} atualizados`
-        );
-        router.refresh();
-      } else {
+      if (!res.ok || json.erro) {
         setMensagem(`Erro: ${json.erro}`);
+        setSincronizando(false);
+        return;
       }
+
+      // Polling do job em background — evita timeout do proxy em painéis com muitos devices
+      const jobId = json.jobId as string;
+      const poll = async () => {
+        const r = await fetch(`/api/paineis/servidores/${painel.id}/sync-aplicativos?jobId=${jobId}`);
+        const job = await r.json();
+        if (!job.done) {
+          setTimeout(poll, 3000);
+          return;
+        }
+        if (job.ok) {
+          setMensagem(
+            `✅ ${job.total_devices} devices · ${job.stats.playlists_sincronizadas} playlists · ${job.stats.inseridos} novos · ${job.stats.atualizados} atualizados`
+          );
+          router.refresh();
+        } else {
+          setMensagem(`Erro: ${job.erro}`);
+        }
+        setSincronizando(false);
+      };
+      setTimeout(poll, 3000);
     } catch {
       setMensagem("Erro de rede.");
-    } finally {
       setSincronizando(false);
     }
   }

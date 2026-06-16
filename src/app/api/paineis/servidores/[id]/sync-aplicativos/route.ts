@@ -16,6 +16,20 @@ const ID_APP: Record<string, number> = {
   smartone:    4,  // "Smartone"
 };
 
+// Quantos devices processar em paralelo — alto suficiente para não levar minutos
+// com painéis de centenas de devices (FunPlays/LazerPlay), baixo suficiente para
+// não esgotar o pool de conexões do Postgres (max padrão do `pg` é 10).
+const CONCORRENCIA = 6;
+
+type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number };
+type JobState =
+  | { done: false }
+  | { done: true; ok: true; total_devices: number; stats: Stats }
+  | { done: true; ok: false; erro: string };
+
+// In-memory job store — ok para single instance (Easypanel não é serverless)
+const jobs = new Map<string, JobState>();
+
 // SmartOne usa cookie de sessão Blesta (não JWT) — validade controlada por session_expiry.
 function sessaoValida(creds: { session_cookie: string | null; session_expiry: Date | string | null }): boolean {
   return (
@@ -34,44 +48,44 @@ function extrairUsernameUrl(url: string): string | null {
   }
 }
 
-
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ erro: "Não autorizado." }, { status: 401 });
-
-  const { id } = await params;
-  const idPainel = parseInt(id, 10);
-  if (isNaN(idPainel)) return NextResponse.json({ erro: "ID inválido." }, { status: 400 });
-
-  // Buscar credenciais e tipo do painel
-  const { rows: painelRows } = await pool.query<
-    ServidorCredenciais & { tipo: string; id: number }
-  >(
-    `SELECT id, tipo, usuario AS painel_usuario, senha AS painel_senha,
-            session_cookie, session_expiry
-     FROM public.painel_servidores WHERE id = $1`,
-    [idPainel]
-  );
-
-  if (!painelRows.length) return NextResponse.json({ erro: "Painel não encontrado." }, { status: 404 });
-  const creds = painelRows[0];
-
-  const tipoSuportado = ["funplays", "lazerplay", "coreplayer", "smartone"];
-  if (!tipoSuportado.includes(creds.tipo)) {
-    return NextResponse.json({ erro: `Painel tipo "${creds.tipo}" não suporta sync de aplicativos.` }, { status: 400 });
+async function mapConcorrente<T>(items: T[], limite: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let indice = 0;
+  async function worker() {
+    while (indice < items.length) {
+      const item = items[indice++];
+      await fn(item);
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(limite, items.length) }, worker));
+}
 
-  const idApp = ID_APP[creds.tipo];
+async function executarSync(idPainel: number, jobId: string) {
+  try {
+    const { rows: painelRows } = await pool.query<ServidorCredenciais & { tipo: string; id: number }>(
+      `SELECT id, tipo, usuario AS painel_usuario, senha AS painel_senha,
+              session_cookie, session_expiry
+       FROM public.painel_servidores WHERE id = $1`,
+      [idPainel]
+    );
 
-  // Obter sessão — reusar se ainda válida, senão relogar.
-  // SmartOne usa cookie de sessão Blesta (validade via session_expiry); os demais usam JWT auto-descritivo.
-  let jwt = creds.session_cookie ?? "";
-  const precisaRelogar = creds.tipo === "smartone" ? !sessaoValida(creds) : !jwtValidoAppAcesso(jwt);
-  if (precisaRelogar) {
-    try {
+    if (!painelRows.length) {
+      jobs.set(jobId, { done: true, ok: false, erro: "Painel não encontrado." });
+      return;
+    }
+    const creds = painelRows[0];
+
+    const tipoSuportado = ["funplays", "lazerplay", "coreplayer", "smartone"];
+    if (!tipoSuportado.includes(creds.tipo)) {
+      jobs.set(jobId, { done: true, ok: false, erro: `Painel tipo "${creds.tipo}" não suporta sync de aplicativos.` });
+      return;
+    }
+
+    const idApp = ID_APP[creds.tipo];
+
+    // Obter sessão — reusar se ainda válida, senão relogar.
+    let jwt = creds.session_cookie ?? "";
+    const precisaRelogar = creds.tipo === "smartone" ? !sessaoValida(creds) : !jwtValidoAppAcesso(jwt);
+    if (precisaRelogar) {
       const loginFn =
         creds.tipo === "lazerplay" ? loginLazerPlay :
         creds.tipo === "coreplayer" ? loginCorePlayer :
@@ -83,128 +97,152 @@ export async function POST(
         `UPDATE public.painel_servidores SET session_cookie = $1, session_expiry = $2 WHERE id = $3`,
         [token, expiry, idPainel]
       );
-    } catch (e: any) {
-      return NextResponse.json({ erro: `Login ${creds.tipo} falhou: ${e.message}` }, { status: 502 });
-    }
-  }
-
-  // Buscar todos os devices
-  const getDevicesFn =
-    creds.tipo === "lazerplay"   ? getLazerPlayDevices :
-    creds.tipo === "coreplayer"  ? getCorePlayerDevices :
-    creds.tipo === "smartone"    ? getSmartOneDevices :
-    getFunPlaysDevices;
-  const getPlaylistsFn =
-    creds.tipo === "lazerplay"   ? getLazerPlayPlaylists :
-    creds.tipo === "coreplayer"  ? getCorePlayerPlaylists :
-    creds.tipo === "smartone"    ? getSmartOnePlaylists :
-    getFunPlaysPlaylists;
-
-  let devices;
-  try {
-    devices = await getDevicesFn(jwt);
-  } catch (e: any) {
-    return NextResponse.json({ erro: `Erro ao buscar devices: ${e.message}` }, { status: 502 });
-  }
-
-  const stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0 };
-
-  for (const dev of devices) {
-    // Busca por mac + id_app (não por painel): o mesmo device pode já existir
-    // com id_painel_servidor NULL (cadastro manual anterior à automação).
-    const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
-      `SELECT id_app_registro, id_cliente
-       FROM public.aplicativos
-       WHERE UPPER(mac) = UPPER($1) AND id_app = $2
-       LIMIT 1`,
-      [dev.mac, idApp]
-    );
-
-    const validade = dev.activation_expired
-      ? new Date(dev.activation_expired).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
-      : null;
-
-    let idAppRegistro: number;
-
-    if (existentes.length > 0) {
-      idAppRegistro = existentes[0].id_app_registro;
-      await pool.query(
-        `UPDATE public.aplicativos
-         SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW()
-         WHERE id_app_registro = $5`,
-        [validade, dev.model ?? null, String(dev.id), idPainel, idAppRegistro]
-      );
-      stats.atualizados++;
-    } else {
-      const { rows: ins } = await pool.query<{ id_app_registro: number }>(
-        `INSERT INTO public.aplicativos
-           (id_app, mac, chave, validade, modelo, id_painel_servidor,
-            status, data_cadastro, atualizado_em)
-         VALUES ($1, $2, $3, $4, $5, $6, 'ativa', NOW(), NOW())
-         RETURNING id_app_registro`,
-        [idApp, dev.mac, String(dev.id), validade, dev.model ?? null, idPainel]
-      );
-      idAppRegistro = ins[0].id_app_registro;
-      stats.inseridos++;
     }
 
-    // Sincronizar playlists deste device (FunPlays / LazerPlay / CorePlayer)
-    let playlists: AppAcessoPlaylist[];
-    try {
-      playlists = await getPlaylistsFn(jwt, dev.id);
-    } catch {
-      playlists = [];
-    }
+    const getDevicesFn =
+      creds.tipo === "lazerplay"   ? getLazerPlayDevices :
+      creds.tipo === "coreplayer"  ? getCorePlayerDevices :
+      creds.tipo === "smartone"    ? getSmartOneDevices :
+      getFunPlaysDevices;
+    const getPlaylistsFn =
+      creds.tipo === "lazerplay"   ? getLazerPlayPlaylists :
+      creds.tipo === "coreplayer"  ? getCorePlayerPlaylists :
+      creds.tipo === "smartone"    ? getSmartOnePlaylists :
+      getFunPlaysPlaylists;
 
-    for (const pl of playlists) {
-      let idConta: number | null = null;
-      const username = pl.url ? extrairUsernameUrl(pl.url) : null;
-      if (username) {
-        const { rows: contaRows } = await pool.query<{ id_conta: number }>(
-          `SELECT id_conta FROM public.contas WHERE usuario = $1 AND removido_em IS NULL LIMIT 1`,
-          [username]
-        );
-        idConta = contaRows[0]?.id_conta ?? null;
-      }
+    const devices = await getDevicesFn(jwt);
+    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0 };
 
-      await pool.query(
-        `INSERT INTO public.aplicativo_playlists
-           (id_app_registro, playlist_id_externo, nome, url, is_selected, expired_date, id_conta, atualizado_em)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-         ON CONFLICT (id_app_registro, playlist_id_externo)
-         DO UPDATE SET
-           nome         = EXCLUDED.nome,
-           url          = EXCLUDED.url,
-           is_selected  = EXCLUDED.is_selected,
-           expired_date = EXCLUDED.expired_date,
-           id_conta     = EXCLUDED.id_conta,
-           atualizado_em = NOW()`,
-        [idAppRegistro, pl.id, pl.name ?? null, pl.url ?? null, pl.is_selected ?? false, pl.expired_date ?? null, idConta]
-      );
-      stats.playlists_sincronizadas++;
-    }
-
-    // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
-    // (mesmo dispositivo físico, ex.: cliente trocou de player mas manteve o mesmo MAC).
-    if ((creds.tipo === "coreplayer" || creds.tipo === "smartone") && !existentes[0]?.id_cliente) {
-      const { rows: vinculoRows } = await pool.query<{ id_cliente: number }>(
-        `SELECT id_cliente FROM public.aplicativos
-         WHERE UPPER(mac) = UPPER($1) AND id_cliente IS NOT NULL AND id_app_registro != $2
+    await mapConcorrente(devices, CONCORRENCIA, async (dev) => {
+      const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
+        `SELECT id_app_registro, id_cliente
+         FROM public.aplicativos
+         WHERE UPPER(mac) = UPPER($1) AND id_app = $2
          LIMIT 1`,
-        [dev.mac, idAppRegistro]
+        [dev.mac, idApp]
       );
-      if (vinculoRows.length === 1) {
+
+      const validade = dev.activation_expired
+        ? new Date(dev.activation_expired).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+        : null;
+
+      let idAppRegistro: number;
+
+      if (existentes.length > 0) {
+        idAppRegistro = existentes[0].id_app_registro;
         await pool.query(
-          `UPDATE public.aplicativos SET id_cliente = $1 WHERE id_app_registro = $2`,
-          [vinculoRows[0].id_cliente, idAppRegistro]
+          `UPDATE public.aplicativos
+           SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW()
+           WHERE id_app_registro = $5`,
+          [validade, dev.model ?? null, String(dev.id), idPainel, idAppRegistro]
         );
+        stats.atualizados++;
+      } else {
+        const { rows: ins } = await pool.query<{ id_app_registro: number }>(
+          `INSERT INTO public.aplicativos
+             (id_app, mac, chave, validade, modelo, id_painel_servidor,
+              status, data_cadastro, atualizado_em)
+           VALUES ($1, $2, $3, $4, $5, $6, 'ativa', NOW(), NOW())
+           RETURNING id_app_registro`,
+          [idApp, dev.mac, String(dev.id), validade, dev.model ?? null, idPainel]
+        );
+        idAppRegistro = ins[0].id_app_registro;
+        stats.inseridos++;
       }
-    }
+
+      let playlists: AppAcessoPlaylist[];
+      try {
+        playlists = await getPlaylistsFn(jwt, dev.id);
+      } catch {
+        playlists = [];
+      }
+
+      for (const pl of playlists) {
+        let idConta: number | null = null;
+        const username = pl.url ? extrairUsernameUrl(pl.url) : null;
+        if (username) {
+          const { rows: contaRows } = await pool.query<{ id_conta: number }>(
+            `SELECT id_conta FROM public.contas WHERE usuario = $1 AND removido_em IS NULL LIMIT 1`,
+            [username]
+          );
+          idConta = contaRows[0]?.id_conta ?? null;
+        }
+
+        await pool.query(
+          `INSERT INTO public.aplicativo_playlists
+             (id_app_registro, playlist_id_externo, nome, url, is_selected, expired_date, id_conta, atualizado_em)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+           ON CONFLICT (id_app_registro, playlist_id_externo)
+           DO UPDATE SET
+             nome         = EXCLUDED.nome,
+             url          = EXCLUDED.url,
+             is_selected  = EXCLUDED.is_selected,
+             expired_date = EXCLUDED.expired_date,
+             id_conta     = EXCLUDED.id_conta,
+             atualizado_em = NOW()`,
+          [idAppRegistro, pl.id, pl.name ?? null, pl.url ?? null, pl.is_selected ?? false, pl.expired_date ?? null, idConta]
+        );
+        stats.playlists_sincronizadas++;
+      }
+
+      // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
+      if ((creds.tipo === "coreplayer" || creds.tipo === "smartone") && !existentes[0]?.id_cliente) {
+        const { rows: vinculoRows } = await pool.query<{ id_cliente: number }>(
+          `SELECT id_cliente FROM public.aplicativos
+           WHERE UPPER(mac) = UPPER($1) AND id_cliente IS NOT NULL AND id_app_registro != $2
+           LIMIT 1`,
+          [dev.mac, idAppRegistro]
+        );
+        if (vinculoRows.length === 1) {
+          await pool.query(
+            `UPDATE public.aplicativos SET id_cliente = $1 WHERE id_app_registro = $2`,
+            [vinculoRows[0].id_cliente, idAppRegistro]
+          );
+        }
+      }
+    });
+
+    jobs.set(jobId, { done: true, ok: true, total_devices: devices.length, stats });
+  } catch (e: unknown) {
+    jobs.set(jobId, { done: true, ok: false, erro: e instanceof Error ? e.message : "Erro ao sincronizar." });
   }
 
-  return NextResponse.json({
-    ok: true,
-    total_devices: devices.length,
-    ...stats,
-  });
+  // Limpa o job após 15 minutos
+  setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
+}
+
+// POST — inicia o job em background e retorna imediatamente
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ erro: "Não autorizado." }, { status: 401 });
+
+  const { id } = await params;
+  const idPainel = parseInt(id, 10);
+  if (isNaN(idPainel)) return NextResponse.json({ erro: "ID inválido." }, { status: 400 });
+
+  const jobId = `apps-${idPainel}-${Date.now()}`;
+  jobs.set(jobId, { done: false });
+
+  // Fire and forget — não bloqueia a resposta HTTP
+  executarSync(idPainel, jobId).catch(() => {});
+
+  return NextResponse.json({ jobId, status: "em_andamento" });
+}
+
+// GET — verifica o status do job
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ erro: "Não autorizado." }, { status: 401 });
+
+  await params;
+  const jobId = new URL(req.url).searchParams.get("jobId") ?? "";
+  const job = jobs.get(jobId);
+  if (!job) return NextResponse.json({ done: false, notFound: true });
+  return NextResponse.json(job);
 }
