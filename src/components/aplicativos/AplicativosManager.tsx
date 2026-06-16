@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAplicativo } from "@/app/actions/aplicativos";
 import AplicativoModal from "./AplicativoModal";
@@ -129,7 +129,28 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [playlistsAoVivo, setPlaylistsAoVivo] = useState<Record<number, PlaylistRow[]>>({});
+  const [atualizadoAoVivo, setAtualizadoAoVivo] = useState<Set<number>>(new Set());
   const router = useRouter();
+
+  // Ao abrir a página do cliente, busca a playlist mais recente de cada app vinculado
+  // a um painel — só usa sessão já em cache (sem forçar relogin síncrono, que pode
+  // travar a página por até ~2min em painéis com captcha). Ver feedback_avaliacao_playlist_live.
+  useEffect(() => {
+    const candidatos = aplicativos.filter((a) => a.id_painel_servidor && a.chave);
+    candidatos.forEach((a) => {
+      fetch(`/api/clientes/${idCliente}/aplicativos/${a.id_app_registro}/playlists-live`)
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.ok) {
+            setPlaylistsAoVivo((prev) => ({ ...prev, [a.id_app_registro]: json.playlists }));
+            setAtualizadoAoVivo((prev) => new Set(prev).add(a.id_app_registro));
+          }
+        })
+        .catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idCliente]);
 
   function toggleExpand(id: number) {
     setExpandedIds((prev) => {
@@ -192,9 +213,10 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {aplicativos.map((a) => {
-                const hasPlaylists = a.playlists?.length > 0;
+                const playlists = playlistsAoVivo[a.id_app_registro] ?? a.playlists;
+                const hasPlaylists = playlists?.length > 0;
                 const isExpanded = expandedIds.has(a.id_app_registro);
-                const plStats = (a.playlists ?? []).reduce(
+                const plStats = (playlists ?? []).reduce(
                   (acc, pl) => {
                     const s = playlistStatus(pl);
                     acc[s]++;
@@ -208,8 +230,14 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                     <tr key={a.id_app_registro} className="hover:bg-zinc-50/50 transition-colors">
                       {/* App */}
                       <td className="px-4 py-3">
-                        <div className="font-medium text-zinc-900">
+                        <div className="font-medium text-zinc-900 flex items-center gap-1.5">
                           {a.nome_app ?? (a.id_app ? `App #${a.id_app}` : "App sem tipo")}
+                          {atualizadoAoVivo.has(a.id_app_registro) && (
+                            <span
+                              title="Playlist atualizada agora via API"
+                              className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"
+                            />
+                          )}
                         </div>
                         {a.exige_licenca && (
                           <div className="text-xs text-amber-600 mt-0.5">🔑 Exige licença</div>
@@ -301,7 +329,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                       </td>
                     </tr>
                     {isExpanded && hasPlaylists && (
-                      <PlaylistsRow playlists={a.playlists} />
+                      <PlaylistsRow playlists={playlists} />
                     )}
                   </>
                 );
