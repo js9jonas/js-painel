@@ -165,17 +165,24 @@ export function criarCentralAdapter(
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
 
       // mounth (typo intencional do servidor)
-      await fetchComRetry(`users/${conta.id}/renew`, {
+      // A resposta do renew já é o objeto do usuário com o exp_date atualizado —
+      // não descartar: é a fonte mais confiável (set-expiry-time abaixo tem formato de resposta inconsistente).
+      const renewed = await fetchComRetry(`users/${conta.id}/renew`, {
         method: "POST",
         body: JSON.stringify({ mounth: 1 }),
       });
+      let expTs = renewed?.exp_date;
 
-      // Ajusta o horário de vencimento para 23:59:59 BRT após a renovação
+      // Ajusta o horário de vencimento para 23:59:59 BRT após a renovação.
+      // Quando o horário já está em 23:59 (comum a partir da 2ª renovação), a API responde
+      // {data:{no_change_needed:true, current_expiry_timestamp}} em vez de {data:{new_expiry_timestamp}} —
+      // por isso checa os dois nomes de campo, com fallback para o exp_date do renew.
       const adjusted = await fetchComRetry(`users/${conta.id}/set-expiry-time`, {
         method: "POST",
         body: JSON.stringify({}),
       });
-      const expTs = adjusted?.data?.new_expiry_timestamp ?? adjusted?.user?.exp_date;
+      expTs = adjusted?.data?.new_expiry_timestamp ?? adjusted?.data?.current_expiry_timestamp ?? adjusted?.user?.exp_date ?? expTs;
+
       const novoVenc = expTs
         ? new Date(Number(expTs) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
         : undefined;
