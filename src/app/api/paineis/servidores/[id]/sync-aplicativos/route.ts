@@ -6,13 +6,24 @@ import type { ServidorCredenciais } from "@/lib/painel-adapters/types";
 import { loginFunPlays, getDispositivos as getFunPlaysDevices, getPlaylistsDispositivo as getFunPlaysPlaylists } from "@/lib/painel-adapters/funplays";
 import { loginLazerPlay, getDispositivos as getLazerPlayDevices, getPlaylistsDispositivo as getLazerPlayPlaylists } from "@/lib/painel-adapters/lazerplay";
 import { loginCorePlayer, getDispositivos as getCorePlayerDevices, getPlaylistsDispositivo as getCorePlayerPlaylists } from "@/lib/painel-adapters/coreplayer";
+import { loginSmartOne, getDispositivos as getSmartOneDevices, getPlaylistsDispositivo as getSmartOnePlaylists } from "@/lib/painel-adapters/smartone";
 import { jwtValido as jwtValidoAppAcesso, type AppAcessoPlaylist } from "@/lib/painel-adapters/appacesso";
 
 const ID_APP: Record<string, number> = {
   funplays:    3,  // "Fun Play"
   lazerplay:   2,  // "Lazer Play"
   coreplayer:  31, // "Core Player"
+  smartone:    4,  // "Smartone"
 };
+
+// SmartOne usa cookie de sessão Blesta (não JWT) — validade controlada por session_expiry.
+function sessaoValida(creds: { session_cookie: string | null; session_expiry: Date | string | null }): boolean {
+  return (
+    !!creds.session_cookie &&
+    !!creds.session_expiry &&
+    new Date(creds.session_expiry).getTime() - 60_000 > Date.now()
+  );
+}
 
 function extrairUsernameUrl(url: string): string | null {
   try {
@@ -48,20 +59,23 @@ export async function POST(
   if (!painelRows.length) return NextResponse.json({ erro: "Painel não encontrado." }, { status: 404 });
   const creds = painelRows[0];
 
-  const tipoSuportado = ["funplays", "lazerplay", "coreplayer"];
+  const tipoSuportado = ["funplays", "lazerplay", "coreplayer", "smartone"];
   if (!tipoSuportado.includes(creds.tipo)) {
     return NextResponse.json({ erro: `Painel tipo "${creds.tipo}" não suporta sync de aplicativos.` }, { status: 400 });
   }
 
   const idApp = ID_APP[creds.tipo];
 
-  // Obter JWT — reusar se ainda válido, senão relogar
+  // Obter sessão — reusar se ainda válida, senão relogar.
+  // SmartOne usa cookie de sessão Blesta (validade via session_expiry); os demais usam JWT auto-descritivo.
   let jwt = creds.session_cookie ?? "";
-  if (!jwtValidoAppAcesso(jwt)) {
+  const precisaRelogar = creds.tipo === "smartone" ? !sessaoValida(creds) : !jwtValidoAppAcesso(jwt);
+  if (precisaRelogar) {
     try {
       const loginFn =
         creds.tipo === "lazerplay" ? loginLazerPlay :
         creds.tipo === "coreplayer" ? loginCorePlayer :
+        creds.tipo === "smartone" ? loginSmartOne :
         loginFunPlays;
       const { token, expiry } = await loginFn(creds.painel_usuario, creds.painel_senha);
       jwt = token;
@@ -78,10 +92,12 @@ export async function POST(
   const getDevicesFn =
     creds.tipo === "lazerplay"   ? getLazerPlayDevices :
     creds.tipo === "coreplayer"  ? getCorePlayerDevices :
+    creds.tipo === "smartone"    ? getSmartOneDevices :
     getFunPlaysDevices;
   const getPlaylistsFn =
     creds.tipo === "lazerplay"   ? getLazerPlayPlaylists :
     creds.tipo === "coreplayer"  ? getCorePlayerPlaylists :
+    creds.tipo === "smartone"    ? getSmartOnePlaylists :
     getFunPlaysPlaylists;
 
   let devices;
@@ -99,7 +115,7 @@ export async function POST(
     const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
       `SELECT id_app_registro, id_cliente
        FROM public.aplicativos
-       WHERE mac = $1 AND id_app = $2
+       WHERE UPPER(mac) = UPPER($1) AND id_app = $2
        LIMIT 1`,
       [dev.mac, idApp]
     );
@@ -168,18 +184,19 @@ export async function POST(
       stats.playlists_sincronizadas++;
     }
 
-    // CorePlayer: complementa o vínculo de cliente via device_note.comment → clientes.nome
-    if (creds.tipo === "coreplayer" && !existentes[0]?.id_cliente && dev.device_note?.comment) {
-      const { rows: clienteRows } = await pool.query<{ id_cliente: number }>(
-        `SELECT id_cliente FROM public.clientes
-         WHERE LOWER(TRIM(nome)) = LOWER(TRIM($1))
-         LIMIT 2`,
-        [dev.device_note.comment]
+    // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
+    // (mesmo dispositivo físico, ex.: cliente trocou de player mas manteve o mesmo MAC).
+    if ((creds.tipo === "coreplayer" || creds.tipo === "smartone") && !existentes[0]?.id_cliente) {
+      const { rows: vinculoRows } = await pool.query<{ id_cliente: number }>(
+        `SELECT id_cliente FROM public.aplicativos
+         WHERE UPPER(mac) = UPPER($1) AND id_cliente IS NOT NULL AND id_app_registro != $2
+         LIMIT 1`,
+        [dev.mac, idAppRegistro]
       );
-      if (clienteRows.length === 1) {
+      if (vinculoRows.length === 1) {
         await pool.query(
           `UPDATE public.aplicativos SET id_cliente = $1 WHERE id_app_registro = $2`,
-          [clienteRows[0].id_cliente, idAppRegistro]
+          [vinculoRows[0].id_cliente, idAppRegistro]
         );
       }
     }

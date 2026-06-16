@@ -63,6 +63,7 @@ export default function PainelAppSyncModal({ painel, onClose, onSalvo }: Props) 
     funplays:   "FunPlays",
     lazerplay:  "LazerPlay",
     coreplayer: "CorePlayer",
+    smartone:   "SmartOne",
   };
 
   return (

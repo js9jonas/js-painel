@@ -1,23 +1,27 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { PainelAppSyncRow } from "@/lib/paineis";
 
 const TIPO_BADGE: Record<string, string> = {
   funplays:   "bg-green-100 text-green-700",
   lazerplay:  "bg-yellow-100 text-yellow-700",
   coreplayer: "bg-emerald-100 text-emerald-700",
+  smartone:   "bg-sky-100 text-sky-700",
 };
 
 const TIPO_LABEL: Record<string, string> = {
   funplays:   "FunPlays",
   lazerplay:  "LazerPlay",
   coreplayer: "CorePlayer",
+  smartone:   "SmartOne",
 };
 
 const URL_PAINEL: Record<string, string> = {
   funplays:   "https://reseller.funplays.app",
   lazerplay:  "https://reseller.lazerplay.io",
   coreplayer: "https://reseller.coreplayer.io",
+  smartone:   "https://smartone-iptv.com/client/login/",
 };
 
 type StatusAoVivo = {
@@ -29,6 +33,7 @@ type StatusAoVivo = {
 type Props = { painel: PainelAppSyncRow; onEditar: () => void };
 
 export default function PainelAppSyncCard({ painel, onEditar }: Props) {
+  const router = useRouter();
   const [sincronizando, setSincronizando] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
@@ -68,6 +73,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         setMensagem(
           `✅ ${json.total_devices} devices · ${json.playlists_sincronizadas} playlists · ${json.inseridos} novos · ${json.atualizados} atualizados`
         );
+        router.refresh();
       } else {
         setMensagem(`Erro: ${json.erro}`);
       }

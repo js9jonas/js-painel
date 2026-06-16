@@ -61,7 +61,7 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       ps.id_servidor
     FROM public.painel_servidores ps
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
-    WHERE ps.tipo NOT IN ('funplays', 'lazerplay', 'coreplayer')
+    WHERE ps.tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone')
     GROUP BY ps.id
     ORDER BY ps.nome
   `);
@@ -122,7 +122,7 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
     FROM public.painel_servidores ps
     LEFT JOIN public.aplicativos ap ON ap.id_painel_servidor = ps.id
     LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
-    WHERE ps.tipo IN ('funplays', 'lazerplay', 'coreplayer')
+    WHERE ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone')
     GROUP BY ps.id
     ORDER BY ps.nome
   `);

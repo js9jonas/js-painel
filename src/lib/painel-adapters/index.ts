@@ -5,6 +5,7 @@ import { criarFastAdapter } from "./fast";
 import { criarFunPlaysAdapter } from "./funplays";
 import { criarLazerPlayAdapter } from "./lazerplay";
 import { criarCorePlayerAdapter } from "./coreplayer";
+import { criarSmartOneAdapter } from "./smartone";
 import { criarUniplayAdapter } from "./uniplay";
 import { criarNowAdapter } from "./now";
 import { criarUnitvAdapter } from "./unitv";
@@ -88,6 +89,7 @@ function buildAdapter(
     case "funplays":    return criarFunPlaysAdapter(creds, id, onSaveSession, onSaveContas);
     case "lazerplay":   return criarLazerPlayAdapter(creds, id, onSaveSession, onSaveContas);
     case "coreplayer":  return criarCorePlayerAdapter(creds, id, onSaveSession, onSaveContas);
+    case "smartone":    return criarSmartOneAdapter(creds, id, onSaveSession, onSaveContas);
     default:
       throw new Error(`Adapter para "${creds.painel_tipo}" ainda não implementado.`);
   }
