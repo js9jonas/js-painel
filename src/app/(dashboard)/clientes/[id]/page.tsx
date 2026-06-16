@@ -23,7 +23,7 @@ import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
 import HistoricoAudit from "@/components/clientes/HistoricoAudit";
 import DesvincularContaButton from "@/components/clientes/DesvincularContaButton";
 import AdicionarContaModal from "@/components/clientes/AdicionarContaModal";
-import ContasCards from "@/components/clientes/ContasCards";
+import ContasGroupClient from "@/components/clientes/ContasGroupClient";
 import { pool } from "@/lib/db";
 
 type Props = {
@@ -293,12 +293,10 @@ export default async function ClienteDetalhePage({ params }: Props) {
 
             {/* Contas: vinculadas ou balão de sem vínculo */}
             <div className="mt-2 pt-2 border-t border-zinc-100">
-              <ContasCards
+              <ContasGroupClient
                 contas={contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []}
+                idCliente={id}
                 vencContas={ativa.venc_contas ?? null}
-                contaAction={(c) => (
-                  <DesvincularContaButton idConta={c.id_conta} idCliente={id} usuario={c.usuario} />
-                )}
                 emptyAction={
                   <AdicionarContaModal
                     idAssinatura={String(ativa.id_assinatura)}
