@@ -30,6 +30,10 @@ export async function POST(
   try {
     const resultado = await adapter.renovar(usuario, 1);
 
+    if (!resultado.ok) {
+      return NextResponse.json({ erro: resultado.erro ?? "Falha ao renovar." }, { status: 502 });
+    }
+
     if (resultado.novoVencimento) {
       await pool.query(
         `UPDATE public.contas

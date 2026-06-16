@@ -97,21 +97,17 @@ function parseJwtExpiry(token: string): Date | null {
 }
 
 // Exposta para uso no endpoint /renovar-sessao (operação longa, fora do status check)
-export async function loginClub(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<string> {
+export async function loginClub(creds: ServidorCredenciais, onSaveSession: SaveSession): Promise<{ token: string; expiry: Date }> {
   const token = await loginViaCaptcha(creds.painel_usuario, creds.painel_senha);
   // Tenta ler o exp do JWT; fallback para 2h se token opaco ou exp ausente
   const expiry = parseJwtExpiry(token) ?? new Date(Date.now() + 2 * 60 * 60 * 1000);
   await onSaveSession(token, expiry);
-  return token;
+  return { token, expiry };
 }
 
-function getSession(creds: ServidorCredenciais): string {
-  if (creds.session_cookie) {
-    const expirado = creds.session_expiry && new Date(creds.session_expiry) <= new Date();
-    if (!expirado) return creds.session_cookie;
-  }
-  throw new Error("CLUB: sessão expirada. Clique em 'Renovar Sessão' no card.");
-}
+// pdcapi.io responde HTTP 200 com {result:false, msg:"A sessão está expirada (N)"}
+// para token morto — não é um erro HTTP, então precisa ser detectado no corpo da resposta.
+class ClubSessionExpiredError extends Error {}
 
 async function apiFetch(token: string, path: string, options: { method?: HttpMethod; body?: URLSearchParams | string } = {}) {
   const res = await impitFetch(impit, API_URL + path, {
@@ -125,7 +121,11 @@ async function apiFetch(token: string, path: string, options: { method?: HttpMet
     },
   });
   if (!res.ok) throw new Error(`pdcapi.io/${path} → ${res.status}`);
-  return res.json();
+  const data = await res.json() as any;
+  if (data?.result === false && /expirad/i.test(data.msg ?? "")) {
+    throw new ClubSessionExpiredError(data.msg);
+  }
+  return data;
 }
 
 function mapStatus(s: string | number): ContaPainel["status"] {
@@ -140,85 +140,109 @@ export function criarClubAdapter(
   onSaveSession: SaveSession,
   onSaveContas: SaveContaVencimento
 ): PainelAdapter {
-  function obterToken(): string {
-    return getSession(creds);
+  let sessionCache = creds.session_cookie ?? "";
+  let expiryCache = creds.session_expiry;
+
+  async function doLogin(): Promise<string> {
+    const { token, expiry } = await loginClub(creds, onSaveSession);
+    sessionCache = token;
+    expiryCache = expiry;
+    return token;
   }
 
-  async function fetchComRetry(path: string, options: { method?: HttpMethod; body?: URLSearchParams | string } = {}): Promise<any> {
-    const token = obterToken();
+  function cachedToken(): string | null {
+    if (!sessionCache) return null;
+    const expirado = expiryCache && new Date(expiryCache) <= new Date();
+    return expirado ? null : sessionCache;
+  }
+
+  // Mesmo padrão usado em now.ts: tenta com o token em cache; se a API
+  // reportar sessão expirada, faz login automático (2captcha) e tenta de novo uma vez.
+  async function withRelogin<T>(fn: (token: string) => Promise<T>): Promise<T> {
+    const token = cachedToken() ?? (await doLogin());
     try {
-      return await apiFetch(token, path, options);
-    } catch (err: any) {
-      if (err.message?.includes("401") || err.message?.includes("403")) {
-        throw new Error("CLUB: sessão expirada. Clique em 'Renovar Sessão' no card.");
-      }
-      throw err;
+      return await fn(token);
+    } catch (err) {
+      if (!(err instanceof ClubSessionExpiredError)) throw err;
+      const fresh = await doLogin();
+      return fn(fresh);
     }
+  }
+
+  async function listarContasRaw(token: string) {
+    const data = await apiFetch(token, "listas/minhas", {
+      method: "POST",
+      body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
+    });
+    return (data.data ?? []) as any[];
   }
 
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const data = await fetchComRetry("listas/minhas", {
-        method: "POST",
-        body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
+      return withRelogin(async (token) => {
+        const lista = await listarContasRaw(token);
+        return lista.map((l: any) => ({
+          usuario: l.username,
+          rotulo: l.reseller_notes || "",
+          vencimento: l.exp_date
+            ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+            : null,
+          status: mapStatus(l.status),
+        }));
       });
-      return (data.data ?? []).map((l: any) => ({
-        usuario: l.username,
-        rotulo: l.reseller_notes || "",
-        vencimento: l.exp_date
-          ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
-          : null,
-        status: mapStatus(l.status),
-      }));
     },
 
     async getCreditos(): Promise<number | null> {
       try {
-        const token = obterToken();
-        const res = await impitFetch(impit, `${API_URL}stats`, {
-          method: "GET",
-          headers: {
-            "X-ACCESS-TOKEN": token,
-            "X_FILTRO": "1",
-            "Origin": "https://dashboard.bz",
-            "Referer": "https://dashboard.bz/",
-          },
+        return await withRelogin(async (token) => {
+          const res = await impitFetch(impit, `${API_URL}stats`, {
+            method: "GET",
+            headers: {
+              "X-ACCESS-TOKEN": token,
+              "X_FILTRO": "1",
+              "Origin": "https://dashboard.bz",
+              "Referer": "https://dashboard.bz/",
+            },
+          });
+          if (!res.ok) throw new Error(`CLUB stats → ${res.status}`);
+          const data = await res.json() as any;
+          if (data?.result === false && /expirad/i.test(data.msg ?? "")) {
+            throw new ClubSessionExpiredError(data.msg);
+          }
+          return data?.data?.credits != null ? parseFloat(data.data.credits) : null;
         });
-        if (!res.ok) return null;
-        const data = await res.json() as any;
-        return data?.data?.credits != null ? parseFloat(data.data.credits) : null;
       } catch {
         return null;
       }
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
-      const lista = await fetchComRetry("listas/minhas", {
-        method: "POST",
-        body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
+      return withRelogin(async (token) => {
+        const lista = await listarContasRaw(token);
+        const conta = lista.find((l: any) => l.username === usuario);
+        if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CLUB.` };
+
+        const result = await apiFetch(token, `listas/${conta.id}/renovar`, {
+          method: "POST",
+          body: new URLSearchParams({ tempo: String(meses) }),
+        });
+        if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao renovar no CLUB." };
+
+        // exp_date pode vir na resposta do renovar OU precisar ser buscado na listagem atualizada
+        // (pequeno delay porque a API às vezes ainda não refletiu o novo vencimento na listagem)
+        let expRaw = result.exp_date;
+        if (!expRaw) {
+          await new Promise((r) => setTimeout(r, 2000));
+          expRaw = (await listarContasRaw(token)).find((l: any) => l.username === usuario)?.exp_date;
+        }
+
+        if (expRaw) {
+          const novoVenc = new Date(Number(expRaw) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+          await onSaveContas(usuario, novoVenc);
+          return { ok: true, novoVencimento: novoVenc };
+        }
+        return { ok: true };
       });
-      const conta = (lista.data ?? []).find((l: any) => l.username === usuario);
-      if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CLUB.` };
-
-      const result = await fetchComRetry(`listas/${conta.id}/renovar`, {
-        method: "POST",
-        body: new URLSearchParams({ tempo: String(meses) }),
-      });
-      if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao renovar no CLUB." };
-
-      // exp_date pode vir na resposta do renovar OU precisar ser buscado na listagem atualizada
-      const expRaw = result.exp_date
-        ?? (await fetchComRetry("listas/minhas", {
-             method: "POST",
-             body: new URLSearchParams({ draw: "1", start: "0", length: "2000" }),
-           })).data?.find((l: any) => l.username === usuario)?.exp_date;
-
-      if (expRaw) {
-        const novoVenc = new Date(Number(expRaw) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
-        await onSaveContas(usuario, novoVenc);
-        return { ok: true, novoVencimento: novoVenc };
-      }
-      return { ok: true };
     },
   };
 }
