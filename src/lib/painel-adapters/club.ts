@@ -138,16 +138,20 @@ export function criarClubAdapter(
     return expirado ? null : sessionCache;
   }
 
-  // Quando a sessão expira (por tempo ou por login em outro dispositivo), dispara
-  // o re-login em background e falha imediatamente com mensagem orientando retry.
-  // Isso evita bloquear o request por 90s e o timeout do proxy reverso (Traefik).
+  // Re-login nunca bloqueia o request — qualquer ausência ou quebra de sessão
+  // dispara doLogin() em background e falha imediatamente com mensagem de retry.
+  // Isso evita o timeout do Traefik (~60s) durante a resolução do hCaptcha.
   async function withRelogin<T>(fn: (token: string) => Promise<T>): Promise<T> {
-    const token = cachedToken() ?? (await doLogin());
+    const cached = cachedToken();
+    if (!cached) {
+      doLogin().catch(() => {});
+      throw new Error("CLUB: sem sessão ativa — reconectando em background. Aguarde ~15s e tente novamente.");
+    }
     try {
-      return await fn(token);
+      return await fn(cached);
     } catch (err) {
       if (!(err instanceof ClubSessionExpiredError)) throw err;
-      doLogin().catch(() => {}); // re-login em background, não bloqueia
+      doLogin().catch(() => {});
       throw new Error("CLUB: sessão expirada — reconectando em background. Aguarde ~15s e sincronize novamente.");
     }
   }
