@@ -13,6 +13,9 @@ const SITEKEY     = "8cf2ef3e-6e60-456a-86ca-6f2c855c3a06";
 // pdcapi.io bloqueia IP do datacenter Hostinger — proxy residencial necessário
 const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
 
+// Evita múltiplos logins simultâneos para o mesmo painel (sync + status ao mesmo tempo)
+const loginEmProgresso = new Map<number, Promise<string | void>>();
+
 async function resolverHCaptcha(): Promise<string> {
   const apiKey = process.env.TWOCAPTCHA_API_KEY;
   if (!apiKey) throw new Error("TWOCAPTCHA_API_KEY não definida no Easypanel.");
@@ -131,7 +134,7 @@ function mapStatus(s: string | number): ContaPainel["status"] {
 
 export function criarClubAdapter(
   creds: ServidorCredenciais,
-  _id: number,
+  id: number,
   onSaveSession: SaveSession,
   onSaveContas: SaveContaVencimento
 ): PainelAdapter {
@@ -151,21 +154,33 @@ export function criarClubAdapter(
     return expirado ? null : sessionCache;
   }
 
+  function dispararLogin() {
+    if (loginEmProgresso.has(id)) return; // já há um login rodando para este painel
+    const p = doLogin()
+      .catch(() => {})
+      .finally(() => loginEmProgresso.delete(id));
+    loginEmProgresso.set(id, p);
+  }
+
   // Re-login nunca bloqueia o request — qualquer ausência ou quebra de sessão
-  // dispara doLogin() em background e falha imediatamente com mensagem de retry.
-  // Isso evita o timeout do Traefik (~60s) durante a resolução do hCaptcha.
+  // dispara doLogin() em background (apenas um por painel) e falha imediatamente.
   async function withRelogin<T>(fn: (token: string) => Promise<T>): Promise<T> {
     const cached = cachedToken();
     if (!cached) {
-      doLogin().catch(() => {});
-      throw new Error("CLUB: sem sessão ativa — reconectando em background. Aguarde ~15s e tente novamente.");
+      dispararLogin();
+      const jaReconectando = loginEmProgresso.has(id);
+      throw new Error(
+        jaReconectando
+          ? "CLUB: reconectando em background (2captcha, ~5min). Aguarde e tente novamente."
+          : "CLUB: sem sessão ativa — reconectando em background. Aguarde e tente novamente."
+      );
     }
     try {
       return await fn(cached);
     } catch (err) {
       if (!(err instanceof ClubSessionExpiredError)) throw err;
-      doLogin().catch(() => {});
-      throw new Error("CLUB: sessão expirada — reconectando em background. Aguarde ~15s e sincronize novamente.");
+      dispararLogin();
+      throw new Error("CLUB: sessão expirada — reconectando em background. Aguarde e tente novamente.");
     }
   }
 
