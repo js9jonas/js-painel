@@ -24,10 +24,12 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ usuario }),
             });
-            const json = await res.json();
+            const text = await res.text();
+            let json: any;
+            try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status} — ${text.slice(0, 150)}`); }
             if (!res.ok || json.erro) {
                 setEstado("erro");
-                setMensagem(json.erro ?? "Erro ao renovar.");
+                setMensagem(json.erro ?? `Erro ${res.status}.`);
             } else {
                 setEstado("ok");
                 setMensagem(json.mensagem ?? "Renovado!");
@@ -36,9 +38,9 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
                     onRenovado?.(json.novoVencimento);
                 }
             }
-        } catch {
+        } catch (e: unknown) {
             setEstado("erro");
-            setMensagem("Erro de rede.");
+            setMensagem(e instanceof Error ? e.message : "Erro de rede.");
         }
     }
 

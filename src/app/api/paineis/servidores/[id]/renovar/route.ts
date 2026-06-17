@@ -31,7 +31,7 @@ export async function POST(
     const resultado = await adapter.renovar(usuario, 1);
 
     if (!resultado.ok) {
-      return NextResponse.json({ erro: resultado.erro ?? "Falha ao renovar." }, { status: 502 });
+      return NextResponse.json({ erro: resultado.erro ?? "Falha ao renovar." }, { status: 422 });
     }
 
     if (resultado.novoVencimento) {
@@ -51,6 +51,6 @@ export async function POST(
         : "Renovação solicitada com sucesso.",
     });
   } catch (e: unknown) {
-    return NextResponse.json({ erro: e instanceof Error ? e.message : "Erro ao renovar." }, { status: 502 });
+    return NextResponse.json({ erro: e instanceof Error ? e.message : "Erro ao renovar." }, { status: 422 });
   }
 }
