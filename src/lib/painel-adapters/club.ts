@@ -1,5 +1,5 @@
 import { Impit, type HttpMethod } from "impit";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
@@ -15,6 +15,26 @@ const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY
 
 // Evita múltiplos logins simultâneos para o mesmo painel (sync + status ao mesmo tempo)
 const loginEmProgresso = new Map<number, Promise<string | void>>();
+
+// Gera username aleatório: 9 chars alfanuméricos minúsculos
+function gerarUsername(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length: 9 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+// Gera senha no padrão exigido: 9 chars, ≥1 maiúscula, ≥1 dígito
+function gerarSenha(): string {
+  const lower  = "abcdefghijklmnopqrstuvwxyz";
+  const upper  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const digits = "0123456789";
+  const all    = lower + upper + digits;
+  const parts  = [
+    upper [Math.floor(Math.random() * upper.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    ...Array.from({ length: 7 }, () => all[Math.floor(Math.random() * all.length)]),
+  ];
+  return parts.sort(() => Math.random() - 0.5).join("");
+}
 
 async function resolverHCaptcha(): Promise<string> {
   const apiKey = process.env.TWOCAPTCHA_API_KEY;
@@ -296,6 +316,32 @@ export function criarClubAdapter(
         });
         if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao editar conta no CLUB." };
         return { ok: true };
+      });
+    },
+
+    async gerarTeste({ comAdultos = false, horas = 6 } = {}): Promise<ResultadoTeste> {
+      return withRelogin(async (token) => {
+        const usuario = gerarUsername();
+        const senha   = gerarSenha();
+        const bouquet = comAdultos ? "36" : "35";
+
+        const result = await apiFetch(token, "listas/teste", {
+          method: "POST",
+          body: new URLSearchParams({
+            adulto:   bouquet,
+            horas:    String(Math.min(Math.max(horas, 1), 6)),
+            username: usuario,
+            password: senha,
+            nitro:    "0",
+          }),
+        });
+
+        if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao gerar teste no CLUB." };
+
+        const expiracao = new Date(Date.now() + horas * 60 * 60 * 1000)
+          .toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+
+        return { ok: true, usuario, senha, expiracao };
       });
     },
   };

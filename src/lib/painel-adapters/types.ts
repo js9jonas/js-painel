@@ -20,11 +20,20 @@ export interface ResultadoEdicao {
   erro?: string;
 }
 
+export interface ResultadoTeste {
+  ok: boolean;
+  usuario?: string;
+  senha?: string;
+  expiracao?: string; // YYYY-MM-DD
+  erro?: string;
+}
+
 export interface PainelAdapter {
   listarContas(): Promise<ContaPainel[]>;
   renovar(usuario: string, meses: number): Promise<ResultadoRenovacao>;
   getCreditos?(): Promise<number | null>;
   editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao>;
+  gerarTeste?(params: { comAdultos?: boolean; horas?: number }): Promise<ResultadoTeste>;
 }
 
 export type SaveSession = (cookie: string, expiry?: Date) => Promise<void>;
