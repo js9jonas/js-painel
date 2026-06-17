@@ -138,16 +138,17 @@ export function criarClubAdapter(
     return expirado ? null : sessionCache;
   }
 
-  // Mesmo padrão usado em now.ts: tenta com o token em cache; se a API
-  // reportar sessão expirada, faz login automático (2captcha) e tenta de novo uma vez.
+  // Quando a sessão expira (por tempo ou por login em outro dispositivo), dispara
+  // o re-login em background e falha imediatamente com mensagem orientando retry.
+  // Isso evita bloquear o request por 90s e o timeout do proxy reverso (Traefik).
   async function withRelogin<T>(fn: (token: string) => Promise<T>): Promise<T> {
     const token = cachedToken() ?? (await doLogin());
     try {
       return await fn(token);
     } catch (err) {
       if (!(err instanceof ClubSessionExpiredError)) throw err;
-      const fresh = await doLogin();
-      return fn(fresh);
+      doLogin().catch(() => {}); // re-login em background, não bloqueia
+      throw new Error("CLUB: sessão expirada — reconectando em background. Aguarde ~15s e sincronize novamente.");
     }
   }
 
