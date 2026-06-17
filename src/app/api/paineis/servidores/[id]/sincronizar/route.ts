@@ -26,7 +26,7 @@ export async function POST(
     contas = await adapter.listarContas();
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Erro ao buscar contas.";
-    return NextResponse.json({ erro: msg }, { status: 502 });
+    return NextResponse.json({ erro: msg }, { status: 422 }); // 502 é interceptado pelo Traefik
   }
 
   // Guarda de segurança: se o retorno for vazio ou menor que 50% do que está ativo,
