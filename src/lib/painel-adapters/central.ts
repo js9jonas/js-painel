@@ -133,12 +133,13 @@ export function criarCentralAdapter(
         page++;
       }
       return allUsers.map((u: any) => ({
-        usuario: u.username,
-        rotulo: u.reseller_notes || u.full_name || "",
+        usuario:    u.username,
+        rotulo:     u.reseller_notes || u.full_name || "",
         vencimento: u.exp_date
           ? new Date(Number(u.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
           : null,
         status: mapStatus(u.enabled ?? 1, u.exp_date ?? 0),
+        senha:  u.password ?? null,
       }));
     },
 
