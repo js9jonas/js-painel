@@ -131,10 +131,12 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
       const res = await fetch(`/api/paineis/servidores/${painel.id}/sincronizar`, {
         method: "POST",
       });
-      const json = await res.json();
-      setMensagem(json.mensagem ?? (res.ok ? "Sincronizado com sucesso." : "Erro ao sincronizar."));
-    } catch {
-      setMensagem("Erro de rede.");
+      const text = await res.text();
+      let json: any;
+      try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status} — resposta não-JSON: ${text.slice(0, 200)}`); }
+      setMensagem(json.mensagem ?? json.erro ?? (res.ok ? "Sincronizado com sucesso." : `Erro ${res.status}.`));
+    } catch (e: unknown) {
+      setMensagem(e instanceof Error ? e.message : "Erro de rede.");
     } finally {
       setSincronizando(false);
     }
