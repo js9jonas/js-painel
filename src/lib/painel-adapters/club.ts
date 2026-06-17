@@ -3,7 +3,7 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciai
 import { impitFetch } from "./proxy-retry";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
-// Login: 2captcha (HCaptchaTask+proxy) → POST pdcapi.io/login (URL-encoded)
+// Login: CapSolver (HCaptchaTaskProxyLess) → POST pdcapi.io/login (URL-encoded)
 // hCaptcha sitekey dashboard.bz: 8cf2ef3e-6e60-456a-86ca-6f2c855c3a06
 
 const API_URL     = "https://pdcapi.io/";
@@ -13,50 +13,32 @@ const SITEKEY     = "8cf2ef3e-6e60-456a-86ca-6f2c855c3a06";
 const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
 
 async function resolverHCaptcha(): Promise<string> {
-  const apiKey = process.env.TWOCAPTCHA_API_KEY;
-  if (!apiKey) throw new Error("TWOCAPTCHA_API_KEY não definida no Easypanel.");
+  const apiKey = process.env.CAPSOLVER_API_KEY;
+  if (!apiKey) throw new Error("CAPSOLVER_API_KEY não definida no Easypanel.");
 
-  let ultimoErro = "";
+  const { taskId, errorId, errorDescription } = await fetch("https://api.capsolver.com/createTask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      clientKey: apiKey,
+      task: { type: "HCaptchaTaskProxyLess", websiteURL: WEBSITE_URL, websiteKey: SITEKEY },
+    }),
+  }).then(r => r.json()) as any;
 
-  // Tenta até 10 vezes sem proxy — workers falham ~66% das vezes neste challenge
-  // P(falhar todas) = 0.66^10 ≈ 1.8%
-  for (let tentativa = 1; tentativa <= 10; tentativa++) {
-    const criacao = await fetch("https://api.2captcha.com/createTask", {
+  if (errorId) throw new Error(`CapSolver erro ao criar tarefa: ${errorDescription}`);
+
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const result = await fetch("https://api.capsolver.com/getTaskResult", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clientKey: apiKey,
-        task: {
-          type: "HCaptchaTaskProxyless",
-          websiteURL: WEBSITE_URL,
-          websiteKey: SITEKEY,
-        },
-      }),
+      body: JSON.stringify({ clientKey: apiKey, taskId }),
     }).then(r => r.json()) as any;
 
-    if (criacao.errorId) {
-      ultimoErro = `createTask: ${criacao.errorDescription ?? criacao.errorCode ?? criacao.errorId}`;
-      continue;
-    }
-
-    const { taskId } = criacao;
-
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 5000));
-      const result = await fetch("https://api.2captcha.com/getTaskResult", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientKey: apiKey, taskId }),
-      }).then(r => r.json()) as any;
-
-      if (result.status === "ready") return result.solution.gRecaptchaResponse as string;
-      if (result.errorId) {
-        ultimoErro = `getTaskResult: ${result.errorDescription ?? result.errorCode}`;
-        break;
-      }
-    }
+    if (result.status === "ready")  return result.solution.gRecaptchaResponse as string;
+    if (result.status === "failed") throw new Error(`CapSolver falhou: ${result.errorDescription}`);
   }
-  throw new Error(`CLUB: hCaptcha não resolvido após 10 tentativas. Último erro: ${ultimoErro}`);
+  throw new Error("CapSolver timeout após 90s.");
 }
 
 async function loginViaCaptcha(usuario: string, senha: string): Promise<string> {
