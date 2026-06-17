@@ -1,5 +1,5 @@
 import { Impit, type HttpMethod } from "impit";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
@@ -196,13 +196,30 @@ export function criarClubAdapter(
     async listarContas(): Promise<ContaPainel[]> {
       return withRelogin(async (token) => {
         const lista = await listarContasRaw(token);
+
+        // Busca senhas em paralelo via listas/{id}/info — batches de 20
+        const BATCH = 20;
+        const senhas = new Map<string, string | null>();
+        for (let i = 0; i < lista.length; i += BATCH) {
+          const batch = lista.slice(i, i + BATCH);
+          const results = await Promise.allSettled(
+            batch.map((l: any) => apiFetch(token, `listas/${l.id}/info`))
+          );
+          results.forEach((r, idx) => {
+            if (r.status === "fulfilled" && r.value?.data?.password) {
+              senhas.set(batch[idx].username, r.value.data.password as string);
+            }
+          });
+        }
+
         return lista.map((l: any) => ({
-          usuario: l.username,
-          rotulo: l.reseller_notes || "",
+          usuario:    l.username,
+          rotulo:     l.reseller_notes || "",
           vencimento: l.exp_date
             ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
             : null,
           status: mapStatus(l.status),
+          senha:  senhas.get(l.username) ?? null,
         }));
       });
     },
@@ -256,6 +273,28 @@ export function criarClubAdapter(
           await onSaveContas(usuario, novoVenc);
           return { ok: true, novoVencimento: novoVenc };
         }
+        return { ok: true };
+      });
+    },
+
+    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+      return withRelogin(async (token) => {
+        // Busca o id interno da conta pelo username
+        const lista = await listarContasRaw(token);
+        const conta = lista.find((l: any) => l.username === usuario);
+        if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CLUB.` };
+
+        const body = new URLSearchParams();
+        body.set("username_edit",    campos.novoUsuario  ?? usuario);
+        body.set("password_edit",    campos.novaSenha    ?? "");
+        body.set("reseller_notes",   campos.novoRotulo   ?? conta.reseller_notes ?? "");
+        body.set("plano_novo_edit",  conta.bouquet ?? "");
+
+        const result = await apiFetch(token, `listas/${conta.id}/editar`, {
+          method: "POST",
+          body,
+        });
+        if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao editar conta no CLUB." };
         return { ok: true };
       });
     },

@@ -15,10 +15,16 @@ export interface ResultadoRenovacao {
   erro?: string;
 }
 
+export interface ResultadoEdicao {
+  ok: boolean;
+  erro?: string;
+}
+
 export interface PainelAdapter {
   listarContas(): Promise<ContaPainel[]>;
   renovar(usuario: string, meses: number): Promise<ResultadoRenovacao>;
   getCreditos?(): Promise<number | null>;
+  editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao>;
 }
 
 export type SaveSession = (cookie: string, expiry?: Date) => Promise<void>;
