@@ -222,8 +222,12 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
       )}
 
 
-      {/* Renovar sessão — exclusivo para painéis com captcha longo (CLUB) */}
-      {painel.tipo === "club" && (!painel.tem_session || painel.session_expiry && new Date(painel.session_expiry) < new Date()) && (
+      {/* Renovar sessão — exclusivo para CLUB; mostra sem sessão, expirada ou com status offline */}
+      {painel.tipo === "club" && (
+        !painel.tem_session ||
+        (painel.session_expiry && new Date(painel.session_expiry) < new Date()) ||
+        aoVivo?.conectado === false
+      ) && (
         <button
           onClick={renovarSessaoClub}
           disabled={renovandoSessao}
