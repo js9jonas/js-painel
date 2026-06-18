@@ -1,6 +1,6 @@
 import { Impit } from "impit";
 import { impitFetch } from "./proxy-retry";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // LIEBE (liebeapp.sigma.vin) — Laravel Sanctum Bearer token
 // Auto-login: POST /api/auth/login → token longa duração
@@ -56,6 +56,20 @@ async function liebePost(token: string, path: string, body?: object): Promise<an
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`LIEBE POST ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
+  }
+  return res.json();
+}
+
+async function liebePut(token: string, path: string, body?: object): Promise<any> {
+  const res = await impitFetch(impit, `${API_BASE}${path}`, {
+    method: "PUT",
+    headers: baseHeaders(token),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`LIEBE PUT ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
   }
   return res.json();
 }
@@ -125,6 +139,64 @@ export function criarLiebeAdapter(
         const novoVenc = updated.data?.expires_at_tz?.slice(0, 10) ?? undefined;
         if (novoVenc) await onSaveContas(usuario, novoVenc);
         return { ok: true, novoVencimento: novoVenc };
+      });
+    },
+
+    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+      return withRelogin(async (token) => {
+        // Busca pelo username para obter o slug interno
+        const listJson = await liebeGet(token, `/customers?page=1&username=${encodeURIComponent(usuario)}&perPage=20`);
+        const conta = (listJson.data ?? []).find((c: any) => c.username === usuario);
+        if (!conta) return { ok: false, erro: `LIEBE: usuário "${usuario}" não encontrado.` };
+
+        // Busca objeto completo — o PUT exige o payload completo do cliente
+        const fullJson = await liebeGet(token, `/customers/${conta.id}`);
+        const full: Record<string, any> = { ...(fullJson.data ?? fullJson) };
+
+        if (campos.novoUsuario !== undefined) full.username = campos.novoUsuario;
+        if (campos.novaSenha  !== undefined)  full.password = campos.novaSenha;
+        if (campos.novoRotulo !== undefined)  full.note     = campos.novoRotulo;
+
+        await liebePut(token, `/customers/${conta.id}`, full);
+        return { ok: true };
+      });
+    },
+
+    async gerarTeste({ comAdultos = false } = {}): Promise<ResultadoTeste> {
+      return withRelogin(async (token) => {
+        // Lista servidores para encontrar pacote de teste adequado
+        const serversJson = await liebeGet(token, "/servers");
+        const servers: any[] = serversJson.data ?? [];
+
+        let serverId: string | null = null;
+        let packageId: string | null = null;
+        let packageDuration = 6;
+
+        for (const server of servers) {
+          const pkgs: any[] = server.packages ?? [];
+          const pkg = pkgs.find((p: any) =>
+            p.is_trial === "YES" && p.status === "ACTIVE" && p.is_adult === comAdultos,
+          );
+          if (pkg) {
+            serverId       = server.id;
+            packageId      = pkg.id;
+            packageDuration = pkg.duration;
+            break;
+          }
+        }
+
+        if (!serverId || !packageId) throw new Error("LIEBE: nenhum pacote de teste disponível.");
+
+        const result = await liebePost(token, "/customers", {
+          server_id:   serverId,
+          package_id:  packageId,
+          trial_hours: packageDuration,
+          connections: 1,
+        });
+
+        const customer = result.data ?? result;
+        const expiracao = customer.expires_at_tz?.slice(0, 10) ?? undefined;
+        return { ok: true, usuario: String(customer.username), senha: String(customer.password), expiracao };
       });
     },
   };
