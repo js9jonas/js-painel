@@ -12,10 +12,28 @@ type Props = {
   appsVinculados: AppVinculado[];
 };
 
+// Campos editáveis via API por tipo de painel
+// Rótulo é sempre editável (banco local) — não entra aqui
+const CAPS: Record<string, { usuario: boolean; senha: boolean }> = {
+  club:        { usuario: true,  senha: true  },
+  central:     { usuario: true,  senha: true  },
+  liebe:       { usuario: true,  senha: true  },
+  fast:        { usuario: false, senha: true  },
+  now:         { usuario: false, senha: true  },
+  uniplay:     { usuario: false, senha: false },
+  unitv:       { usuario: false, senha: false },
+};
+
+function caps(tipo: string) {
+  return CAPS[tipo] ?? { usuario: false, senha: false };
+}
+
 export default function EditarContaButton({ conta, idCliente: _idCliente, appsVinculados }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const c = caps(conta.tipo_painel);
 
   const [rotulo, setRotulo]     = useState(conta.rotulo   ?? "");
   const [senha,  setSenha]      = useState(conta.senha    ?? "");
@@ -49,9 +67,9 @@ export default function EditarContaButton({ conta, idCliente: _idCliente, appsVi
           idConta: Number(conta.id_conta),
           usuario: conta.usuario,
         };
-        if (rotulo  !== (conta.rotulo  ?? "")) body.novoRotulo  = rotulo;
-        if (senha   !== (conta.senha   ?? "")) body.novaSenha   = senha;
-        if (usuario !== conta.usuario)         body.novoUsuario = usuario;
+        if (rotulo !== (conta.rotulo ?? ""))           body.novoRotulo  = rotulo;
+        if (c.senha  && senha   !== (conta.senha ?? "")) body.novaSenha   = senha;
+        if (c.usuario && usuario !== conta.usuario)     body.novoUsuario = usuario;
 
         // Nada mudou
         if (Object.keys(body).length === 2) {
@@ -135,26 +153,39 @@ export default function EditarContaButton({ conta, idCliente: _idCliente, appsVi
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">Senha</label>
+                <label className="block text-xs font-medium mb-1 flex items-center gap-1.5">
+                  <span className={c.senha ? "text-zinc-700" : "text-zinc-400"}>Senha</span>
+                  {!c.senha && (
+                    <span className="text-xs font-normal text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+                      não editável neste painel
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={senha}
                   onChange={e => setSenha(e.target.value)}
-                  placeholder={conta.senha ?? "•••••••"}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!c.senha}
+                  placeholder={c.senha ? (conta.senha ?? "nova senha") : "—"}
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Usuário
-                  <span className="ml-1.5 font-normal text-zinc-400">(somente adapters que suportam)</span>
+                <label className="block text-xs font-medium mb-1 flex items-center gap-1.5">
+                  <span className={c.usuario ? "text-zinc-700" : "text-zinc-400"}>Usuário</span>
+                  {!c.usuario && (
+                    <span className="text-xs font-normal text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+                      não editável neste painel
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
                   value={usuario}
                   onChange={e => setUsuario(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!c.usuario}
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
