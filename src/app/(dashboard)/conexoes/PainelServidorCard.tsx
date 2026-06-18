@@ -41,6 +41,7 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
   const [renovandoSessao, setRenovandoSessao] = useState(false);
+  const [importandoSenhas, setImportandoSenhas] = useState(false);
 
   // Tipos com auto-login via impit (TLS Chrome) — login automático sem sessão salva
   const TIPOS_AUTO_LOGIN: string[] = ["uniplay", "central"];
@@ -121,6 +122,22 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
       setMensagem(`Erro inesperado: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setRenovandoSessao(false);
+    }
+  }
+
+  async function importarSenhas() {
+    setImportandoSenhas(true);
+    setMensagem("Importando senhas... (pode levar alguns minutos)");
+    try {
+      const res = await fetch(`/api/paineis/servidores/${painel.id}/importar-senhas`, { method: "POST" });
+      const text = await res.text();
+      let json: any;
+      try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status} — ${text.slice(0, 200)}`); }
+      setMensagem(json.mensagem ?? json.erro ?? (res.ok ? "Senhas importadas." : `Erro ${res.status}.`));
+    } catch (e: unknown) {
+      setMensagem(e instanceof Error ? e.message : "Erro de rede.");
+    } finally {
+      setImportandoSenhas(false);
     }
   }
 
@@ -234,6 +251,17 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
           className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
         >
           {renovandoSessao ? "Resolvendo captcha... (pode levar minutos)" : "Renovar Sessão CLUB"}
+        </button>
+      )}
+
+      {/* Importar senhas — exclusivo para CLUB; só quando conectado */}
+      {painel.tipo === "club" && aoVivo?.conectado && (
+        <button
+          onClick={importarSenhas}
+          disabled={importandoSenhas}
+          className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 transition-colors disabled:opacity-50"
+        >
+          {importandoSenhas ? "Importando senhas… (aguarde)" : "Importar Senhas CLUB"}
         </button>
       )}
 
