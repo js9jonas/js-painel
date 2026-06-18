@@ -234,9 +234,13 @@ export function criarClubAdapter(
     // Importa senhas sequencialmente via listas/{id}/info — chamado explicitamente, não no sync diário.
     // Sequencial (não paralelo) + pausa de 300ms para não invalizar a sessão única do CLUB.
     // Se a sessão morrer no meio, retorna o parcial acumulado (não lança).
-    async importarSenhas(): Promise<Map<string, string | null>> {
+    async importarSenhas(prioridade?: Set<string>): Promise<Map<string, string | null>> {
       return withRelogin(async (token) => {
-        const lista = await listarContasRaw(token);
+        const raw = await listarContasRaw(token);
+        // Contas sem senha primeiro; as demais em seguida
+        const lista = prioridade && prioridade.size > 0
+          ? [...raw.filter((l: any) => prioridade.has(l.username)), ...raw.filter((l: any) => !prioridade.has(l.username))]
+          : raw;
         const senhas = new Map<string, string | null>();
         for (const l of lista) {
           try {

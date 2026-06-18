@@ -24,9 +24,16 @@ export async function POST(
     return NextResponse.json({ erro: "Este painel não suporta importação de senhas." }, { status: 400 });
   }
 
+  // Usuários sem senha no banco — processados primeiro para maximizar aproveitamento da sessão
+  const { rows: semSenha } = await pool.query<{ usuario: string }>(
+    `SELECT usuario FROM public.contas WHERE id_painel_servidor = $1 AND senha IS NULL AND removido_em IS NULL`,
+    [idPainel]
+  );
+  const prioridade = new Set(semSenha.map(r => r.usuario));
+
   let senhas: Map<string, string | null>;
   try {
-    senhas = await adapter.importarSenhas();
+    senhas = await adapter.importarSenhas(prioridade);
   } catch (e: unknown) {
     return NextResponse.json({ erro: e instanceof Error ? e.message : "Erro ao importar senhas." }, { status: 422 });
   }
