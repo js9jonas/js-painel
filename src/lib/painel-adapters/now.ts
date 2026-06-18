@@ -1,4 +1,4 @@
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // Painel N (pnw7.cc) — PHP session + reCAPTCHA v2
 // Auto-login: CapSolver ReCaptchaV2TaskProxyLess → POST validar-login.php → PHPSESSID no Set-Cookie
@@ -114,6 +114,27 @@ function parseStatus(cell3: string): ContaPainel["status"] {
   return "ok";
 }
 
+// Gera credencial aleatória: lowercase + dígitos, 9 chars, ao menos 1 letra + 1 número
+function gerarCredencialNow(): string {
+  const chars = "abcdefghjkmnpqrstuvwxyz123456789";
+  let s = "";
+  for (let i = 0; i < 9; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  if (!/[a-z]/.test(s)) s = "a" + s.slice(1);
+  if (!/[0-9]/.test(s)) s = s.slice(0, -1) + "1";
+  return s;
+}
+
+function parseModalValor(html: string, id: string): string {
+  const m = html.match(new RegExp(`id="${id}"[^>]+value="([^"]*)"`, "i"))
+         ?? html.match(new RegExp(`name="${id}"[^>]+value="([^"]*)"`, "i"));
+  return m ? m[1] : "";
+}
+
+function parseModalPerfil(html: string): string {
+  const m = html.match(/value="(\[(?:COM|SEM)-ADULTO\])"[^>]+checked/i);
+  return m ? m[1] : "[SEM-ADULTO]";
+}
+
 function buildDataTablesParams(length = 5000): URLSearchParams {
   const p = new URLSearchParams({ draw: "1", start: "0", length: String(length), "search[value]": "", "search[regex]": "false" });
   for (let i = 0; i <= 6; i++) {
@@ -209,6 +230,89 @@ export function criarNowAdapter(
           return m ? Number(m[1]) : null;
         });
       } catch { return null; }
+    },
+
+    async editarConta(usuarioId: string, campos: { novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+      return withRelogin(async (session) => {
+        const codrev = getCodrev(painelUrl);
+
+        // Busca dados atuais via modal de edição
+        const modalRes = await phpFetch(session, codrev, "ScriptModalUserEditar.php",
+          new URLSearchParams({ usuario: usuarioId })
+        );
+        if (!modalRes.ok) throw new Error(`NOW ScriptModalUserEditar → ${modalRes.status}`);
+        const modalHtml = await modalRes.text();
+        if (!modalHtml.includes("EditarNome")) throw new NowSessionExpiredError();
+
+        const nome  = campos.novoRotulo ?? parseModalValor(modalHtml, "EditarNome");
+        const senha = campos.novaSenha  ?? parseModalValor(modalHtml, "EditarSenha");
+        const perfil = parseModalPerfil(modalHtml);
+
+        const body = new URLSearchParams({
+          EditarPorEmail: "N",
+          EditarPorSMS:   "N",
+          EditarNome:     nome,
+          EditarSenha:    senha,
+          EditarEmail:    "",
+          EditarCelular:  "",
+          ValorCobrado:   "",
+          obs:            "",
+          Usuario:        usuarioId,
+        });
+        body.append("EditarPerfil[]", perfil);
+
+        const res = await phpFetch(session, codrev, "EnviarEditarUser.php", body);
+        if (!res.ok) throw new Error(`NOW editarConta → ${res.status}`);
+        const text = await res.text();
+        if (!text.includes("LimparScript")) throw new NowSessionExpiredError();
+        return { ok: true };
+      });
+    },
+
+    async gerarTeste({ comAdultos = false, rotulo = "" } = {}): Promise<ResultadoTeste> {
+      return withRelogin(async (session) => {
+        const codrev     = getCodrev(painelUrl);
+        const novoUser   = gerarCredencialNow();
+        const novaSenha  = gerarCredencialNow();
+        const perfil     = comAdultos ? "[COM-ADULTO]" : "[SEM-ADULTO]";
+
+        const body = new URLSearchParams({
+          EditarPorEmail: "N",
+          EditarPorSMS:   "N",
+          EditarNome:     rotulo,
+          EditarUsuario:  novoUser,
+          EditarSenha:    novaSenha,
+          EditarEmail:    "",
+          EditarCelular:  "",
+          obs:            "",
+        });
+        body.append("EditarPerfil[]", perfil);
+
+        const res = await phpFetch(session, codrev, "EnviarAdicionarTeste.php", body);
+        if (!res.ok) throw new Error(`NOW gerarTeste → ${res.status}`);
+        const text = await res.text();
+        if (!text.includes("LimparScript")) throw new NowSessionExpiredError();
+        if (!text.toLowerCase().includes("sucesso")) throw new Error("NOW gerarTeste: falhou.");
+
+        // Busca vencimento do teste recém-criado
+        let expiracao: string | undefined;
+        try {
+          const listaRes = await phpFetch(
+            session, codrev,
+            `teste-status-processo.php?usuario=${usuario}&status=&perfil=`,
+            buildDataTablesParams()
+          );
+          if (listaRes.ok) {
+            const listaText = await listaRes.text();
+            const lista = JSON.parse(listaText);
+            const rows: string[][] = lista.data ?? [];
+            const row = rows.find((r) => parseUsername(r[0]) === novoUser);
+            if (row) expiracao = parseVencimento(row[3]) ?? undefined;
+          }
+        } catch { /* segue sem expiracao */ }
+
+        return { ok: true, usuario: novoUser, senha: novaSenha, expiracao };
+      });
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
