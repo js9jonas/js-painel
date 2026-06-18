@@ -4,9 +4,11 @@ import { useState, type ReactNode } from "react";
 import ContasCards from "./ContasCards";
 import VerificarContaButton from "./VerificarContaButton";
 import DesvincularContaButton from "./DesvincularContaButton";
+import EditarContaButton from "./EditarContaButton";
 import type { ContaPainelVinculada } from "@/lib/clientes";
 
 type ContaAtualizada = { id_conta: number; vencimento: string | null; status: string };
+type AppVinculado = { id_app_registro: number; nome_app: string | null };
 
 type Props = {
   contas: ContaPainelVinculada[];
@@ -14,9 +16,10 @@ type Props = {
   vencContas?: string | null;
   emptyAction?: ReactNode;
   small?: boolean;
+  appsVinculados?: Map<string, AppVinculado[]>; // id_conta → apps
 };
 
-export default function ContasGroupClient({ contas, idCliente, vencContas, emptyAction, small }: Props) {
+export default function ContasGroupClient({ contas, idCliente, vencContas, emptyAction, small, appsVinculados }: Props) {
   const [verificados, setVerificados] = useState<Set<string>>(new Set());
 
   function marcarVerificados(atualizados: ContaAtualizada[]) {
@@ -35,6 +38,11 @@ export default function ContasGroupClient({ contas, idCliente, vencContas, empty
       small={small}
       contaAction={(c) => (
         <>
+          <EditarContaButton
+            conta={c}
+            idCliente={idCliente}
+            appsVinculados={appsVinculados?.get(c.id_conta) ?? []}
+          />
           <VerificarContaButton
             idConta={c.id_conta}
             usuario={c.usuario}

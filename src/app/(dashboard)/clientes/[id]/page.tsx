@@ -126,6 +126,17 @@ export default async function ClienteDetalhePage({ params }: Props) {
     contasPorAssinatura.set(c.id_assinatura, lista);
   }
 
+  // Mapa id_conta → apps vinculados (para alerta no modal de edição)
+  const appsPorConta = new Map<string, { id_app_registro: number; nome_app: string | null }[]>();
+  for (const app of aplicativos) {
+    if (app.id_conta != null) {
+      const key = String(app.id_conta);
+      const lista = appsPorConta.get(key) ?? [];
+      lista.push({ id_app_registro: app.id_app_registro, nome_app: app.nome_app });
+      appsPorConta.set(key, lista);
+    }
+  }
+
   // ✅ Inclui "atrasado" no card de destaque
   const ativa = [...assinaturas]
     .filter((a) => STATUS_DESTAQUE.includes((a.status ?? "").toLowerCase().trim()))
@@ -297,6 +308,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
                 contas={contasPorAssinatura.get(String(ativa.id_assinatura)) ?? []}
                 idCliente={id}
                 vencContas={ativa.venc_contas ?? null}
+                appsVinculados={appsPorConta}
                 emptyAction={
                   <AdicionarContaModal
                     idAssinatura={String(ativa.id_assinatura)}
