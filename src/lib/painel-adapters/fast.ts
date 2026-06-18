@@ -1,8 +1,9 @@
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://api.painelcliente.com
 // Auth: token permanente na URL + secret no body JSON
 // Credenciais armazenadas em servidores.api_token e servidores.api_secret
+// Swagger: https://painelcliente.com/swagger (OAS 3.0, requer login)
 
 const API_BASE = "https://api.painelcliente.com";
 
@@ -29,6 +30,12 @@ function mapStatus(enabled: number, expDate: number): ContaPainel["status"] {
   if (enabled === 0) return "bloqueada";
   if (expDate && new Date(expDate * 1000) < new Date()) return "vencida";
   return "ok";
+}
+
+// Gera credencial aleatória: 8 chars alfanuméricos lowercase
+function gerarCredencial(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
 export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
@@ -76,6 +83,44 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
       } catch {
         return null;
       }
+    },
+
+    async editarConta(usuario: string, campos: { novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+      const { token, secret } = getCredentials(creds);
+      const body: Record<string, unknown> = { secret, username: usuario };
+      if (campos.novaSenha)   body.password = campos.novaSenha;
+      if (campos.novoRotulo !== undefined) body.notes = campos.novoRotulo;
+      await apiFetch(token, "update_client", body);
+      return { ok: true };
+    },
+
+    async gerarTeste({ rotulo = "" } = {}): Promise<ResultadoTeste> {
+      const { token, secret } = getCredentials(creds);
+      // Busca bouquets disponíveis para incluir no teste
+      let bouquets: number[] = [];
+      try {
+        const bdata = await apiFetch(token, "bouquets", { secret });
+        const list: any[] = Array.isArray(bdata) ? bdata : Object.values(bdata);
+        bouquets = list.map((b: any) => Number(b.id ?? b.bouquet_id)).filter(Boolean);
+      } catch { /* usa bouquets vazio se falhar */ }
+
+      const usuario = gerarCredencial();
+      const senha   = gerarCredencial();
+
+      const data = await apiFetch(token, "trial_create", {
+        secret,
+        username:   usuario,
+        password:   senha,
+        idbouquet:  bouquets,
+        notes:      rotulo,
+      });
+
+      // exp_date em timestamp Unix
+      const expiracao = data?.exp_date
+        ? new Date(Number(data.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+        : undefined;
+
+      return { ok: true, usuario, senha, expiracao };
     },
   };
 }
