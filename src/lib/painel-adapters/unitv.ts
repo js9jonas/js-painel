@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { Impit } from "impit";
 import { impitFetch } from "./proxy-retry";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // UNITV (ResellerSystem) — https://panel-web.revenda.watch/
 // Auth: dealer_token retornado no login. Re-login automático via CapSolver (ImageToTextTask) quando returnCode=300.
@@ -225,6 +225,56 @@ export function criarUnitvAdapter(
       const pkgObjs: any[] = data.dealerInfo?.package_objs ?? [];
       const pkg = pkgObjs.find((p: any) => p.package_obj?.package_id === 1) ?? pkgObjs[0];
       return Number(pkg?.points ?? data.dealerInfo?.points ?? 0);
+    },
+
+    async editarConta(sn: string, campos: { novoRotulo?: string }): Promise<ResultadoEdicao> {
+      const listData = await callWithRelogin("account", (token) => ({
+        package_id: 1, dealer_token: token, dealer_name: usuario,
+        time_zone: "America/Sao_Paulo", page: 1, pageSize: 500,
+      }));
+      const conta = (listData.list ?? []).find((u: any) => u.sn === sn);
+      if (!conta) return { ok: false, erro: `UNITV: usuário "${sn}" não encontrado.` };
+
+      await callWithRelogin("account/upEdit", (token) => ({
+        dealer_token: token,
+        dealer_name: usuario,
+        sn:          conta.sn,
+        id:          conta.id,
+        sn_name:     campos.novoRotulo   ?? conta.snName      ?? "",
+        sn_email:    conta.snEmail       ?? "",
+        sn_telphone: conta.snTelphone    ?? "",
+        remark:      conta.remark        ?? "",
+      }), false);
+
+      return { ok: true };
+    },
+
+    async recriarlinha(sn: string): Promise<ResultadoTeste> {
+      const listData = await callWithRelogin("account", (token) => ({
+        package_id: 1, dealer_token: token, dealer_name: usuario,
+        time_zone: "America/Sao_Paulo", page: 1, pageSize: 500,
+      }));
+      const conta = (listData.list ?? []).find((u: any) => u.sn === sn);
+      if (!conta) return { ok: false, erro: `UNITV: usuário "${sn}" não encontrado.` };
+
+      // Dispara reset de senha — nova senha leva até 5min para propagar
+      await callWithRelogin("account/password", (token) => ({
+        sn:           conta.sn,
+        id:           conta.id,
+        dealer_token: token,
+        dealer_name:  usuario,
+      }));
+
+      // Aguarda ~2s e rebusca lista para pegar nova senha
+      await new Promise(r => setTimeout(r, 2000));
+      const updatedData = await callWithRelogin("account", (token) => ({
+        package_id: 1, dealer_token: token, dealer_name: usuario,
+        time_zone: "America/Sao_Paulo", page: 1, pageSize: 500,
+      }));
+      const updated = (updatedData.list ?? []).find((u: any) => u.sn === sn);
+      const novaSenha = updated?.newPassword ?? updated?.password ?? undefined;
+
+      return { ok: true, usuario: sn, senha: novaSenha };
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
