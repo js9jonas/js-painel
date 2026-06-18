@@ -265,6 +265,11 @@ export function criarNowAdapter(
         if (!res.ok) throw new Error(`NOW editarConta → ${res.status}`);
         const text = await res.text();
         if (!text.includes("LimparScript")) throw new NowSessionExpiredError();
+        if (!text.toLowerCase().includes("sucesso")) {
+          // Extrai mensagem de erro do HTML se houver
+          const match = text.match(/<p[^>]*>([^<]{5,200})<\/p>/i);
+          throw new Error(match ? match[1].trim() : "NOW: painel recusou a alteração.");
+        }
         return { ok: true };
       });
     },
