@@ -17,60 +17,62 @@ export async function POST(
     idConta     = body?.idConta;
     usuario     = body?.usuario;
     novaSenha   = body?.novaSenha   || undefined;
-    novoRotulo  = body?.novoRotulo  !== undefined ? String(body.novoRotulo)  : undefined;
+    novoRotulo  = body?.novoRotulo  !== undefined ? String(body.novoRotulo) : undefined;
     novoUsuario = body?.novoUsuario || undefined;
   } catch {
     return NextResponse.json({ erro: "Body inválido." }, { status: 400 });
   }
   if (!idConta || !usuario) return NextResponse.json({ erro: "Campos obrigatórios ausentes." }, { status: 400 });
 
-  // Tenta chamar o adapter (não bloqueia se não tiver editarConta)
-  let erroAdapter: string | null = null;
-  try {
-    const adapter = await getAdapterPainel(idPainel);
-    if (typeof adapter.editarConta === "function") {
-      const resultado = await adapter.editarConta(usuario, {
-        ...(novoUsuario && novoUsuario !== usuario ? { novoUsuario } : {}),
-        ...(novaSenha  ? { novaSenha }  : {}),
-        ...(novoRotulo !== undefined ? { novoRotulo } : {}),
-      });
-      if (!resultado.ok) erroAdapter = resultado.erro ?? "Adapter retornou erro.";
+  const temMudancaPainel = !!(novaSenha || (novoUsuario && novoUsuario !== usuario));
+
+  // Se há campos que precisam ir ao painel (senha/usuário), chama o adapter primeiro.
+  // Só atualiza o banco se o painel aceitar — evita inconsistência com dado inválido salvo.
+  if (temMudancaPainel) {
+    try {
+      const adapter = await getAdapterPainel(idPainel);
+      if (typeof adapter.editarConta === "function") {
+        const resultado = await adapter.editarConta(usuario, {
+          ...(novoUsuario && novoUsuario !== usuario ? { novoUsuario } : {}),
+          ...(novaSenha ? { novaSenha } : {}),
+          // Rótulo junto para não fazer 2 chamadas
+          ...(novoRotulo !== undefined ? { novoRotulo } : {}),
+        });
+        if (!resultado.ok) {
+          return NextResponse.json(
+            { erro: resultado.erro ?? "O painel rejeitou a alteração." },
+            { status: 422 }
+          );
+        }
+      }
+    } catch (e: unknown) {
+      return NextResponse.json(
+        { erro: e instanceof Error ? e.message : "Erro ao comunicar com o painel." },
+        { status: 422 }
+      );
     }
-  } catch (e: unknown) {
-    erroAdapter = e instanceof Error ? e.message : "Erro no adapter.";
+
+    // Painel aceitou — atualiza banco local com todos os campos alterados
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    if (novoRotulo !== undefined)            { values.push(novoRotulo || null); setClauses.push(`rotulo = $${values.length}`); }
+    if (novaSenha)                           { values.push(novaSenha);          setClauses.push(`senha = $${values.length}`); }
+    if (novoUsuario && novoUsuario !== usuario) { values.push(novoUsuario);     setClauses.push(`usuario = $${values.length}`); }
+    if (setClauses.length > 0) {
+      values.push(idConta);
+      await pool.query(`UPDATE public.contas SET ${setClauses.join(", ")} WHERE id_conta = $${values.length}`, values);
+    }
+
+    return NextResponse.json({ ok: true, mensagem: "Conta atualizada com sucesso." });
   }
 
-  // Atualiza banco local sempre (mesmo se adapter falhou)
-  const setClauses: string[] = [];
-  const values: unknown[] = [];
-
+  // Apenas rótulo mudou (campo local) — atualiza banco sem chamar adapter
   if (novoRotulo !== undefined) {
-    values.push(novoRotulo || null);
-    setClauses.push(`rotulo = $${values.length}`);
-  }
-  if (novaSenha) {
-    values.push(novaSenha);
-    setClauses.push(`senha = $${values.length}`);
-  }
-  if (novoUsuario && novoUsuario !== usuario) {
-    values.push(novoUsuario);
-    setClauses.push(`usuario = $${values.length}`);
-  }
-
-  if (setClauses.length > 0) {
-    values.push(idConta);
     await pool.query(
-      `UPDATE public.contas SET ${setClauses.join(", ")} WHERE id_conta = $${values.length}`,
-      values
+      `UPDATE public.contas SET rotulo = $1 WHERE id_conta = $2`,
+      [novoRotulo || null, idConta]
     );
   }
 
-  if (erroAdapter) {
-    return NextResponse.json({
-      ok: true,
-      aviso: `Banco local atualizado, mas o painel retornou erro: ${erroAdapter}`,
-    });
-  }
-
-  return NextResponse.json({ ok: true, mensagem: "Conta atualizada com sucesso." });
+  return NextResponse.json({ ok: true, mensagem: "Rótulo atualizado." });
 }
