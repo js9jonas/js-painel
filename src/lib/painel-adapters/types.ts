@@ -35,6 +35,8 @@ export interface PainelAdapter {
   editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string; novoPacote?: number }): Promise<ResultadoEdicao>;
   gerarTeste?(params: { comAdultos?: boolean; horas?: number; rotulo?: string }): Promise<ResultadoTeste>;
   recriarlinha?(usuario: string): Promise<ResultadoTeste>;
+  // Operações longas que não devem correr junto ao sync diário
+  importarSenhas?(): Promise<Map<string, string | null>>;
 }
 
 export type SaveSession = (cookie: string, expiry?: Date) => Promise<void>;

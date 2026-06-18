@@ -214,11 +214,28 @@ export function criarClubAdapter(
 
   return {
     async listarContas(): Promise<ContaPainel[]> {
+      // Apenas o bulk — 1 request. Senhas NÃO são buscadas aqui para não esgotar a sessão
+      // (CLUB é sessão única: 280+ chamadas individuais invalidam o token no servidor).
+      // Senhas são importadas separadamente via /importar-senhas.
       return withRelogin(async (token) => {
         const lista = await listarContasRaw(token);
+        return lista.map((l: any) => ({
+          usuario:    l.username,
+          rotulo:     l.reseller_notes || "",
+          vencimento: l.exp_date
+            ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+            : null,
+          status: mapStatus(l.status),
+          senha:  null, // sempre nulo aqui — senhas vivem no banco local
+        }));
+      });
+    },
 
-        // Busca senhas em paralelo via listas/{id}/info — batches de 20
-        const BATCH = 20;
+    // Importa senhas em batch via listas/{id}/info — chamado explicitamente, não no sync diário
+    async importarSenhas(): Promise<Map<string, string | null>> {
+      return withRelogin(async (token) => {
+        const lista = await listarContasRaw(token);
+        const BATCH = 10; // lotes menores para não stressar a sessão
         const senhas = new Map<string, string | null>();
         for (let i = 0; i < lista.length; i += BATCH) {
           const batch = lista.slice(i, i + BATCH);
@@ -228,19 +245,14 @@ export function criarClubAdapter(
           results.forEach((r, idx) => {
             if (r.status === "fulfilled" && r.value?.data?.password) {
               senhas.set(batch[idx].username, r.value.data.password as string);
+            } else {
+              senhas.set(batch[idx].username, null);
             }
           });
+          // Pausa entre lotes para não sobrecarregar a sessão
+          if (i + BATCH < lista.length) await new Promise(r => setTimeout(r, 500));
         }
-
-        return lista.map((l: any) => ({
-          usuario:    l.username,
-          rotulo:     l.reseller_notes || "",
-          vencimento: l.exp_date
-            ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
-            : null,
-          status: mapStatus(l.status),
-          senha:  senhas.get(l.username) ?? null,
-        }));
+        return senhas;
       });
     },
 
