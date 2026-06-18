@@ -227,6 +227,62 @@ export function criarUnitvAdapter(
       return Number(pkg?.points ?? data.dealerInfo?.points ?? 0);
     },
 
+    async gerarTeste({ rotulo = "" } = {}): Promise<ResultadoTeste> {
+      const package_id  = 1;
+      const points_type = 1;
+      const auth_cycle  = 1;
+      const points      = 1; // 1 mês — Basic Plan
+
+      // sign = md5("dealer", package_id, points_type, points)
+      const sign = md5("dealer", String(package_id), String(points_type), String(points));
+
+      // Snapshot da lista antes para identificar a conta nova
+      const antes = await callWithRelogin("account", (token) => ({
+        package_id, dealer_token: token, dealer_name: usuario,
+        time_zone: "America/Sao_Paulo", page: 1, pageSize: 500,
+      }));
+      const snAntes = new Set((antes.list ?? []).map((u: any) => u.sn));
+
+      // Cria conta
+      await callWithRelogin("account/create", (token) => ({
+        dealer_token: token,
+        dealer_name:  usuario,
+        sign,
+        pre_auth_id:  123,
+        package_id,
+        points_type,
+        auth_cycle,
+        add_total:    1,
+        points,
+      }));
+
+      // Aguarda processamento e rebusca lista
+      await new Promise(r => setTimeout(r, 3000));
+      const depois = await callWithRelogin("account", (token) => ({
+        package_id, dealer_token: token, dealer_name: usuario,
+        time_zone: "America/Sao_Paulo", page: 1, pageSize: 500,
+      }));
+      const nova = (depois.list ?? []).find((u: any) => !snAntes.has(u.sn));
+      if (!nova) throw new Error("UNITV: conta criada mas não encontrada na lista.");
+
+      // Aplica rótulo imediatamente se fornecido
+      if (rotulo) {
+        await callWithRelogin("account/upEdit", (token) => ({
+          dealer_token: token,
+          dealer_name:  usuario,
+          sn:           nova.sn,
+          id:           nova.id,
+          sn_name:      rotulo,
+          sn_email:     "",
+          sn_telphone:  "",
+          remark:       "",
+        }), false);
+      }
+
+      const expiracao = nova.expireTime ? nova.expireTime.slice(0, 10) : undefined;
+      return { ok: true, usuario: nova.sn, senha: nova.password, expiracao };
+    },
+
     async editarConta(sn: string, campos: { novoRotulo?: string }): Promise<ResultadoEdicao> {
       const listData = await callWithRelogin("account", (token) => ({
         package_id: 1, dealer_token: token, dealer_name: usuario,
