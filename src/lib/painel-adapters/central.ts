@@ -1,14 +1,16 @@
 import { Impit } from "impit";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // API base: https://api.controle.fit/api
 // Auth: JWT Bearer, expira em 1h
 // Login: Cloudflare Turnstile resolvido via CapSolver (sitekey 0x4AAAAAACFhU7XJduqvbHH2)
 
-const API_BASE       = "https://api.controle.fit/api";
-const SITEKEY        = "0x4AAAAAACFhU7XJduqvbHH2";
-const WEBSITE_URL    = "https://painel.fun/login";
-const impit          = new Impit({ browser: "chrome" });
+const API_BASE              = "https://api.controle.fit/api";
+const SITEKEY               = "0x4AAAAAACFhU7XJduqvbHH2";
+const WEBSITE_URL           = "https://painel.fun/login";
+const RECAPTCHA_SITEKEY     = "6LeJTpIeAAAAALiuQPGPcaXbs9XL-cKdwEBuOmJ7";
+const RECAPTCHA_WEBSITE_URL = "https://painel.fun/users";
+const impit                 = new Impit({ browser: "chrome" });
 
 async function resolverTurnstile(): Promise<string> {
   const apiKey = process.env.CAPSOLVER_API_KEY;
@@ -37,6 +39,42 @@ async function resolverTurnstile(): Promise<string> {
     if (result.status === "failed") throw new Error(`CapSolver falhou: ${result.errorDescription}`);
   }
   throw new Error("CapSolver timeout após 60s.");
+}
+
+// reCAPTCHA Enterprise para criação de usuários (sitekey do painel.fun)
+async function resolverReCaptchaEnterprise(): Promise<string | null> {
+  const apiKey = process.env.CAPSOLVER_API_KEY;
+  if (!apiKey) return null;
+
+  const { taskId, errorId } = await fetch("https://api.capsolver.com/createTask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      clientKey: apiKey,
+      task: { type: "ReCaptchaV2EnterpriseTaskProxyLess", websiteURL: RECAPTCHA_WEBSITE_URL, websiteKey: RECAPTCHA_SITEKEY },
+    }),
+  }).then(r => r.json()) as any;
+
+  if (errorId) return null;
+
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const result = await fetch("https://api.capsolver.com/getTaskResult", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientKey: apiKey, taskId }),
+    }).then(r => r.json()) as any;
+
+    if (result.status === "ready")  return result.solution.gRecaptchaResponse as string;
+    if (result.status === "failed") return null;
+  }
+  return null;
+}
+
+// Credenciais no padrão CENTRAL: 6 chars, lowercase + números (igual ao gerador do painel)
+function gerarCredencialCentral(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
 async function loginViaCapSolver(usuario: string, senha: string): Promise<string> {
@@ -189,6 +227,63 @@ export function criarCentralAdapter(
         : undefined;
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
+    },
+
+    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+      // Localiza a conta pelo username para obter o id interno
+      let conta: any = null;
+      let page = 1;
+      while (!conta) {
+        const data = await fetchComRetry(`users?page=${page}&per=100&reseller=${creds.painel_usuario}`);
+        const users: any[] = data.data ?? [];
+        conta = users.find((u: any) => u.username === usuario);
+        if (!conta && users.length < 100) break;
+        page++;
+      }
+      if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
+
+      const body: Record<string, any> = {
+        username:        campos.novoUsuario  ?? conta.username,
+        reseller_notes:  campos.novoRotulo   ?? conta.reseller_notes ?? "",
+      };
+      if (campos.novaSenha) body.password = campos.novaSenha;
+
+      await fetchComRetry(`users/${conta.id}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      return { ok: true };
+    },
+
+    async gerarTeste({ comAdultos = false } = {}): Promise<ResultadoTeste> {
+      const usuario    = gerarCredencialCentral();
+      const senha      = gerarCredencialCentral();
+      const packageId  = comAdultos ? 62 : 61;
+      const recaptcha  = await resolverReCaptchaEnterprise();
+
+      await fetchComRetry("trial_users", {
+        method: "POST",
+        body: JSON.stringify({
+          username:               usuario,
+          password:               senha,
+          full_name:              "",
+          as_number:              "",
+          type:                   1,
+          max_connections:        1,
+          is_trial:               true,
+          package_id:             packageId,
+          adult_channels:         comAdultos,
+          "g-recaptcha-response": recaptcha,
+          official_credits:       0,
+          isIPTV:                 true,
+        }),
+      });
+
+      // Duração fixa de 3h (determinada pelo package 61/62 no servidor)
+      const expiracao = new Date(Date.now() + 3 * 60 * 60 * 1000)
+        .toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+
+      return { ok: true, usuario, senha, expiracao };
     },
   };
 }
