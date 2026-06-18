@@ -231,26 +231,24 @@ export function criarClubAdapter(
       });
     },
 
-    // Importa senhas em batch via listas/{id}/info — chamado explicitamente, não no sync diário
+    // Importa senhas sequencialmente via listas/{id}/info — chamado explicitamente, não no sync diário.
+    // Sequencial (não paralelo) + pausa de 300ms para não invalizar a sessão única do CLUB.
+    // Se a sessão morrer no meio, retorna o parcial acumulado (não lança).
     async importarSenhas(): Promise<Map<string, string | null>> {
       return withRelogin(async (token) => {
         const lista = await listarContasRaw(token);
-        const BATCH = 10; // lotes menores para não stressar a sessão
         const senhas = new Map<string, string | null>();
-        for (let i = 0; i < lista.length; i += BATCH) {
-          const batch = lista.slice(i, i + BATCH);
-          const results = await Promise.allSettled(
-            batch.map((l: any) => apiFetch(token, `listas/${l.id}/info`))
-          );
-          results.forEach((r, idx) => {
-            if (r.status === "fulfilled" && r.value?.data?.password) {
-              senhas.set(batch[idx].username, r.value.data.password as string);
-            } else {
-              senhas.set(batch[idx].username, null);
+        for (const l of lista) {
+          try {
+            const info = await apiFetch(token, `listas/${l.id}/info`);
+            if (info?.data?.password) {
+              senhas.set(l.username, info.data.password as string);
             }
-          });
-          // Pausa entre lotes para não sobrecarregar a sessão
-          if (i + BATCH < lista.length) await new Promise(r => setTimeout(r, 500));
+          } catch (err) {
+            if (err instanceof ClubSessionExpiredError) break; // retorna parcial
+            // outros erros: ignora e continua
+          }
+          await new Promise(r => setTimeout(r, 300));
         }
         return senhas;
       });

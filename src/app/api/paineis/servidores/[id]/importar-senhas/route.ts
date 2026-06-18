@@ -42,10 +42,13 @@ export async function POST(
     if (rowCount) atualizadas++;
   }
 
-  return NextResponse.json({
-    ok: true,
-    total: senhas.size,
-    atualizadas,
-    mensagem: `${atualizadas} senhas salvas de ${senhas.size} contas.`,
-  });
+  const total = senhas.size;
+  const mensagem = total === 0
+    ? "Nenhuma senha encontrada — sessão pode ter expirado logo no início."
+    : atualizadas === 0
+    ? `${total} contas processadas — todas já tinham as senhas atualizadas.`
+    : `${atualizadas} senhas salvas de ${total} contas processadas.` +
+      (total < 262 ? ` (parcial — sessão expirou em ${total} contas, importe novamente para continuar)` : "");
+
+  return NextResponse.json({ ok: true, total, atualizadas, mensagem });
 }
