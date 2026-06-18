@@ -24,55 +24,56 @@ export async function POST(
   }
   if (!idConta || !usuario) return NextResponse.json({ erro: "Campos obrigatórios ausentes." }, { status: 400 });
 
-  const temMudancaPainel = !!(novaSenha || (novoUsuario && novoUsuario !== usuario));
+  const nada = novoRotulo === undefined && !novaSenha && !novoUsuario;
+  if (nada) return NextResponse.json({ erro: "Nenhum campo para atualizar." }, { status: 400 });
 
-  // Se há campos que precisam ir ao painel (senha/usuário), chama o adapter primeiro.
-  // Só atualiza o banco se o painel aceitar — evita inconsistência com dado inválido salvo.
-  if (temMudancaPainel) {
+  const campos = {
+    ...(novoUsuario && novoUsuario !== usuario ? { novoUsuario } : {}),
+    ...(novaSenha   ? { novaSenha }   : {}),
+    ...(novoRotulo !== undefined ? { novoRotulo } : {}),
+  };
+
+  let adapter;
+  try {
+    adapter = await getAdapterPainel(idPainel);
+  } catch (e: unknown) {
+    return NextResponse.json({ erro: e instanceof Error ? e.message : "Adapter indisponível." }, { status: 400 });
+  }
+
+  if (typeof adapter.editarConta === "function") {
+    // Adapter com suporte a edição — painel deve confirmar antes do banco ser atualizado
+    let resultado;
     try {
-      const adapter = await getAdapterPainel(idPainel);
-      if (typeof adapter.editarConta === "function") {
-        const resultado = await adapter.editarConta(usuario, {
-          ...(novoUsuario && novoUsuario !== usuario ? { novoUsuario } : {}),
-          ...(novaSenha ? { novaSenha } : {}),
-          // Rótulo junto para não fazer 2 chamadas
-          ...(novoRotulo !== undefined ? { novoRotulo } : {}),
-        });
-        if (!resultado.ok) {
-          return NextResponse.json(
-            { erro: resultado.erro ?? "O painel rejeitou a alteração." },
-            { status: 422 }
-          );
-        }
-      }
+      resultado = await adapter.editarConta(usuario, campos);
     } catch (e: unknown) {
       return NextResponse.json(
         { erro: e instanceof Error ? e.message : "Erro ao comunicar com o painel." },
         { status: 422 }
       );
     }
-
-    // Painel aceitou — atualiza banco local com todos os campos alterados
-    const setClauses: string[] = [];
-    const values: unknown[] = [];
-    if (novoRotulo !== undefined)            { values.push(novoRotulo || null); setClauses.push(`rotulo = $${values.length}`); }
-    if (novaSenha)                           { values.push(novaSenha);          setClauses.push(`senha = $${values.length}`); }
-    if (novoUsuario && novoUsuario !== usuario) { values.push(novoUsuario);     setClauses.push(`usuario = $${values.length}`); }
-    if (setClauses.length > 0) {
-      values.push(idConta);
-      await pool.query(`UPDATE public.contas SET ${setClauses.join(", ")} WHERE id_conta = $${values.length}`, values);
+    if (!resultado.ok) {
+      return NextResponse.json(
+        { erro: resultado.erro ?? "O painel rejeitou a alteração." },
+        { status: 422 }
+      );
     }
-
-    return NextResponse.json({ ok: true, mensagem: "Conta atualizada com sucesso." });
   }
+  // Painéis sem editarConta (app panels: funplays, lazerplay, etc.) → atualiza banco local apenas
 
-  // Apenas rótulo mudou (campo local) — atualiza banco sem chamar adapter
-  if (novoRotulo !== undefined) {
+  // Painel confirmou (ou não tem API de edição) — atualiza banco local
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
+  if (novoRotulo !== undefined)                  { values.push(novoRotulo || null); setClauses.push(`rotulo = $${values.length}`); }
+  if (novaSenha)                                 { values.push(novaSenha);          setClauses.push(`senha = $${values.length}`); }
+  if (novoUsuario && novoUsuario !== usuario)    { values.push(novoUsuario);        setClauses.push(`usuario = $${values.length}`); }
+
+  if (setClauses.length > 0) {
+    values.push(idConta);
     await pool.query(
-      `UPDATE public.contas SET rotulo = $1 WHERE id_conta = $2`,
-      [novoRotulo || null, idConta]
+      `UPDATE public.contas SET ${setClauses.join(", ")} WHERE id_conta = $${values.length}`,
+      values
     );
   }
 
-  return NextResponse.json({ ok: true, mensagem: "Rótulo atualizado." });
+  return NextResponse.json({ ok: true, mensagem: "Conta atualizada com sucesso." });
 }
