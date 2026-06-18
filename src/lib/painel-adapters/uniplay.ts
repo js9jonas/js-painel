@@ -1,5 +1,5 @@
 import { Impit, type HttpMethod } from "impit";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 
 // API base: https://gesapioffice.com/api
@@ -174,6 +174,71 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
       } catch {
         return null;
       }
+    },
+
+    async editarConta(usuario: string, campos: { novoRotulo?: string; novoPacote?: number }): Promise<ResultadoEdicao> {
+      const session = await obterSessao();
+      const users = await listar(session);
+      const user = users.find((u: any) => u.username === String(usuario));
+      if (!user) return { ok: false, erro: `Usuário "${usuario}" não encontrado no UNIPLAY.` };
+
+      const res = await authFetch(session.token, `users-iptv/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          action:          3,
+          nota:            campos.novoRotulo   ?? user.nota ?? "",
+          package:         campos.novoPacote   ?? 0,
+          username:        user.username,
+          reg_password:    session.cryptPass,
+          id_iptv:         user.id,
+          isCustomPackage: false,
+          bouquets:        [],
+          whatsapp:        user.whatsapp ?? "+550",
+          exp_day:         0,
+          flagVencimento:  0,
+        }),
+      });
+      if (!res.ok) throw new Error(`UNIPLAY editar → ${res.status}`);
+      return { ok: true };
+    },
+
+    async gerarTeste({ horas = 6, rotulo = "" } = {}): Promise<ResultadoTeste> {
+      const session = await obterSessao();
+      const res = await authFetch(session.token, "users-iptv", {
+        method: "POST",
+        body: JSON.stringify({
+          isOficial:       false,
+          package:         "1",
+          credits:         1,
+          isCustomPackage: false,
+          nota:            rotulo,
+          test_hours:      String(Math.min(Math.max(horas, 1), 6)),
+        }),
+      });
+      if (!res.ok) throw new Error(`UNIPLAY gerarTeste → ${res.status}`);
+      const data = await res.json() as any;
+      const expiracao = data.exp_date
+        ? new Date(data.exp_date).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+        : undefined;
+      return { ok: true, usuario: String(data.username), senha: data.password, expiracao };
+    },
+
+    async recriarlinha(usuario: string): Promise<ResultadoTeste> {
+      const session = await obterSessao();
+      const users = await listar(session);
+      const user = users.find((u: any) => u.username === String(usuario));
+      if (!user) return { ok: false, erro: `Usuário "${usuario}" não encontrado no UNIPLAY.` };
+
+      const res = await authFetch(session.token, `recreate-line/${user.id}`, {
+        method: "PUT",
+        body: "",
+      });
+      if (!res.ok) throw new Error(`UNIPLAY recriarlinha → ${res.status}`);
+      const data = await res.json() as any;
+      const expiracao = data.exp_date
+        ? new Date(data.exp_date).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+        : undefined;
+      return { ok: true, usuario: String(data.username), senha: data.password, expiracao };
     },
   };
 }

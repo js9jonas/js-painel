@@ -32,8 +32,9 @@ export interface PainelAdapter {
   listarContas(): Promise<ContaPainel[]>;
   renovar(usuario: string, meses: number): Promise<ResultadoRenovacao>;
   getCreditos?(): Promise<number | null>;
-  editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao>;
-  gerarTeste?(params: { comAdultos?: boolean; horas?: number }): Promise<ResultadoTeste>;
+  editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string; novoPacote?: number }): Promise<ResultadoEdicao>;
+  gerarTeste?(params: { comAdultos?: boolean; horas?: number; rotulo?: string }): Promise<ResultadoTeste>;
+  recriarlinha?(usuario: string): Promise<ResultadoTeste>;
 }
 
 export type SaveSession = (cookie: string, expiry?: Date) => Promise<void>;
