@@ -48,7 +48,7 @@ function isVencido(validade: string | null) {
   return validade.slice(0, 10) < hojeStr();
 }
 
-function playlistStatus(pl: PlaylistRow): "vinculada" | "expirada" | "nao_reconhecida" {
+function playlistStatus(pl: PlaylistRow, tipoPainel?: string | null): "vinculada" | "expirada" | "nao_reconhecida" {
   const hoje = hojeStr();
   if (pl.id_conta) {
     // Quando vinculada a uma conta, usa a validade real do painel — não o expired_date do FunPlays
@@ -56,8 +56,12 @@ function playlistStatus(pl: PlaylistRow): "vinculada" | "expirada" | "nao_reconh
     if (venc && venc.slice(0, 10) < hoje) return "expirada";
     return "vinculada";
   }
+  // SmartOne não preenche expired_date (a validade fica no device, não na playlist).
+  // Considerar válida se tem playlist_id_externo — "nao_reconhecida" seria falso positivo.
+  if (tipoPainel === "smartone" && pl.playlist_id_externo != null) return "vinculada";
   if (pl.expired_date && pl.expired_date.slice(0, 10) < hoje) return "expirada";
-  return "nao_reconhecida";
+  if (!pl.expired_date) return "nao_reconhecida";
+  return "vinculada";
 }
 
 // Username já vem na URL da playlist como query param — extrair pra exibir mesmo
@@ -118,11 +122,13 @@ function PlaylistOptionsButton({ onEditar, onExcluir, excluindo }: { onEditar: (
 function PlaylistBadge({
   pl,
   idAppRegistro,
+  tipoPainel,
   onEditar,
   onExcluido,
 }: {
   pl: PlaylistRow;
   idAppRegistro: number;
+  tipoPainel: string | null;
   onEditar: () => void;
   onExcluido: () => void;
 }) {
@@ -162,7 +168,7 @@ function PlaylistBadge({
     }
   }
 
-  const status = playlistStatus(pl);
+  const status = playlistStatus(pl, tipoPainel);
   const classes = {
     vinculada:       "bg-emerald-50 text-emerald-700 border border-emerald-200",
     expirada:        "bg-red-50 text-red-600 border border-red-200",
@@ -212,11 +218,13 @@ function PlaylistBadge({
 function PlaylistsRow({
   playlists,
   idAppRegistro,
+  tipoPainel,
   onEditarPlaylist,
   onPlaylistExcluida,
 }: {
   playlists: PlaylistRow[];
   idAppRegistro: number;
+  tipoPainel: string | null;
   onEditarPlaylist: (pl: PlaylistRow) => void;
   onPlaylistExcluida: (pl: PlaylistRow) => void;
 }) {
@@ -224,7 +232,7 @@ function PlaylistsRow({
 
   const stats = playlists.reduce(
     (acc, pl) => {
-      const s = playlistStatus(pl);
+      const s = playlistStatus(pl, tipoPainel);
       acc[s]++;
       return acc;
     },
@@ -252,6 +260,7 @@ function PlaylistsRow({
               key={pl.id}
               pl={pl}
               idAppRegistro={idAppRegistro}
+              tipoPainel={tipoPainel}
               onEditar={() => onEditarPlaylist(pl)}
               onExcluido={() => onPlaylistExcluida(pl)}
             />
@@ -370,7 +379,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                 const isExpanded = expandedIds.has(a.id_app_registro);
                 const plStats = (playlists ?? []).reduce(
                   (acc, pl) => {
-                    const s = playlistStatus(pl);
+                    const s = playlistStatus(pl, a.tipo_painel);
                     acc[s]++;
                     return acc;
                   },
@@ -496,6 +505,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                       <PlaylistsRow
                         playlists={playlists}
                         idAppRegistro={a.id_app_registro}
+                        tipoPainel={a.tipo_painel}
                         onEditarPlaylist={(pl) => setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
                         onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
                       />
