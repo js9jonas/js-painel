@@ -35,6 +35,7 @@ export type AplicativoRow = {
   status: string | null;
   observacao: string | null;
   id_assinatura: number | null;
+  venc_contrato: string | null;
   id_conta: number | null;
   id_dispositivo: number | null;
   id_painel_servidor: number | null;
@@ -59,6 +60,7 @@ export async function getAplicativosByClienteId(id_cliente: string): Promise<Apl
        ap.status,
        ap.observacao,
        ap.id_assinatura,
+       to_char(ass.venc_contrato, 'YYYY-MM-DD') AS venc_contrato,
        ap.id_conta,
        ap.id_dispositivo,
        ap.id_painel_servidor,
@@ -85,10 +87,11 @@ export async function getAplicativosByClienteId(id_cliente: string): Promise<Apl
      FROM public.aplicativos ap
      LEFT JOIN public.apps a ON a.id_app = ap.id_app
      LEFT JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor
+     LEFT JOIN public.assinaturas ass ON ass.id_assinatura = ap.id_assinatura
      LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
      LEFT JOIN public.contas c ON c.id_conta = pl.id_conta
      WHERE ap.id_cliente = $1::int
-     GROUP BY ap.id_app_registro, a.nome_app, a.exige_licenca, ps.tipo
+     GROUP BY ap.id_app_registro, a.nome_app, a.exige_licenca, ps.tipo, ass.venc_contrato
      ORDER BY ap.atualizado_em DESC NULLS LAST, ap.id_app_registro DESC`,
     [id_cliente]
   );

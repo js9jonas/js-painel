@@ -48,10 +48,14 @@ function isVencido(validade: string | null) {
   return validade.slice(0, 10) < hojeStr();
 }
 
-function playlistStatus(pl: PlaylistRow, tipoPainel?: string | null): "vinculada" | "expirada" | "nao_reconhecida" {
+function playlistStatus(pl: PlaylistRow, tipoPainel?: string | null, vencContrato?: string | null): "vinculada" | "expirada" | "nao_reconhecida" {
   const hoje = hojeStr();
+  // Assinatura é a fonte de verdade: se há venc_contrato, determina o status diretamente.
+  if (vencContrato) {
+    return vencContrato < hoje ? "expirada" : "vinculada";
+  }
   if (pl.id_conta) {
-    // Quando vinculada a uma conta, usa a validade real do painel — não o expired_date do FunPlays
+    // Sem assinatura, usa a validade real da conta no painel — não o expired_date do FunPlays
     const venc = pl.venc_real_conta;
     if (venc && venc.slice(0, 10) < hoje) return "expirada";
     return "vinculada";
@@ -123,12 +127,14 @@ function PlaylistBadge({
   pl,
   idAppRegistro,
   tipoPainel,
+  vencContrato,
   onEditar,
   onExcluido,
 }: {
   pl: PlaylistRow;
   idAppRegistro: number;
   tipoPainel: string | null;
+  vencContrato: string | null;
   onEditar: () => void;
   onExcluido: () => void;
 }) {
@@ -168,7 +174,7 @@ function PlaylistBadge({
     }
   }
 
-  const status = playlistStatus(pl, tipoPainel);
+  const status = playlistStatus(pl, tipoPainel, vencContrato);
   const classes = {
     vinculada:       "bg-emerald-50 text-emerald-700 border border-emerald-200",
     expirada:        "bg-red-50 text-red-600 border border-red-200",
@@ -219,12 +225,14 @@ function PlaylistsRow({
   playlists,
   idAppRegistro,
   tipoPainel,
+  vencContrato,
   onEditarPlaylist,
   onPlaylistExcluida,
 }: {
   playlists: PlaylistRow[];
   idAppRegistro: number;
   tipoPainel: string | null;
+  vencContrato: string | null;
   onEditarPlaylist: (pl: PlaylistRow) => void;
   onPlaylistExcluida: (pl: PlaylistRow) => void;
 }) {
@@ -232,7 +240,7 @@ function PlaylistsRow({
 
   const stats = playlists.reduce(
     (acc, pl) => {
-      const s = playlistStatus(pl, tipoPainel);
+      const s = playlistStatus(pl, tipoPainel, vencContrato);
       acc[s]++;
       return acc;
     },
@@ -261,6 +269,7 @@ function PlaylistsRow({
               pl={pl}
               idAppRegistro={idAppRegistro}
               tipoPainel={tipoPainel}
+              vencContrato={vencContrato}
               onEditar={() => onEditarPlaylist(pl)}
               onExcluido={() => onPlaylistExcluida(pl)}
             />
@@ -379,7 +388,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                 const isExpanded = expandedIds.has(a.id_app_registro);
                 const plStats = (playlists ?? []).reduce(
                   (acc, pl) => {
-                    const s = playlistStatus(pl, a.tipo_painel);
+                    const s = playlistStatus(pl, a.tipo_painel, a.venc_contrato);
                     acc[s]++;
                     return acc;
                   },
@@ -506,6 +515,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
                         playlists={playlists}
                         idAppRegistro={a.id_app_registro}
                         tipoPainel={a.tipo_painel}
+                        vencContrato={a.venc_contrato}
                         onEditarPlaylist={(pl) => setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
                         onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
                       />
