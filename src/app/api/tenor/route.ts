@@ -3,9 +3,8 @@ import { auth } from '@/auth'
 
 export const dynamic = 'force-dynamic'
 
-const TENOR_KEY = process.env.TENOR_API_KEY ?? ''
-const TENOR_BASE = 'https://tenor.googleapis.com/v2'
-const CLIENT_KEY = 'js-painel'
+const GIPHY_KEY = process.env.GIPHY_API_KEY ?? ''
+const GIPHY_BASE = 'https://api.giphy.com/v1/gifs'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -13,40 +12,43 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q') ?? ''
-  const pos = searchParams.get('pos') ?? ''
+  const offset = parseInt(searchParams.get('pos') ?? '0', 10)
   const limit = 20
 
   const params = new URLSearchParams({
-    key: TENOR_KEY,
-    client_key: CLIENT_KEY,
+    api_key: GIPHY_KEY,
     limit: String(limit),
-    media_filter: 'gif,tinygif,mp4,tinymp4',
-    contentfilter: 'low',
+    offset: String(offset),
+    rating: 'pg',
+    lang: 'pt',
   })
-  if (pos) params.set('pos', pos)
 
   const endpoint = q
-    ? `${TENOR_BASE}/search?${params}&q=${encodeURIComponent(q)}`
-    : `${TENOR_BASE}/featured?${params}`
+    ? `${GIPHY_BASE}/search?${params}&q=${encodeURIComponent(q)}`
+    : `${GIPHY_BASE}/trending?${params}`
 
   try {
     const r = await fetch(endpoint)
     const data = await r.json()
+    type GiphyImage = { url?: string; mp4?: string }
     // Normaliza para { results: [{id, gif, tinygif, mp4, preview}], next }
-    const results = (data.results ?? []).map((item: Record<string, unknown>) => {
-      const media = (item.media_formats ?? {}) as Record<string, { url: string; dims: number[] }>
+    const results = (data.data ?? []).map((item: Record<string, unknown>) => {
+      const images = (item.images ?? {}) as Record<string, GiphyImage>
       return {
         id: item.id,
-        gif: media.gif?.url ?? '',
-        tinygif: media.tinygif?.url ?? media.gif?.url ?? '',
-        mp4: media.mp4?.url ?? media.tinymp4?.url ?? '',
-        preview: media.tinygif?.url ?? media.gif?.url ?? '',
+        gif: images.original?.url ?? images.downsized?.url ?? '',
+        tinygif: images.fixed_width_downsampled?.url ?? images.fixed_width_small?.url ?? '',
+        mp4: images.original?.mp4 ?? images.fixed_height?.mp4 ?? '',
+        preview: images.fixed_width_downsampled?.url ?? '',
         title: item.title ?? '',
       }
     })
-    return NextResponse.json({ results, next: data.next ?? '' })
+    const pagination = (data.pagination ?? {}) as { offset?: number; count?: number; total_count?: number }
+    const nextOffset = (pagination.offset ?? offset) + (pagination.count ?? results.length)
+    const hasMore = nextOffset < (pagination.total_count ?? 0)
+    return NextResponse.json({ results, next: hasMore ? String(nextOffset) : '' })
   } catch (err) {
-    console.error('[Tenor]', err)
+    console.error('[Giphy]', err)
     return NextResponse.json({ error: 'Erro ao buscar GIFs' }, { status: 500 })
   }
 }
