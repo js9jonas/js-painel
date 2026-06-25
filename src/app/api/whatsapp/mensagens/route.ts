@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
           id, wa_msg_id, telefone, nome_contato, tipo,
           conteudo, media_mime, nome_arquivo, origem, sugestao_ia, foi_aceita, mensagem_final,
           reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem,
-          reacao, status, source, recebida_em
+          reacao, status, source, recebida_em, transcricao
         FROM public.whatsapp_mensagens
         WHERE telefone = $1
         ORDER BY recebida_em DESC

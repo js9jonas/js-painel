@@ -15,6 +15,7 @@ import type { PlanoRow } from '@/lib/planos'
 import type { PacoteRow } from '@/lib/pacotes'
 import RenovarAssinatura from '@/components/clientes/RenovarAssinatura'
 import StickerPicker from '@/components/chat/StickerPicker'
+import TranscribeButton from '@/components/chat/TranscribeButton'
 
 interface Conversa {
   telefone: string
@@ -48,6 +49,7 @@ interface Mensagem {
   status: string | null
   source: string | null
   recebida_em: string
+  transcricao: string | null
 }
 
 interface Cliente {
@@ -1306,12 +1308,24 @@ export default function ChatPage() {
                         {msg.tipo === 'audio' && msg.conteudo && (
                           mediaErros.has(msg.id)
                             ? <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#adbac1', fontSize: 13, fontStyle: 'italic', padding: '4px 0' }}>🎵 Áudio indisponível</div>
-                            : <audio
-                                controls
-                                src={`/api/whatsapp/media?id=${msg.conteudo}`}
-                                style={{ maxWidth: '100%', height: 36, display: 'block' }}
-                                onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
-                              />
+                            : <>
+                                <audio
+                                  controls
+                                  src={`/api/whatsapp/media?id=${msg.conteudo}`}
+                                  style={{ maxWidth: '100%', height: 36, display: 'block' }}
+                                  onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
+                                />
+                                {msg.transcricao
+                                  ? <div style={{ fontSize: 12, color: msg.origem === 'cliente' ? '#3b4a54' : '#e9ffd8', marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
+                                      {msg.transcricao}
+                                    </div>
+                                  : <TranscribeButton
+                                      msgId={msg.id}
+                                      fromMe={msg.origem !== 'cliente'}
+                                      onTranscribed={t => setMensagens(prev => prev.map(m => m.id === msg.id ? { ...m, transcricao: t } : m))}
+                                    />
+                                }
+                              </>
                         )}
                         {msg.tipo === 'image' && msg.conteudo && (
                           mediaErros.has(msg.id)
