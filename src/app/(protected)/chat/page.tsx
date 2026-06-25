@@ -1316,7 +1316,7 @@ export default function ChatPage() {
                                   onError={() => setMediaErros(prev => new Set(prev).add(msg.id))}
                                 />
                                 {msg.transcricao
-                                  ? <div style={{ fontSize: 12, color: msg.origem === 'cliente' ? '#3b4a54' : '#e9ffd8', marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
+                                  ? <div style={{ fontSize: 12, color: '#3b4a54', marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
                                       {msg.transcricao}
                                     </div>
                                   : <TranscribeButton
