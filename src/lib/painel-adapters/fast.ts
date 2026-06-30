@@ -122,5 +122,10 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
 
       return { ok: true, usuario, senha, expiracao };
     },
+
+    async deletarConta(usuario: string): Promise<void> {
+      const { token, secret } = getCredentials(creds);
+      await apiFetch(token, "delete_client", { secret, username: usuario });
+    },
   };
 }

@@ -60,6 +60,18 @@ async function liebePost(token: string, path: string, body?: object): Promise<an
   return res.json();
 }
 
+async function liebeDelete(token: string, path: string): Promise<void> {
+  const res = await impitFetch(impit, `${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: baseHeaders(token),
+  });
+  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`LIEBE DELETE ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
+  }
+}
+
 async function liebePut(token: string, path: string, body?: object): Promise<any> {
   const res = await impitFetch(impit, `${API_BASE}${path}`, {
     method: "PUT",
@@ -197,6 +209,15 @@ export function criarLiebeAdapter(
         const customer = result.data ?? result;
         const expiracao = customer.expires_at_tz?.slice(0, 10) ?? undefined;
         return { ok: true, usuario: String(customer.username), senha: String(customer.password), expiracao };
+      });
+    },
+
+    async deletarConta(usuario: string): Promise<void> {
+      return withRelogin(async (token) => {
+        const listJson = await liebeGet(token, `/customers?page=1&username=${encodeURIComponent(usuario)}&perPage=20`);
+        const conta = (listJson.data ?? []).find((c: any) => c.username === usuario);
+        if (!conta) throw new Error(`LIEBE: usuário "${usuario}" não encontrado.`);
+        await liebeDelete(token, `/customers/${conta.id}`);
       });
     },
   };

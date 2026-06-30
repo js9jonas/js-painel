@@ -377,5 +377,20 @@ export function criarUnitvAdapter(
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
     },
+
+    async deletarConta(sn: string): Promise<void> {
+      const listData = await callWithRelogin("account", (token) => ({
+        package_id: 1, dealer_token: token, dealer_name: usuario,
+        time_zone: "America/Sao_Paulo", page: 1, pageSize: 500,
+      }));
+      const conta = (listData.list ?? []).find((u: any) => u.sn === sn);
+      if (!conta) throw new Error(`UNITV: usuário "${sn}" não encontrado.`);
+      await callWithRelogin("account/delete", (token) => ({
+        sn:           conta.sn,
+        id:           conta.id,
+        dealer_token: token,
+        dealer_name:  usuario,
+      }), false);
+    },
   };
 }

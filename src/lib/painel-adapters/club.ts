@@ -146,9 +146,12 @@ async function apiFetch(token: string, path: string, options: { method?: HttpMet
   return data;
 }
 
-function mapStatus(s: string | number): ContaPainel["status"] {
-  if (String(s) === "1") return "ok";
+function mapStatus(s: string | number, expDate?: number): ContaPainel["status"] {
   if (String(s) === "0") return "bloqueada";
+  if (String(s) === "1") {
+    if (expDate && new Date(expDate * 1000) < new Date()) return "vencida";
+    return "ok";
+  }
   return "vencida";
 }
 
@@ -225,7 +228,7 @@ export function criarClubAdapter(
           vencimento: l.exp_date
             ? new Date(Number(l.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
             : null,
-          status: mapStatus(l.status),
+          status: mapStatus(l.status, l.exp_date ? Number(l.exp_date) : undefined),
           senha:  null, // sempre nulo aqui — senhas vivem no banco local
         }));
       });
@@ -356,6 +359,16 @@ export function criarClubAdapter(
           .toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
 
         return { ok: true, usuario, senha, expiracao };
+      });
+    },
+
+    async deletarConta(usuario: string): Promise<void> {
+      return withRelogin(async (token) => {
+        const lista = await listarContasRaw(token);
+        const conta = lista.find((l: any) => l.username === usuario);
+        if (!conta) throw new Error(`CLUB: usuário "${usuario}" não encontrado.`);
+        const result = await apiFetch(token, `listas/${conta.id}/deletar`, { method: "POST" });
+        if (result?.result === false) throw new Error(result.msg ?? "CLUB: falha ao deletar conta.");
       });
     },
   };
