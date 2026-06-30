@@ -98,7 +98,7 @@ export default function EditAssinaturaModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="mb-5">
           <h2 className="text-lg font-bold text-zinc-900">Editar Assinatura</h2>
           <p className="text-sm text-zinc-500 mt-0.5">ID: {assinatura.id_assinatura}</p>
@@ -170,7 +170,7 @@ export default function EditAssinaturaModal({
           </div>
 
           {/* Vencimentos */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
                 Venc. Contrato
@@ -231,7 +231,7 @@ export default function EditAssinaturaModal({
           </p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button
             type="button"
             onClick={onClose}

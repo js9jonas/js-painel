@@ -268,9 +268,9 @@ export default function RenovarAssinatura({
 
             {open && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh]">
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh] overflow-x-hidden">
 
-                        <div className="px-6 pt-6 pb-4 border-b">
+                        <div className="px-4 pt-5 pb-4 border-b sm:px-6 sm:pt-6">
                             <h2 className="text-lg font-semibold text-zinc-900">Renovar assinatura</h2>
                             <p className="mt-1 text-xs text-zinc-500">
                                 Assinatura #{idAssinatura}
@@ -309,7 +309,7 @@ export default function RenovarAssinatura({
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 sm:px-6">
 
                                 {/* Modo normal: mostra período e datas */}
                                 {!isPendente && (
@@ -464,7 +464,7 @@ export default function RenovarAssinatura({
                             </div>
                         )}
 
-                        <div className="px-6 py-4 border-t flex justify-end gap-2">
+                        <div className="px-4 py-4 border-t flex flex-wrap justify-end gap-2 sm:px-6">
                             {resultadosContas.length > 0 ? (
                                 <button type="button" onClick={fecharComRefresh}
                                     className="h-9 rounded-xl bg-zinc-900 px-4 text-sm text-white font-medium hover:bg-zinc-800">

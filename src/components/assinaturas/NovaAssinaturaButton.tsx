@@ -84,15 +84,15 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
-          <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh]">
+          <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh] overflow-x-hidden">
 
-            <div className="px-6 pt-6 pb-4 border-b border-zinc-100">
+            <div className="px-4 pt-5 pb-4 border-b border-zinc-100 sm:px-6 sm:pt-6">
               <h2 className="text-lg font-bold text-zinc-900">Nova Assinatura</h2>
               <p className="text-sm text-zinc-500 mt-0.5">Cliente ID {idCliente}</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 sm:px-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Status</label>
                   <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
@@ -107,7 +107,7 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Pacote</label>
                   <select value={idPacote} onChange={(e) => handlePacoteChange(e.target.value)} className={selectClass}>
@@ -159,9 +159,9 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
               </div>
             </div>
 
-            {error && <p className="mx-6 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="mx-4 sm:mx-6 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-            <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-3">
+            <div className="px-4 py-4 border-t border-zinc-100 flex flex-wrap justify-end gap-3 sm:px-6">
               <button onClick={handleClose} disabled={isPending}
                 className="h-10 rounded-xl border border-zinc-300 px-5 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50">
                 Cancelar
