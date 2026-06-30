@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { pool } from "@/lib/db";
 import VinculacaoAssinaturaClient from "./VinculacaoAssinaturaClient";
 import AutoVincularAssinaturaButton from "./AutoVincularAssinaturaButton";
+import AssinaturasDivergentes, { type AssinaturaDivergente } from "./AssinaturasDivergentes";
 
 export type ContaVinculacaoAssinatura = {
   id_conta: number;
@@ -21,6 +22,34 @@ export type ContaVinculacaoAssinatura = {
   sugestao_nome_cliente: string | null;
   score: number | null;
 };
+
+async function getAssinaturasDivergentes(): Promise<AssinaturaDivergente[]> {
+  const { rows } = await pool.query<AssinaturaDivergente>(`
+    SELECT
+      a.id_assinatura,
+      a.id_cliente,
+      cl.nome                              AS cliente,
+      pk.contrato                          AS pacote,
+      pl.tipo                              AS plano,
+      COALESCE(pk.telas, pl.telas)         AS telas_esperadas,
+      COUNT(c.id_conta) FILTER (WHERE c.removido_em IS NULL)::int AS contas_ativas,
+      (COALESCE(pk.telas, pl.telas) - COUNT(c.id_conta) FILTER (WHERE c.removido_em IS NULL))::int AS diferenca,
+      a.venc_contrato::text
+    FROM public.assinaturas a
+    JOIN public.clientes cl ON cl.id_cliente = a.id_cliente
+    LEFT JOIN public.pacote pk ON pk.id_pacote = a.id_pacote
+    LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
+    LEFT JOIN public.contas c ON c.id_assinatura = a.id_assinatura
+    WHERE a.status = 'ativo'
+      AND COALESCE(pk.telas, pl.telas) IS NOT NULL
+    GROUP BY a.id_assinatura, a.id_cliente, cl.nome, pk.contrato, pl.tipo, pk.telas, pl.telas, a.venc_contrato
+    HAVING
+      COUNT(c.id_conta) FILTER (WHERE c.removido_em IS NULL) = 0
+      OR COUNT(c.id_conta) FILTER (WHERE c.removido_em IS NULL) <> COALESCE(pk.telas, pl.telas)
+    ORDER BY diferenca DESC, cl.nome
+  `);
+  return rows;
+}
 
 async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
   const { rows } = await pool.query<ContaVinculacaoAssinatura>(`
@@ -77,7 +106,7 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
 }
 
 export default async function VinculacaoAssinaturaPage() {
-  const contas = await getDados();
+  const [contas, divergentes] = await Promise.all([getDados(), getAssinaturasDivergentes()]);
   const semVinculo = contas.filter((c) => !c.id_assinatura).length;
   const vinculadas = contas.filter((c) => c.id_assinatura).length;
   const confiantes = contas.filter((c) => !c.id_assinatura && (c.score ?? 0) >= 0.7).length;
@@ -90,6 +119,8 @@ export default async function VinculacaoAssinaturaPage() {
           Associe cada conta dos painéis à assinatura correspondente para habilitar a renovação automática.
         </p>
       </div>
+
+      <AssinaturasDivergentes rows={divergentes} />
 
       <div className="flex flex-wrap gap-4 items-center">
         <div className="rounded-xl border bg-white px-5 py-3 shadow-sm">
