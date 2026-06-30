@@ -4,16 +4,16 @@ import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import { getAdapterPainel } from "@/lib/painel-adapters";
 
-// POST /api/contas/[idConta]/excluir
+// POST /api/contas/[id]/excluir
 // Exclui a conta no painel externo e marca removido_em localmente.
 export async function POST(
   _req: NextRequest,
-  { params }: { params: Promise<{ idConta: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ erro: "Não autorizado." }, { status: 401 });
 
-  const { idConta } = await params;
+  const { id: idConta } = await params;
   const id = parseInt(idConta, 10);
   if (isNaN(id)) return NextResponse.json({ erro: "ID inválido." }, { status: 400 });
 
