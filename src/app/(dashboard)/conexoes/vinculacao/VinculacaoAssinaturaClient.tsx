@@ -19,6 +19,27 @@ function formatDate(d: string | null) {
   return d.slice(0, 10).split("-").reverse().join("/");
 }
 
+function diasRestantes(venc: string | null): number | null {
+  if (!venc) return null;
+  const [ano, mes, dia] = venc.slice(0, 10).split("-").map(Number);
+  const vencDate = new Date(ano, mes - 1, dia);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return Math.round((vencDate.getTime() - hoje.getTime()) / 86400000);
+}
+
+function DiasBadge({ venc }: { venc: string | null }) {
+  const dias = diasRestantes(venc);
+  if (dias === null) return <span className="text-zinc-300">—</span>;
+  if (dias > 0) return (
+    <span className="text-xs font-semibold text-emerald-600">+{dias}d</span>
+  );
+  if (dias === 0) return (
+    <span className="text-xs font-semibold text-amber-600">hoje</span>
+  );
+  return <span className="text-xs font-semibold text-red-600">{dias}d</span>;
+}
+
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return <span className="text-xs text-zinc-400 italic">sem match</span>;
   const pct = Math.round(score * 100);
@@ -172,6 +193,8 @@ export default function VinculacaoAssinaturaClient({
   const router = useRouter();
   const [listaContas, setListaContas] = useState(contas);
   const [vinculandoId, setVinculandoId] = useState<number | null>(null);
+  const [excluindoId, setExcluindoId] = useState<number | null>(null);
+  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<"sem" | "com" | "todos">("sem");
   const [busca, setBusca] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -230,8 +253,33 @@ export default function VinculacaoAssinaturaClient({
     });
   }
 
+  async function handleExcluir(idConta: number, usuario: string) {
+    if (!confirm(`Excluir a conta "${usuario}" no painel externo? Esta ação não pode ser desfeita.`)) return;
+    setExcluindoId(idConta);
+    setErroExclusao(null);
+    try {
+      const res = await fetch(`/api/contas/${idConta}/excluir`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setErroExclusao(json.erro ?? "Erro ao excluir.");
+      } else {
+        setListaContas(prev => prev.filter(c => c.id_conta !== idConta));
+      }
+    } catch {
+      setErroExclusao("Erro de rede ao excluir.");
+    } finally {
+      setExcluindoId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {erroExclusao && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span className="font-medium">Erro ao excluir:</span> {erroExclusao}
+          <button onClick={() => setErroExclusao(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex rounded-lg border border-zinc-200 overflow-hidden text-sm">
@@ -274,7 +322,7 @@ export default function VinculacaoAssinaturaClient({
               <table className="w-full text-sm">
                 <thead className="border-b bg-zinc-50/50">
                   <tr>
-                    {["Usuário", "Rótulo", "Vencimento", "Assinatura vinculada", ""].map((h) => (
+                    {["Usuário", "Rótulo", "Vencimento", "Dias", "Assinatura vinculada", ""].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wide"
@@ -295,6 +343,9 @@ export default function VinculacaoAssinaturaClient({
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-zinc-600 whitespace-nowrap">
                         {formatDate(c.vencimento_real_painel)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <DiasBadge venc={c.vencimento_real_painel} />
                       </td>
                       <td className="px-4 py-3 min-w-72">
                         {vinculandoId === c.id_conta ? (
@@ -329,6 +380,14 @@ export default function VinculacaoAssinaturaClient({
                                 className="h-7 rounded-md border border-zinc-200 px-2.5 text-xs text-zinc-500 hover:border-red-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                               >
                                 Desvincular
+                              </button>
+                            ) : c.status_conta === "vencida" ? (
+                              <button
+                                onClick={() => handleExcluir(c.id_conta, c.usuario)}
+                                disabled={excluindoId === c.id_conta}
+                                className="h-7 rounded-md border border-red-200 bg-red-50 px-2.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-40"
+                              >
+                                {excluindoId === c.id_conta ? "..." : "Excluir"}
                               </button>
                             ) : !c.sugestao_id_assinatura ? (
                               <button

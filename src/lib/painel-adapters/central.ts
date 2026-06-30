@@ -285,5 +285,30 @@ export function criarCentralAdapter(
 
       return { ok: true, usuario, senha, expiracao };
     },
+
+    async deletarConta(usuario: string): Promise<void> {
+      // Localiza o id interno iterando páginas (API não tem busca por username)
+      let idInterno: number | null = null;
+      let page = 1;
+      while (idInterno === null) {
+        const data = await fetchComRetry(`users?page=${page}&per=100&reseller=${creds.painel_usuario}`);
+        const users: any[] = data.data ?? [];
+        const found = users.find((u: any) => u.username === usuario);
+        if (found) { idInterno = found.id; break; }
+        if (users.length < 100) break;
+        page++;
+      }
+      if (idInterno === null) throw new Error(`CENTRAL: usuário "${usuario}" não encontrado.`);
+
+      const token = await obterToken();
+      const res = await fetch(`${API_BASE}/users/${idInterno}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        throw new Error(`CENTRAL deletar → ${res.status}: ${msg.slice(0, 200)}`);
+      }
+    },
   };
 }

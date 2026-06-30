@@ -35,6 +35,7 @@ export interface PainelAdapter {
   editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string; novoPacote?: number }): Promise<ResultadoEdicao>;
   gerarTeste?(params: { comAdultos?: boolean; horas?: number; rotulo?: string }): Promise<ResultadoTeste>;
   recriarlinha?(usuario: string): Promise<ResultadoTeste>;
+  deletarConta?(usuario: string): Promise<void>;
   // Operações longas que não devem correr junto ao sync diário
   importarSenhas?(prioridade?: Set<string>): Promise<Map<string, string | null>>;
 }
