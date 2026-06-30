@@ -11,7 +11,9 @@ interface Item {
 
 export default function NavDropdown({ label, items }: { label: string; items: Item[] }) {
   const [aberto, setAberto] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
   const pathname = usePathname()
 
   const ativo = items.some(i => pathname === i.href || pathname.startsWith(i.href + '/'))
@@ -24,11 +26,20 @@ export default function NavDropdown({ label, items }: { label: string; items: It
     return () => document.removeEventListener('mousedown', fechar)
   }, [])
 
+  function handleToggle() {
+    if (!aberto && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    }
+    setAberto(v => !v)
+  }
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref}>
       <button
-        onClick={() => setAberto(v => !v)}
-        className={`flex items-center gap-1 rounded-lg px-3 py-2 text-sm transition-all ${
+        ref={btnRef}
+        onClick={handleToggle}
+        className={`flex items-center gap-1 rounded-lg px-3 py-2 text-sm transition-all whitespace-nowrap ${
           ativo
             ? 'bg-zinc-100 text-zinc-900 font-medium'
             : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -44,7 +55,10 @@ export default function NavDropdown({ label, items }: { label: string; items: It
       </button>
 
       {aberto && (
-        <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-zinc-200 bg-white shadow-lg py-1 z-50">
+        <div
+          className="fixed w-44 rounded-xl border border-zinc-200 bg-white shadow-lg py-1 z-50"
+          style={{ top: pos.top, right: pos.right }}
+        >
           {items.map(item => (
             <Link
               key={item.href}
