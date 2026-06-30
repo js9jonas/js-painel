@@ -10,6 +10,7 @@ import { criarUniplayAdapter } from "./uniplay";
 import { criarNowAdapter } from "./now";
 import { criarUnitvAdapter } from "./unitv";
 import { criarLiebeAdapter } from "./liebe";
+import { criarNatvAdapter } from "./natv";
 import type { PainelAdapter, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
 // Lê credenciais de painel_servidores (nova arquitetura)
@@ -90,6 +91,7 @@ function buildAdapter(
     case "lazerplay":   return criarLazerPlayAdapter(creds, id, onSaveSession, onSaveContas);
     case "coreplayer":  return criarCorePlayerAdapter(creds, id, onSaveSession, onSaveContas);
     case "smartone":    return criarSmartOneAdapter(creds, id, onSaveSession, onSaveContas);
+    case "natv":        return criarNatvAdapter(creds, id, onSaveSession, onSaveContas);
     default:
       throw new Error(`Adapter para "${creds.painel_tipo}" ainda não implementado.`);
   }
