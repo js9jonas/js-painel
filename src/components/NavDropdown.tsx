@@ -44,7 +44,7 @@ export default function NavDropdown({ label, items }: { label: string; items: It
       </button>
 
       {aberto && (
-        <div className="absolute left-0 top-full mt-1 w-44 rounded-xl border border-zinc-200 bg-white shadow-lg py-1 z-50">
+        <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-zinc-200 bg-white shadow-lg py-1 z-50">
           {items.map(item => (
             <Link
               key={item.href}

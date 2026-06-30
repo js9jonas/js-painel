@@ -171,11 +171,11 @@ export default async function ClienteDetalhePage({ params }: Props) {
 
       {/* Cabecalho do cliente */}
       <div className="rounded-xl border bg-white px-4 py-3 sticky top-16 z-20">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           {/* Esquerda: nome + dados inline */}
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-lg font-semibold leading-tight truncate">
+              <h1 className="text-lg font-semibold leading-tight break-words min-w-0">
                 {cliente?.nome ?? `Cliente #${id}`}
               </h1>
               <ScoreFidelidade
