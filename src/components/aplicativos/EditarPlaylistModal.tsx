@@ -7,6 +7,7 @@ type Props = {
   idAppRegistro: number;
   playlist: PlaylistRow;
   tipoPainel: string | null;
+  nomeCliente: string;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -19,7 +20,7 @@ function parseSmartOneUrl(url: string | null): { host: string; port: string; usu
   return { host: m[1], port: m[2], usuario: decodeURIComponent(m[3]), senha: decodeURIComponent(m[4]) };
 }
 
-export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPainel, onClose, onSaved }: Props) {
+export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPainel, nomeCliente, onClose, onSaved }: Props) {
   const isSmartOne = tipoPainel === "smartone";
   const smartOneCampos = isSmartOne ? parseSmartOneUrl(playlist.url) : null;
 
@@ -37,7 +38,7 @@ export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPaine
     setSalvando(true);
     setErro(null);
     try {
-      const corpo = isSmartOne ? { nome, host, port, usuario, senha } : { nome, url };
+      const corpo = isSmartOne ? { nome, host, port, usuario, senha, nota: nomeCliente } : { nome, url };
       const startRes = await fetch(`/api/aplicativos/${idAppRegistro}/playlists/${playlist.playlist_id_externo}?acao=editar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

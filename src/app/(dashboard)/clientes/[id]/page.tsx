@@ -528,6 +528,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
 
         <AplicativosManager
           idCliente={id}
+          nomeCliente={cliente?.nome ?? ""}
           aplicativos={aplicativos}
           apps={apps}
         />

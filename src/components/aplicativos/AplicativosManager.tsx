@@ -11,6 +11,7 @@ import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
 
 type Props = {
   idCliente: string;
+  nomeCliente: string;
   aplicativos: AplicativoRow[];
   apps: AppRow[];
 };
@@ -280,7 +281,7 @@ function PlaylistsRow({
   );
 }
 
-export default function AplicativosManager({ idCliente, aplicativos, apps }: Props) {
+export default function AplicativosManager({ idCliente, nomeCliente, aplicativos, apps }: Props) {
   const [modalApp, setModalApp] = useState<AplicativoRow | null | "novo">(null);
   const [appPgto, setAppPgto] = useState<AplicativoRow | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
@@ -560,6 +561,7 @@ export default function AplicativosManager({ idCliente, aplicativos, apps }: Pro
           idAppRegistro={editandoPlaylist.idAppRegistro}
           playlist={editandoPlaylist.pl}
           tipoPainel={editandoPlaylist.tipoPainel}
+          nomeCliente={nomeCliente}
           onClose={() => setEditandoPlaylist(null)}
           onSaved={() => {
             recarregarPlaylistsAoVivo(editandoPlaylist.idAppRegistro);
