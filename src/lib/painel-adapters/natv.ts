@@ -8,8 +8,13 @@ import type {
 } from "./types";
 
 // NATV (revenda.pixbot.link) — Bearer Token auth, sem sessão/captcha
+// /report/allusers tem rate limit de 60s — cache em memória evita 429 em chamadas rápidas
 
 const BASE_URL = "https://revenda.pixbot.link";
+
+// Cache módulo-nível: compartilhado entre todas as instâncias do adapter NATV no mesmo processo
+let _contasCache: { contas: ContaPainel[]; ts: number } | null = null;
+const CACHE_TTL_MS = 62_000;
 
 // Campos abreviados do relatório /report/allusers
 interface UserReportItem {
@@ -85,12 +90,24 @@ export function criarNatvAdapter(
 
   return {
     async listarContas(): Promise<ContaPainel[]> {
+      const now = Date.now();
+      if (_contasCache && now - _contasCache.ts < CACHE_TTL_MS) {
+        return _contasCache.contas;
+      }
+
       const res = await apiFetch("/report/allusers");
+
+      if (res.status === 429) {
+        // Rate limit de 60s — usa cache se disponível, senão erro amigável
+        if (_contasCache) return _contasCache.contas;
+        throw new Error("NATV: rate limit atingido. Aguarde 60s e tente novamente.");
+      }
       if (!res.ok) throw new Error(`NATV listarContas → ${res.status}`);
+
       const data = await res.json() as UserReportItem[];
       if (!Array.isArray(data)) return [];
 
-      return data
+      const contas = data
         .filter((item) => item.t !== 1) // exclui contas de teste
         .map((item) => ({
           usuario:    item.u,
@@ -99,6 +116,9 @@ export function criarNatvAdapter(
           status:     resolverStatus(item),
           senha:      item.p ?? null,
         }));
+
+      _contasCache = { contas, ts: now };
+      return contas;
     },
 
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
