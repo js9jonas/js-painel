@@ -240,5 +240,17 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
         : undefined;
       return { ok: true, usuario: String(data.username), senha: data.password, expiracao };
     },
+
+    async deletarConta(usuario: string): Promise<void> {
+      const session = await obterSessao();
+      const users = await listar(session);
+      const user = users.find((u: any) => u.username === String(usuario));
+      if (!user) throw new Error(`UNIPLAY: usuário "${usuario}" não encontrado.`);
+      const res = await authFetch(session.token, `users-iptv/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ action: 2, id_iptv: user.id, reg_password: session.cryptPass }),
+      });
+      if (!res.ok) throw new Error(`UNIPLAY deletar → ${res.status}`);
+    },
   };
 }
