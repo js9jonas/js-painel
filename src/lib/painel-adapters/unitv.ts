@@ -377,6 +377,13 @@ export function criarUnitvAdapter(
       if (novoVenc) await onSaveContas(usuario, novoVenc);
       return { ok: true, novoVencimento: novoVenc };
     },
-    // UNITV ResellerSystem não expõe endpoint de deleção para revendedores.
+
+    async deletarConta(sn: string): Promise<void> {
+      await callWithRelogin("dealer-core/account/delete", (token) => ({
+        sn_list:      [sn],
+        dealer_token: token,
+        dealer_name:  usuario,
+      }), false);
+    },
   };
 }
