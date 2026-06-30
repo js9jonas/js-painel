@@ -381,7 +381,7 @@ export default function VinculacaoAssinaturaClient({
                               >
                                 Desvincular
                               </button>
-                            ) : c.status_conta === "vencida" ? (
+                            ) : (c.status_conta === "vencida" || (diasRestantes(c.vencimento_real_painel) ?? 1) < 0) ? (
                               <button
                                 onClick={() => handleExcluir(c.id_conta, c.usuario)}
                                 disabled={excluindoId === c.id_conta}
