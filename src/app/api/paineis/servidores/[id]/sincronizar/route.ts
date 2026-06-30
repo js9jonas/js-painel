@@ -21,6 +21,13 @@ export async function POST(
     return NextResponse.json({ erro: msg }, { status: 400 });
   }
 
+  // Resolve o id_servidor real vinculado a este painel (pode diferir do id do painel_servidores)
+  const { rows: painelMeta } = await pool.query<{ id_servidor: number | null }>(
+    `SELECT id_servidor FROM public.painel_servidores WHERE id = $1`,
+    [idPainel]
+  );
+  const idServidor: number = painelMeta[0]?.id_servidor ?? idPainel;
+
   let contas;
   try {
     contas = await adapter.listarContas();
@@ -51,8 +58,8 @@ export async function POST(
       await pool.query(
         `INSERT INTO public.contas
            (id_painel_servidor, id_servidor, usuario, rotulo, vencimento_real_painel, status_conta, senha, status_sinc, removido_em)
-         VALUES ($1, $1, $2, $3, $4, $5, $6, 'pendente', NULL)`,
-        [idPainel, conta.usuario, conta.rotulo, conta.vencimento, conta.status, conta.senha ?? null]
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendente', NULL)`,
+        [idPainel, idServidor, conta.usuario, conta.rotulo, conta.vencimento, conta.status, conta.senha ?? null]
       );
       inseridas++;
     } else {
@@ -82,16 +89,13 @@ export async function POST(
     removidas = rowCount ?? 0;
   }
 
-  // Atualização automática de saldo — se o painel tiver id_servidor vinculado
+  // Atualização automática de saldo — usa idServidor já resolvido no início
   let saldoAtualizado = false;
   try {
-    const { rows: painelRows } = await pool.query<{ id_servidor: number | null }>(
-      `SELECT id_servidor FROM public.painel_servidores WHERE id = $1`,
-      [idPainel]
-    );
-    const idServidor = painelRows[0]?.id_servidor ?? null;
+    const idServidorSaldo = painelMeta[0]?.id_servidor ?? null;
 
-    if (idServidor !== null) {
+    if (idServidorSaldo !== null) {
+      const idServidor = idServidorSaldo;
       const creditos = adapter.getCreditos ? await adapter.getCreditos() : null;
       if (creditos !== null) {
         const creditosInt = Math.round(creditos);
