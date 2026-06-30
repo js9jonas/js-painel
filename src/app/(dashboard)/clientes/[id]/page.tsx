@@ -175,7 +175,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
           {/* Esquerda: nome + dados inline */}
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-lg font-semibold leading-tight truncate">
+              <h1 className="text-lg font-semibold leading-tight">
                 {cliente?.nome ?? `Cliente #${id}`}
               </h1>
               <ScoreFidelidade
