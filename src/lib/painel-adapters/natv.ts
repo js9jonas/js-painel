@@ -16,21 +16,21 @@ const BASE_URL = "https://revenda.pixbot.link";
 let _contasCache: { contas: ContaPainel[]; ts: number } | null = null;
 const CACHE_TTL_MS = 62_000;
 
-// Campos abreviados do relatório /report/allusers
+// Campos abreviados do relatório /report/allusers — todos chegam como string
 interface UserReportItem {
-  i: number;   // id
+  i: string;   // id
   u: string;   // username
   p: string;   // password
   n: string;   // notes (rótulo)
-  d: string;   // domain
-  l: number;   // last_login (Unix timestamp)
-  e: number;   // exp_date (Unix timestamp em segundos)
-  r: number;   // reseller id
-  c: number;   // max_connections
+  d: string;   // created_at ("YYYY-MM-DD HH:MM:SS")
+  l: string;   // last_login ("YYYY-MM-DD HH:MM:SS")
+  e: string;   // exp_date ("YYYY-MM-DD HH:MM:SS")
+  r: string;   // reseller username
+  c: string;   // max_connections
   o: string;   // owner
-  t: number;   // is_test (1 = conta de teste)
-  b: number;   // blocked (1 = bloqueada)
-  x: number;   // enabled
+  t: string;   // status: "Ativo" | "Expirado" | "Bloqueado"
+  b: string;   // blocked: "Yes" | "No"
+  x: string | null;
 }
 
 interface ActionLogItem {
@@ -39,20 +39,17 @@ interface ActionLogItem {
   b: number;   // balance after action
 }
 
-function parseExpDate(e: number | string | undefined): string | null {
+function parseExpDate(e: string | undefined): string | null {
   if (!e) return null;
-  const ts = typeof e === "string" ? Number(e) : e;
-  if (!ts || isNaN(ts)) return null;
-  // Unix timestamp em segundos
-  const d = new Date(ts * 1000);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+  // Formato: "YYYY-MM-DD HH:MM:SS" — pega só a data
+  const date = e.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  return date;
 }
 
 function resolverStatus(item: UserReportItem): ContaPainel["status"] {
-  if (item.b === 1) return "bloqueada";
-  const venc = parseExpDate(item.e);
-  if (venc && venc < new Date().toISOString().slice(0, 10)) return "vencida";
+  if (item.b === "Yes") return "bloqueada";
+  if (item.t === "Expirado") return "vencida";
   return "ok";
 }
 
@@ -108,10 +105,9 @@ export function criarNatvAdapter(
       if (!Array.isArray(data)) return [];
 
       const contas = data
-        .filter((item) => item.t !== 1) // exclui contas de teste
         .map((item) => ({
           usuario:    item.u,
-          rotulo:     item.n ?? "",
+          rotulo:     item.n || item.u, // rótulo vazio → usa username como fallback
           vencimento: parseExpDate(item.e),
           status:     resolverStatus(item),
           senha:      item.p ?? null,
@@ -132,7 +128,7 @@ export function criarNatvAdapter(
         throw new Error(`NATV renovar → ${res.status}: ${txt}`);
       }
 
-      const data = await res.json() as { exp_date?: number; expiration_date?: number };
+      const data = await res.json() as { exp_date?: string; expiration_date?: string };
 
       // Busca novo vencimento da resposta ou relista
       let novoVenc: string | undefined;
@@ -147,7 +143,7 @@ export function criarNatvAdapter(
             body: JSON.stringify({ username: usuario }),
           });
           if (sr.ok) {
-            const sdata = await sr.json() as { exp_date?: number }[];
+            const sdata = await sr.json() as { exp_date?: string }[];
             if (Array.isArray(sdata) && sdata[0]?.exp_date) {
               novoVenc = parseExpDate(sdata[0].exp_date) ?? undefined;
             }
@@ -188,7 +184,7 @@ export function criarNatvAdapter(
       const data = await res.json() as {
         username?: string;
         password?: string;
-        exp_date?: number;
+        exp_date?: string;
       };
 
       return {
