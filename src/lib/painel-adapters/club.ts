@@ -367,7 +367,7 @@ export function criarClubAdapter(
         const lista = await listarContasRaw(token);
         const conta = lista.find((l: any) => l.username === usuario);
         if (!conta) throw new Error(`CLUB: usuário "${usuario}" não encontrado.`);
-        const result = await apiFetch(token, `listas/${conta.id}/deletar`, { method: "POST" });
+        const result = await apiFetch(token, `listas/${conta.id}/deletar`, { method: "GET" });
         if (result?.result === false) throw new Error(result.msg ?? "CLUB: falha ao deletar conta.");
       });
     },
