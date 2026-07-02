@@ -63,7 +63,6 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
        WHERE ct.id_conta IS NOT NULL
          AND ct.vencimento_real_painel IS NOT NULL
          AND ct.removido_em IS NULL
-         AND ct.vencimento_real_painel::date >= CURRENT_DATE - 1
      ),
      '[]'::json
    )                                             AS sub_contas
@@ -77,19 +76,17 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
    AND a.venc_contrato IS NOT NULL
    AND a.venc_contrato::date >= CURRENT_DATE
    AND (
-     -- assinatura vence entre ontem e +N dias, e o contrato ainda cobre período após o vencimento
+     -- assinatura vence até +N dias (inclui vencidas há qualquer tempo), e o contrato ainda cobre período após o vencimento
      (a.venc_contas IS NOT NULL
-       AND a.venc_contas::date >= CURRENT_DATE - 1
        AND a.venc_contas::date <= CURRENT_DATE + ($1::int || ' days')::interval
        AND a.venc_contrato::date > a.venc_contas::date)
      OR
-     -- ou tem conta com vencimento_real_painel entre ontem e +N dias, e o contrato cobre além dele
+     -- ou tem conta com vencimento_real_painel até +N dias (inclui vencidas há qualquer tempo), e o contrato cobre além dele
      EXISTS (
        SELECT 1 FROM public.contas ct2
        WHERE ct2.id_assinatura = a.id_assinatura
          AND ct2.removido_em IS NULL
          AND ct2.vencimento_real_painel IS NOT NULL
-         AND ct2.vencimento_real_painel::date >= CURRENT_DATE - 1
          AND ct2.vencimento_real_painel::date <= CURRENT_DATE + ($1::int || ' days')::interval
          AND a.venc_contrato::date > ct2.vencimento_real_painel::date
      )
@@ -141,7 +138,6 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
      WHERE lower(btrim(ap.status)) = 'ativa'
        AND ap.validade IS NOT NULL
        AND ap.validade::date <= CURRENT_DATE + ($1::int || ' days')::interval
-       AND ap.validade::date >= CURRENT_DATE - 1
      ORDER BY ap.validade ASC`,
         [dias]
     );

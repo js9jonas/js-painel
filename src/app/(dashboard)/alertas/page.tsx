@@ -139,10 +139,7 @@ export default async function AlertasPage() {
                                 {contas.map((r) => {
                                     const diasContas = r.venc_contas ? diasRestantes(r.venc_contas.split("T")[0]) : null;
                                     const vinculado = r.pacote_telas !== null && r.contas_vinculadas_total === r.pacote_telas;
-                                    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-                                    const subContasHoje = r.sub_contas.filter(ct =>
-                                        ct.vencimento_real_painel.split("T")[0] >= hojeStr
-                                    );
+                                    const subContasVinculadas = r.sub_contas;
                                     return (
                                         <React.Fragment key={r.id_assinatura}>
                                             {/* Linha da assinatura */}
@@ -195,7 +192,7 @@ export default async function AlertasPage() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {subContasHoje.length === 0 && (
+                                                    {subContasVinculadas.length === 0 && (
                                                         <div className="flex items-center gap-2">
                                                             <AdicionarMesContaButton idAssinatura={r.id_assinatura} />
                                                             <DefinirDataContaButton
@@ -207,9 +204,9 @@ export default async function AlertasPage() {
                                                 </td>
                                             </tr>
 
-                                            {/* Sub-linhas: contas com validade >= hoje ou balão sem vínculo */}
-                                            {subContasHoje.length > 0
-                                                ? subContasHoje.map((ct) => {
+                                            {/* Sub-linhas: contas vinculadas (inclusive vencidas) ou balão sem vínculo */}
+                                            {subContasVinculadas.length > 0
+                                                ? subContasVinculadas.map((ct) => {
                                                     const diasCt = diasRestantes(ct.vencimento_real_painel.split("T")[0]);
                                                     const dataFmt = ct.vencimento_real_painel.split("T")[0].split("-").reverse().join("/");
                                                     return (
