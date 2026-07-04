@@ -91,6 +91,7 @@ export async function getAplicativosByClienteId(id_cliente: string): Promise<Apl
      LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
      LEFT JOIN public.contas c ON c.id_conta = pl.id_conta
      WHERE ap.id_cliente = $1::int
+       AND ap.removido_em IS NULL
      GROUP BY ap.id_app_registro, a.nome_app, a.exige_licenca, ps.tipo, ass.venc_contrato
      ORDER BY ap.atualizado_em DESC NULLS LAST, ap.id_app_registro DESC`,
     [id_cliente]

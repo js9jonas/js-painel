@@ -21,10 +21,10 @@ const ID_APP: Record<string, number> = {
 // não esgotar o pool de conexões do Postgres (max padrão do `pg` é 10).
 const CONCORRENCIA = 6;
 
-type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number };
+type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number; removidos: number };
 type JobState =
   | { done: false }
-  | { done: true; ok: true; total_devices: number; stats: Stats }
+  | { done: true; ok: true; total_devices: number; stats: Stats; aviso?: string }
   | { done: true; ok: false; erro: string };
 
 // In-memory job store — ok para single instance (Easypanel não é serverless)
@@ -111,7 +111,7 @@ async function executarSync(idPainel: number, jobId: string) {
       getFunPlaysPlaylists;
 
     const devices = await getDevicesFn(jwt);
-    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0 };
+    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0, removidos: 0 };
 
     await mapConcorrente(devices, CONCORRENCIA, async (dev) => {
       const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
@@ -132,7 +132,7 @@ async function executarSync(idPainel: number, jobId: string) {
         idAppRegistro = existentes[0].id_app_registro;
         await pool.query(
           `UPDATE public.aplicativos
-           SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW()
+           SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW(), removido_em = NULL
            WHERE id_app_registro = $5`,
           [validade, dev.model ?? null, String(dev.id), idPainel, idAppRegistro]
         );
@@ -202,7 +202,37 @@ async function executarSync(idPainel: number, jobId: string) {
       }
     });
 
-    jobs.set(jobId, { done: true, ok: true, total_devices: devices.length, stats });
+    // Detecção de exclusão remota: devices que sumiram da resposta da API são
+    // marcados como removidos localmente, com a mesma guarda de segurança usada
+    // no sync de contas (aborta se a API devolver menos de 50% do volume ativo
+    // esperado, pra não apagar tudo numa falha parcial).
+    const { rows: countRows } = await pool.query<{ total: string }>(
+      `SELECT COUNT(*) AS total FROM public.aplicativos WHERE id_painel_servidor = $1 AND removido_em IS NULL`,
+      [idPainel]
+    );
+    const totalAtivos = Number(countRows[0]?.total ?? 0);
+    const syncConfiavel = devices.length > 0 && (totalAtivos === 0 || devices.length >= totalAtivos * 0.5);
+
+    if (syncConfiavel) {
+      const macsAtuais = devices.map(d => d.mac.toUpperCase());
+      const { rowCount } = await pool.query(
+        `UPDATE public.aplicativos
+         SET removido_em = NOW()
+         WHERE id_painel_servidor = $1
+           AND UPPER(mac) != ALL($2::text[])
+           AND removido_em IS NULL`,
+        [idPainel, macsAtuais]
+      );
+      stats.removidos = rowCount ?? 0;
+    }
+
+    jobs.set(jobId, {
+      done: true,
+      ok: true,
+      total_devices: devices.length,
+      stats,
+      aviso: syncConfiavel ? undefined : "Sync com retorno insuficiente — remoções ignoradas por segurança.",
+    });
   } catch (e: unknown) {
     jobs.set(jobId, { done: true, ok: false, erro: e instanceof Error ? e.message : "Erro ao sincronizar." });
   }
