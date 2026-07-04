@@ -85,10 +85,11 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
           return;
         }
         if (job.ok) {
-          const removidosTxto = job.stats.removidos > 0 ? ` · ${job.stats.removidos} removidos` : "";
+          const removidosTxto = job.stats.removidos > 0 ? ` · ${job.stats.removidos} devices removidos` : "";
+          const playlistsRemovidasTxto = job.stats.playlists_removidas > 0 ? ` · ${job.stats.playlists_removidas} playlists removidas` : "";
           const avisoTxto = job.aviso ? ` ⚠️ ${job.aviso}` : "";
           setMensagem(
-            `✅ ${job.total_devices} devices · ${job.stats.playlists_sincronizadas} playlists · ${job.stats.inseridos} novos · ${job.stats.atualizados} atualizados${removidosTxto}${avisoTxto}`
+            `✅ ${job.total_devices} devices · ${job.stats.playlists_sincronizadas} playlists · ${job.stats.inseridos} novos · ${job.stats.atualizados} atualizados${removidosTxto}${playlistsRemovidasTxto}${avisoTxto}`
           );
           router.refresh();
         } else {

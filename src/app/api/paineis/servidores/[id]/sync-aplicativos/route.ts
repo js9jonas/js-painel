@@ -21,7 +21,7 @@ const ID_APP: Record<string, number> = {
 // não esgotar o pool de conexões do Postgres (max padrão do `pg` é 10).
 const CONCORRENCIA = 6;
 
-type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number; removidos: number };
+type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number; playlists_removidas: number; removidos: number };
 type JobState =
   | { done: false }
   | { done: true; ok: true; total_devices: number; stats: Stats; aviso?: string }
@@ -111,7 +111,7 @@ async function executarSync(idPainel: number, jobId: string) {
       getFunPlaysPlaylists;
 
     const devices = await getDevicesFn(jwt);
-    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0, removidos: 0 };
+    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0, playlists_removidas: 0, removidos: 0 };
 
     await mapConcorrente(devices, CONCORRENCIA, async (dev) => {
       const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
@@ -150,11 +150,12 @@ async function executarSync(idPainel: number, jobId: string) {
         stats.inseridos++;
       }
 
-      let playlists: AppAcessoPlaylist[];
+      let playlists: AppAcessoPlaylist[] = [];
+      let playlistsOk = true;
       try {
         playlists = await getPlaylistsFn(jwt, dev.id);
       } catch {
-        playlists = [];
+        playlistsOk = false; // falha na busca — não mexe nas playlists já salvas deste device
       }
 
       for (const pl of playlists) {
@@ -183,6 +184,20 @@ async function executarSync(idPainel: number, jobId: string) {
           [idAppRegistro, pl.id, pl.name ?? null, pl.url ?? null, pl.is_selected ?? false, pl.expired_date ?? null, idConta]
         );
         stats.playlists_sincronizadas++;
+      }
+
+      // Remove localmente as playlists que sumiram do device no painel remoto —
+      // só quando a busca deu certo (playlistsOk), pra uma falha transitória da API
+      // não apagar playlists que continuam existindo de verdade.
+      if (playlistsOk) {
+        const idsAtuais = playlists.map(p => p.id);
+        const { rowCount } = await pool.query(
+          `DELETE FROM public.aplicativo_playlists
+           WHERE id_app_registro = $1
+             AND playlist_id_externo != ALL($2::bigint[])`,
+          [idAppRegistro, idsAtuais]
+        );
+        stats.playlists_removidas += rowCount ?? 0;
       }
 
       // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
