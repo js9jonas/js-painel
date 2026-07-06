@@ -8,12 +8,13 @@ import type {
 } from "./types";
 
 // NATV (revenda.pixbot.link) — Bearer Token auth, sem sessão/captcha
-// /report/allusers tem rate limit de 60s — cache em memória evita 429 em chamadas rápidas
+// /report/allusers e /report/actionlog têm rate limit de 60s cada — cache em memória evita 429 em chamadas rápidas
 
 const BASE_URL = "https://revenda.pixbot.link";
 
 // Cache módulo-nível: compartilhado entre todas as instâncias do adapter NATV no mesmo processo
 let _contasCache: { contas: ContaPainel[]; ts: number } | null = null;
+let _creditosCache: { valor: number | null; ts: number } | null = null;
 const CACHE_TTL_MS = 62_000;
 
 // Campos abreviados do relatório /report/allusers — todos chegam como string
@@ -156,16 +157,34 @@ export function criarNatvAdapter(
     },
 
     async getCreditos(): Promise<number | null> {
+      const now = Date.now();
+      if (_creditosCache && now - _creditosCache.ts < CACHE_TTL_MS) {
+        return _creditosCache.valor;
+      }
+
       try {
         const res = await apiFetch("/report/actionlog");
+        if (res.status === 429) {
+          // Rate limit de 60s — usa cache se disponível, senão desiste sem sobrescrever
+          if (_creditosCache) return _creditosCache.valor;
+          return null;
+        }
         if (!res.ok) return null;
+
         const data = await res.json() as ActionLogItem[];
         if (!Array.isArray(data) || data.length === 0) return null;
+
         // O campo b é o saldo após a ação — pega o mais recente
         const ultimo = data[0];
-        const saldo = typeof ultimo.b === "string" ? parseFloat(ultimo.b) : ultimo.b;
-        return Number.isFinite(saldo) ? saldo : null;
-      } catch { return null; }
+        const saldoRaw = typeof ultimo.b === "string" ? parseFloat(ultimo.b) : ultimo.b;
+        const saldo = Number.isFinite(saldoRaw) ? saldoRaw : null;
+
+        _creditosCache = { valor: saldo, ts: now };
+        return saldo;
+      } catch {
+        if (_creditosCache) return _creditosCache.valor;
+        return null;
+      }
     },
 
     async gerarTeste({ horas = 1 } = {}): Promise<ResultadoTeste> {
