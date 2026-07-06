@@ -34,9 +34,9 @@ interface UserReportItem {
 }
 
 interface ActionLogItem {
-  a: string;   // action
-  d: string;   // date
-  b: number;   // balance after action
+  a: string;          // action
+  d: string;          // date
+  b: number | string; // balance after action — API retorna como string (ex: "16.5")
 }
 
 function parseExpDate(e: string | undefined): string | null {
@@ -163,7 +163,8 @@ export function criarNatvAdapter(
         if (!Array.isArray(data) || data.length === 0) return null;
         // O campo b é o saldo após a ação — pega o mais recente
         const ultimo = data[0];
-        return typeof ultimo.b === "number" ? ultimo.b : null;
+        const saldo = typeof ultimo.b === "string" ? parseFloat(ultimo.b) : ultimo.b;
+        return Number.isFinite(saldo) ? saldo : null;
       } catch { return null; }
     },
 
