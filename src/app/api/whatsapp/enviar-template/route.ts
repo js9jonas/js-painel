@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
 import { auth } from '@/auth'
+import { enviarTemplateWhatsapp } from '@/lib/whatsapp-template'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,45 +16,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'telefone e template_name obrigatórios' }, { status: 400 })
     }
 
-    const token = process.env.WHATSAPP_TOKEN
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+    const resultado = await enviarTemplateWhatsapp(telefone, template_name, Array.isArray(parametros) ? parametros : [])
 
-    const template: Record<string, unknown> = {
-      name: template_name,
-      language: { code: 'pt_BR' },
-    }
-
-    if (Array.isArray(parametros) && parametros.length > 0) {
-      template.components = [
-        {
-          type: 'body',
-          parameters: parametros.map((texto: string) => ({ type: 'text', text: texto })),
-        },
-      ]
-    }
-
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: telefone,
-          type: 'template',
-          template,
-        }),
-      }
-    )
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      console.error('[Chat] Erro ao enviar template:', data)
-      return NextResponse.json({ error: data.error?.message ?? 'Erro ao enviar template' }, { status: 500 })
+    if (!resultado.ok) {
+      return NextResponse.json({ error: resultado.error }, { status: 500 })
     }
 
     await pool.query(
@@ -62,14 +28,14 @@ export async function POST(req: NextRequest) {
        VALUES ($1, $2, 'template', $3, 'jonas', $4, NOW())
        ON CONFLICT (wa_msg_id) DO NOTHING`,
       [
-        data.messages?.[0]?.id ?? `tmpl_${Date.now()}`,
+        resultado.msgId,
         telefone,
         JSON.stringify({ name: template_name, parametros: parametros ?? null, copyCode: null }),
         session?.user?.email ? `chat:${session.user.email}` : 'chat',
       ]
     )
 
-    return NextResponse.json({ success: true, message_id: data.messages?.[0]?.id })
+    return NextResponse.json({ success: true, message_id: resultado.msgId })
   } catch (err) {
     console.error('[Chat] Erro ao enviar template:', err)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

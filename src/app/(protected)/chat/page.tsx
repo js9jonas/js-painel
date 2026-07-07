@@ -14,6 +14,7 @@ import VincularClienteModal from '@/components/clientes/VincularClienteModal'
 import type { PlanoRow } from '@/lib/planos'
 import type { PacoteRow } from '@/lib/pacotes'
 import RenovarAssinatura from '@/components/clientes/RenovarAssinatura'
+import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVencimentoPanel'
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 
@@ -1164,12 +1165,13 @@ export default function ChatPage() {
         {!selecionado ? (
           <div style={{
             flex: 1, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', color: '#667781',
-            background: '#f8f9fa'
+            alignItems: 'center', color: '#667781',
+            background: '#f8f9fa', overflowY: 'auto', paddingTop: 48, paddingBottom: 24,
           }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>💬</div>
             <div style={{ fontSize: 20, fontWeight: 600, color: '#3b4a54' }}>JS Sistemas — Atendimento</div>
             <div style={{ fontSize: 14, marginTop: 8 }}>Selecione uma conversa para começar</div>
+            <NotificacoesVencimentoPanel />
           </div>
         ) : (
           <>
