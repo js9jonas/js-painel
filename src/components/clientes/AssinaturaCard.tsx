@@ -7,6 +7,11 @@ import AdicionarContaModal from "@/components/clientes/AdicionarContaModal";
 import ContasGroupClient from "@/components/clientes/ContasGroupClient";
 import { tempoDesde } from "@/lib/tempo";
 
+function isInativa(status: string | null): boolean {
+  const s = (status ?? "").toLowerCase().trim();
+  return s === "inativo" || s === "cancelado";
+}
+
 /** Rótulo legível do cabeçalho do card, por status */
 export function labelStatusCard(status: string | null): string {
   switch ((status ?? "").toLowerCase().trim()) {
@@ -80,7 +85,11 @@ export default function AssinaturaCard({
           )}
         </span>
         {a.criado_em && (
-          <span className="font-normal opacity-60">{tempoDesde(a.criado_em)}</span>
+          <span className="font-normal opacity-60">
+            {isInativa(a.status) && a.venc_contrato
+              ? `ativa por ${tempoDesde(a.criado_em, a.venc_contrato)}`
+              : tempoDesde(a.criado_em)}
+          </span>
         )}
       </div>
       <div className="px-3 py-2">

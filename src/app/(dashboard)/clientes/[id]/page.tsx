@@ -97,13 +97,15 @@ export default async function ClienteDetalhePage({ params }: Props) {
     });
 
   // "Dias desde o último pagamento" por assinatura: filtra pelo id_assinatura quando o
-  // pagamento já tiver esse vínculo salvo; lançamentos antigos (id_assinatura null) caem
-  // no fallback do último pagamento do cliente, igual ao comportamento anterior.
+  // pagamento já tiver esse vínculo salvo. Sem vínculo próprio, cai no fallback — mas o
+  // fallback só pode considerar lançamentos SEM id_assinatura (legado); pagamentos já
+  // vinculados a OUTRA assinatura do mesmo cliente não podem "vazar" pra esta.
+  const pagamentosSemVinculo = todosPagamentos.filter((p) => p.id_assinatura === null);
   const diasPorAssinatura: Record<string, number | null> = {};
   for (const a of assinaturas) {
     const doAssinatura = todosPagamentos.filter((p) => p.id_assinatura === a.id_assinatura);
     diasPorAssinatura[a.id_assinatura] = diasDesdeUltimoPagamento(
-      doAssinatura.length > 0 ? doAssinatura : todosPagamentos
+      doAssinatura.length > 0 ? doAssinatura : pagamentosSemVinculo
     );
   }
 

@@ -1,12 +1,16 @@
 /**
- * Retorna uma string legível com o tempo decorrido desde uma data.
+ * Retorna uma string legível com o tempo decorrido entre duas datas.
+ * Sem o segundo argumento, conta até hoje.
  * Ex: "2 anos, 3 meses e 15 dias" ou "5 meses e 2 dias" ou "18 dias"
  */
-export function tempoDesde(data: Date | string | null | undefined): string {
+export function tempoDesde(
+  data: Date | string | null | undefined,
+  ate: Date | string | null | undefined = new Date()
+): string {
   if (!data) return "";
 
   const inicio = new Date(data);
-  const hoje = new Date();
+  const hoje = ate ? new Date(ate) : new Date();
 
   let anos = hoje.getFullYear() - inicio.getFullYear();
   let meses = hoje.getMonth() - inicio.getMonth();
