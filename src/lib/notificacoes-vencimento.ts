@@ -8,6 +8,7 @@ export interface ItemNotificacaoVencimento {
   telefone: string | null
   telas: number
   venc_contrato: string
+  status: string
   jaEnviado: boolean
 }
 
@@ -37,7 +38,7 @@ export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<
   const source = sourceDoTipo(tipo)
 
   const r = await pool.query(
-    `SELECT a.id_assinatura::text, c.nome, ct.telefone, p.telas, a.venc_contrato::text,
+    `SELECT a.id_assinatura::text, c.nome, ct.telefone, p.telas, a.venc_contrato::text, a.status,
        EXISTS (
          SELECT 1 FROM public.whatsapp_mensagens wm
          WHERE wm.telefone = ct.telefone AND wm.source = $1 AND wm.recebida_em::date = CURRENT_DATE
@@ -60,6 +61,7 @@ export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<
     telefone: row.telefone,
     telas: row.telas,
     venc_contrato: row.venc_contrato,
+    status: row.status,
     jaEnviado: row.ja_enviado,
   }))
 }

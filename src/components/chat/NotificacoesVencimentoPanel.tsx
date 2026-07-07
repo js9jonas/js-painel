@@ -8,6 +8,7 @@ interface Item {
   telefone: string | null
   telas: number
   venc_contrato: string
+  status: string
   jaEnviado: boolean
   erro?: string
 }
@@ -22,6 +23,20 @@ const TITULOS: Record<Tipo, string> = {
 const COR_BOTAO: Record<Tipo, string> = {
   vencidos: '#f57c00',
   amanha: '#00a884',
+}
+
+// Mesma paleta/rótulos de src/components/clientes/AssinaturaCard.tsx (labelStatusCard/corStatusCard)
+const STATUS_INFO: Record<string, { label: string; bg: string; cor: string }> = {
+  pendente: { label: 'Pendente', bg: '#fef2f2', cor: '#dc2626' },
+  atrasado: { label: 'Atrasado', bg: '#fefce8', cor: '#a16207' },
+  vencido: { label: 'Vencido', bg: '#f4f4f5', cor: '#71717a' },
+  inativo: { label: 'Inativo', bg: '#f4f4f5', cor: '#71717a' },
+  cancelado: { label: 'Cancelado', bg: '#f4f4f5', cor: '#71717a' },
+}
+const STATUS_ATIVO = { label: 'Ativo', bg: '#ecfdf5', cor: '#047857' }
+
+function infoStatus(status: string) {
+  return STATUS_INFO[(status ?? '').toLowerCase().trim()] ?? STATUS_ATIVO
 }
 
 function ListaNotificacao({ tipo }: { tipo: Tipo }) {
@@ -79,6 +94,12 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
     })
   }
 
+  const todosSelecionados = itens.length > 0 && selecionados.size === itens.length
+
+  function toggleTodos() {
+    setSelecionados(todosSelecionados ? new Set() : new Set(itens.map((i) => i.id_assinatura)))
+  }
+
   async function disparar() {
     const ids = Array.from(selecionados)
     if (ids.length === 0) return
@@ -113,9 +134,21 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
   return (
     <div style={{
       flex: 1, minWidth: 280, maxWidth: 380, background: '#fff', borderRadius: 8,
-      border: '1px solid #d1d7db', display: 'flex', flexDirection: 'column', maxHeight: 420,
+      border: '1px solid #d1d7db', display: 'flex', flexDirection: 'column', maxHeight: 630,
     }}>
       <div style={{ padding: '10px 12px', borderBottom: '1px solid #d1d7db' }}>
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+          fontSize: 12, color: '#54656f', cursor: itens.length === 0 ? 'default' : 'pointer',
+        }}>
+          <input
+            type="checkbox"
+            checked={todosSelecionados}
+            onChange={toggleTodos}
+            disabled={itens.length === 0}
+          />
+          {todosSelecionados ? 'Desmarcar todos' : 'Marcar todos'}
+        </label>
         <button
           type="button"
           onClick={disparar}
@@ -154,6 +187,13 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
               <div style={{ color: '#111b21', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {item.nome} <span style={{ color: '#667781', fontWeight: 400 }}>{item.telefone ?? '(sem telefone)'}</span>
               </div>
+              <span style={{
+                display: 'inline-block', marginTop: 2, padding: '1px 6px', borderRadius: 4,
+                fontSize: 11, fontWeight: 600,
+                background: infoStatus(item.status).bg, color: infoStatus(item.status).cor,
+              }}>
+                {infoStatus(item.status).label}
+              </span>
               {item.erro && (
                 <div style={{ color: '#d32f2f', fontSize: 11 }}>Falha: {item.erro}</div>
               )}
