@@ -497,6 +497,21 @@ export default function ChatPage() {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [selecionado, carregarMensagens])
 
+  // Esc fecha a conversa aberta, desde que nenhum modal esteja na frente
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape' || !selecionado) return
+      const modalAberto =
+        editAssinaturaOpen || editClienteOpen || novoClienteOpen || vincularClienteOpen ||
+        qrOpen || configOpen || stickerPickerOpen || lightbox !== null || forwardMsg !== null ||
+        document.querySelector('.fixed.inset-0.z-50') !== null
+      if (modalAberto) return
+      setSelecionado(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selecionado, editAssinaturaOpen, editClienteOpen, novoClienteOpen, vincularClienteOpen, qrOpen, configOpen, stickerPickerOpen, lightbox, forwardMsg])
+
   useEffect(() => {
     if (mensagens.length > prevMsgCountRef.current) {
       const isInitial = prevMsgCountRef.current === 0

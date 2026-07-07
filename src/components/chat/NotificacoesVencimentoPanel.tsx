@@ -44,7 +44,6 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const idsConhecidos = useRef<Set<string>>(new Set())
   const requestId = useRef(0)
 
   const carregar = useCallback(async () => {
@@ -59,21 +58,7 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
       if (meuId !== requestId.current) return
 
       setItens(novosItens)
-
-      setSelecionados((prev) => {
-        const novo = new Set<string>()
-        for (const item of novosItens) {
-          if (idsConhecidos.current.has(item.id_assinatura)) {
-            // item já visto antes: preserva a escolha manual do usuário
-            if (prev.has(item.id_assinatura)) novo.add(item.id_assinatura)
-          } else {
-            // item novo na lista: aplica o padrão (pré-marcado se ainda não enviado)
-            if (!item.jaEnviado) novo.add(item.id_assinatura)
-          }
-        }
-        return novo
-      })
-      idsConhecidos.current = new Set(novosItens.map((i) => i.id_assinatura))
+      setSelecionados(new Set(novosItens.filter((i) => !i.jaEnviado).map((i) => i.id_assinatura)))
     } finally {
       setCarregando(false)
     }
