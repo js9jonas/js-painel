@@ -80,12 +80,12 @@ export async function PUT(
           await client.query(
             `INSERT INTO public.pagamentos
              (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
-              tipo_pagamento, dias_relativo_vencimento, atualizado_em)
+              tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura)
              VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                     $7, $8, NOW())`,
+                     $7, $8, NOW(), $9::bigint)`,
             [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
              pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes,
-             tipoPagSoPag, diasRelSoPag]
+             tipoPagSoPag, diasRelSoPag, idAssinatura]
           );
         }
 
@@ -169,12 +169,12 @@ export async function PUT(
         await client.query(
           `INSERT INTO public.pagamentos
            (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
-            tipo_pagamento, dias_relativo_vencimento, atualizado_em)
+            tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura)
            VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                   $7, $8, NOW())`,
+                   $7, $8, NOW(), $9::bigint)`,
           [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
            pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes,
-           tipoPagamento, diasRelVencimento]
+           tipoPagamento, diasRelVencimento, idAssinatura]
         );
       }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAplicativo } from "@/app/actions/aplicativos";
 import AplicativoModal from "./AplicativoModal";
@@ -397,8 +397,8 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                 );
 
                 return (
-                  <>
-                    <tr key={a.id_app_registro} className="hover:bg-zinc-50/50 transition-colors">
+                  <Fragment key={a.id_app_registro}>
+                    <tr className="hover:bg-zinc-50/50 transition-colors">
                       {/* App */}
                       <td className="px-4 py-3">
                         <div className="font-medium text-zinc-900 flex items-center gap-1.5">
@@ -521,7 +521,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                         onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
                       />
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

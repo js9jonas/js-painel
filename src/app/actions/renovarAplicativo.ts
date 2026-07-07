@@ -72,9 +72,9 @@ export async function renovarAplicativo({
     if (modo === "pagamento") {
       await client.query(
         `INSERT INTO public.pagamentos
-           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em)
-         VALUES ($1, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Licenças', NOW())`,
-        [id_cliente, cliente, nome_app, forma, valor, detalhes || "PAGO"]
+           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em, id_assinatura)
+         VALUES ($1, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Licenças', NOW(), $7::bigint)`,
+        [id_cliente, cliente, nome_app, forma, valor, detalhes || "PAGO", id_assinatura ?? null]
       );
     }
 
