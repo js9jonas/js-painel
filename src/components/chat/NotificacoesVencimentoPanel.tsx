@@ -30,13 +30,19 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
   const [carregando, setCarregando] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const idsConhecidos = useRef<Set<string>>(new Set())
+  const requestId = useRef(0)
 
   const carregar = useCallback(async () => {
+    const meuId = ++requestId.current
     setCarregando(true)
     try {
       const resp = await fetch(`/api/whatsapp/notificacoes-vencimento?tipo=${tipo}`)
       const j = await resp.json()
       const novosItens: Item[] = j.itens ?? []
+
+      // Descarta resposta obsoleta (ex: 2ª chamada do React Strict Mode em dev, ou poll concorrente)
+      if (meuId !== requestId.current) return
+
       setItens(novosItens)
 
       setSelecionados((prev) => {
