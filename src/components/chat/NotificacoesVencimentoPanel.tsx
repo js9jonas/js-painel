@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 
 interface Item {
   id_assinatura: string
@@ -19,11 +19,17 @@ const TITULOS: Record<Tipo, string> = {
   amanha: 'Notificar vencem amanhã',
 }
 
+const COR_BOTAO: Record<Tipo, string> = {
+  vencidos: '#f57c00',
+  amanha: '#00a884',
+}
+
 function ListaNotificacao({ tipo }: { tipo: Tipo }) {
   const [itens, setItens] = useState<Item[]>([])
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const idsConhecidos = useRef<Set<string>>(new Set())
 
   const carregar = useCallback(async () => {
     setCarregando(true)
@@ -32,7 +38,21 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
       const j = await resp.json()
       const novosItens: Item[] = j.itens ?? []
       setItens(novosItens)
-      setSelecionados(new Set(novosItens.filter((i) => !i.jaEnviado).map((i) => i.id_assinatura)))
+
+      setSelecionados((prev) => {
+        const novo = new Set<string>()
+        for (const item of novosItens) {
+          if (idsConhecidos.current.has(item.id_assinatura)) {
+            // item já visto antes: preserva a escolha manual do usuário
+            if (prev.has(item.id_assinatura)) novo.add(item.id_assinatura)
+          } else {
+            // item novo na lista: aplica o padrão (pré-marcado se ainda não enviado)
+            if (!item.jaEnviado) novo.add(item.id_assinatura)
+          }
+        }
+        return novo
+      })
+      idsConhecidos.current = new Set(novosItens.map((i) => i.id_assinatura))
     } finally {
       setCarregando(false)
     }
@@ -95,7 +115,7 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
           onClick={disparar}
           disabled={enviando || selecionados.size === 0}
           style={{
-            width: '100%', background: selecionados.size === 0 ? '#c4c9cc' : '#00a884',
+            width: '100%', background: selecionados.size === 0 ? '#c4c9cc' : COR_BOTAO[tipo],
             color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px',
             fontSize: 13, fontWeight: 600, cursor: selecionados.size === 0 ? 'default' : 'pointer',
           }}
