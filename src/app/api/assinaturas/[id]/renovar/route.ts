@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { abaterCreditoRenovacao } from "@/lib/saldoServidor";
+import { notificarRenovacao } from "@/lib/notificar-renovacao";
 
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 
@@ -90,7 +91,19 @@ export async function PUT(
         }
 
         await client.query("COMMIT");
-        return NextResponse.json({ ok: true });
+
+        let whatsapp = undefined;
+        if (registrarPagamento && pgto?.idCliente) {
+          const { rows: vencRows } = await pool.query(
+            `SELECT a.venc_contrato::text AS venc_contrato, p.telas
+             FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano
+             WHERE a.id_assinatura = $1::bigint`,
+            [idAssinatura]
+          );
+          whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null);
+        }
+
+        return NextResponse.json({ ok: true, whatsapp });
       } catch (err) {
         await client.query("ROLLBACK");
         throw err;
@@ -182,7 +195,17 @@ export async function PUT(
       await abaterCreditoRenovacao(client, idAssinatura, vencContasAnterior, vencContasNova);
 
       await client.query("COMMIT");
-      return NextResponse.json({ ok: true, assinatura });
+
+      let whatsapp = undefined;
+      if (assinatura.status === "ativo") {
+        const { rows: telasRows } = await pool.query(
+          `SELECT p.telas FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano WHERE a.id_assinatura = $1::bigint`,
+          [idAssinatura]
+        );
+        whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null);
+      }
+
+      return NextResponse.json({ ok: true, assinatura, whatsapp });
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

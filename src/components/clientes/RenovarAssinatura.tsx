@@ -199,6 +199,10 @@ export default function RenovarAssinatura({
             return;
         }
 
+        if (j?.whatsapp?.enviado === false) {
+            alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
+        }
+
         setOpen(false);
         router.refresh();
         onSuccess?.();
@@ -236,6 +240,10 @@ export default function RenovarAssinatura({
             setLoading(false);
             alert(j?.error ?? text ?? `Erro HTTP ${resp.status}`);
             return;
+        }
+
+        if (j?.whatsapp?.enviado === false) {
+            alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
         }
 
         const expiradas = contasExpiradas(contasVinculadas ?? []);

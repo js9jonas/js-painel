@@ -1,32 +1,10 @@
 import { pool } from '@/lib/db'
+import { enviarTextoWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID
 const PIX_CHAVE = '40827286000106'
 const TEMPLATES_GATILHO = ['lembrete_vencimento', 'vencido_plano']
-
-async function enviarTexto(telefone: string, texto: string): Promise<string | null> {
-  const response = await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to: telefone,
-      type: 'text',
-      text: { body: texto },
-    }),
-  })
-
-  const data = await response.json()
-  if (!response.ok) {
-    console.error('[AutoResposta] Erro ao enviar texto:', data)
-    return null
-  }
-  return data.messages?.[0]?.id ?? null
-}
 
 async function enviarBotoes(
   telefone: string,
@@ -65,14 +43,10 @@ async function registrarEnvio(
   conteudo: string,
   replyToMsgId: string
 ) {
-  if (!waMsgId) return
-  await pool.query(
-    `INSERT INTO public.whatsapp_mensagens
-      (wa_msg_id, telefone, tipo, conteudo, origem, source, reply_to_wa_msg_id, recebida_em)
-     VALUES ($1, $2, 'text', $3, 'jonas', 'auto-resposta-suporte', $4, NOW())
-     ON CONFLICT (wa_msg_id) DO NOTHING`,
-    [waMsgId, telefone, conteudo, replyToMsgId]
-  )
+  await registrarMensagemWhatsapp(waMsgId, telefone, conteudo, {
+    source: 'auto-resposta-suporte',
+    replyToMsgId,
+  })
 }
 
 async function buscarClienteEPlano(telefone: string) {
@@ -144,7 +118,7 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
   }
 
   if (botaoClicado === 'Chave PIX') {
-    const msgId = await enviarTexto(telefone, PIX_CHAVE)
+    const msgId = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
     await registrarEnvio(msgId, telefone, PIX_CHAVE, cliqueMsgId)
     return
   }
@@ -154,10 +128,10 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
       'Anotado! ✅\n\n' +
       'Assim que a renovação automática mensal estiver disponível, vamos te avisar com as instruções de ativação.\n\n' +
       'Por enquanto, a renovação deve ser feita enviando o comprovante do PIX pela chave abaixo.'
-    const msgIdA = await enviarTexto(telefone, textoA)
+    const msgIdA = await enviarTextoWhatsapp(telefone, textoA)
     await registrarEnvio(msgIdA, telefone, textoA, cliqueMsgId)
 
-    const msgIdB = await enviarTexto(telefone, PIX_CHAVE)
+    const msgIdB = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
     await registrarEnvio(msgIdB, telefone, PIX_CHAVE, cliqueMsgId)
     return
   }
