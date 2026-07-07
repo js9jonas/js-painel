@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { pool } from '@/lib/db'
 import { maybeSyncLabels } from '@/lib/label-sync'
+import { responderFalarComSuporte } from '@/lib/auto-resposta-suporte'
 
 export const dynamic = 'force-dynamic'
 
@@ -137,6 +138,16 @@ export async function POST(req: NextRequest) {
               [msgId, from, nome, tipo, conteudo, media_mime, nome_arquivo,
                replyToId, replyToConteudo, replyToOrigem, timestamp, metadata?.phone_number_id]
             )
+
+            // Auto-resposta a cliques nos botões do fluxo de vencimento — fire-and-forget
+            if (tipo === 'interactive_reply' && ['Falar com suporte', 'Chave PIX', 'Automático mensal'].includes(conteudo)) {
+              responderFalarComSuporte({
+                telefone: from,
+                cliqueMsgId: msgId,
+                botaoClicado: conteudo,
+                replyToMsgId: replyToId,
+              }).catch(err => console.error('[WhatsApp] auto-resposta-suporte error:', err))
+            }
 
             // Sync de etiquetas WA — fire-and-forget, no máximo 1x/dia por contato
             maybeSyncLabels(from).catch(err =>

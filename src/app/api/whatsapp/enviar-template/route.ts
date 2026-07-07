@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    const { telefone, template_name } = await req.json()
+    const { telefone, template_name, parametros } = await req.json()
 
     if (!telefone || !template_name) {
       return NextResponse.json({ error: 'telefone e template_name obrigatórios' }, { status: 400 })
@@ -17,6 +17,20 @@ export async function POST(req: NextRequest) {
 
     const token = process.env.WHATSAPP_TOKEN
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+
+    const template: Record<string, unknown> = {
+      name: template_name,
+      language: { code: 'pt_BR' },
+    }
+
+    if (Array.isArray(parametros) && parametros.length > 0) {
+      template.components = [
+        {
+          type: 'body',
+          parameters: parametros.map((texto: string) => ({ type: 'text', text: texto })),
+        },
+      ]
+    }
 
     const response = await fetch(
       `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
@@ -30,10 +44,7 @@ export async function POST(req: NextRequest) {
           messaging_product: 'whatsapp',
           to: telefone,
           type: 'template',
-          template: {
-            name: template_name,
-            language: { code: 'pt_BR' },
-          },
+          template,
         }),
       }
     )
@@ -53,7 +64,7 @@ export async function POST(req: NextRequest) {
       [
         data.messages?.[0]?.id ?? `tmpl_${Date.now()}`,
         telefone,
-        JSON.stringify({ name: template_name, copyCode: null }),
+        JSON.stringify({ name: template_name, parametros: parametros ?? null, copyCode: null }),
         session?.user?.email ? `chat:${session.user.email}` : 'chat',
       ]
     )
