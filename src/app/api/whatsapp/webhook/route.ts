@@ -106,6 +106,10 @@ export async function POST(req: NextRequest) {
               const reply = iv.button_reply ?? iv.list_reply ?? {}
               conteudo = reply.title ?? JSON.stringify(iv).slice(0, 300)
               tipo = 'interactive_reply'
+            } else if (msg.type === 'button') {
+              // Clique em botão quick-reply anexado a um TEMPLATE — formato diferente do 'interactive'
+              conteudo = msg.button?.text ?? JSON.stringify(msg.button ?? {}).slice(0, 300)
+              tipo = 'interactive_reply'
             } else {
               console.log(`[WhatsApp] Tipo desconhecido de cliente: ${msg.type}`, JSON.stringify(msg).slice(0, 1000))
               conteudo = JSON.stringify(msg[msg.type] ?? {})
