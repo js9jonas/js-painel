@@ -39,6 +39,26 @@ function infoStatus(status: string) {
   return STATUS_INFO[(status ?? '').toLowerCase().trim()] ?? STATUS_ATIVO
 }
 
+function IndicadorEnvio({ jaEnviado, erro }: { jaEnviado: boolean; erro?: string }) {
+  let cor = '#8696a0'
+  let texto = 'Avisar'
+  if (jaEnviado) {
+    cor = '#00a884'
+    texto = 'Enviado'
+  } else if (erro) {
+    cor = '#d32f2f'
+    texto = 'Falha'
+  }
+  return (
+    <span
+      title={erro ? `Falha: ${erro}` : jaEnviado ? 'Enviado hoje' : 'Ainda não enviado'}
+      style={{ color: cor, fontSize: 11, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}
+    >
+      {texto}
+    </span>
+  )
+}
+
 function ListaNotificacao({ tipo }: { tipo: Tipo }) {
   const [itens, setItens] = useState<Item[]>([])
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
@@ -183,7 +203,7 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
                 <div style={{ color: '#d32f2f', fontSize: 11 }}>Falha: {item.erro}</div>
               )}
             </div>
-            <input type="checkbox" checked={item.jaEnviado} readOnly disabled title="Já enviado hoje" />
+            <IndicadorEnvio jaEnviado={item.jaEnviado} erro={item.erro} />
           </div>
         ))}
       </div>
