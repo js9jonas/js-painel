@@ -28,14 +28,14 @@ type WhatsappStatus = { ok: true } | { ok: false; reason: string } | null;
 
 function whatsappMensagem(status: WhatsappStatus): { texto: string; cls: string } | null {
     if (!status) return null;
-    if (status.ok) return { texto: "✅ Mensagens WhatsApp enviadas com sucesso!", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" };
+    if (status.ok) return { texto: "✅ Notificação enviada no Telegram — abra e clique no botão pra enviar no WhatsApp.", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" };
     const motivos: Record<string, string> = {
         sem_telefone: "Nenhum telefone cadastrado para este cliente.",
-        sem_config: "Configuração do WhatsApp ausente no servidor.",
-        erro_envio: "Falha ao enviar via WhatsApp. Verifique o número ou a conexão.",
+        sem_config: "Configuração do Telegram ausente no servidor.",
+        erro_envio: "Falha ao notificar no Telegram. Verifique o bot ou a conexão.",
     };
     const detalhe = motivos[(status as { ok: false; reason: string }).reason] ?? "Erro desconhecido.";
-    return { texto: `⚠️ Cortesia concedida, mas não foi possível enviar a mensagem: ${detalhe}`, cls: "bg-amber-50 border-amber-200 text-amber-700" };
+    return { texto: `⚠️ Cortesia concedida, mas não foi possível notificar: ${detalhe}`, cls: "bg-amber-50 border-amber-200 text-amber-700" };
 }
 
 function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: CortesiaModalProps) {
@@ -117,7 +117,7 @@ function CortesiaModal({ parceiro, idsSelecionados, onClose, onSuccess }: Cortes
                                     onChange={(e) => setEnviarMensagem(e.target.checked)}
                                     className="w-4 h-4 rounded accent-emerald-600"
                                 />
-                                <span className="text-sm text-zinc-700">Enviar mensagem WhatsApp ao cliente</span>
+                                <span className="text-sm text-zinc-700">Notificar no Telegram (botão pronto pra enviar no WhatsApp)</span>
                             </label>
                         </>
                     )}

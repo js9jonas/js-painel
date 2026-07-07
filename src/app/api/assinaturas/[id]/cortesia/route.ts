@@ -65,13 +65,13 @@ export async function PUT(
 
       await client.query("COMMIT");
 
-      const whatsapp = enviarMensagem
-        ? await enviarMensagensCortesia({
-            idCliente, nomeCliente, vencContrato: assinatura.venc_contrato,
+      const notificacao = enviarMensagem
+        ? await notificarCortesiaTelegram({
+            idCliente, nomeCliente, vencContrato: assinatura.venc_contrato, idsIndicacoes,
           }).catch(() => ({ ok: false as const, reason: "erro_envio" }))
         : null;
 
-      return NextResponse.json({ ok: true, assinatura, whatsapp });
+      return NextResponse.json({ ok: true, assinatura, whatsapp: notificacao });
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -86,32 +86,25 @@ export async function PUT(
 
 type WhatsappResult = { ok: true } | { ok: false; reason: string };
 
-// Template Meta: nome "js_cortesia_indicacao", categoria UTILITY, idioma pt_BR
-// Corpo do template (submeter para aprovação):
-//
-//   Parabéns, {{1}}! 🎁
-//
-//   Você ganhou 1 mês de cortesia na sua assinatura JS Sistemas
-//   pelas suas indicações.
-//
-//   Novo vencimento do contrato: {{2}}
-//
-//   Obrigado por confiar na JS Sistemas e por nos indicar! 🙏
-//
-// Parâmetros: {{1}} = primeiro nome do cliente  {{2}} = data de vencimento (dd/mm/aaaa)
-
-async function enviarMensagensCortesia({
+/**
+ * Sem template Meta aprovado para esta mensagem, a notificação vai para o Telegram
+ * de Jonas com um botão wa.me pré-preenchido — ele confere e envia manualmente pelo
+ * próprio WhatsApp, o que não exige aprovação de template por ser envio manual.
+ */
+async function notificarCortesiaTelegram({
   idCliente,
   nomeCliente,
   vencContrato,
+  idsIndicacoes,
 }: {
   idCliente: string;
   nomeCliente: string | null;
   vencContrato: string | null;
+  idsIndicacoes: string[];
 }): Promise<WhatsappResult> {
-  const token = process.env.WHATSAPP_TOKEN;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!token || !phoneId) return { ok: false, reason: "sem_config" };
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID_JONAS;
+  if (!botToken || !chatId) return { ok: false, reason: "sem_config" };
 
   const { rows } = await pool.query(
     `SELECT ct.telefone::text AS telefone
@@ -132,40 +125,50 @@ async function enviarMensagensCortesia({
   const nome = nomeCliente ? nomeCliente.split(" ")[0] : "cliente";
   const vencFormatado = vencContrato
     ? new Date(vencContrato + "T00:00:00").toLocaleDateString("pt-BR")
-    : "—";
+    : null;
 
-  const res = await fetch(
-    `https://graph.facebook.com/v22.0/${phoneId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+  let nomesIndicados: string[] = [];
+  if (idsIndicacoes.length > 0) {
+    const { rows: indicadosRows } = await pool.query(
+      `SELECT c.nome
+       FROM public.indicacoes i
+       JOIN public.clientes c ON c.id_cliente = i.id_indicado
+       WHERE i.id_indicacao = ANY($1::bigint[])
+       ORDER BY c.nome ASC`,
+      [idsIndicacoes]
+    );
+    nomesIndicados = indicadosRows.map((r: { nome: string }) => r.nome);
+  }
+
+  const blocoIndicados = nomesIndicados.length > 0
+    ? `📋 *Indicações desta cortesia:*\n${nomesIndicados.map((n) => `• ${n}`).join("\n")}\n\n`
+    : "";
+  const linhaVenc = vencFormatado ? `📅 Novo vencimento do contrato: *${vencFormatado}*\n\n` : "";
+
+  const mensagem =
+    `*Parabéns, ${nome}!* 🎁\n\n` +
+    `Você ganhou _1 mês de cortesia_ na sua assinatura *JS Sistemas* como agradecimento pelas suas indicações.\n\n` +
+    `${blocoIndicados}${linhaVenc}` +
+    `_Obrigado por confiar na JS Sistemas e por nos indicar!_ 🙏`;
+
+  const linkWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem).replace(/!/g, "%21")}`;
+
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: `🎁 *Cortesia concedida — ${nomeCliente ?? "cliente"}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [[{ text: "📲 Abrir no WhatsApp", url: linkWhatsapp }]],
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: numero,
-        type: "template",
-        template: {
-          name: "js_cortesia_indicacao",
-          language: { code: "pt_BR" },
-          components: [
-            {
-              type: "body",
-              parameters: [
-                { type: "text", text: nome },
-                { type: "text", text: vencFormatado },
-              ],
-            },
-          ],
-        },
-      }),
-    }
-  );
+    }),
+  });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    console.error("[Cortesia] Erro ao enviar WA:", err);
+    console.error("[Cortesia] Erro ao notificar Telegram:", err);
     return { ok: false, reason: "erro_envio" };
   }
 

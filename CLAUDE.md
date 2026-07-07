@@ -68,4 +68,10 @@ WHATSAPP_WABA_ID         # 265749013278174
 WHATSAPP_VERIFY_TOKEN    # token de verificação do webhook
 WHATSAPP_APP_SECRET      # App Secret do app jswhats (ID 1060517628167041) — usado para verificar assinatura HMAC-SHA256 do webhook
 WHATSAPP_INTERNAL_KEY    # chave secreta para o endpoint POST /api/whatsapp/registrar (usado pelo n8n para salvar mensagens de automação no chat)
+TELEGRAM_BOT_TOKEN       # bot @jonascheibe_bot — usado para notificar Jonas de mensagens sem template Meta aprovado (ex: cortesia de indicação)
+TELEGRAM_CHAT_ID_JONAS   # chat_id pessoal do Jonas no Telegram (1110331118)
 ```
+
+## Mensagens sem template Meta aprovado
+
+Quando não há template aprovado pela Meta para um tipo de mensagem (ex: agradecimento de cortesia), **não enviar direto pela Cloud API**. Em vez disso, notificar o Telegram de Jonas (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID_JONAS`) com um botão inline `url` apontando para `https://wa.me/<numero>?text=<mensagem>` — ele abre o WhatsApp do próprio Jonas com o texto pronto, e o envio manual não exige template. Ver `src/app/api/assinaturas/[id]/cortesia/route.ts` (`notificarCortesiaTelegram`) como referência de implementação, incluindo escape de pontuação na URL (`encodeURIComponent` + `%21` pro `!`).
