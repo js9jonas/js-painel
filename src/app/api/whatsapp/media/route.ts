@@ -14,7 +14,40 @@ export async function GET(req: NextRequest) {
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
-  // ── 1. Tentar Meta Cloud API ─────────────────────────────────────────────
+  // ── 1. Já arquivada no Drive? Serve direto — mídia arquivada já expirou na Meta,
+  //      então tentar a Meta primeiro seria uma chamada fadada a falhar (InvalidID).
+  const dbRes = await pool.query(
+    `SELECT media_drive_id, media_mime
+     FROM public.whatsapp_mensagens
+     WHERE conteudo = $1 AND media_drive_id IS NOT NULL
+     LIMIT 1`,
+    [id]
+  )
+  const row = dbRes.rows[0]
+
+  if (row?.media_drive_id) {
+    const driveAuth = createDriveAuth()
+    if (driveAuth) {
+      const { token } = await driveAuth.getAccessToken()
+      if (token) {
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${row.media_drive_id}?alt=media`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (driveRes.ok) {
+          return new NextResponse(driveRes.body, {
+            headers: {
+              'Content-Type': row.media_mime ?? driveRes.headers.get('content-type') ?? 'application/octet-stream',
+              'Cache-Control': 'private, max-age=2592000',
+            },
+          })
+        }
+      }
+    }
+    // Drive indisponível apesar de arquivada — cai pro fallback da Meta abaixo.
+  }
+
+  // ── 2. Ainda não arquivada (ou Drive falhou agora): tenta Meta Cloud API ──
   const metaRes = await fetch(`https://graph.facebook.com/v22.0/${id}`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   })
@@ -42,39 +75,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── 2. Fallback: Google Drive (mídias arquivadas) ────────────────────────
-  const dbRes = await pool.query(
-    `SELECT media_drive_id, media_mime
-     FROM public.whatsapp_mensagens
-     WHERE conteudo = $1 AND media_drive_id IS NOT NULL
-     LIMIT 1`,
-    [id]
-  )
-  const row = dbRes.rows[0]
-
-  if (!row?.media_drive_id) {
-    return NextResponse.json({ error: 'Mídia não encontrada' }, { status: 404 })
-  }
-
-  const driveAuth = createDriveAuth()
-  if (!driveAuth) {
-    console.warn('[media] GOOGLE_DRIVE_* env vars não configuradas — fallback Drive indisponível')
-    return NextResponse.json({ error: 'Mídia expirada' }, { status: 404 })
-  }
-
-  const { token } = await driveAuth.getAccessToken()
-  if (!token) return NextResponse.json({ error: 'Mídia expirada' }, { status: 404 })
-
-  const driveRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${row.media_drive_id}?alt=media`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  )
-  if (!driveRes.ok) return NextResponse.json({ error: 'Mídia expirada' }, { status: 404 })
-
-  return new NextResponse(driveRes.body, {
-    headers: {
-      'Content-Type': row.media_mime ?? driveRes.headers.get('content-type') ?? 'application/octet-stream',
-      'Cache-Control': 'private, max-age=2592000',
-    },
-  })
+  return NextResponse.json({ error: 'Mídia não encontrada' }, { status: 404 })
 }

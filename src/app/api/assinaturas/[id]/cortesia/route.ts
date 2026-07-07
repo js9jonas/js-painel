@@ -153,18 +153,25 @@ async function notificarCortesiaTelegram({
 
   const linkWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem).replace(/!/g, "%21")}`;
 
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: `🎁 *Cortesia concedida — ${nomeCliente ?? "cliente"}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [[{ text: "📲 Abrir no WhatsApp", url: linkWhatsapp }]],
-      },
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `🎁 *Cortesia concedida — ${nomeCliente ?? "cliente"}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [[{ text: "📲 Abrir no WhatsApp", url: linkWhatsapp }]],
+        },
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (err) {
+    console.error("[Cortesia] Timeout/erro de rede ao notificar Telegram:", err);
+    return { ok: false, reason: "erro_envio" };
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
