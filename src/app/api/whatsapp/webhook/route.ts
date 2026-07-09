@@ -3,7 +3,6 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { pool } from '@/lib/db'
 import { maybeSyncLabels } from '@/lib/label-sync'
 import { responderFalarComSuporte } from '@/lib/auto-resposta-suporte'
-import { processarRespostaAguardando } from '@/lib/pix-automatico'
 
 export const dynamic = 'force-dynamic'
 
@@ -152,13 +151,6 @@ export async function POST(req: NextRequest) {
                 botaoClicado: conteudo,
                 replyToMsgId: replyToId,
               }).catch(err => console.error('[WhatsApp] auto-resposta-suporte error:', err))
-            }
-
-            // Resposta a uma pergunta pendente (ex: chave Pix do fluxo de Pix Automático) — fire-and-forget
-            if (tipo === 'text') {
-              processarRespostaAguardando({ telefone: from, texto: conteudo }).catch(err =>
-                console.error('[WhatsApp] pix-automatico error:', err)
-              )
             }
 
             // Sync de etiquetas WA — fire-and-forget, no máximo 1x/dia por contato
