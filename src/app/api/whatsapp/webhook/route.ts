@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { pool } from '@/lib/db'
 import { maybeSyncLabels } from '@/lib/label-sync'
 import { responderFalarComSuporte } from '@/lib/auto-resposta-suporte'
+import { processarRespostaAguardando } from '@/lib/pix-automatico'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,6 +154,13 @@ export async function POST(req: NextRequest) {
               }).catch(err => console.error('[WhatsApp] auto-resposta-suporte error:', err))
             }
 
+            // Resposta a uma pergunta pendente (ex: chave Pix do fluxo de Pix Automático) — fire-and-forget
+            if (tipo === 'text') {
+              processarRespostaAguardando({ telefone: from, texto: conteudo }).catch(err =>
+                console.error('[WhatsApp] pix-automatico error:', err)
+              )
+            }
+
             // Sync de etiquetas WA — fire-and-forget, no máximo 1x/dia por contato
             maybeSyncLabels(from).catch(err =>
               console.error('[WhatsApp] label-sync error:', err)
@@ -162,8 +170,8 @@ export async function POST(req: NextRequest) {
           // Status updates (sent, delivered, read, failed)
           for (const status of value.statuses ?? []) {
             await pool.query(
-              `UPDATE public.whatsapp_mensagens SET status = $1, status_at = NOW() WHERE wa_msg_id = $2`,
-              [status.status, status.id]
+              `UPDATE public.whatsapp_mensagens SET status = $1, status_at = NOW(), status_error = $2 WHERE wa_msg_id = $3`,
+              [status.status, status.errors ? JSON.stringify(status.errors) : null, status.id]
             )
           }
 

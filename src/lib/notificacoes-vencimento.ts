@@ -10,6 +10,7 @@ export interface ItemNotificacaoVencimento {
   venc_contrato: string
   status: string
   jaEnviado: boolean
+  falhouEnvio: boolean
 }
 
 const TEMPLATE_POR_TIPO: Record<TipoNotificacaoVencimento, string> = {
@@ -39,31 +40,39 @@ export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<
 
   const r = await pool.query(
     `SELECT a.id_assinatura::text, c.nome, ct.telefone, p.telas, a.venc_contrato::text, a.status,
-       EXISTS (
-         SELECT 1 FROM public.whatsapp_mensagens wm
-         WHERE wm.telefone = ct.telefone AND wm.source = $1 AND wm.recebida_em::date = CURRENT_DATE
-       ) AS ja_enviado
+       ultimo.tentou AS tentou_hoje, ultimo.status AS status_envio
      FROM public.assinaturas a
      JOIN public.clientes c ON c.id_cliente = a.id_cliente
      JOIN public.planos p ON p.id_plano = a.id_plano
      LEFT JOIN LATERAL (
        SELECT telefone FROM public.contatos WHERE id_cliente = c.id_cliente ORDER BY criado_em ASC LIMIT 1
      ) ct ON true
+     LEFT JOIN LATERAL (
+       SELECT true AS tentou, wm.status
+       FROM public.whatsapp_mensagens wm
+       WHERE wm.telefone = ct.telefone AND wm.source = $1 AND wm.recebida_em::date = CURRENT_DATE
+       ORDER BY wm.recebida_em DESC LIMIT 1
+     ) ultimo ON true
      WHERE a.venc_contrato::date = ${intervaloDoTipo(tipo)}
        AND a.status NOT IN ('inativo')
      ORDER BY c.nome`,
     [source]
   )
 
-  return r.rows.map((row) => ({
-    id_assinatura: row.id_assinatura,
-    nome: row.nome,
-    telefone: row.telefone,
-    telas: row.telas,
-    venc_contrato: row.venc_contrato,
-    status: row.status,
-    jaEnviado: row.ja_enviado,
-  }))
+  return r.rows.map((row) => {
+    const tentouHoje = row.tentou_hoje === true
+    const falhouEnvio = tentouHoje && row.status_envio === 'failed'
+    return {
+      id_assinatura: row.id_assinatura,
+      nome: row.nome,
+      telefone: row.telefone,
+      telas: row.telas,
+      venc_contrato: row.venc_contrato,
+      status: row.status,
+      jaEnviado: tentouHoje && !falhouEnvio,
+      falhouEnvio,
+    }
+  })
 }
 
 export async function buscarDadosParaEnvio(idAssinatura: string): Promise<{

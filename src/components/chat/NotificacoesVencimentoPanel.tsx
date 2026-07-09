@@ -10,6 +10,7 @@ interface Item {
   venc_contrato: string
   status: string
   jaEnviado: boolean
+  falhouEnvio: boolean
   erro?: string
 }
 
@@ -39,19 +40,19 @@ function infoStatus(status: string) {
   return STATUS_INFO[(status ?? '').toLowerCase().trim()] ?? STATUS_ATIVO
 }
 
-function IndicadorEnvio({ jaEnviado, erro }: { jaEnviado: boolean; erro?: string }) {
+function IndicadorEnvio({ jaEnviado, falhouEnvio, erro }: { jaEnviado: boolean; falhouEnvio: boolean; erro?: string }) {
   let cor = '#8696a0'
   let texto = 'Avisar'
-  if (jaEnviado) {
-    cor = '#00a884'
-    texto = 'Enviado'
-  } else if (erro) {
+  if (falhouEnvio || erro) {
     cor = '#d32f2f'
     texto = 'Falha'
+  } else if (jaEnviado) {
+    cor = '#00a884'
+    texto = 'Enviado'
   }
   return (
     <span
-      title={erro ? `Falha: ${erro}` : jaEnviado ? 'Enviado hoje' : 'Ainda não enviado'}
+      title={erro ? `Falha: ${erro}` : falhouEnvio ? 'A Meta reportou falha na entrega' : jaEnviado ? 'Enviado hoje' : 'Ainda não enviado'}
       style={{ color: cor, fontSize: 11, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}
     >
       {texto}
@@ -202,8 +203,11 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
               {item.erro && (
                 <div style={{ color: '#d32f2f', fontSize: 11 }}>Falha: {item.erro}</div>
               )}
+              {!item.erro && item.falhouEnvio && (
+                <div style={{ color: '#d32f2f', fontSize: 11 }}>Falha: Meta reportou falha na entrega</div>
+              )}
             </div>
-            <IndicadorEnvio jaEnviado={item.jaEnviado} erro={item.erro} />
+            <IndicadorEnvio jaEnviado={item.jaEnviado} falhouEnvio={item.falhouEnvio} erro={item.erro} />
           </div>
         ))}
       </div>

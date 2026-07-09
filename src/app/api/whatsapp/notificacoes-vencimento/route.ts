@@ -49,37 +49,49 @@ export async function POST(req: NextRequest) {
   const templateName = templateDoTipo(tipo)
   const source = sourceDoTipo(tipo)
 
-  const resultados = await Promise.all(
-    ids.map(async (idAssinatura: string) => {
-      try {
-        const dados = await buscarDadosParaEnvio(idAssinatura)
-        if (!dados) return { id_assinatura: idAssinatura, ok: false, error: 'Assinatura não encontrada' }
-        if (!dados.telefone) return { id_assinatura: idAssinatura, nome: dados.nome, ok: false, error: 'Sem telefone cadastrado' }
+  const DELAY_ENTRE_CONTATOS_MS = 200
 
-        const primeiroNome = dados.nome.trim().split(/\s+/)[0]
-        const telasTxt = `${dados.telas} tela${dados.telas > 1 ? 's' : ''}`
-        const dataTxt = formatarData(dados.venc_contrato)
+  const resultados: any[] = []
+  for (let i = 0; i < ids.length; i++) {
+    const idAssinatura: string = ids[i]
 
-        const resultado = await enviarTemplateWhatsapp(dados.telefone, templateName, [primeiroNome, telasTxt, dataTxt])
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, DELAY_ENTRE_CONTATOS_MS))
 
-        if (!resultado.ok) {
-          return { id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: false, error: resultado.error }
-        }
-
-        await pool.query(
-          `INSERT INTO public.whatsapp_mensagens
-            (wa_msg_id, telefone, tipo, conteudo, origem, source, recebida_em)
-           VALUES ($1, $2, 'template', $3, 'jonas', $4, NOW())
-           ON CONFLICT (wa_msg_id) DO NOTHING`,
-          [resultado.msgId, dados.telefone, JSON.stringify({ name: templateName, parametros: [primeiroNome, telasTxt, dataTxt], copyCode: null }), source]
-        )
-
-        return { id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: true }
-      } catch (err: any) {
-        return { id_assinatura: idAssinatura, ok: false, error: err?.message ?? 'Erro interno' }
+    try {
+      const dados = await buscarDadosParaEnvio(idAssinatura)
+      if (!dados) {
+        resultados.push({ id_assinatura: idAssinatura, ok: false, error: 'Assinatura não encontrada' })
+        continue
       }
-    })
-  )
+      if (!dados.telefone) {
+        resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, ok: false, error: 'Sem telefone cadastrado' })
+        continue
+      }
+
+      const primeiroNome = dados.nome.trim().split(/\s+/)[0]
+      const telasTxt = `${dados.telas} tela${dados.telas > 1 ? 's' : ''}`
+      const dataTxt = formatarData(dados.venc_contrato)
+
+      const resultado = await enviarTemplateWhatsapp(dados.telefone, templateName, [primeiroNome, telasTxt, dataTxt])
+
+      if (!resultado.ok) {
+        resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: false, error: resultado.error })
+        continue
+      }
+
+      await pool.query(
+        `INSERT INTO public.whatsapp_mensagens
+          (wa_msg_id, telefone, tipo, conteudo, origem, source, recebida_em)
+         VALUES ($1, $2, 'template', $3, 'jonas', $4, NOW())
+         ON CONFLICT (wa_msg_id) DO NOTHING`,
+        [resultado.msgId, dados.telefone, JSON.stringify({ name: templateName, parametros: [primeiroNome, telasTxt, dataTxt], copyCode: null }), source]
+      )
+
+      resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: true })
+    } catch (err: any) {
+      resultados.push({ id_assinatura: idAssinatura, ok: false, error: err?.message ?? 'Erro interno' })
+    }
+  }
 
   return NextResponse.json({ resultados })
 }
