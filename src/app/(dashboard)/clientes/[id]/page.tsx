@@ -102,11 +102,17 @@ export default async function ClienteDetalhePage({ params }: Props) {
   // vinculados a OUTRA assinatura do mesmo cliente não podem "vazar" pra esta.
   const pagamentosSemVinculo = todosPagamentos.filter((p) => p.id_assinatura === null);
   const diasPorAssinatura: Record<string, number | null> = {};
+  // Pode excluir só se a assinatura não tiver pagamento, conta ou aplicativo vinculado
+  // (mesmas 3 tabelas com FK bloqueante checadas de novo na Server Action — isso aqui é só pra decidir se mostra o botão).
+  const podeExcluirPorAssinatura: Record<string, boolean> = {};
   for (const a of assinaturas) {
     const doAssinatura = todosPagamentos.filter((p) => p.id_assinatura === a.id_assinatura);
     diasPorAssinatura[a.id_assinatura] = diasDesdeUltimoPagamento(
       doAssinatura.length > 0 ? doAssinatura : pagamentosSemVinculo
     );
+    const temContas = (contasPorAssinatura[String(a.id_assinatura)] ?? []).length > 0;
+    const temApps = aplicativos.some((ap) => ap.id_assinatura != null && String(ap.id_assinatura) === String(a.id_assinatura));
+    podeExcluirPorAssinatura[a.id_assinatura] = doAssinatura.length === 0 && !temContas && !temApps;
   }
 
   const planosRenovar = planos.map((p) => ({
@@ -208,6 +214,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
           pacotes={pacotes}
           planosRenovar={planosRenovar}
           diasUltimoPagamento={diasPorAssinatura[a.id_assinatura] ?? null}
+          podeExcluir={podeExcluirPorAssinatura[a.id_assinatura] ?? false}
         />
       ))}
 
@@ -224,6 +231,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
           pacotes={pacotes}
           planosRenovar={planosRenovar}
           diasPorAssinatura={diasPorAssinatura}
+          podeExcluirPorAssinatura={podeExcluirPorAssinatura}
         />
       )}
 

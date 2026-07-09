@@ -17,6 +17,7 @@ type Props = {
   pacotes: PacoteRow[];
   planosRenovar: { id_plano: string; tipo: string; telas: number; meses: number; valor: string }[];
   diasPorAssinatura: Record<string, number | null>;
+  podeExcluirPorAssinatura: Record<string, boolean>;
 };
 
 export default function AssinaturasInativasGroup({
@@ -30,6 +31,7 @@ export default function AssinaturasInativasGroup({
   pacotes,
   planosRenovar,
   diasPorAssinatura,
+  podeExcluirPorAssinatura,
 }: Props) {
   const [expandido, setExpandido] = useState(false);
 
@@ -61,6 +63,7 @@ export default function AssinaturasInativasGroup({
                 pacotes={pacotes}
                 planosRenovar={planosRenovar}
                 diasUltimoPagamento={diasPorAssinatura[String(a.id_assinatura)] ?? null}
+                podeExcluir={podeExcluirPorAssinatura[String(a.id_assinatura)] ?? false}
               />
             </div>
           ))}

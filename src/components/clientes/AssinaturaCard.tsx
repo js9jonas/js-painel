@@ -3,6 +3,7 @@ import type { PlanoRow } from "@/lib/planos";
 import type { PacoteRow } from "@/lib/pacotes";
 import RenovarAssinatura from "@/components/clientes/RenovarAssinatura";
 import EditAssinaturaButton from "@/components/assinaturas/EditAssinaturaButton";
+import DeleteAssinaturaButton from "@/components/assinaturas/DeleteAssinaturaButton";
 import AdicionarContaModal from "@/components/clientes/AdicionarContaModal";
 import ContasGroupClient from "@/components/clientes/ContasGroupClient";
 import { tempoDesde } from "@/lib/tempo";
@@ -59,6 +60,7 @@ type Props = {
   pacotes: PacoteRow[];
   planosRenovar: { id_plano: string; tipo: string; telas: number; meses: number; valor: string }[];
   diasUltimoPagamento: number | null;
+  podeExcluir: boolean;
 };
 
 export default function AssinaturaCard({
@@ -72,6 +74,7 @@ export default function AssinaturaCard({
   pacotes,
   planosRenovar,
   diasUltimoPagamento,
+  podeExcluir,
 }: Props) {
   return (
     <div className="rounded-xl border bg-white overflow-hidden">
@@ -202,6 +205,9 @@ export default function AssinaturaCard({
             contasVinculadas={contas}
             planos={planosRenovar}
           />
+          {podeExcluir && (
+            <DeleteAssinaturaButton idAssinatura={String(a.id_assinatura)} idCliente={idCliente} />
+          )}
         </div>
       </div>
     </div>

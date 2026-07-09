@@ -155,3 +155,58 @@ export async function updateAssinatura(
     client.release();
   }
 }
+
+export async function deleteAssinatura(
+  id_assinatura: string,
+  id_cliente: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { rows: vinc } = await client.query(
+      `SELECT
+         (SELECT COUNT(*) FROM public.pagamentos  WHERE id_assinatura = $1::bigint)::int AS pagamentos,
+         (SELECT COUNT(*) FROM public.contas      WHERE id_assinatura = $1::bigint)::int AS contas,
+         (SELECT COUNT(*) FROM public.aplicativos WHERE id_assinatura = $1::bigint)::int AS aplicativos`,
+      [id_assinatura]
+    );
+    const { pagamentos, contas, aplicativos } = vinc[0];
+
+    if (pagamentos > 0 || contas > 0 || aplicativos > 0) {
+      await client.query("ROLLBACK");
+      const partes: string[] = [];
+      if (pagamentos > 0) partes.push(`${pagamentos} pagamento(s)`);
+      if (contas > 0) partes.push(`${contas} conta(s)`);
+      if (aplicativos > 0) partes.push(`${aplicativos} aplicativo(s)`);
+      return {
+        ok: false,
+        error: `Não é possível excluir: assinatura tem ${partes.join(", ")} vinculado(s). Remova esses vínculos antes.`,
+      };
+    }
+
+    // Sem pagamentos/contas/aplicativos vinculados — seguro excluir. Limpa histórico de auditoria
+    // (só registra edições da própria assinatura que está sendo removida, não há motivo pra manter órfão).
+    await client.query(`DELETE FROM public.audit_log WHERE id_assinatura = $1::bigint`, [id_assinatura]);
+    await client.query(`DELETE FROM public.saldo_servidor_historico WHERE id_assinatura = $1::bigint`, [id_assinatura]);
+
+    const { rowCount } = await client.query(
+      `DELETE FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+      [id_assinatura]
+    );
+    if (rowCount === 0) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "Assinatura não encontrada." };
+    }
+
+    await client.query("COMMIT");
+    revalidatePath(`/clientes/${id_cliente}`);
+    return { ok: true };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    return { ok: false, error: err instanceof Error ? err.message : "Erro ao excluir assinatura." };
+  } finally {
+    client.release();
+  }
+}
