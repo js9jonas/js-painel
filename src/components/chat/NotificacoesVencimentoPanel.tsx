@@ -110,6 +110,8 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
     const ids = Array.from(selecionados)
     if (ids.length === 0) return
 
+    if (!confirm(`Enviar "${TITULOS[tipo]}" para ${ids.length} cliente${ids.length !== 1 ? 's' : ''}?`)) return
+
     setEnviando(true)
     try {
       const resp = await fetch('/api/whatsapp/notificacoes-vencimento', {
