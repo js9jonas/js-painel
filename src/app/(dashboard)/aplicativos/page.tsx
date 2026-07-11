@@ -2,6 +2,8 @@
 import { getApps } from "@/lib/aplicativos";
 import BuscaMacClient from "@/components/aplicativos/BuscaMacClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function AplicativosPage() {
   const apps = await getApps();
 
