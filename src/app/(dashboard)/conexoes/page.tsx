@@ -1,16 +1,8 @@
 export const dynamic = "force-dynamic";
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
 import { getPainelServidores, getPainelApps, getPainelAppSync, getServidoresParaVinculo } from "@/lib/paineis";
 import ConexoesClient from "./ConexoesClient";
 
 export default async function ConexoesPage() {
-  const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (!session?.user || role !== "admin") {
-    redirect("/dashboard");
-  }
-
   const [servidores, apps, appSync, servidoresVinculo] = await Promise.all([
     getPainelServidores(),
     getPainelApps(),

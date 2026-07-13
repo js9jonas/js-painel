@@ -1,7 +1,5 @@
 export const dynamic = "force-dynamic";
 
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
 import { pool } from "@/lib/db";
 import VinculacaoAssinaturaClient from "./VinculacaoAssinaturaClient";
 import AutoVincularAssinaturaButton from "./AutoVincularAssinaturaButton";
@@ -108,12 +106,6 @@ async function getDados(): Promise<ContaVinculacaoAssinatura[]> {
 }
 
 export default async function VinculacaoAssinaturaPage() {
-  const session = await auth();
-  const role = (session?.user as { role?: string })?.role;
-  if (!session?.user || role !== "admin") {
-    redirect("/dashboard");
-  }
-
   const [contas, divergentes] = await Promise.all([getDados(), getAssinaturasDivergentes()]);
   const semVinculo = contas.filter((c) => !c.id_assinatura).length;
   const vinculadas = contas.filter((c) => c.id_assinatura).length;
