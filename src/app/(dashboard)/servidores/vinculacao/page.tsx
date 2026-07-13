@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { pool } from "@/lib/db";
 import VinculacaoClient from "@/components/servidores/VinculacaoClient";
 import AutoVincularButton from "@/components/servidores/AutoVincularButton";
@@ -68,6 +70,12 @@ async function getContasParaVincular(): Promise<ContaVinculacao[]> {
 }
 
 export default async function VinculacaoPage() {
+  const session = await auth();
+  const role = (session?.user as { role?: string })?.role;
+  if (!session?.user || role !== "admin") {
+    redirect("/dashboard");
+  }
+
   const contas = await getContasParaVincular();
   const semVinculo = contas.filter((c) => !c.id_cliente).length;
   const comVinculo = contas.filter((c) => c.id_cliente).length;
