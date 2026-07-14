@@ -75,7 +75,7 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onCon
             title="Ações da conta"
             type="button"
           >
-            ⚙️
+            👤
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
