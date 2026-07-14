@@ -3,6 +3,7 @@
 import React from 'react'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import ContasCards from '@/components/clientes/ContasCards'
+import ContaAcoesMenu from '@/components/clientes/ContaAcoesMenu'
 import type { ContaPainelVinculada } from '@/lib/clientes'
 import type { AplicativoRow, AppRow } from '@/lib/aplicativos'
 import AplicativoModal from '@/components/aplicativos/AplicativoModal'
@@ -724,13 +725,17 @@ export default function ChatPage() {
       .catch(() => setAplicativos([]))
   }
 
-  // Carrega contas, aplicativos e pagamentos quando cliente é identificado
-  useEffect(() => {
-    if (!cliente?.id_cliente) { setContas([]); setAplicativos([]); setPagamentos([]); return }
-    fetch(`/api/clientes/${cliente.id_cliente}/contas`)
+  function carregarContasCliente(id: number) {
+    fetch(`/api/clientes/${id}/contas`)
       .then(r => r.ok ? r.json() : [])
       .then(setContas)
       .catch(() => setContas([]))
+  }
+
+  // Carrega contas, aplicativos e pagamentos quando cliente é identificado
+  useEffect(() => {
+    if (!cliente?.id_cliente) { setContas([]); setAplicativos([]); setPagamentos([]); return }
+    carregarContasCliente(cliente.id_cliente)
     carregarAplicativosCliente(cliente.id_cliente)
     fetch(`/api/clientes/${cliente.id_cliente}/pagamentos`)
       .then(r => r.ok ? r.json() : [])
@@ -2292,6 +2297,16 @@ export default function ChatPage() {
                   contas={contas.filter(c => c.id_assinatura === String(cliente.id_assinatura))}
                   vencContas={cliente.venc_contas ?? null}
                   small
+                  contaAction={(c) => (
+                    <ContaAcoesMenu
+                      conta={c}
+                      idCliente={String(cliente.id_cliente)}
+                      appsVinculados={aplicativos
+                        .filter(a => String(a.id_conta) === c.id_conta)
+                        .map(a => ({ id_app_registro: a.id_app_registro, nome_app: a.nome_app }))}
+                      onContaChanged={() => carregarContasCliente(cliente.id_cliente)}
+                    />
+                  )}
                 />
               </div>
 

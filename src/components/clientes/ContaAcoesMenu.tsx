@@ -18,9 +18,11 @@ type Props = {
   conta: ContaPainelVinculada;
   idCliente: string;
   appsVinculados: AppVinculado[];
+  /** Chamado após editar a conta com sucesso — ver EditarContaModal.onSaved. */
+  onContaChanged?: () => void;
 };
 
-export default function ContaAcoesMenu({ conta, idCliente, appsVinculados }: Props) {
+export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onContaChanged }: Props) {
   const [editarAberto, setEditarAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEnvioDados | null>(null);
@@ -108,6 +110,7 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados }: Pro
         appsVinculados={appsVinculados}
         open={editarAberto}
         onClose={() => setEditarAberto(false)}
+        onSaved={onContaChanged}
       />
 
       {(resultado || isPending) && (

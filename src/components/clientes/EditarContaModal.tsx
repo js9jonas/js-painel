@@ -11,6 +11,9 @@ type Props = {
   appsVinculados: AppVinculado[];
   open: boolean;
   onClose: () => void;
+  /** Chamado após salvar com sucesso, além do router.refresh() — necessário em páginas
+   * que buscam as contas via fetch client-side (ex: chat) em vez de props de Server Component. */
+  onSaved?: () => void;
 };
 
 // Campos editáveis via API por tipo de painel
@@ -29,7 +32,7 @@ function caps(tipo: string) {
   return CAPS[tipo] ?? { usuario: false, senha: false };
 }
 
-export default function EditarContaModal({ conta, appsVinculados, open, onClose }: Props) {
+export default function EditarContaModal({ conta, appsVinculados, open, onClose, onSaved }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -91,6 +94,7 @@ export default function EditarContaModal({ conta, appsVinculados, open, onClose 
         else setOk(true);
 
         router.refresh();
+        onSaved?.();
       } catch (e) {
         setErro(e instanceof Error ? e.message : "Erro de rede.");
       }
