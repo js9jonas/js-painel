@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import ContasCards from "./ContasCards";
 import VerificarContaButton from "./VerificarContaButton";
 import DesvincularContaButton from "./DesvincularContaButton";
-import EditarContaButton from "./EditarContaButton";
+import ContaAcoesMenu from "./ContaAcoesMenu";
 import type { ContaPainelVinculada } from "@/lib/clientes";
 
 type ContaAtualizada = { id_conta: number; vencimento: string | null; status: string };
@@ -38,7 +38,7 @@ export default function ContasGroupClient({ contas, idCliente, vencContas, empty
       small={small}
       contaAction={(c) => (
         <>
-          <EditarContaButton
+          <ContaAcoesMenu
             conta={c}
             idCliente={idCliente}
             appsVinculados={appsVinculados?.get(c.id_conta) ?? []}

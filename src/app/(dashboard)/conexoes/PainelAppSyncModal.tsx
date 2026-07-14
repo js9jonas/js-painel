@@ -50,6 +50,7 @@ export default function PainelAppSyncModal({ painel, onClose, onSalvo }: Props) 
       id: painel?.id,
       tipo: painel?.tipo ?? "",
       url_api: painel?.url_api ?? "",
+      host_stream: "",
       padrao_usuario: "",
       padrao_senha: "",
       id_servidor: null,

@@ -9,6 +9,7 @@ export type PainelServidorInput = {
   tipo: string;
   url_painel: string;
   url_api: string;
+  host_stream: string;
   usuario: string;
   senha: string;
   master: string;
@@ -38,11 +39,11 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
     if (input.id) {
       await pool.query(
         `UPDATE public.painel_servidores SET
-           nome = $2, tipo = $3, url_painel = $4, url_api = $5,
-           usuario = $6, senha = CASE WHEN $7 = '' THEN senha ELSE $7 END,
-           master = $8, contato_master = $9,
-           padrao_usuario = NULLIF($10, ''), padrao_senha = NULLIF($11, ''),
-           ativo = $12, id_servidor = $13
+           nome = $2, tipo = $3, url_painel = $4, url_api = $5, host_stream = $6,
+           usuario = $7, senha = CASE WHEN $8 = '' THEN senha ELSE $8 END,
+           master = $9, contato_master = $10,
+           padrao_usuario = NULLIF($11, ''), padrao_senha = NULLIF($12, ''),
+           ativo = $13, id_servidor = $14
          WHERE id = $1`,
         [
           input.id,
@@ -50,6 +51,7 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
           input.tipo.trim(),
           input.url_painel.trim() || null,
           input.url_api.trim() || null,
+          input.host_stream.trim() || null,
           input.usuario.trim() || null,
           input.senha,
           input.master.trim() || null,
@@ -63,13 +65,14 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
     } else {
       await pool.query(
         `INSERT INTO public.painel_servidores
-           (nome, tipo, url_painel, url_api, usuario, senha, master, contato_master, padrao_usuario, padrao_senha, ativo, id_servidor)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),NULLIF($10,''),$11,$12)`,
+           (nome, tipo, url_painel, url_api, host_stream, usuario, senha, master, contato_master, padrao_usuario, padrao_senha, ativo, id_servidor)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),NULLIF($11,''),$12,$13)`,
         [
           input.nome.trim(),
           input.tipo.trim(),
           input.url_painel.trim() || null,
           input.url_api.trim() || null,
+          input.host_stream.trim() || null,
           input.usuario.trim() || null,
           input.senha || null,
           input.master.trim() || null,

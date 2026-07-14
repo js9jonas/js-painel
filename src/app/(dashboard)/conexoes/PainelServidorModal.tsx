@@ -15,7 +15,7 @@ type Props = {
 };
 
 const VAZIO = {
-  nome: "", tipo: "club", url_painel: "", url_api: "",
+  nome: "", tipo: "club", url_painel: "", url_api: "", host_stream: "",
   usuario: "", senha: "", master: "", contato_master: "",
   padrao_usuario: "", padrao_senha: "", ativo: true, id_servidor: null as number | null,
 };
@@ -32,6 +32,7 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
         tipo:           painel.tipo,
         url_painel:     painel.url_painel ?? "",
         url_api:        painel.url_api ?? "",
+        host_stream:    painel.host_stream ?? "",
         usuario:        painel.usuario ?? "",
         senha:          "",
         master:         painel.master ?? "",
@@ -92,8 +93,8 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
           <Field label="URL do painel">
             <input className={input} value={form.url_painel} onChange={(e) => set("url_painel", e.target.value)} placeholder="https://" />
           </Field>
-          <Field label="URL da API">
-            <input className={input} value={form.url_api} onChange={(e) => set("url_api", e.target.value)} placeholder="https://api..." />
+          <Field label="URL da lista">
+            <input className={input} value={form.host_stream} onChange={(e) => set("host_stream", e.target.value)} placeholder="http://dominio.com" />
           </Field>
         </div>
 
