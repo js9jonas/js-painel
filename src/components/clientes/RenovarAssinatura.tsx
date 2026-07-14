@@ -200,7 +200,11 @@ export default function RenovarAssinatura({
         }
 
         if (j?.whatsapp?.enviado === false) {
-            alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
+            if (j.whatsapp.viaTelegram) {
+                alert(`Assinatura renovada. Cliente sem conversa ativa — mensagem enviada como link no seu Telegram, para envio manual.`);
+            } else {
+                alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
+            }
         }
 
         setOpen(false);
@@ -243,7 +247,11 @@ export default function RenovarAssinatura({
         }
 
         if (j?.whatsapp?.enviado === false) {
-            alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
+            if (j.whatsapp.viaTelegram) {
+                alert(`Assinatura renovada. Cliente sem conversa ativa — mensagem enviada como link no seu Telegram, para envio manual.`);
+            } else {
+                alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
+            }
         }
 
         const expiradas = contasExpiradas(contasVinculadas ?? []);
