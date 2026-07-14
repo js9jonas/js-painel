@@ -95,7 +95,7 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
  ORDER BY LEAST(
    a.venc_contas::date,
    MIN(ct.vencimento_real_painel)::date
- ) ASC NULLS LAST`,
+ ) ASC NULLS LAST, c.nome ASC`,
         [dias]
     );
     return rows;
