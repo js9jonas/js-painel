@@ -301,6 +301,7 @@ export function criarNowAdapter(
 
         // Busca vencimento do teste recém-criado
         let expiracao: string | undefined;
+        let expiracaoHorario: string | undefined;
         try {
           const listaRes = await phpFetch(
             session, codrev,
@@ -312,11 +313,16 @@ export function criarNowAdapter(
             const lista = JSON.parse(listaText);
             const rows: string[][] = lista.data ?? [];
             const row = rows.find((r) => parseUsername(r[0]) === novoUser);
-            if (row) expiracao = parseVencimento(row[3]) ?? undefined;
+            if (row) {
+              expiracao = parseVencimento(row[3]) ?? undefined;
+              // Best-effort: célula pode trazer hora junto da data (ex: "14/07/2026 21:30")
+              const horarioMatch = row[3].match(/(\d{2}):(\d{2})/);
+              expiracaoHorario = horarioMatch ? `${horarioMatch[1]}:${horarioMatch[2]}` : undefined;
+            }
           }
         } catch { /* segue sem expiracao */ }
 
-        return { ok: true, usuario: novoUser, senha: novaSenha, expiracao };
+        return { ok: true, usuario: novoUser, senha: novaSenha, expiracao, expiracaoHorario };
       });
     },
 

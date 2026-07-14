@@ -174,7 +174,7 @@ export function criarLiebeAdapter(
       });
     },
 
-    async gerarTeste({ comAdultos = false } = {}): Promise<ResultadoTeste> {
+    async gerarTeste({ comAdultos = false, rotulo = "" } = {}): Promise<ResultadoTeste> {
       return withRelogin(async (token) => {
         // Lista servidores para encontrar pacote de teste adequado
         const serversJson = await liebeGet(token, "/servers");
@@ -186,9 +186,11 @@ export function criarLiebeAdapter(
 
         for (const server of servers) {
           const pkgs: any[] = server.packages ?? [];
-          const pkg = pkgs.find((p: any) =>
+          const candidatos = pkgs.filter((p: any) =>
             p.is_trial === "YES" && p.status === "ACTIVE" && p.is_adult === comAdultos,
           );
+          // Prefere o pacote de 24h como padrão (confirmado disponível); cai pro primeiro achado se não houver
+          const pkg = candidatos.find((p: any) => p.duration === 24) ?? candidatos[0];
           if (pkg) {
             serverId       = server.id;
             packageId      = pkg.id;
@@ -204,11 +206,13 @@ export function criarLiebeAdapter(
           package_id:  packageId,
           trial_hours: packageDuration,
           connections: 1,
+          name:        rotulo,
         });
 
         const customer = result.data ?? result;
         const expiracao = customer.expires_at_tz?.slice(0, 10) ?? undefined;
-        return { ok: true, usuario: String(customer.username), senha: String(customer.password), expiracao };
+        const expiracaoHorario = customer.expires_at_tz?.slice(11, 16) ?? undefined;
+        return { ok: true, usuario: String(customer.username), senha: String(customer.password), expiracao, expiracaoHorario };
       });
     },
 

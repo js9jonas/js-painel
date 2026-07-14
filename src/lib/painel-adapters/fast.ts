@@ -116,11 +116,11 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
       });
 
       // exp_date em timestamp Unix
-      const expiracao = data?.exp_date
-        ? new Date(Number(data.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
-        : undefined;
+      const expDate = data?.exp_date ? new Date(Number(data.exp_date) * 1000) : undefined;
+      const expiracao = expDate?.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      const expiracaoHorario = expDate?.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
-      return { ok: true, usuario, senha, expiracao };
+      return { ok: true, usuario, senha, expiracao, expiracaoHorario };
     },
 
     async deletarConta(usuario: string): Promise<void> {

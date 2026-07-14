@@ -255,7 +255,7 @@ export function criarCentralAdapter(
       return { ok: true };
     },
 
-    async gerarTeste({ comAdultos = false } = {}): Promise<ResultadoTeste> {
+    async gerarTeste({ comAdultos = false, rotulo = "" } = {}): Promise<ResultadoTeste> {
       const usuario    = gerarCredencialCentral();
       const senha      = gerarCredencialCentral();
       const packageId  = comAdultos ? 62 : 61;
@@ -266,7 +266,7 @@ export function criarCentralAdapter(
         body: JSON.stringify({
           username:               usuario,
           password:               senha,
-          full_name:              "",
+          full_name:              rotulo,
           as_number:              "",
           type:                   1,
           max_connections:        1,
@@ -280,10 +280,11 @@ export function criarCentralAdapter(
       });
 
       // Duração fixa de 3h (determinada pelo package 61/62 no servidor)
-      const expiracao = new Date(Date.now() + 3 * 60 * 60 * 1000)
-        .toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      const expDate = new Date(Date.now() + 3 * 60 * 60 * 1000);
+      const expiracao = expDate.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      const expiracaoHorario = expDate.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
-      return { ok: true, usuario, senha, expiracao };
+      return { ok: true, usuario, senha, expiracao, expiracaoHorario };
     },
 
     async deletarConta(usuario: string): Promise<void> {

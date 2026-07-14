@@ -187,13 +187,18 @@ export function criarNatvAdapter(
       }
     },
 
-    async gerarTeste({ horas = 1 } = {}): Promise<ResultadoTeste> {
-      const novoUser  = gerarUsername();
-      const minutos   = Math.min(Math.max(horas * 60, 15), 360);
+    async gerarTeste({ horas = 6 } = {}): Promise<ResultadoTeste> {
+      const novoUser = gerarUsername();
+      // API só aceita esses valores exatos (como string) — pega o mais próximo do solicitado
+      const MINUTOS_VALIDOS = [15, 30, 60, 120, 180, 240, 300, 360];
+      const alvo = horas * 60;
+      const minutos = MINUTOS_VALIDOS.reduce((mais, atual) =>
+        Math.abs(atual - alvo) < Math.abs(mais - alvo) ? atual : mais
+      );
 
       const res = await apiFetch("/user", {
         method: "POST",
-        body: JSON.stringify({ username: novoUser, minutes: minutos }),
+        body: JSON.stringify({ username: novoUser, minutes: String(minutos) }),
       });
 
       if (!res.ok) {
@@ -204,14 +209,19 @@ export function criarNatvAdapter(
       const data = await res.json() as {
         username?: string;
         password?: string;
-        exp_date?: string;
+        exp_date?: number; // Unix timestamp (segundos) — schema oficial do POST /user, diferente do formato string do /report/allusers
       };
 
+      const expDate = typeof data.exp_date === "number" ? new Date(data.exp_date * 1000) : undefined;
+      const expiracao = expDate?.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      const expiracaoHorario = expDate?.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
       return {
-        ok:        true,
-        usuario:   data.username ?? novoUser,
-        senha:     data.password ?? undefined,
-        expiracao: data.exp_date ? parseExpDate(data.exp_date) ?? undefined : undefined,
+        ok:               true,
+        usuario:          data.username ?? novoUser,
+        senha:            data.password ?? undefined,
+        expiracao,
+        expiracaoHorario,
       };
     },
   };

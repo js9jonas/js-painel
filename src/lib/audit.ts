@@ -39,7 +39,8 @@ export type AuditTipo =
   | "edicao_cadastro"
   | "alteracao_app"
   | "vinculo_conta"
-  | "desvinculo_conta";
+  | "desvinculo_conta"
+  | "criacao_teste_conta";
 
 export async function registrarAudit(
   client: PoolClient,

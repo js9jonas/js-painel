@@ -25,6 +25,7 @@ export interface ResultadoTeste {
   usuario?: string;
   senha?: string;
   expiracao?: string; // YYYY-MM-DD
+  expiracaoHorario?: string; // HH:MM, quando disponível — só exibição, não é persistido (vencimento_real_painel é DATE)
   erro?: string;
 }
 

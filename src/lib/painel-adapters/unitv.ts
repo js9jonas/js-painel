@@ -280,7 +280,8 @@ export function criarUnitvAdapter(
       }
 
       const expiracao = nova.expireTime ? nova.expireTime.slice(0, 10) : undefined;
-      return { ok: true, usuario: nova.sn, senha: nova.password, expiracao };
+      const expiracaoHorario = nova.expireTime ? nova.expireTime.slice(11, 16) : undefined;
+      return { ok: true, usuario: nova.sn, senha: nova.password, expiracao, expiracaoHorario };
     },
 
     async editarConta(sn: string, campos: { novoRotulo?: string }): Promise<ResultadoEdicao> {

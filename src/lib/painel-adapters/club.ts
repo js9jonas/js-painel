@@ -321,11 +321,26 @@ export function criarClubAdapter(
         const conta = lista.find((l: any) => l.username === usuario);
         if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CLUB.` };
 
+        // A listagem em massa não traz senha — busca a atual via /info quando não estamos trocando,
+        // pra não mandar o campo em branco (payload real do site sempre envia a senha atual)
+        let senhaAtual = campos.novaSenha;
+        if (!senhaAtual) {
+          const info = await apiFetch(token, `listas/${conta.id}/info`);
+          senhaAtual = info?.data?.password ?? "";
+        }
+
+        // Nomes de campo confirmados capturando o payload real do formulário de edição do site
+        // (diferente do que estava aqui antes: username_edit/password_edit/reseller_notes/plano_novo_edit)
         const body = new URLSearchParams();
-        body.set("username_edit",    campos.novoUsuario  ?? usuario);
-        body.set("password_edit",    campos.novaSenha    ?? "");
-        body.set("reseller_notes",   campos.novoRotulo   ?? conta.reseller_notes ?? "");
-        body.set("plano_novo_edit",  conta.bouquet ?? "");
+        body.set("id",             String(conta.id));
+        body.set("username",       campos.novoUsuario ?? usuario);
+        body.set("password",       senhaAtual ?? "");
+        body.set("email",          "");
+        body.set("plano",          "");
+        body.set("plano_antigo",   conta.bouquet ?? "");
+        body.set("plano_novo",     conta.bouquet ?? "");
+        body.set("plano_opt_edit", "antigo");
+        body.set("notas",          campos.novoRotulo ?? conta.reseller_notes ?? "");
 
         const result = await apiFetch(token, `listas/${conta.id}/editar`, {
           method: "POST",
@@ -336,7 +351,7 @@ export function criarClubAdapter(
       });
     },
 
-    async gerarTeste({ comAdultos = false, horas = 6 } = {}): Promise<ResultadoTeste> {
+    async gerarTeste({ comAdultos = false, horas = 6, rotulo = "" } = {}): Promise<ResultadoTeste> {
       return withRelogin(async (token) => {
         const usuario = gerarUsername();
         const senha   = gerarSenha();
@@ -355,10 +370,33 @@ export function criarClubAdapter(
 
         if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao gerar teste no CLUB." };
 
-        const expiracao = new Date(Date.now() + horas * 60 * 60 * 1000)
-          .toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+        // A criação não aceita rótulo — aplica via chamada extra de edição (campo "notas",
+        // confirmado capturando o payload real do site; mantém mesmo plano pra não resetar o teste)
+        if (rotulo) {
+          try {
+            const lista = await listarContasRaw(token);
+            const conta = lista.find((l: any) => l.username === usuario);
+            if (conta) {
+              const body = new URLSearchParams();
+              body.set("id", String(conta.id));
+              body.set("username", usuario);
+              body.set("password", senha);
+              body.set("email", "");
+              body.set("plano", "");
+              body.set("plano_antigo", bouquet);
+              body.set("plano_novo", bouquet);
+              body.set("plano_opt_edit", "antigo");
+              body.set("notas", rotulo);
+              await apiFetch(token, `listas/${conta.id}/editar`, { method: "POST", body });
+            }
+          } catch { /* segue sem rótulo remoto se a edição falhar */ }
+        }
 
-        return { ok: true, usuario, senha, expiracao };
+        const expDate = new Date(Date.now() + horas * 60 * 60 * 1000);
+        const expiracao = expDate.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+        const expiracaoHorario = expDate.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+        return { ok: true, usuario, senha, expiracao, expiracaoHorario };
       });
     },
 

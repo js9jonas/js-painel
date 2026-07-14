@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { buscarContasLivres, vincularContaExistente, type ContaLivre } from "@/app/actions/contasVinculo";
+import { buscarContasLivres, vincularContaExistente, criarContaTeste, type ContaLivre, type ResultadoCriarTeste } from "@/app/actions/contasVinculo";
 
 type Painel = { id: number; nome: string; tipo: string };
+
+// Tipos de painel cujo adapter implementa gerarTeste() — ver src/lib/painel-adapters/*.ts
+const TIPOS_COM_TESTE = new Set(["club", "central", "uniplay", "now", "unitv", "liebe", "natv", "fast"]);
 
 type Props = {
   idAssinatura: string;
@@ -20,6 +23,9 @@ export default function AdicionarContaModal({ idAssinatura, idCliente, paineis, 
   const [buscando, setBuscando] = useState(false);
   const [pending, startTransition] = useTransition();
   const [mensagem, setMensagem] = useState<string | null>(null);
+  const [descricaoTeste, setDescricaoTeste] = useState("");
+  const [criandoTeste, startCriandoTeste] = useTransition();
+  const [resultadoTeste, setResultadoTeste] = useState<ResultadoCriarTeste | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -28,8 +34,23 @@ export default function AdicionarContaModal({ idAssinatura, idCliente, paineis, 
       setQuery("");
       setResultados([]);
       setMensagem(null);
+      setDescricaoTeste("");
+      setResultadoTeste(null);
     }
   }, [aberto]);
+
+  // p.id vem do banco como BIGINT (pg retorna como string); idPainel pode ser number após onPainelChange — comparar como string
+  const painelSelecionado = paineis.find((p) => String(p.id) === String(idPainel));
+  const podeCriarTeste = !!painelSelecionado && TIPOS_COM_TESTE.has(painelSelecionado.tipo);
+
+  function criarTeste() {
+    if (!idPainel || !descricaoTeste.trim()) return;
+    setResultadoTeste(null);
+    startCriandoTeste(async () => {
+      const res = await criarContaTeste(Number(idPainel), idCliente, idAssinatura, descricaoTeste.trim());
+      setResultadoTeste(res);
+    });
+  }
 
   async function buscar(q: string, painel: number | "") {
     if (!painel) return;
@@ -124,6 +145,44 @@ export default function AdicionarContaModal({ idAssinatura, idCliente, paineis, 
                   className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              {podeCriarTeste && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 space-y-2">
+                  <label className="block text-xs font-medium text-zinc-600">Criar conta de teste</label>
+                  <input
+                    type="text"
+                    placeholder="Descrição (ex: teste solicitado)"
+                    value={descricaoTeste}
+                    onChange={(e) => setDescricaoTeste(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={criarTeste}
+                    disabled={criandoTeste || !descricaoTeste.trim()}
+                    className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {criandoTeste ? "Criando…" : "Criar teste"}
+                  </button>
+
+                  {resultadoTeste?.ok && (
+                    <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-3 py-2">
+                      Teste criado e vinculado! Usuário: <span className="font-mono font-semibold">{resultadoTeste.usuario}</span>
+                      {resultadoTeste.senha && <> / Senha: <span className="font-mono font-semibold">{resultadoTeste.senha}</span></>}
+                      {resultadoTeste.expiracao && (
+                        <>
+                          {" "}/ Vence: <span className="font-mono font-semibold">
+                            {resultadoTeste.expiracao.split("-").reverse().join("/")}
+                            {resultadoTeste.expiracaoHorario && ` às ${resultadoTeste.expiracaoHorario}`}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {resultadoTeste && !resultadoTeste.ok && (
+                    <p className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{resultadoTeste.erro}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Resultados */}
