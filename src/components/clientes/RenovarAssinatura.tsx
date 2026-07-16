@@ -59,6 +59,24 @@ function contasExpiradas(contas: ContaVinculada[]): ContaVinculada[] {
     });
 }
 
+/**
+ * Resposta sem JSON válido = falha de infra (proxy, gateway, timeout) antes de chegar
+ * na rota — nada foi salvo, só pedir pra tentar de novo. Resposta com JSON válido e
+ * erro = falha na própria rota, então monta um bloco técnico fácil de colar de volta
+ * pra investigar (endpoint, status, mensagem do servidor e horário).
+ */
+function formatarErroSalvar(endpoint: string, status: number, jsonOk: boolean, j: any, textoCru: string): string {
+    if (!jsonOk) {
+        return `Falha temporária de conexão (HTTP ${status}). Nada foi salvo — pode tentar de novo.`;
+    }
+    return [
+        `Erro ao salvar (HTTP ${status})`,
+        `Endpoint: ${endpoint}`,
+        `Mensagem: ${j?.error ?? textoCru ?? "desconhecida"}`,
+        `Horário: ${new Date().toLocaleString("pt-BR")}`,
+    ].join("\n");
+}
+
 async function renovarContasViaAPI(contas: ContaVinculada[]): Promise<ResultadoConta[]> {
     return Promise.all(
         contas.map(async (c) => {
@@ -178,6 +196,7 @@ export default function RenovarAssinatura({
         if (!valor.trim()) { alert("Informe o valor do pagamento."); return; }
         setLoading(true);
 
+        const endpoint = `PUT /api/assinaturas/${idAssinatura}/renovar`;
         const resp = await fetch(`/api/assinaturas/${idAssinatura}/renovar`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -191,11 +210,12 @@ export default function RenovarAssinatura({
 
         const text = await resp.text();
         let j: any = {};
-        try { j = JSON.parse(text); } catch { }
+        let jsonOk = false;
+        try { j = JSON.parse(text); jsonOk = true; } catch { }
         setLoading(false);
 
         if (!resp.ok || j?.ok === false) {
-            alert(j?.error ?? text ?? `Erro HTTP ${resp.status}`);
+            alert(formatarErroSalvar(endpoint, resp.status, jsonOk, j, text));
             return;
         }
 
@@ -221,6 +241,7 @@ export default function RenovarAssinatura({
 
         setLoading(true);
 
+        const endpoint = `PUT /api/assinaturas/${idAssinatura}/renovar`;
         const resp = await fetch(`/api/assinaturas/${idAssinatura}/renovar`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -238,11 +259,12 @@ export default function RenovarAssinatura({
 
         const text = await resp.text();
         let j: any = {};
-        try { j = JSON.parse(text); } catch { }
+        let jsonOk = false;
+        try { j = JSON.parse(text); jsonOk = true; } catch { }
 
         if (!resp.ok || j?.ok === false) {
             setLoading(false);
-            alert(j?.error ?? text ?? `Erro HTTP ${resp.status}`);
+            alert(formatarErroSalvar(endpoint, resp.status, jsonOk, j, text));
             return;
         }
 
