@@ -11,7 +11,9 @@ const API_URL     = "https://pdcapi.io/";
 const WEBSITE_URL = "https://dashboard.bz/login.php";
 const SITEKEY     = "8cf2ef3e-6e60-456a-86ca-6f2c855c3a06";
 // pdcapi.io bloqueia IP do datacenter Hostinger — proxy residencial necessário
-const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
+// timeout curto (padrão do impit é ~30s, igual ao timeout externo do /conexoes — não sobra
+// janela pro retry de proxy-retry.ts tentar outro IP do pool antes do status check desistir)
+const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL, timeout: 10_000 });
 
 // Evita múltiplos logins simultâneos para o mesmo painel (sync + status ao mesmo tempo)
 const loginEmProgresso = new Map<number, Promise<string | void>>();

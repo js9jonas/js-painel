@@ -18,7 +18,9 @@ const AES_KEY = Buffer.from("93403d3aa2ec48b4", "utf8");
 const AES_IV  = Buffer.from("7cf0127d190cb909", "utf8");
 
 // proxyUrl residencial bypassa bloqueio de IP do datacenter no Cloudflare
-const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
+// timeout curto (padrão do impit é ~30s, igual ao timeout externo do /conexoes — não sobra
+// janela pro retry de proxy-retry.ts tentar outro IP do pool antes do status check desistir)
+const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL, timeout: 10_000 });
 
 interface UnitvSession { token: string }
 

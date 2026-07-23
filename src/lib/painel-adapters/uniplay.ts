@@ -10,7 +10,9 @@ const API_BASE = "https://gesapioffice.com/api";
 
 // Instância global reutilizada entre requisições — imita TLS Chrome
 // proxyUrl roteia via proxy residencial (bypassa bloqueio de IP do datacenter)
-const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
+// timeout curto (padrão do impit é ~30s, igual ao timeout externo do /conexoes — não sobra
+// janela pro retry de proxy-retry.ts tentar outro IP do pool antes do status check desistir)
+const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL, timeout: 10_000 });
 
 const ORIGIN_HEADERS = {
   Origin: "http://searchdefense.top",

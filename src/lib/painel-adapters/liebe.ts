@@ -10,7 +10,9 @@ import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, R
 const API_BASE   = "https://liebeapp.sigma.vin/api";
 const ORIGIN     = "https://painel.liebeapp.me";
 
-const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL });
+// timeout curto (padrão do impit é ~30s, igual ao timeout externo do /conexoes — não sobra
+// janela pro retry de proxy-retry.ts tentar outro IP do pool antes do status check desistir)
+const impit = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL, timeout: 10_000 });
 
 function baseHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
