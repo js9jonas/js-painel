@@ -154,6 +154,9 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               Vencimento
             </th>
             <th className="sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 px-6 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider">
+              Contas
+            </th>
+            <th className="sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 px-6 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider">
               Status
             </th>
             <th className="sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 px-6 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider">
@@ -199,6 +202,27 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               </td>
 
               <td className="px-6 py-4">
+                {c.sub_contas.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {c.sub_contas.map((ct) => (
+                      <div key={ct.id_conta} className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+                        <span className="font-medium text-zinc-700">
+                          {ct.vencimento_real_painel
+                            ? ct.vencimento_real_painel.split('T')[0].split('-').reverse().join('/')
+                            : "—"}
+                        </span>
+                        {ct.nome_painel && (
+                          <span className="text-zinc-400">· {ct.nome_painel}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-zinc-400 text-xs">—</span>
+                )}
+              </td>
+
+              <td className="px-6 py-4">
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${badgeClass(c.status_tela)}`}>
                   {badgeLabel(c.status_tela)}
                 </span>
@@ -230,7 +254,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
           {data.length === 0 && (
             <tr>
-              <td className="px-6 py-16 text-center text-zinc-500" colSpan={6}>
+              <td className="px-6 py-16 text-center text-zinc-500" colSpan={7}>
                 <div className="flex flex-col items-center gap-2">
                   <div className="text-4xl">🔍</div>
                   <div className="font-medium">Nenhum cliente encontrado</div>

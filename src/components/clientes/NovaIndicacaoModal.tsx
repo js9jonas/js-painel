@@ -90,6 +90,7 @@ export default function NovaIndicacaoModal({ idParceiro, planos, pacotes }: Prop
       pacote_nome: null,
       observacao_assinatura: null,
       id_assinatura_principal: null,
+      sub_contas: [],
     };
     setSelecionado(clienteFake);
     setBusca(nome);

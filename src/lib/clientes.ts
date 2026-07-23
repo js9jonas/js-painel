@@ -12,6 +12,13 @@ export type ClienteStatusTela =
 
 export type DueFilter = "todos" | "ontem" | "hoje" | "amanha";
 
+export type SubContaCliente = {
+  id_conta: string;
+  usuario: string;
+  vencimento_real_painel: string;
+  nome_painel: string | null;
+};
+
 export type ClienteRow = {
   id_cliente: string;
   nome: string;
@@ -23,6 +30,7 @@ export type ClienteRow = {
   pacote_nome: string | null;
   observacao_assinatura: string | null;
   id_assinatura_principal: string | null;
+  sub_contas: SubContaCliente[];
 };
 
 export type GetClientesParams = {
@@ -194,6 +202,7 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         COALESCE(assin_near.pacote_nome, app_pend.pacote_nome) AS pacote_nome,
         assin_latest.observacao AS observacao_assinatura,
         assin_latest.id_assinatura AS id_assinatura_principal,
+        contas_near.sub_contas,
         CASE
           WHEN COUNT(a.id_assinatura) = 0
             THEN CASE
@@ -227,7 +236,7 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
       ) ct ON true
       LEFT JOIN public.assinaturas a ON a.id_cliente = c.id_cliente
       LEFT JOIN LATERAL (
-        SELECT a2.venc_contrato::text AS venc_contrato, pac.contrato::text AS pacote_nome
+        SELECT a2.id_assinatura::text AS id_assinatura, a2.venc_contrato::text AS venc_contrato, pac.contrato::text AS pacote_nome
         FROM public.assinaturas a2
         LEFT JOIN public.pacote pac ON pac.id_pacote = a2.id_pacote
         WHERE a2.id_cliente = c.id_cliente
@@ -235,6 +244,23 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
         ORDER BY ABS(a2.venc_contrato::date - CURRENT_DATE) ASC NULLS LAST
         LIMIT 1
       ) assin_near ON true
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'id_conta',               ct2.id_conta::text,
+              'usuario',                ct2.usuario,
+              'vencimento_real_painel', ct2.vencimento_real_painel::text,
+              'nome_painel',            ps2.nome
+            ) ORDER BY ct2.vencimento_real_painel ASC NULLS LAST
+          ) FILTER (WHERE ct2.id_conta IS NOT NULL),
+          '[]'::jsonb
+        ) AS sub_contas
+        FROM public.contas ct2
+        LEFT JOIN public.painel_servidores ps2 ON ps2.id = ct2.id_painel_servidor
+        WHERE ct2.id_assinatura::text = assin_near.id_assinatura
+          AND ct2.removido_em IS NULL
+      ) contas_near ON true
       LEFT JOIN LATERAL (
         SELECT a3.id_assinatura::text AS id_assinatura, a3.observacao
         FROM public.assinaturas a3
@@ -253,9 +279,10 @@ export async function getClientes(params: GetClientesParams = {}): Promise<Clien
       ) app_pend ON true
       ${whereSql}
       GROUP BY c.id_cliente, c.nome, c.observacao, ct.telefone,
-               assin_near.venc_contrato, assin_near.pacote_nome,
+               assin_near.id_assinatura, assin_near.venc_contrato, assin_near.pacote_nome,
                assin_latest.id_assinatura, assin_latest.observacao,
-               app_pend.validade, app_pend.pacote_nome, app_pend.has_pend
+               app_pend.validade, app_pend.pacote_nome, app_pend.has_pend,
+               contas_near.sub_contas
     )
     SELECT *
     FROM base
