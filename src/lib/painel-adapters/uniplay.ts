@@ -32,12 +32,18 @@ function parseSession(cookie: string | null): UniplaySession | null {
   }
 }
 
-async function login(usuario: string, senha: string): Promise<UniplaySession> {
+async function login(usuario: string, senha: string, tentativa = 1): Promise<UniplaySession> {
   const res = await impitFetch(impit, `${API_BASE}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...ORIGIN_HEADERS },
     body: JSON.stringify({ username: usuario, password: senha, code: "" }),
   });
+  // 404 aqui costuma ser o IP do proxy rotativo caindo no bloqueio de datacenter do
+  // gesapioffice.com (não credencial inválida) — tenta de novo pra pegar outro IP do pool.
+  if (res.status === 404 && tentativa < 3) {
+    await new Promise(r => setTimeout(r, 800 * tentativa));
+    return login(usuario, senha, tentativa + 1);
+  }
   if (!res.ok) throw new Error(`UNIPLAY login falhou: ${res.status}`);
   const data = await res.json() as any;
   if (!data.access_token) throw new Error("UNIPLAY: sem access_token na resposta de login");
