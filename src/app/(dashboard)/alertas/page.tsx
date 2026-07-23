@@ -11,6 +11,7 @@ import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
 import SecaoRecolhivel from "@/components/alertas/SecaoRecolhivel";
 import DefinirDataContaButton from "@/components/alertas/DefinirDataContaButton";
 import RenovarViaAPIButton from "@/components/alertas/RenovarViaAPIButton";
+import VerificarContaButton from "@/components/clientes/VerificarContaButton";
 import AutoRefresh from "@/components/AutoRefresh";
 
 function diasRestantes(data: string): number {
@@ -226,7 +227,10 @@ export default async function AlertasPage() {
                                                                     <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(diasCt)}`}>
                                                                         {dataFmt}
                                                                     </span>
-                                                                    <span className="text-xs text-zinc-400 pl-1 underline">{ct.usuario}</span>
+                                                                    <span className="inline-flex items-center pl-1">
+                                                                        <span className="text-xs text-zinc-400 underline">{ct.usuario}</span>
+                                                                        <VerificarContaButton idConta={ct.id_conta} usuario={ct.usuario} />
+                                                                    </span>
                                                                 </div>
                                                             </td>
                                                             <td className="px-4 py-2">
