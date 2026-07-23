@@ -107,7 +107,23 @@ async function listarUsuarios(
   return Array.isArray(data) ? data : Object.values(data);
 }
 
-export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
+// Cache curto da listagem completa, compartilhado entre requisições concorrentes do mesmo painel.
+// listarUsuarios() busca TODOS os usuários (~200KB) — sem isso, clicar rápido em "Renovar via API"
+// em várias contas na página Alertas dispara uma listagem completa por click, multiplicando carga
+// (confirmado: 10 listagens concorrentes chegam a ~4x mais lentas que uma isolada e podem estourar timeout).
+const CACHE_LISTAGEM_MS = 8_000;
+const _listagemCache = new Map<number, { promise: Promise<any[]>; timestamp: number }>();
+
+function listarComCache(id: number, session: UniplaySession, onSaveSession: SaveSession, creds: ServidorCredenciais): Promise<any[]> {
+  const cache = _listagemCache.get(id);
+  if (cache && Date.now() - cache.timestamp < CACHE_LISTAGEM_MS) return cache.promise;
+  const promise = listarUsuarios(session, onSaveSession, creds);
+  promise.catch(() => _listagemCache.delete(id)); // não mantém erro em cache
+  _listagemCache.set(id, { promise, timestamp: Date.now() });
+  return promise;
+}
+
+export function criarUniplayAdapter(creds: ServidorCredenciais, id: number, onSaveSession: SaveSession, onSaveContas: SaveContaVencimento): PainelAdapter {
   let _sessionPromise: Promise<UniplaySession> | null = null;
   function obterSessao(): Promise<UniplaySession> {
     if (!_sessionPromise) _sessionPromise = getSession(creds, onSaveSession);
@@ -117,7 +133,7 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, _id: number, onS
     _sessionPromise = Promise.resolve(nova);
   }
   function listar(session: UniplaySession) {
-    return listarUsuarios(session, onSaveSession, creds);
+    return listarComCache(id, session, onSaveSession, creds);
   }
   return {
     async listarContas(): Promise<ContaPainel[]> {
