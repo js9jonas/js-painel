@@ -31,6 +31,7 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onCon
 
   const isUnitv = conta.tipo_painel === "unitv";
   const podeM3u = !isUnitv && !!conta.host_stream;
+  const podeAcessoWeb = !!conta.url_acesso_web;
 
   function copiarM3u() {
     if (!conta.host_stream) return;
@@ -100,6 +101,12 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onCon
           {isUnitv && (
             <DropdownMenuItem onSelect={() => enviar("unitv")}>
               📲 Enviar dados de acesso
+            </DropdownMenuItem>
+          )}
+
+          {podeAcessoWeb && (
+            <DropdownMenuItem onSelect={() => enviar("web")}>
+              🌐 Enviar acesso web
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

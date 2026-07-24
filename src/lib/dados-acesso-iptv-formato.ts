@@ -4,6 +4,7 @@ type DadosConta = {
   rotulo: string | null;
   nomePainel: string;
   hostStream: string | null;
+  urlAcessoWeb?: string | null;
 };
 
 export function montarLinkM3u({ hostStream, usuario, senha }: DadosConta): string {
@@ -22,4 +23,8 @@ export function montarMensagemXtream({ hostStream, usuario, senha, rotulo, nomeP
 
 export function montarMensagemUnitv({ usuario, senha }: DadosConta): string {
   return `*Dados de acesso UNITV*\nConta: ${usuario}\nSenha: ${senha}`;
+}
+
+export function montarMensagemAcessoWeb({ urlAcessoWeb, usuario, senha }: DadosConta): string {
+  return `*Pode acessar sua conta* usando o navegador de internet 👇\nAcesse: ${urlAcessoWeb}\n\nEm seguida entre com seus dados de acesso.\n*Usuário*: ${usuario}\n*Senha*: ${senha}`;
 }

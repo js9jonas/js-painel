@@ -75,6 +75,7 @@ export type ContaPainelVinculada = {
   tipo_painel: string;
   vencimento_real_painel: string | null;
   host_stream: string | null;
+  url_acesso_web: string | null;
 };
 
 export async function getContasPainelByClienteId(id: string): Promise<ContaPainelVinculada[]> {
@@ -83,7 +84,7 @@ export async function getContasPainelByClienteId(id: string): Promise<ContaPaine
             c.usuario, c.senha,
             c.rotulo, c.status_conta, ps.nome AS nome_painel, ps.tipo AS tipo_painel,
             c.vencimento_real_painel::text AS vencimento_real_painel,
-            ps.host_stream
+            ps.host_stream, ps.url_acesso_web
      FROM public.contas c
      JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
      WHERE c.id_assinatura IN (
