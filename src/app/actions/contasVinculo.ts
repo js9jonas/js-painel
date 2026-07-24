@@ -149,7 +149,7 @@ export async function criarContaTeste(
 
   let resultado;
   try {
-    resultado = await adapter.gerarTeste({ rotulo });
+    resultado = await adapter.gerarTeste({ rotulo, comAdultos: true });
   } catch (e) {
     return { ok: false, erro: e instanceof Error ? e.message : "Erro ao gerar teste no painel." };
   }
