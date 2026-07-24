@@ -146,7 +146,32 @@ export function criarLiebeAdapter(
         const conta = (json.data ?? []).find((c: any) => c.username === usuario);
         if (!conta) throw new Error(`LIEBE: usuário "${usuario}" não encontrado.`);
 
-        await liebePost(token, `/customers/${conta.id}/renew`);
+        // Conta ainda presa num pacote trial (ex: teste que virou assinatura real sem
+        // trocar de pacote no painel) — /renew sem body retorna 400 "You can't renew
+        // using a trial package". A própria API resolve migração + renovação no mesmo
+        // POST desde que mandemos um package_id pago junto (confirmado via reverse
+        // engineering do painel web em 24/07/2026: "Ações" → "Alterar Plano").
+        let body: { package_id: string; connections: number } | undefined;
+        if (conta.is_trial === "YES") {
+          const serversJson = await liebeGet(token, "/servers");
+          const servidor = (serversJson.data ?? []).find((s: any) => s.id === conta.server_id);
+          const pacotePago = (servidor?.packages ?? []).find(
+            (p: any) =>
+              p.is_trial === "NO" &&
+              p.status === "ACTIVE" &&
+              p.is_adult === conta.package_is_adult &&
+              p.duration === 1 &&
+              p.duration_in === "MONTHS"
+          );
+          if (!pacotePago) {
+            throw new Error(
+              `LIEBE: conta "${usuario}" está presa num pacote trial e não há pacote pago (1 mês) equivalente disponível pra conversão automática.`
+            );
+          }
+          body = { package_id: pacotePago.id, connections: conta.connections };
+        }
+
+        await liebePost(token, `/customers/${conta.id}/renew`, body);
 
         // Busca novo vencimento
         const updated = await liebeGet(token, `/customers/${conta.id}`);
