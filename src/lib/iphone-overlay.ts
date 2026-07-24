@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
 import fs from "fs";
 import path from "path";
 
@@ -18,16 +18,16 @@ const CAMPOS = [
 ] as const;
 const TEXTO_LEFT = 568 + 18;
 
-let fonteBase64Cache: string | null = null;
-function carregarFonteBase64(): string {
-  if (!fonteBase64Cache) {
-    fonteBase64Cache = fs.readFileSync(FONTE).toString("base64");
+let fonteRegistrada = false;
+function garantirFonteRegistrada() {
+  // registro explícito por arquivo — não depende de fontconfig/fontes do host,
+  // ao contrário do SVG+@font-face via sharp/librsvg (falhava em produção, sem
+  // nenhuma fonte instalada no container: texto virava "tofu" ▯▯▯). Verificado
+  // reproduzindo o mesmo container (node:20-slim, zero fontes) antes de trocar.
+  if (!fonteRegistrada) {
+    GlobalFonts.registerFromPath(FONTE, FONT_FAMILY);
+    fonteRegistrada = true;
   }
-  return fonteBase64Cache;
-}
-
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export type DadosIphone = {
@@ -38,32 +38,21 @@ export type DadosIphone = {
 };
 
 export async function gerarImagemDadosIphone(dados: DadosIphone): Promise<Buffer> {
-  const fonteBase64 = carregarFonteBase64();
+  garantirFonteRegistrada();
 
-  const textos = CAMPOS.map((c) => {
+  const imagemBase = await loadImage(BASE_LIMPA);
+  const canvas = createCanvas(imagemBase.width, imagemBase.height);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(imagemBase, 0, 0);
+  ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#2b1338";
+
+  for (const c of CAMPOS) {
     const baseline = c.top + c.height / 2 + FONT_SIZE * 0.35;
-    const valor = escapeXml(dados[c.chave]);
-    return `<text x="${TEXTO_LEFT}" y="${baseline}" class="campo">${valor}</text>`;
-  }).join("\n");
+    ctx.fillText(dados[c.chave], TEXTO_LEFT, baseline);
+  }
 
-  const svg = `
-<svg width="1280" height="591" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style type="text/css">
-      @font-face {
-        font-family: '${FONT_FAMILY}';
-        src: url(data:font/ttf;base64,${fonteBase64}) format('truetype');
-      }
-      .campo { font-family: '${FONT_FAMILY}'; font-size: ${FONT_SIZE}px; fill: #2b1338; }
-    </style>
-  </defs>
-  ${textos}
-</svg>`;
-
-  return sharp(BASE_LIMPA)
-    .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
-    .png()
-    .toBuffer();
+  return canvas.toBuffer("image/png");
 }
 
 export function lerAssetEstatico(nome: "logo-app.png" | "choose-playlist-type.png" | "parental-control.png"): Buffer {
