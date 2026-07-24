@@ -1,0 +1,8 @@
+Liberation Sans Bold — SIL Open Font License 1.1
+Fonte redistribuída sob os termos da SIL Open Font License, Version 1.1.
+Copyright (c) 2010 Google Corporation with Reserved Font Arimo, Tinos and Cousine.
+Copyright (c) 2012 Red Hat, Inc. with Reserved Font Name Liberation.
+Texto completo da licença: http://scripts.sil.org/OFL
+
+Embutida no projeto para renderização determinística das imagens de
+instrução (WhatsApp), sem depender das fontes instaladas no host de deploy.

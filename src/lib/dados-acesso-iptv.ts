@@ -7,7 +7,7 @@ interface EnvioResultado {
   telefone?: string;
 }
 
-export async function enviarDadosAcessoIptv(idCliente: string, texto: string): Promise<EnvioResultado> {
+export async function buscarTelefoneJanela24h(idCliente: string): Promise<string | null> {
   const telefoneAtivo = await pool.query(
     `SELECT ct.telefone
      FROM public.contatos ct
@@ -18,12 +18,15 @@ export async function enviarDadosAcessoIptv(idCliente: string, texto: string): P
      LIMIT 1`,
     [idCliente]
   );
+  return telefoneAtivo.rows[0]?.telefone ?? null;
+}
 
-  if (!telefoneAtivo.rows[0]) {
+export async function enviarDadosAcessoIptv(idCliente: string, texto: string): Promise<EnvioResultado> {
+  const telefone = await buscarTelefoneJanela24h(idCliente);
+
+  if (!telefone) {
     return { enviado: false, motivo: "Nenhuma mensagem recebida deste cliente nas últimas 24h" };
   }
-
-  const telefone = telefoneAtivo.rows[0].telefone;
 
   const msgId = await enviarTextoWhatsapp(telefone, texto);
   await registrarMensagemWhatsapp(msgId, telefone, texto, { source: "dados-iptv" });

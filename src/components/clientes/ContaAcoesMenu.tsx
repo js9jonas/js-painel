@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { ContaPainelVinculada } from "@/lib/clientes";
 import { enviarDadosAcesso, type FormatoEnvio, type ResultadoEnvioDados } from "@/app/actions/dadosAcessoIptv";
+import { enviarDadosAcessoIphone } from "@/app/actions/dadosAcessoIphone";
 import { montarLinkM3u } from "@/lib/dados-acesso-iptv-formato";
 import EditarContaModal from "./EditarContaModal";
 import {
@@ -60,6 +61,15 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onCon
     });
   }
 
+  function enviarIphone() {
+    setResultado(null);
+    setCopiadoModelo(false);
+    startTransition(async () => {
+      const r = await enviarDadosAcessoIphone(conta.id_conta, idCliente);
+      setResultado({ ...r, texto: "" });
+    });
+  }
+
   function copiarModelo() {
     if (!resultado) return;
     navigator.clipboard.writeText(resultado.texto);
@@ -94,6 +104,9 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onCon
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => enviar("xtream")}>
                 📲 Enviar dados Xtream Codes
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={enviarIphone}>
+                📱 Enviar dados para iPhone
               </DropdownMenuItem>
             </>
           )}
