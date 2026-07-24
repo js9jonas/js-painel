@@ -5,13 +5,11 @@ export type PainelServidorRow = {
   nome: string;
   tipo: string;
   url_painel: string | null;
-  url_api: string | null;
   host_stream: string | null;
+  url_acesso_web: string | null;
   usuario: string | null;
   master: string | null;
   contato_master: string | null;
-  padrao_usuario: string | null;
-  padrao_senha: string | null;
   ativo: boolean;
   tem_session: boolean;
   session_expiry: Date | null;
@@ -46,13 +44,11 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       ps.nome,
       ps.tipo,
       ps.url_painel,
-      ps.url_api,
       ps.host_stream,
+      ps.url_acesso_web,
       ps.usuario,
       ps.master,
       ps.contato_master,
-      ps.padrao_usuario,
-      ps.padrao_senha,
       ps.ativo,
       (ps.session_cookie IS NOT NULL) AS tem_session,
       ps.session_expiry,
@@ -103,12 +99,10 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
       ps.nome,
       ps.tipo,
       ps.url_painel,
-      ps.url_api,
+      ps.url_acesso_web,
       ps.usuario,
       ps.master,
       ps.contato_master,
-      ps.padrao_usuario,
-      ps.padrao_senha,
       ps.ativo,
       (ps.session_cookie IS NOT NULL) AS tem_session,
       ps.session_expiry,
@@ -134,8 +128,8 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
 export async function getPainelServidorById(id: number): Promise<PainelServidorRow | null> {
   const { rows } = await pool.query<PainelServidorRow>(`
     SELECT
-      ps.id, ps.nome, ps.tipo, ps.url_painel, ps.url_api, ps.host_stream, ps.usuario,
-      ps.master, ps.contato_master, ps.padrao_usuario, ps.padrao_senha, ps.ativo,
+      ps.id, ps.nome, ps.tipo, ps.url_painel, ps.host_stream, ps.url_acesso_web, ps.usuario,
+      ps.master, ps.contato_master, ps.ativo,
       (ps.session_cookie IS NOT NULL) AS tem_session,
       ps.session_expiry,
       (ps.api_token IS NOT NULL)      AS tem_api_token,

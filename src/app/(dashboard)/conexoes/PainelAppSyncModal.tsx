@@ -49,10 +49,8 @@ export default function PainelAppSyncModal({ painel, onClose, onSalvo }: Props) 
       ...form,
       id: painel?.id,
       tipo: painel?.tipo ?? "",
-      url_api: painel?.url_api ?? "",
       host_stream: "",
-      padrao_usuario: "",
-      padrao_senha: "",
+      url_acesso_web: painel?.url_acesso_web ?? "",
       id_servidor: null,
     });
     setSalvando(false);

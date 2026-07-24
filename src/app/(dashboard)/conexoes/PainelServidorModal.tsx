@@ -15,9 +15,9 @@ type Props = {
 };
 
 const VAZIO = {
-  nome: "", tipo: "club", url_painel: "", url_api: "", host_stream: "",
+  nome: "", tipo: "club", url_painel: "", host_stream: "", url_acesso_web: "",
   usuario: "", senha: "", master: "", contato_master: "",
-  padrao_usuario: "", padrao_senha: "", ativo: true, id_servidor: null as number | null,
+  ativo: true, id_servidor: null as number | null,
 };
 
 export default function PainelServidorModal({ painel, servidores, onClose, onSalvo }: Props) {
@@ -31,14 +31,12 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
         nome:           painel.nome,
         tipo:           painel.tipo,
         url_painel:     painel.url_painel ?? "",
-        url_api:        painel.url_api ?? "",
         host_stream:    painel.host_stream ?? "",
+        url_acesso_web: painel.url_acesso_web ?? "",
         usuario:        painel.usuario ?? "",
         senha:          "",
         master:         painel.master ?? "",
         contato_master: painel.contato_master ?? "",
-        padrao_usuario: painel.padrao_usuario ?? "",
-        padrao_senha:   painel.padrao_senha ?? "",
         ativo:          painel.ativo,
         id_servidor:    painel.id_servidor ?? null,
       });
@@ -98,6 +96,10 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
           </Field>
         </div>
 
+        <Field label="Acesso web (login pelo navegador)">
+          <input className={input} value={form.url_acesso_web} onChange={(e) => set("url_acesso_web", e.target.value)} placeholder="Ex: site.com" />
+        </Field>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Usuário">
             <input className={input} value={form.usuario} onChange={(e) => set("usuario", e.target.value)} />
@@ -113,15 +115,6 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
           </Field>
           <Field label="Contato do master">
             <input className={input} value={form.contato_master} onChange={(e) => set("contato_master", e.target.value)} placeholder="(51) 9..." />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Padrão de usuário">
-            <input className={input} value={form.padrao_usuario} onChange={(e) => set("padrao_usuario", e.target.value)} placeholder="Ex: primeironome.sobrenome" />
-          </Field>
-          <Field label="Padrão de senha">
-            <input className={input} value={form.padrao_senha} onChange={(e) => set("padrao_senha", e.target.value)} placeholder="Ex: Cel+3dígitos" />
           </Field>
         </div>
 

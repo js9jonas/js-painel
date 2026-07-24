@@ -216,18 +216,6 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
         </div>
       )}
 
-      {/* Padrões de criação */}
-      {(painel.padrao_usuario || painel.padrao_senha) && (
-        <div className="text-xs text-zinc-400 space-y-0.5">
-          {painel.padrao_usuario && (
-            <p><span className="text-zinc-500">Usuário:</span> {painel.padrao_usuario}</p>
-          )}
-          {painel.padrao_senha && (
-            <p><span className="text-zinc-500">Senha:</span> {painel.padrao_senha}</p>
-          )}
-        </div>
-      )}
-
       {/* Erro ao vivo */}
       {aoVivo?.erro && (
         <p className="text-xs text-red-500 bg-red-50 rounded px-3 py-2">{aoVivo.erro}</p>

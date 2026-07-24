@@ -8,14 +8,12 @@ export type PainelServidorInput = {
   nome: string;
   tipo: string;
   url_painel: string;
-  url_api: string;
   host_stream: string;
+  url_acesso_web: string;
   usuario: string;
   senha: string;
   master: string;
   contato_master: string;
-  padrao_usuario: string;
-  padrao_senha: string;
   ativo: boolean;
   id_servidor: number | null;
 };
@@ -39,25 +37,22 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
     if (input.id) {
       await pool.query(
         `UPDATE public.painel_servidores SET
-           nome = $2, tipo = $3, url_painel = $4, url_api = $5, host_stream = $6,
+           nome = $2, tipo = $3, url_painel = $4, host_stream = $5, url_acesso_web = $6,
            usuario = $7, senha = CASE WHEN $8 = '' THEN senha ELSE $8 END,
            master = $9, contato_master = $10,
-           padrao_usuario = NULLIF($11, ''), padrao_senha = NULLIF($12, ''),
-           ativo = $13, id_servidor = $14
+           ativo = $11, id_servidor = $12
          WHERE id = $1`,
         [
           input.id,
           input.nome.trim(),
           input.tipo.trim(),
           input.url_painel.trim() || null,
-          input.url_api.trim() || null,
           input.host_stream.trim() || null,
+          input.url_acesso_web.trim() || null,
           input.usuario.trim() || null,
           input.senha,
           input.master.trim() || null,
           input.contato_master.trim() || null,
-          input.padrao_usuario.trim(),
-          input.padrao_senha.trim(),
           input.ativo,
           input.id_servidor ?? null,
         ]
@@ -65,20 +60,18 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
     } else {
       await pool.query(
         `INSERT INTO public.painel_servidores
-           (nome, tipo, url_painel, url_api, host_stream, usuario, senha, master, contato_master, padrao_usuario, padrao_senha, ativo, id_servidor)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),NULLIF($11,''),$12,$13)`,
+           (nome, tipo, url_painel, host_stream, url_acesso_web, usuario, senha, master, contato_master, ativo, id_servidor)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [
           input.nome.trim(),
           input.tipo.trim(),
           input.url_painel.trim() || null,
-          input.url_api.trim() || null,
           input.host_stream.trim() || null,
+          input.url_acesso_web.trim() || null,
           input.usuario.trim() || null,
           input.senha || null,
           input.master.trim() || null,
           input.contato_master.trim() || null,
-          input.padrao_usuario.trim(),
-          input.padrao_senha.trim(),
           input.ativo,
           input.id_servidor ?? null,
         ]
