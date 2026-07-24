@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactCompiler: true,
-  // impit usa módulo nativo Rust (NAPI) — não pode ser empacotado pelo webpack
-  serverExternalPackages: ["impit"],
+  // impit e @napi-rs/canvas usam módulo nativo Rust (NAPI) — não podem ser empacotados pelo webpack/turbopack
+  serverExternalPackages: ["impit", "@napi-rs/canvas"],
   images: {
     remotePatterns: [
       {
