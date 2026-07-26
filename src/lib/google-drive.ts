@@ -1,11 +1,11 @@
 import { google } from 'googleapis'
 
 export function createDriveAuth() {
-  const clientId     = process.env.GOOGLE_DRIVE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET
-  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN
-  if (!clientId || !clientSecret || !refreshToken) return null
-  const auth = new google.auth.OAuth2(clientId, clientSecret)
-  auth.setCredentials({ refresh_token: refreshToken })
-  return auth
+  const keyJson = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY
+  if (!keyJson) return null
+  const credentials = JSON.parse(Buffer.from(keyJson, 'base64').toString('utf8'))
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  })
 }

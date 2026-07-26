@@ -25,11 +25,9 @@ const DB_URL   = process.env.DATABASE_URL || 'postgresql://postgres:87fec7260577
 const WA_TOKEN = process.env.WHATSAPP_TOKEN;
 if (!WA_TOKEN) throw new Error('WHATSAPP_TOKEN não definida');
 
-const GOOGLE_CLIENT_ID     = process.env.GOOGLE_DRIVE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
-const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN)
-  throw new Error('GOOGLE_DRIVE_CLIENT_ID / _CLIENT_SECRET / _REFRESH_TOKEN não definidas');
+const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY;
+if (!GOOGLE_SERVICE_ACCOUNT_KEY)
+  throw new Error('GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY não definida');
 
 const DRIVE_PASTA_RAIZ = 'WhatsApp Mídias';
 const META_GRAPH_VERSION = 'v20.0';
@@ -57,8 +55,11 @@ const BATCH    = batchArg !== -1 ? parseInt(process.argv[batchArg + 1]) : 50;
 // ─── Google Drive ────────────────────────────────────────────────────────────
 
 function criarDriveClient() {
-  const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
-  auth.setCredentials({ refresh_token: GOOGLE_REFRESH_TOKEN });
+  const credentials = JSON.parse(Buffer.from(GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf8'));
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
   return google.drive({ version: 'v3', auth });
 }
 
@@ -94,22 +95,17 @@ async function obterPastaRaiz(drive) {
   const cacheKey = `root/${DRIVE_PASTA_RAIZ}`;
   if (pastaCache.has(cacheKey)) return pastaCache.get(cacheKey);
 
+  // Conta de serviço não tem "root" próprio — a pasta pertence ao Drive do Jonas,
+  // compartilhada com a conta de serviço. Busca por nome, sem restringir o parent.
   const res = await drive.files.list({
-    q: `name='${DRIVE_PASTA_RAIZ}' and mimeType='application/vnd.google-apps.folder' and 'root' in parents and trashed=false`,
+    q: `name='${DRIVE_PASTA_RAIZ}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id)',
   });
 
-  let id;
-  if (res.data.files.length > 0) {
-    id = res.data.files[0].id;
-  } else {
-    const created = await drive.files.create({
-      requestBody: { name: DRIVE_PASTA_RAIZ, mimeType: 'application/vnd.google-apps.folder' },
-      fields: 'id',
-    });
-    id = created.data.id;
-    console.log(`  📁 Pasta raiz criada: ${DRIVE_PASTA_RAIZ}`);
+  if (res.data.files.length === 0) {
+    throw new Error(`Pasta "${DRIVE_PASTA_RAIZ}" não encontrada — compartilhe-a com a conta de serviço antes de rodar.`);
   }
+  const id = res.data.files[0].id;
 
   pastaCache.set(cacheKey, id);
   return id;

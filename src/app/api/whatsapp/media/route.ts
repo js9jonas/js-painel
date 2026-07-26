@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   if (row?.media_drive_id) {
     const driveAuth = createDriveAuth()
     if (driveAuth) {
-      const { token } = await driveAuth.getAccessToken()
+      const token = await driveAuth.getAccessToken()
       if (token) {
         const driveRes = await fetch(
           `https://www.googleapis.com/drive/v3/files/${row.media_drive_id}?alt=media`,

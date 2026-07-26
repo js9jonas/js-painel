@@ -81,7 +81,7 @@ async function downloadFromMeta(mediaId: string): Promise<Buffer> {
 async function downloadFromDrive(driveId: string): Promise<Buffer> {
   const driveAuth = createDriveAuth()
   if (!driveAuth) throw new Error('Credenciais Drive não configuradas')
-  const { token } = await driveAuth.getAccessToken()
+  const token = await driveAuth.getAccessToken()
   if (!token) throw new Error('Token Drive inválido')
 
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
