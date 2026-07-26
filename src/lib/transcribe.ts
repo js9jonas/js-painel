@@ -1,8 +1,11 @@
 import { pool } from '@/lib/db'
 import { createDriveAuth } from '@/lib/google-drive'
+import fs from 'fs/promises'
+import path from 'path'
 
 const WA_TOKEN     = process.env.WHATSAPP_TOKEN!
 const GROQ_API_KEY = process.env.GROQ_API_KEY
+const MIDIA_ROOT    = process.env.WHATSAPP_MIDIA_ROOT || '/app/whatsapp-midias'
 
 export async function transcribeAudio(
   msgId: number
@@ -11,26 +14,36 @@ export async function transcribeAudio(
 
   // 1. Busca dados da mensagem
   const { rows } = await pool.query(
-    `SELECT conteudo, media_mime, media_drive_id FROM public.whatsapp_mensagens WHERE id = $1`,
+    `SELECT conteudo, media_mime, media_drive_id, media_local_path FROM public.whatsapp_mensagens WHERE id = $1`,
     [msgId]
   )
   const msg = rows[0]
   if (!msg?.conteudo) return { ok: false, error: 'Mensagem não encontrada' }
 
-  const mediaId  = msg.conteudo as string
-  const mimeType = (msg.media_mime as string | null) ?? 'audio/ogg'
-  const driveId  = msg.media_drive_id as string | null
+  const mediaId   = msg.conteudo as string
+  const mimeType  = (msg.media_mime as string | null) ?? 'audio/ogg'
+  const driveId   = msg.media_drive_id as string | null
+  const localPath = msg.media_local_path as string | null
 
-  // 2. Baixa o áudio — tenta Meta primeiro, fallback Drive
+  // 2. Baixa o áudio — tenta Meta primeiro, depois disco local, depois Drive (legado)
   let buffer: Buffer
   try {
     buffer = await downloadFromMeta(mediaId)
   } catch (metaErr) {
-    if (!driveId) return { ok: false, error: `Download Meta falhou: ${metaErr}` }
-    try {
-      buffer = await downloadFromDrive(driveId)
-    } catch (driveErr) {
-      return { ok: false, error: `Meta: ${metaErr} | Drive: ${driveErr}` }
+    if (localPath) {
+      try {
+        buffer = await downloadFromLocal(localPath)
+      } catch (localErr) {
+        return { ok: false, error: `Meta: ${metaErr} | Local: ${localErr}` }
+      }
+    } else if (driveId) {
+      try {
+        buffer = await downloadFromDrive(driveId)
+      } catch (driveErr) {
+        return { ok: false, error: `Meta: ${metaErr} | Drive: ${driveErr}` }
+      }
+    } else {
+      return { ok: false, error: `Download Meta falhou: ${metaErr}` }
     }
   }
 
@@ -76,6 +89,10 @@ async function downloadFromMeta(mediaId: string): Promise<Buffer> {
   const audioRes = await fetch(url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
   if (!audioRes.ok) throw new Error(`Download ${audioRes.status}`)
   return Buffer.from(await audioRes.arrayBuffer())
+}
+
+async function downloadFromLocal(localPath: string): Promise<Buffer> {
+  return fs.readFile(path.join(MIDIA_ROOT, localPath))
 }
 
 async function downloadFromDrive(driveId: string): Promise<Buffer> {

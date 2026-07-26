@@ -1,10 +1,10 @@
 /**
- * Worker de arquivamento de mídias do WhatsApp → Google Drive
+ * Worker de arquivamento de mídias do WhatsApp → disco local
  *
  * - Busca mensagens com mídia sem media_url no banco
  * - Baixa o arquivo da Meta Cloud API
- * - Sobe para o Google Drive em WhatsApp Mídias/{YYYY-MM}/{tipo}/
- * - Atualiza media_url e media_drive_id no banco
+ * - Grava em ARQUIVO_MIDIA_ROOT/{YYYY-MM}/{tipo}/
+ * - Atualiza media_url e media_local_path no banco
  *
  * Uso:
  *   node scripts/arquivar-midias.mjs           # processa pendentes (max 50)
@@ -12,10 +12,10 @@
  *   node scripts/arquivar-midias.mjs --batch 20 # processa N por vez
  */
 
-import { google } from 'googleapis';
 import pkg from 'pg';
 import https from 'https';
-import { Readable } from 'stream';
+import fs from 'fs';
+import path from 'path';
 
 const { Pool } = pkg;
 
@@ -25,11 +25,7 @@ const DB_URL   = process.env.DATABASE_URL || 'postgresql://postgres:87fec7260577
 const WA_TOKEN = process.env.WHATSAPP_TOKEN;
 if (!WA_TOKEN) throw new Error('WHATSAPP_TOKEN não definida');
 
-const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY;
-if (!GOOGLE_SERVICE_ACCOUNT_KEY)
-  throw new Error('GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY não definida');
-
-const DRIVE_PASTA_RAIZ = 'WhatsApp Mídias';
+const MIDIA_ROOT = process.env.WHATSAPP_MIDIA_ROOT || '/app/whatsapp-midias';
 const META_GRAPH_VERSION = 'v20.0';
 
 const TIPO_EXTENSAO = {
@@ -52,81 +48,6 @@ const DRY_RUN  = process.argv.includes('--dry-run');
 const batchArg = process.argv.indexOf('--batch');
 const BATCH    = batchArg !== -1 ? parseInt(process.argv[batchArg + 1]) : 50;
 
-// ─── Google Drive ────────────────────────────────────────────────────────────
-
-function criarDriveClient() {
-  const credentials = JSON.parse(Buffer.from(GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf8'));
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-  return google.drive({ version: 'v3', auth });
-}
-
-const pastaCache = new Map(); // path → id
-
-async function obterOuCriarPasta(drive, nome, parentId) {
-  const cacheKey = `${parentId}/${nome}`;
-  if (pastaCache.has(cacheKey)) return pastaCache.get(cacheKey);
-
-  const res = await drive.files.list({
-    q: `name='${nome}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
-    fields: 'files(id)',
-    spaces: 'drive',
-  });
-
-  let id;
-  if (res.data.files.length > 0) {
-    id = res.data.files[0].id;
-  } else {
-    const created = await drive.files.create({
-      requestBody: { name: nome, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
-      fields: 'id',
-    });
-    id = created.data.id;
-    console.log(`  📁 Pasta criada: ${nome}`);
-  }
-
-  pastaCache.set(cacheKey, id);
-  return id;
-}
-
-async function obterPastaRaiz(drive) {
-  const cacheKey = `root/${DRIVE_PASTA_RAIZ}`;
-  if (pastaCache.has(cacheKey)) return pastaCache.get(cacheKey);
-
-  // Conta de serviço não tem "root" próprio — a pasta pertence ao Drive do Jonas,
-  // compartilhada com a conta de serviço. Busca por nome, sem restringir o parent.
-  const res = await drive.files.list({
-    q: `name='${DRIVE_PASTA_RAIZ}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id)',
-  });
-
-  if (res.data.files.length === 0) {
-    throw new Error(`Pasta "${DRIVE_PASTA_RAIZ}" não encontrada — compartilhe-a com a conta de serviço antes de rodar.`);
-  }
-  const id = res.data.files[0].id;
-
-  pastaCache.set(cacheKey, id);
-  return id;
-}
-
-async function obterPastaDestino(drive, anoMes, tipo) {
-  const raizId    = await obterPastaRaiz(drive);
-  const mesId     = await obterOuCriarPasta(drive, anoMes, raizId);
-  const tipoId    = await obterOuCriarPasta(drive, TIPO_PASTA[tipo] || tipo, mesId);
-  return tipoId;
-}
-
-async function uploadParaDrive(drive, { nomeArquivo, mimeType, stream, pastaId }) {
-  const res = await drive.files.create({
-    requestBody: { name: nomeArquivo, parents: [pastaId] },
-    media: { mimeType, body: stream },
-    fields: 'id, webViewLink',
-  });
-  return { driveId: res.data.id, url: res.data.webViewLink };
-}
-
 // ─── Meta API ────────────────────────────────────────────────────────────────
 
 async function obterUrlMidia(mediaId) {
@@ -140,14 +61,17 @@ async function obterUrlMidia(mediaId) {
   return data; // { url, mime_type, sha256, file_size }
 }
 
-function downloadStream(url) {
+function downloadParaArquivo(url, destino) {
   return new Promise((resolve, reject) => {
     https.get(url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } }, (res) => {
       if (res.statusCode !== 200) {
         reject(new Error(`Download falhou: ${res.statusCode}`));
         return;
       }
-      resolve(res); // readable stream
+      const arquivo = fs.createWriteStream(destino);
+      res.pipe(arquivo);
+      arquivo.on('finish', () => arquivo.close(resolve));
+      arquivo.on('error', reject);
     }).on('error', reject);
   });
 }
@@ -167,12 +91,12 @@ async function buscarPendentes(pool, limit) {
   return rows;
 }
 
-async function marcarArquivada(pool, id, driveId, url) {
+async function marcarArquivada(pool, id, localPath) {
   await pool.query(`
     UPDATE whatsapp_mensagens
-    SET media_url = $1, media_drive_id = $2, media_arquivada_em = NOW()
-    WHERE id = $3
-  `, [url, driveId, id]);
+    SET media_url = $1, media_local_path = $1, media_arquivada_em = NOW()
+    WHERE id = $2
+  `, [localPath, id]);
 }
 
 async function marcarErro(pool, id, motivo) {
@@ -186,8 +110,7 @@ async function marcarErro(pool, id, motivo) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const pool  = new Pool({ connectionString: DB_URL });
-  const drive = criarDriveClient();
+  const pool = new Pool({ connectionString: DB_URL });
 
   // Contagem geral
   const { rows: [{ total, expiradas }] } = await pool.query(`
@@ -226,19 +149,18 @@ async function main() {
       const nomeBase = msg.nome_arquivo || `${msg.wa_msg_id || msg.id}`;
       const nomeArquivo = nomeBase.endsWith(`.${ext}`) ? nomeBase : `${nomeBase}.${ext}`;
 
-      // 2. Stream do arquivo
-      const stream = await downloadStream(meta.url);
+      // 2. Pasta de destino local
+      const pastaRelativa = path.join(anoMes, TIPO_PASTA[tipo] || tipo);
+      const pastaAbsoluta = path.join(MIDIA_ROOT, pastaRelativa);
+      fs.mkdirSync(pastaAbsoluta, { recursive: true });
 
-      // 3. Pasta de destino no Drive
-      const pastaId = await obterPastaDestino(drive, anoMes, tipo);
+      // 3. Download direto pro disco
+      const caminhoRelativo  = path.join(pastaRelativa, nomeArquivo);
+      const caminhoAbsoluto  = path.join(MIDIA_ROOT, caminhoRelativo);
+      await downloadParaArquivo(meta.url, caminhoAbsoluto);
 
-      // 4. Upload
-      const { driveId, url } = await uploadParaDrive(drive, {
-        nomeArquivo, mimeType, stream, pastaId,
-      });
-
-      // 5. Atualizar banco
-      await marcarArquivada(pool, msg.id, driveId, url);
+      // 4. Atualizar banco
+      await marcarArquivada(pool, msg.id, caminhoRelativo);
 
       console.log(`✅ ${nomeArquivo}`);
       ok++;

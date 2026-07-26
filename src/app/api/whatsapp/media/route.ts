@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { pool } from '@/lib/db'
 import { createDriveAuth } from '@/lib/google-drive'
+import fs from 'fs'
+import path from 'path'
+import { Readable } from 'stream'
 
 export const dynamic = 'force-dynamic'
 
 const TOKEN = process.env.WHATSAPP_TOKEN!
+const MIDIA_ROOT = process.env.WHATSAPP_MIDIA_ROOT || '/app/whatsapp-midias'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -14,16 +18,30 @@ export async function GET(req: NextRequest) {
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
-  // ── 1. Já arquivada no Drive? Serve direto — mídia arquivada já expirou na Meta,
-  //      então tentar a Meta primeiro seria uma chamada fadada a falhar (InvalidID).
+  // ── 1. Já arquivada (local ou Drive)? Serve direto — mídia arquivada já expirou
+  //      na Meta, então tentar a Meta primeiro seria uma chamada fadada a falhar (InvalidID).
   const dbRes = await pool.query(
-    `SELECT media_drive_id, media_mime
+    `SELECT media_local_path, media_drive_id, media_mime
      FROM public.whatsapp_mensagens
-     WHERE conteudo = $1 AND media_drive_id IS NOT NULL
+     WHERE conteudo = $1 AND (media_local_path IS NOT NULL OR media_drive_id IS NOT NULL)
      LIMIT 1`,
     [id]
   )
   const row = dbRes.rows[0]
+
+  if (row?.media_local_path) {
+    const caminho = path.join(MIDIA_ROOT, row.media_local_path)
+    if (fs.existsSync(caminho)) {
+      const stream = Readable.toWeb(fs.createReadStream(caminho)) as ReadableStream
+      return new NextResponse(stream, {
+        headers: {
+          'Content-Type': row.media_mime ?? 'application/octet-stream',
+          'Cache-Control': 'private, max-age=2592000',
+        },
+      })
+    }
+    // Arquivo local sumiu apesar de registrado — cai pro fallback da Meta abaixo.
+  }
 
   if (row?.media_drive_id) {
     const driveAuth = createDriveAuth()
