@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
             )
 
             // Auto-resposta a cliques nos botões do fluxo de vencimento — fire-and-forget
-            if (tipo === 'interactive_reply' && ['Falar com suporte', 'Chave PIX', 'Automático mensal'].includes(conteudo)) {
+            if (tipo === 'interactive_reply' && ['Falar com suporte', 'Chave PIX', 'Automático mensal', 'Pagamento mensal', 'Planos estendidos'].includes(conteudo)) {
               responderFalarComSuporte({
                 telefone: from,
                 cliqueMsgId: msgId,
