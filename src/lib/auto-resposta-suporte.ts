@@ -4,7 +4,7 @@ import { enviarTextoWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-e
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID
 const PIX_CHAVE = '40827286000106'
-const TEMPLATES_GATILHO = ['lembrete_vencimento', 'lembrete_vencimento_v2', 'vencido_plano']
+const TEMPLATES_GATILHO = ['lembrete_vencimento', 'lembrete_vencimento_v2', 'vencido_plano', 'vencido_plano_v2']
 
 async function enviarBotoes(
   telefone: string,

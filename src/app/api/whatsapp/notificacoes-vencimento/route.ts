@@ -73,10 +73,7 @@ export async function POST(req: NextRequest) {
       const dataTxt = formatarData(dados.venc_contrato)
       const identificacaoTxt = dados.identificacao?.trim() || 'Principal'
 
-      const parametros =
-        tipo === 'amanha'
-          ? [primeiroNome, telasTxt, identificacaoTxt, dataTxt]
-          : [primeiroNome, telasTxt, dataTxt]
+      const parametros = [primeiroNome, telasTxt, identificacaoTxt, dataTxt]
 
       const resultado = await enviarTemplateWhatsapp(dados.telefone, templateName, parametros)
 

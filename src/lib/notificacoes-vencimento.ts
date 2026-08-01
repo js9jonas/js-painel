@@ -14,7 +14,7 @@ export interface ItemNotificacaoVencimento {
 }
 
 const TEMPLATE_POR_TIPO: Record<TipoNotificacaoVencimento, string> = {
-  vencidos: 'vencido_plano',
+  vencidos: 'vencido_plano_v2',
   amanha: 'lembrete_vencimento_v2',
 }
 
