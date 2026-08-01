@@ -71,8 +71,14 @@ export async function POST(req: NextRequest) {
       const primeiroNome = dados.nome.trim().split(/\s+/)[0]
       const telasTxt = `${dados.telas} tela${dados.telas > 1 ? 's' : ''}`
       const dataTxt = formatarData(dados.venc_contrato)
+      const identificacaoTxt = dados.identificacao?.trim() || 'Principal'
 
-      const resultado = await enviarTemplateWhatsapp(dados.telefone, templateName, [primeiroNome, telasTxt, dataTxt])
+      const parametros =
+        tipo === 'amanha'
+          ? [primeiroNome, telasTxt, identificacaoTxt, dataTxt]
+          : [primeiroNome, telasTxt, dataTxt]
+
+      const resultado = await enviarTemplateWhatsapp(dados.telefone, templateName, parametros)
 
       if (!resultado.ok) {
         resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: false, error: resultado.error })
@@ -84,7 +90,12 @@ export async function POST(req: NextRequest) {
           (wa_msg_id, telefone, tipo, conteudo, origem, source, recebida_em)
          VALUES ($1, $2, 'template', $3, 'jonas', $4, NOW())
          ON CONFLICT (wa_msg_id) DO NOTHING`,
-        [resultado.msgId, dados.telefone, JSON.stringify({ name: templateName, parametros: [primeiroNome, telasTxt, dataTxt], copyCode: null }), source]
+        [
+          resultado.msgId,
+          dados.telefone,
+          JSON.stringify({ name: templateName, parametros, copyCode: null, id_assinatura: idAssinatura }),
+          source,
+        ]
       )
 
       resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: true })

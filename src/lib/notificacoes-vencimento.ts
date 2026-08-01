@@ -15,7 +15,7 @@ export interface ItemNotificacaoVencimento {
 
 const TEMPLATE_POR_TIPO: Record<TipoNotificacaoVencimento, string> = {
   vencidos: 'vencido_plano',
-  amanha: 'lembrete_vencimento',
+  amanha: 'lembrete_vencimento_v2',
 }
 
 const SOURCE_POR_TIPO: Record<TipoNotificacaoVencimento, string> = {
@@ -79,10 +79,11 @@ export async function buscarDadosParaEnvio(idAssinatura: string): Promise<{
   nome: string
   telefone: string | null
   telas: number
+  identificacao: string | null
   venc_contrato: string
 } | null> {
   const r = await pool.query(
-    `SELECT c.nome, ct.telefone, p.telas, a.venc_contrato::text
+    `SELECT c.nome, ct.telefone, p.telas, a.identificacao, a.venc_contrato::text
      FROM public.assinaturas a
      JOIN public.clientes c ON c.id_cliente = a.id_cliente
      JOIN public.planos p ON p.id_plano = a.id_plano
