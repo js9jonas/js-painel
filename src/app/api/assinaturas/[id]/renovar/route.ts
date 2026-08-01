@@ -97,12 +97,12 @@ export async function PUT(
         let whatsapp = undefined;
         if (registrarPagamento && pgto?.idCliente) {
           const { rows: vencRows } = await pool.query(
-            `SELECT a.venc_contrato::text AS venc_contrato, p.telas
+            `SELECT a.venc_contrato::text AS venc_contrato, a.identificacao, p.telas
              FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano
              WHERE a.id_assinatura = $1::bigint`,
             [idAssinatura]
           );
-          whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null, ehNovoSoPag);
+          whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null, ehNovoSoPag, vencRows[0]?.identificacao ?? null);
         }
 
         return NextResponse.json({ ok: true, whatsapp });
@@ -203,10 +203,10 @@ export async function PUT(
       let whatsapp = undefined;
       if (assinatura.status === "ativo") {
         const { rows: telasRows } = await pool.query(
-          `SELECT p.telas FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano WHERE a.id_assinatura = $1::bigint`,
+          `SELECT p.telas, a.identificacao FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano WHERE a.id_assinatura = $1::bigint`,
           [idAssinatura]
         );
-        whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null, ehNovo);
+        whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null, ehNovo, telasRows[0]?.identificacao ?? null);
       }
 
       return NextResponse.json({ ok: true, assinatura, whatsapp });

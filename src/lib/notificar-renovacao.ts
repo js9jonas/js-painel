@@ -17,11 +17,13 @@ interface NotificarRenovacaoResultado {
   viaTelegram?: boolean
 }
 
-function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean): string {
+function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean, identificacao: string | null): string {
+  const linhaIdentificacao = identificacao ? `🏷️ Identificação: ${identificacao}\n` : ''
   if (ehNovo) {
     return (
       `🎉 *BEM-VINDO(A)!* 🎉\n\n` +
       `📺 Telas: ${telas ?? '-'}\n` +
+      linhaIdentificacao +
       `📅 Vencimento: ${dataTxt}\n\n` +
       `Qualquer dúvida é só chamar por aqui 📲\n\n` +
       `😊 Muito obrigado pela confiança, esperamos que aproveite bem!`
@@ -30,6 +32,7 @@ function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean): st
   return (
     `🔰 *ASSINATURA RENOVADA* ♻️\n\n` +
     `📺 Telas: ${telas ?? '-'}\n` +
+    linhaIdentificacao +
     `📅 Novo vencimento: ${dataTxt}\n\n` +
     `Se precisar de algo é só chamar 📲\n\n` +
     `🙏 Muito obrigado pela confiança e por continuar com a gente!\n` +
@@ -41,13 +44,14 @@ export async function notificarRenovacao(
   idCliente: string,
   novoVencimento: string | null,
   telas: number | null,
-  ehNovo: boolean = false
+  ehNovo: boolean = false,
+  identificacao: string | null = null
 ): Promise<NotificarRenovacaoResultado> {
   const cliente = await pool.query(`SELECT nome FROM public.clientes WHERE id_cliente = $1::bigint`, [idCliente])
   if (!cliente.rows[0]) return { enviado: false, motivo: 'Cliente não encontrado' }
 
   const dataTxt = novoVencimento ? formatarData(novoVencimento) : '-'
-  const texto = montarTexto(telas, dataTxt, ehNovo)
+  const texto = montarTexto(telas, dataTxt, ehNovo, identificacao)
 
   const telefoneAtivo = await pool.query(
     `SELECT ct.telefone
