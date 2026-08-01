@@ -23,7 +23,8 @@ function montarTexto(telas: number | null, dataTxt: string): string {
     `📺 Telas: ${telas ?? '-'}\n` +
     `📅 Novo vencimento: ${dataTxt}\n\n` +
     `Se precisar de algo é só chamar 📲\n\n` +
-    `😊 Muito obrigado! 🤝`
+    `🙏 Muito obrigado pela confiança e por continuar com a gente!\n` +
+    `Aproveite bem sua assinatura! 😊`
   )
 }
 
