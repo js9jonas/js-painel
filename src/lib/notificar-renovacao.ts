@@ -17,7 +17,16 @@ interface NotificarRenovacaoResultado {
   viaTelegram?: boolean
 }
 
-function montarTexto(telas: number | null, dataTxt: string): string {
+function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean): string {
+  if (ehNovo) {
+    return (
+      `🎉 *BEM-VINDO(A)!* 🎉\n\n` +
+      `📺 Telas: ${telas ?? '-'}\n` +
+      `📅 Vencimento: ${dataTxt}\n\n` +
+      `Qualquer dúvida é só chamar por aqui 📲\n\n` +
+      `😊 Muito obrigado pela confiança, esperamos que aproveite bem!`
+    )
+  }
   return (
     `🔰 *ASSINATURA RENOVADA* ♻️\n\n` +
     `📺 Telas: ${telas ?? '-'}\n` +
@@ -31,13 +40,14 @@ function montarTexto(telas: number | null, dataTxt: string): string {
 export async function notificarRenovacao(
   idCliente: string,
   novoVencimento: string | null,
-  telas: number | null
+  telas: number | null,
+  ehNovo: boolean = false
 ): Promise<NotificarRenovacaoResultado> {
   const cliente = await pool.query(`SELECT nome FROM public.clientes WHERE id_cliente = $1::bigint`, [idCliente])
   if (!cliente.rows[0]) return { enviado: false, motivo: 'Cliente não encontrado' }
 
   const dataTxt = novoVencimento ? formatarData(novoVencimento) : '-'
-  const texto = montarTexto(telas, dataTxt)
+  const texto = montarTexto(telas, dataTxt, ehNovo)
 
   const telefoneAtivo = await pool.query(
     `SELECT ct.telefone
@@ -53,12 +63,12 @@ export async function notificarRenovacao(
   if (telefoneAtivo.rows[0]) {
     const telefone = telefoneAtivo.rows[0].telefone
     const msgId = await enviarTextoWhatsapp(telefone, texto)
-    await registrarMensagemWhatsapp(msgId, telefone, texto, { source: 'notificacao-renovacao' })
+    await registrarMensagemWhatsapp(msgId, telefone, texto, { source: ehNovo ? 'notificacao-boas-vindas' : 'notificacao-renovacao' })
     if (msgId) return { enviado: true, telefone }
     // Falha no envio direto mesmo com janela aberta — segue pro fallback Telegram como rede de segurança
   }
 
-  return notificarRenovacaoTelegram({ idCliente, nomeCliente: cliente.rows[0].nome, texto })
+  return notificarRenovacaoTelegram({ idCliente, nomeCliente: cliente.rows[0].nome, texto, ehNovo })
 }
 
 /**
@@ -70,10 +80,12 @@ async function notificarRenovacaoTelegram({
   idCliente,
   nomeCliente,
   texto,
+  ehNovo,
 }: {
   idCliente: string
   nomeCliente: string | null
   texto: string
+  ehNovo: boolean
 }): Promise<NotificarRenovacaoResultado> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID_JONAS
@@ -107,7 +119,9 @@ async function notificarRenovacaoTelegram({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: `🔰 *Renovação sem conversa ativa — ${nomeCliente ?? 'cliente'}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
+        text: ehNovo
+          ? `🎉 *Boas-vindas sem conversa ativa — ${nomeCliente ?? 'cliente'}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`
+          : `🔰 *Renovação sem conversa ativa — ${nomeCliente ?? 'cliente'}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [[{ text: '📲 Abrir no WhatsApp', url: linkWhatsapp }]],

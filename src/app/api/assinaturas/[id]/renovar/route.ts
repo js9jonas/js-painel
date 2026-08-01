@@ -64,6 +64,7 @@ export async function PUT(
           [idAssinatura]
         );
 
+        let ehNovoSoPag = false;
         if (registrarPagamento && pgto) {
           const idCliente = pgto.idCliente;
 
@@ -74,6 +75,7 @@ export async function PUT(
              ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
             [idCliente]
           );
+          ehNovoSoPag = ultPgto.length === 0;
           const detalhes = ultPgto.length > 0 && ultPgto[0].dias != null
             ? `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`
             : "novo";
@@ -100,7 +102,7 @@ export async function PUT(
              WHERE a.id_assinatura = $1::bigint`,
             [idAssinatura]
           );
-          whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null);
+          whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null, ehNovoSoPag);
         }
 
         return NextResponse.json({ ok: true, whatsapp });
@@ -165,6 +167,7 @@ export async function PUT(
       const vencContasNova: string | null = assinatura.venc_contas ?? null;
 
       // Registra pagamento somente se status = ativo
+      let ehNovo = false;
       if (registrarPagamento && pgto && statusFinal !== "pendente") {
         const idCliente = pgto.idCliente ?? assinatura.id_cliente;
 
@@ -175,6 +178,7 @@ export async function PUT(
            ORDER BY data_pgto DESC NULLS LAST LIMIT 1`,
           [idCliente]
         );
+        ehNovo = ultPgto.length === 0;
         const detalhes = ultPgto.length > 0 && ultPgto[0].dias != null
           ? `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`
           : "novo";
@@ -202,7 +206,7 @@ export async function PUT(
           `SELECT p.telas FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano WHERE a.id_assinatura = $1::bigint`,
           [idAssinatura]
         );
-        whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null);
+        whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null, ehNovo);
       }
 
       return NextResponse.json({ ok: true, assinatura, whatsapp });
