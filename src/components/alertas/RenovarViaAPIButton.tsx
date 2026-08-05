@@ -11,6 +11,7 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
     const [estado, setEstado] = useState<"idle" | "loading" | "ok" | "erro">("idle");
     const [mensagem, setMensagem] = useState<string | null>(null);
     const [novaData, setNovaData] = useState<string | null>(null);
+    const [migrado, setMigrado] = useState(false);
 
     const semPainel = idPainelServidor === null;
 
@@ -33,6 +34,7 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
             } else {
                 setEstado("ok");
                 setMensagem(json.mensagem ?? "Renovado!");
+                setMigrado(json.migrado === true);
                 if (json.novoVencimento) {
                     setNovaData(json.novoVencimento.split("-").reverse().join("/"));
                     onRenovado?.(json.novoVencimento);
@@ -48,7 +50,7 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
         return (
             <div className="flex flex-col gap-0.5">
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                    ✓ Renovado
+                    {migrado ? "✓ Migrado" : "✓ Renovado"}
                     {novaData && <span className="opacity-75">→ {novaData}</span>}
                 </span>
             </div>
