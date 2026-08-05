@@ -1,5 +1,5 @@
 import { Impit, type HttpMethod } from "impit";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ResultadoCriacao, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ResultadoCriacao, DetalhesConta, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
@@ -406,6 +406,25 @@ export function criarClubAdapter(
         const expiracaoHorario = expDate.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
         return { ok: true, usuario, senha, expiracao, expiracaoHorario };
+      });
+    },
+
+    // Busca senha/telas/adulto/rótulo direto no painel — usado antes de migrar a conta pra
+    // outro painel CLUB, quando o banco local não tem tudo (ex: senha nunca importada).
+    async obterDetalhes(usuario: string): Promise<DetalhesConta | null> {
+      return withRelogin(async (token) => {
+        const lista = await listarContasRaw(token);
+        const conta = lista.find((l: any) => l.username === usuario);
+        if (!conta) return null;
+        const info = await apiFetch(token, `listas/${conta.id}/info`);
+        if (!info?.data) return null;
+        const d = info.data;
+        return {
+          senha: d.password ?? null,
+          telas: Number(d.max_connections) || 1,
+          comAdultos: /Canais Adultos:<\/b> Sim/.test(d.bouquet_name ?? ""),
+          rotulo: d.reseller_notes ?? "",
+        };
       });
     },
 

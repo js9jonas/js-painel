@@ -6,6 +6,7 @@ import { enviarDadosAcesso, type FormatoEnvio, type ResultadoEnvioDados } from "
 import { enviarDadosAcessoIphone } from "@/app/actions/dadosAcessoIphone";
 import { montarLinkM3u } from "@/lib/dados-acesso-iptv-formato";
 import EditarContaModal from "./EditarContaModal";
+import MigrarPainelModal from "./MigrarPainelModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,25 +15,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 type AppVinculado = { id_app_registro: number; nome_app: string | null };
+type PainelResumo = { id: number; nome: string; tipo: string };
 
 type Props = {
   conta: ContaPainelVinculada;
   idCliente: string;
   appsVinculados: AppVinculado[];
+  paineisList?: PainelResumo[];
   /** Chamado após editar a conta com sucesso — ver EditarContaModal.onSaved. */
   onContaChanged?: () => void;
 };
 
-export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onContaChanged }: Props) {
+export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paineisList, onContaChanged }: Props) {
   const [editarAberto, setEditarAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEnvioDados | null>(null);
   const [copiadoModelo, setCopiadoModelo] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [migrarAberto, setMigrarAberto] = useState(false);
 
   const isUnitv = conta.tipo_painel === "unitv";
   const podeM3u = !isUnitv && !!conta.host_stream;
   const podeAcessoWeb = !!conta.url_acesso_web;
+
+  const outrosPaineisMesmoTipo = (paineisList ?? []).filter(
+    (p) => p.tipo === conta.tipo_painel && p.id !== conta.id_painel_servidor
+  );
 
   function copiarM3u() {
     if (!conta.host_stream) return;
@@ -122,8 +130,23 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, onCon
               🌐 Enviar acesso web
             </DropdownMenuItem>
           )}
+
+          {outrosPaineisMesmoTipo.length > 0 && (
+            <DropdownMenuItem onSelect={() => setMigrarAberto(true)}>
+              🔁 Migrar pra outro painel
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {migrarAberto && (
+        <MigrarPainelModal
+          conta={conta}
+          opcoes={outrosPaineisMesmoTipo}
+          onClose={() => setMigrarAberto(false)}
+          onMigrado={() => { setMigrarAberto(false); onContaChanged?.(); }}
+        />
+      )}
 
       <EditarContaModal
         conta={conta}

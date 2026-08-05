@@ -125,6 +125,16 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
   return rows;
 }
 
+export type PainelServidorResumo = { id: number; nome: string; tipo: string; ativo: boolean };
+
+// Versão leve (sem agregação de contas) — usada pra popular o seletor de "migrar pra outro painel".
+export async function getPainelServidoresResumo(): Promise<PainelServidorResumo[]> {
+  const { rows } = await pool.query<PainelServidorResumo>(
+    `SELECT id, nome, tipo, ativo FROM public.painel_servidores ORDER BY nome`
+  );
+  return rows;
+}
+
 export async function getPainelServidorById(id: number): Promise<PainelServidorRow | null> {
   const { rows } = await pool.query<PainelServidorRow>(`
     SELECT

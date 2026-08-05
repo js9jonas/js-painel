@@ -9,6 +9,7 @@ import type { ContaPainelVinculada } from "@/lib/clientes";
 
 type ContaAtualizada = { id_conta: number; vencimento: string | null; status: string };
 type AppVinculado = { id_app_registro: number; nome_app: string | null };
+type PainelResumo = { id: number; nome: string; tipo: string };
 
 type Props = {
   contas: ContaPainelVinculada[];
@@ -17,9 +18,10 @@ type Props = {
   emptyAction?: ReactNode;
   small?: boolean;
   appsVinculados?: Map<string, AppVinculado[]>; // id_conta → apps
+  paineisList?: PainelResumo[]; // usado pra oferecer "migrar pra outro painel do mesmo tipo"
 };
 
-export default function ContasGroupClient({ contas, idCliente, vencContas, emptyAction, small, appsVinculados }: Props) {
+export default function ContasGroupClient({ contas, idCliente, vencContas, emptyAction, small, appsVinculados, paineisList }: Props) {
   const [verificados, setVerificados] = useState<Set<string>>(new Set());
 
   function marcarVerificados(atualizados: ContaAtualizada[]) {
@@ -42,6 +44,7 @@ export default function ContasGroupClient({ contas, idCliente, vencContas, empty
             conta={c}
             idCliente={idCliente}
             appsVinculados={appsVinculados?.get(c.id_conta) ?? []}
+            paineisList={paineisList}
           />
           <VerificarContaButton
             idConta={c.id_conta}

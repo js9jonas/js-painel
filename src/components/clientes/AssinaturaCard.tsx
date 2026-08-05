@@ -158,6 +158,7 @@ export default function AssinaturaCard({
             idCliente={idCliente}
             vencContas={a.venc_contas ?? null}
             appsVinculados={new Map(Object.entries(appsPorConta))}
+            paineisList={paineisList}
             emptyAction={
               <AdicionarContaModal
                 idAssinatura={String(a.id_assinatura)}
