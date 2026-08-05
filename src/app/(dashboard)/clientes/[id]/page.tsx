@@ -20,7 +20,7 @@ import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
 import HistoricoAudit from "@/components/clientes/HistoricoAudit";
 import AssinaturaCard from "@/components/clientes/AssinaturaCard";
 import AssinaturasInativasGroup from "@/components/clientes/AssinaturasInativasGroup";
-import { pool } from "@/lib/db";
+import { getPainelServidoresResumo } from "@/lib/paineis";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -59,9 +59,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
     getParceiroByIndicadoId(id),
     getAuditLogByClienteId(id),
     getContasPainelByClienteId(id),
-    pool.query<{ id: number; nome: string; tipo: string }>(
-      `SELECT id, nome, tipo FROM public.painel_servidores WHERE ativo = true ORDER BY nome`
-    ).then(r => r.rows),
+    getPainelServidoresResumo(),
   ]);
 
   const contasPorAssinatura: Record<string, ContaPainelVinculada[]> = {};

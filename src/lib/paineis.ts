@@ -127,11 +127,16 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
 
 export type PainelServidorResumo = { id: number; nome: string; tipo: string; ativo: boolean };
 
-// Versão leve (sem agregação de contas) — usada pra popular o seletor de "migrar pra outro painel".
-// Só painéis ativos (não faz sentido oferecer migração pra um painel desativado).
+// Versão leve (sem agregação de contas) — usada pra popular o seletor de "migrar pra outro painel"
+// e a lista de painéis do modal "Adicionar conta IPTV". Só painéis ativos (não faz sentido
+// oferecer migração/vínculo pra um painel desativado), e só painéis de CONTA — painéis de
+// aplicativo (FunPlays/LazerPlay/CorePlayer/SmartOne, ver getPainelAppSync acima) não têm
+// contas pra buscar/migrar, então nunca deveriam aparecer aqui.
 export async function getPainelServidoresResumo(): Promise<PainelServidorResumo[]> {
   const { rows } = await pool.query<PainelServidorResumo>(
-    `SELECT id, nome, tipo, ativo FROM public.painel_servidores WHERE ativo = true ORDER BY nome`
+    `SELECT id, nome, tipo, ativo FROM public.painel_servidores
+     WHERE ativo = true AND tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone')
+     ORDER BY nome`
   );
   return rows;
 }
