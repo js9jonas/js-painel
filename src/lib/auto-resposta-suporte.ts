@@ -89,7 +89,7 @@ async function buscarAssinaturaCliente(telefone: string, idAssinatura: string | 
        FROM public.assinaturas a
        JOIN public.clientes c ON c.id_cliente = a.id_cliente
        JOIN public.planos p ON p.id_plano = a.id_plano
-       WHERE a.id_assinatura = $1::bigint AND a.status IN ('ativo', 'atrasado', 'pendente', 'vencido')
+       WHERE a.id_assinatura = $1::bigint
        LIMIT 1`,
       [idAssinatura]
     )
@@ -113,7 +113,7 @@ async function buscarAssinaturaCliente(telefone: string, idAssinatura: string | 
      JOIN public.clientes c ON c.id_cliente = ct.id_cliente
      JOIN public.assinaturas a ON a.id_cliente = c.id_cliente
      JOIN public.planos p ON p.id_plano = a.id_plano
-     WHERE ct.telefone = $1 AND a.status IN ('ativo', 'atrasado', 'pendente', 'vencido') AND p.tipo != 'Cortesia'`,
+     WHERE ct.telefone = $1 AND p.tipo != 'Cortesia'`,
     [telefone]
   )
   if (r.rows.length === 0) return { status: 'nao_encontrado' }
