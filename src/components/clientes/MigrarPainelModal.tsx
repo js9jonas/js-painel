@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ContaPainelVinculada } from "@/lib/clientes";
 
 type PainelResumo = { id: number; nome: string; tipo: string };
+// Campos mínimos usados pelo modal — aceita tanto ContaPainelVinculada (clientes/[id])
+// quanto AlertaSubConta (alertas), sem acoplar aos tipos completos de cada página.
+type ContaMinima = { id_conta: string; usuario: string; nome_painel: string | null };
 
 type Props = {
-  conta: ContaPainelVinculada;
+  conta: ContaMinima;
   opcoes: PainelResumo[];
   onClose: () => void;
   onMigrado: () => void;
