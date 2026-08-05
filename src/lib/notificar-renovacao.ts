@@ -94,23 +94,33 @@ async function notificarRenovacaoTelegram({
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID_JONAS
   if (!botToken || !chatId) {
-    return { enviado: false, motivo: 'Nenhuma mensagem recebida deste cliente nas últimas 24h' }
+    return { enviado: false, motivo: 'Sem janela de 24h e Telegram não configurado' }
   }
 
-  // Sem restrição de 24h aqui — pega o telefone com a conversa mais recente entre os cadastrados
+  // Sem restrição de 24h aqui — prefere o telefone com a conversa mais recente entre os
+  // cadastrados, mas NÃO exige que exista histórico de mensagem do cliente: um cliente que
+  // nunca mandou mensagem nenhuma (comum em cliente novo que só pagou, sem nunca ter
+  // conversado) ainda tem telefone cadastrado em contatos, e o link wa.me funciona pra
+  // iniciar uma conversa nova, sem precisar de histórico prévio. Exigir histórico aqui fazia
+  // essa função desistir em silêncio pra esses clientes — nem o WhatsApp direto (sem janela
+  // de 24h) nem o fallback Telegram saíam, e nada indicava a falha (bug real encontrado
+  // 05/08/2026, ver project_notificacao_renovacao).
   const { rows } = await pool.query(
     `SELECT ct.telefone
      FROM public.contatos ct
-     JOIN public.whatsapp_mensagens wm
-       ON wm.telefone = ct.telefone AND wm.origem = 'cliente'
+     LEFT JOIN LATERAL (
+       SELECT MAX(wm.recebida_em) AS ultima
+       FROM public.whatsapp_mensagens wm
+       WHERE wm.telefone = ct.telefone AND wm.origem = 'cliente'
+     ) hist ON true
      WHERE ct.id_cliente = $1::bigint
-     ORDER BY wm.recebida_em DESC
+     ORDER BY hist.ultima DESC NULLS LAST, ct.criado_em ASC
      LIMIT 1`,
     [idCliente]
   )
   const telefoneRaw: string | undefined = rows[0]?.telefone
   if (!telefoneRaw) {
-    return { enviado: false, motivo: 'Nenhuma mensagem recebida deste cliente nas últimas 24h' }
+    return { enviado: false, motivo: 'Cliente sem telefone cadastrado' }
   }
 
   const digits = telefoneRaw.replace(/\D/g, '')
@@ -136,11 +146,11 @@ async function notificarRenovacaoTelegram({
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       console.error('[NotificarRenovacao] Erro ao notificar Telegram:', err)
-      return { enviado: false, motivo: 'Nenhuma mensagem recebida deste cliente nas últimas 24h; falha ao notificar Telegram' }
+      return { enviado: false, motivo: 'Falha ao notificar Telegram' }
     }
   } catch (err) {
     console.error('[NotificarRenovacao] Timeout/erro de rede ao notificar Telegram:', err)
-    return { enviado: false, motivo: 'Nenhuma mensagem recebida deste cliente nas últimas 24h; falha ao notificar Telegram' }
+    return { enviado: false, motivo: 'Falha ao notificar Telegram' }
   }
 
   return {
