@@ -38,8 +38,11 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
   const podeM3u = !isUnitv && !!conta.host_stream;
   const podeAcessoWeb = !!conta.url_acesso_web;
 
+  // Number(...) porque painel_servidores.id é bigint — o driver pg retorna como string,
+  // e id_painel_servidor pode chegar como number (ex: quando vem de um json_build_object
+  // agregado no SQL, como em /alertas) — comparação direta (===/!==) falha silenciosamente.
   const outrosPaineisMesmoTipo = (paineisList ?? []).filter(
-    (p) => p.tipo === conta.tipo_painel && p.id !== conta.id_painel_servidor
+    (p) => p.tipo === conta.tipo_painel && Number(p.id) !== Number(conta.id_painel_servidor)
   );
 
   function copiarM3u() {

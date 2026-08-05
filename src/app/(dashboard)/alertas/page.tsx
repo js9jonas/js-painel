@@ -250,7 +250,7 @@ export default async function AlertasPage() {
                                                                     <MigrarPainelButton
                                                                         conta={ct}
                                                                         opcoes={painelServidores.filter(
-                                                                            (p) => p.tipo === ct.tipo_painel && p.id !== ct.id_painel_servidor
+                                                                            (p) => p.tipo === ct.tipo_painel && Number(p.id) !== Number(ct.id_painel_servidor)
                                                                         )}
                                                                     />
                                                                 </div>
