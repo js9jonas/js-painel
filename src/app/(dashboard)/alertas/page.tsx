@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { getAlertasContas, getAlertasApps } from "@/lib/alertas";
 import { getSaldosServidores, getPrevisaoEsgotamento, getConsumoMensal } from "@/lib/saldoServidor";
+import { getPainelServidoresResumo } from "@/lib/paineis";
 import AdicionarMesContaButton from "@/components/alertas/AdicionarMesContaButton";
 import AlertasAppsClient from "@/components/alertas/AlertasAppsClient";
 import SaldoServidoresCard from "@/components/alertas/SaldoServidoresCard";
@@ -12,6 +13,7 @@ import SecaoRecolhivel from "@/components/alertas/SecaoRecolhivel";
 import DefinirDataContaButton from "@/components/alertas/DefinirDataContaButton";
 import RenovarViaAPIButton from "@/components/alertas/RenovarViaAPIButton";
 import VerificarContaButton from "@/components/clientes/VerificarContaButton";
+import MigrarPainelButton from "@/components/clientes/MigrarPainelButton";
 import AutoRefresh from "@/components/AutoRefresh";
 
 function diasRestantes(data: string): number {
@@ -36,12 +38,13 @@ function labelDias(dias: number) {
 }
 
 export default async function AlertasPage() {
-    const [contas, apps, saldos, previsoes, consumos] = await Promise.all([
+    const [contas, apps, saldos, previsoes, consumos, painelServidores] = await Promise.all([
         getAlertasContas(5),
         getAlertasApps(7),
         getSaldosServidores(),
         getPrevisaoEsgotamento(),
         getConsumoMensal(),
+        getPainelServidoresResumo(),
     ]);
 
     // Servidores com previsão < 15 dias
@@ -239,10 +242,18 @@ export default async function AlertasPage() {
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-2">
-                                                                <RenovarViaAPIButton
-                                                                    idPainelServidor={ct.id_painel_servidor}
-                                                                    usuario={ct.usuario}
-                                                                />
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <RenovarViaAPIButton
+                                                                        idPainelServidor={ct.id_painel_servidor}
+                                                                        usuario={ct.usuario}
+                                                                    />
+                                                                    <MigrarPainelButton
+                                                                        conta={ct}
+                                                                        opcoes={painelServidores.filter(
+                                                                            (p) => p.tipo === ct.tipo_painel && Number(p.id) !== Number(ct.id_painel_servidor)
+                                                                        )}
+                                                                    />
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );

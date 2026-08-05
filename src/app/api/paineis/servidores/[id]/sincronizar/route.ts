@@ -21,12 +21,22 @@ export async function POST(
     return NextResponse.json({ erro: msg }, { status: 400 });
   }
 
-  // Resolve o id_servidor real vinculado a este painel (pode diferir do id do painel_servidores)
+  // Resolve o id_servidor real vinculado a este painel — contas.id_servidor é FK NOT NULL
+  // pra public.servidores (tabela legada), então precisa existir de fato. Cair pro idPainel
+  // como fallback era frágil: só funcionava por coincidência quando o id do painel_servidores
+  // batia com um id_servidor legado válido (ids 1-13, dos painéis migrados originalmente).
+  // Painéis novos cadastrados via UI ganham ids maiores e quebram o INSERT com FK violation
+  // no meio do loop — exceção não tratada, resposta HTML de erro em vez de JSON.
   const { rows: painelMeta } = await pool.query<{ id_servidor: number | null }>(
     `SELECT id_servidor FROM public.painel_servidores WHERE id = $1`,
     [idPainel]
   );
-  const idServidor: number = painelMeta[0]?.id_servidor ?? idPainel;
+  if (!painelMeta[0]?.id_servidor) {
+    return NextResponse.json({
+      erro: "Painel sem id_servidor vinculado (aba Conexões → editar painel → Servidor vinculado). Sem esse vínculo não é possível gravar contas novas.",
+    }, { status: 422 });
+  }
+  const idServidor: number = painelMeta[0].id_servidor;
 
   let contas;
   try {

@@ -7,6 +7,7 @@ export type AlertaSubConta = {
     vencimento_real_painel: string;
     id_painel_servidor: number | null;
     nome_painel: string | null;
+    tipo_painel: string | null;
     status_conta: string | null;
 };
 
@@ -57,6 +58,7 @@ export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
          'vencimento_real_painel',ct.vencimento_real_painel::text,
          'id_painel_servidor',    ct.id_painel_servidor,
          'nome_painel',           ps.nome,
+         'tipo_painel',           ps.tipo,
          'status_conta',          ct.status_conta
        ) ORDER BY ct.vencimento_real_painel ASC NULLS LAST
      ) FILTER (

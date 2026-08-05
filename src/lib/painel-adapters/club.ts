@@ -1,5 +1,5 @@
 import { Impit, type HttpMethod } from "impit";
-import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ResultadoCriacao, DetalhesConta, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
@@ -10,6 +10,13 @@ import { impitFetch } from "./proxy-retry";
 const API_URL     = "https://pdcapi.io/";
 const WEBSITE_URL = "https://dashboard.bz/login.php";
 const SITEKEY     = "8cf2ef3e-6e60-456a-86ca-6f2c855c3a06";
+
+// Pacote "Completo" — pares [sem_adulto, com_adulto] por categoria (Canais, Canais 24H, Filmes,
+// Series, Novelas) + Radios (225, sem variante adulta). Capturado via payload real do formulário
+// "Criar nova lista" em dashboard.bz (reverse engineering 05/08/2026, ver reference-adapters-paineis-iptv).
+const BOUQUET_PARES_COMPLETO = ["215|216", "217|218", "219|220", "221|222", "223|224"];
+const BOUQUET_COMPLETO_SEM_ADULTO = "215,217,219,221,223,225";
+const BOUQUET_COMPLETO_COM_ADULTO = "216,218,220,222,224,225";
 // pdcapi.io bloqueia IP do datacenter Hostinger — proxy residencial necessário
 // timeout curto (padrão do impit é ~30s, igual ao timeout externo do /conexoes — não sobra
 // janela pro retry de proxy-retry.ts tentar outro IP do pool antes do status check desistir)
@@ -316,7 +323,7 @@ export function criarClubAdapter(
       });
     },
 
-    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string; comAdultos?: boolean }): Promise<ResultadoEdicao> {
       return withRelogin(async (token) => {
         // Busca o id interno da conta pelo username
         const lista = await listarContasRaw(token);
@@ -331,17 +338,33 @@ export function criarClubAdapter(
           senhaAtual = info?.data?.password ?? "";
         }
 
+        // Por padrão preserva o bouquet atual. Só troca quando comAdultos é passado explicitamente
+        // (ex: reaproveitar uma conta de teste "sem adulto" pra virar uma conta paga "com adulto"
+        // na migração CLUB antigo→novo — ver criarConta() acima pro mesmo padrão de troca de bouquet).
+        const trocandoBouquet = campos.comAdultos !== undefined;
+        const bouquetAlvo = trocandoBouquet
+          ? (campos.comAdultos ? BOUQUET_COMPLETO_COM_ADULTO : BOUQUET_COMPLETO_SEM_ADULTO)
+          : (conta.bouquet ?? "");
+
         // Nomes de campo confirmados capturando o payload real do formulário de edição do site
         // (diferente do que estava aqui antes: username_edit/password_edit/reseller_notes/plano_novo_edit)
+        // ⚠️ 05/08/2026: capturado via interceptor de fetch/XHR (Claude in Chrome) editando uma conta
+        // real com o toggle "Conteúdo Adulto" — dois campos que faltavam completamente antes:
+        // `plano_opt_edit` é "on" (não "antigo") quando o pacote/bouquet está sendo REALMENTE aplicado
+        // (só usa "antigo" pra manter o pacote atual sem mexer), e existe um campo SEPARADO
+        // `plano_adulto=1` que é o que de fato liga o conteúdo adulto — os IDs de bouquet sozinhos
+        // (215..225 vs 216..225) nunca foram suficientes. Isso explica o quirk antigo documentado
+        // no criarConta() ("bouquet adulto não aplica mesmo com IDs certos") — ver mesmo fix lá embaixo.
         const body = new URLSearchParams();
         body.set("id",             String(conta.id));
         body.set("username",       campos.novoUsuario ?? usuario);
         body.set("password",       senhaAtual ?? "");
         body.set("email",          "");
         body.set("plano",          "");
-        body.set("plano_antigo",   conta.bouquet ?? "");
-        body.set("plano_novo",     conta.bouquet ?? "");
-        body.set("plano_opt_edit", "antigo");
+        body.set("plano_antigo",   bouquetAlvo);
+        body.set("plano_novo",     bouquetAlvo);
+        body.set("plano_opt_edit", trocandoBouquet ? "on" : "antigo");
+        if (trocandoBouquet) body.set("plano_adulto", campos.comAdultos ? "1" : "0");
         body.set("notas",          campos.novoRotulo ?? conta.reseller_notes ?? "");
 
         const result = await apiFetch(token, `listas/${conta.id}/editar`, {
@@ -402,6 +425,25 @@ export function criarClubAdapter(
       });
     },
 
+    // Busca senha/telas/adulto/rótulo direto no painel — usado antes de migrar a conta pra
+    // outro painel CLUB, quando o banco local não tem tudo (ex: senha nunca importada).
+    async obterDetalhes(usuario: string): Promise<DetalhesConta | null> {
+      return withRelogin(async (token) => {
+        const lista = await listarContasRaw(token);
+        const conta = lista.find((l: any) => l.username === usuario);
+        if (!conta) return null;
+        const info = await apiFetch(token, `listas/${conta.id}/info`);
+        if (!info?.data) return null;
+        const d = info.data;
+        return {
+          senha: d.password ?? null,
+          telas: Number(d.max_connections) || 1,
+          comAdultos: /Canais Adultos:<\/b> Sim/.test(d.bouquet_name ?? ""),
+          rotulo: d.reseller_notes ?? "",
+        };
+      });
+    },
+
     async deletarConta(usuario: string): Promise<void> {
       return withRelogin(async (token) => {
         const lista = await listarContasRaw(token);
@@ -409,6 +451,70 @@ export function criarClubAdapter(
         if (!conta) throw new Error(`CLUB: usuário "${usuario}" não encontrado.`);
         const result = await apiFetch(token, `listas/${conta.id}/deletar`, { method: "GET" });
         if (result?.result === false) throw new Error(result.msg ?? "CLUB: falha ao deletar conta.");
+      });
+    },
+
+    // Cria conta paga (produção) com usuário/senha específicos — usado em migração entre painéis
+    // CLUB (excluir do antigo + criar no novo mantendo credenciais). Endpoint listas/nova descoberto
+    // via reverse engineering do payload real do formulário "Criar nova lista" (05/08/2026).
+    async criarConta(
+      usuario: string,
+      senha: string,
+      { meses = 1, telas = 1, comAdultos = false, rotulo = "" }: { meses?: number; telas?: number; comAdultos?: boolean; rotulo?: string } = {}
+    ): Promise<ResultadoCriacao> {
+      return withRelogin(async (token) => {
+        const bouquets = comAdultos ? BOUQUET_COMPLETO_COM_ADULTO : BOUQUET_COMPLETO_SEM_ADULTO;
+
+        const body = new URLSearchParams();
+        body.set("username", usuario);
+        body.set("password", senha);
+        body.set("email", "");
+        body.set("conexoes", String(telas));
+        body.set("tempo", String(meses));
+        body.set("plano", "");
+        body.set("plano_novo", bouquets);
+        body.set("plano_opt", "on");
+        for (const par of BOUQUET_PARES_COMPLETO) body.append("plano_custom[]", par);
+
+        const result = await apiFetch(token, "listas/nova", { method: "POST", body });
+        if (!result.result) return { ok: false, erro: result.msg ?? "Erro ao criar conta no CLUB." };
+
+        // ⚠️ Confirmado empiricamente 05/08/2026: a criação (listas/nova) NÃO respeita de forma
+        // confiável o bouquet com adulto, mesmo enviando os IDs corretos em plano_novo — a conta
+        // sai sempre sem conteúdo adulto. Só uma edição pós-criação (listas/{id}/editar, mesmo
+        // endpoint testado e confirmado no fluxo manual) realmente aplica o bouquet certo. Por
+        // isso SEMPRE roda a edição de confirmação abaixo (não só quando há rótulo).
+        // ⚠️ Fix 05/08/2026 (interceptor de fetch/XHR, ver editarConta() acima): faltava o campo
+        // plano_adulto=1 e plano_opt_edit precisa ser "on" (não "antigo") pra realmente aplicar —
+        // antes disso essa edição de confirmação nunca ligava o adulto de verdade (falso sucesso).
+        let venc: string | undefined;
+        try {
+          const lista = await listarContasRaw(token);
+          const conta = lista.find((l: any) => l.username === usuario);
+          if (conta) {
+            const editBody = new URLSearchParams();
+            editBody.set("id", String(conta.id));
+            editBody.set("username", usuario);
+            editBody.set("password", senha);
+            editBody.set("email", "");
+            editBody.set("plano", "");
+            editBody.set("plano_antigo", bouquets);
+            editBody.set("plano_novo", bouquets);
+            editBody.set("plano_opt_edit", "on");
+            editBody.set("plano_adulto", comAdultos ? "1" : "0");
+            editBody.set("notas", rotulo || conta.reseller_notes || "");
+            await apiFetch(token, `listas/${conta.id}/editar`, { method: "POST", body: editBody });
+
+            // Relê para confirmar o vencimento final (a edição não altera o vencimento, só o bouquet)
+            const listaPos = await listarContasRaw(token);
+            const contaPos = listaPos.find((l: any) => l.username === usuario);
+            if (contaPos?.exp_date) {
+              venc = new Date(Number(contaPos.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+            }
+          }
+        } catch { /* segue sem vencimento/rótulo/bouquet confirmado se a busca pós-criação falhar */ }
+
+        return { ok: true, vencimento: venc };
       });
     },
   };
