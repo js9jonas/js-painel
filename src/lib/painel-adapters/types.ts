@@ -29,6 +29,12 @@ export interface ResultadoTeste {
   erro?: string;
 }
 
+export interface ResultadoCriacao {
+  ok: boolean;
+  vencimento?: string; // YYYY-MM-DD
+  erro?: string;
+}
+
 export interface PainelAdapter {
   listarContas(): Promise<ContaPainel[]>;
   renovar(usuario: string, meses: number): Promise<ResultadoRenovacao>;
@@ -37,6 +43,8 @@ export interface PainelAdapter {
   gerarTeste?(params: { comAdultos?: boolean; horas?: number; rotulo?: string }): Promise<ResultadoTeste>;
   recriarlinha?(usuario: string): Promise<ResultadoTeste>;
   deletarConta?(usuario: string): Promise<void>;
+  // Cria conta paga (produção) com usuário/senha específicos — usado em migração entre painéis
+  criarConta?(usuario: string, senha: string, params?: { meses?: number; telas?: number; comAdultos?: boolean; rotulo?: string }): Promise<ResultadoCriacao>;
   // Operações longas que não devem correr junto ao sync diário
   importarSenhas?(prioridade?: Set<string>): Promise<Map<string, string | null>>;
 }
