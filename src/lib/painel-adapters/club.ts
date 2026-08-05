@@ -323,7 +323,7 @@ export function criarClubAdapter(
       });
     },
 
-    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
+    async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string; comAdultos?: boolean }): Promise<ResultadoEdicao> {
       return withRelogin(async (token) => {
         // Busca o id interno da conta pelo username
         const lista = await listarContasRaw(token);
@@ -338,17 +338,33 @@ export function criarClubAdapter(
           senhaAtual = info?.data?.password ?? "";
         }
 
+        // Por padrão preserva o bouquet atual. Só troca quando comAdultos é passado explicitamente
+        // (ex: reaproveitar uma conta de teste "sem adulto" pra virar uma conta paga "com adulto"
+        // na migração CLUB antigo→novo — ver criarConta() acima pro mesmo padrão de troca de bouquet).
+        const trocandoBouquet = campos.comAdultos !== undefined;
+        const bouquetAlvo = trocandoBouquet
+          ? (campos.comAdultos ? BOUQUET_COMPLETO_COM_ADULTO : BOUQUET_COMPLETO_SEM_ADULTO)
+          : (conta.bouquet ?? "");
+
         // Nomes de campo confirmados capturando o payload real do formulário de edição do site
         // (diferente do que estava aqui antes: username_edit/password_edit/reseller_notes/plano_novo_edit)
+        // ⚠️ 05/08/2026: capturado via interceptor de fetch/XHR (Claude in Chrome) editando uma conta
+        // real com o toggle "Conteúdo Adulto" — dois campos que faltavam completamente antes:
+        // `plano_opt_edit` é "on" (não "antigo") quando o pacote/bouquet está sendo REALMENTE aplicado
+        // (só usa "antigo" pra manter o pacote atual sem mexer), e existe um campo SEPARADO
+        // `plano_adulto=1` que é o que de fato liga o conteúdo adulto — os IDs de bouquet sozinhos
+        // (215..225 vs 216..225) nunca foram suficientes. Isso explica o quirk antigo documentado
+        // no criarConta() ("bouquet adulto não aplica mesmo com IDs certos") — ver mesmo fix lá embaixo.
         const body = new URLSearchParams();
         body.set("id",             String(conta.id));
         body.set("username",       campos.novoUsuario ?? usuario);
         body.set("password",       senhaAtual ?? "");
         body.set("email",          "");
         body.set("plano",          "");
-        body.set("plano_antigo",   conta.bouquet ?? "");
-        body.set("plano_novo",     conta.bouquet ?? "");
-        body.set("plano_opt_edit", "antigo");
+        body.set("plano_antigo",   bouquetAlvo);
+        body.set("plano_novo",     bouquetAlvo);
+        body.set("plano_opt_edit", trocandoBouquet ? "on" : "antigo");
+        if (trocandoBouquet) body.set("plano_adulto", campos.comAdultos ? "1" : "0");
         body.set("notas",          campos.novoRotulo ?? conta.reseller_notes ?? "");
 
         const result = await apiFetch(token, `listas/${conta.id}/editar`, {
@@ -468,6 +484,9 @@ export function criarClubAdapter(
         // sai sempre sem conteúdo adulto. Só uma edição pós-criação (listas/{id}/editar, mesmo
         // endpoint testado e confirmado no fluxo manual) realmente aplica o bouquet certo. Por
         // isso SEMPRE roda a edição de confirmação abaixo (não só quando há rótulo).
+        // ⚠️ Fix 05/08/2026 (interceptor de fetch/XHR, ver editarConta() acima): faltava o campo
+        // plano_adulto=1 e plano_opt_edit precisa ser "on" (não "antigo") pra realmente aplicar —
+        // antes disso essa edição de confirmação nunca ligava o adulto de verdade (falso sucesso).
         let venc: string | undefined;
         try {
           const lista = await listarContasRaw(token);
@@ -481,7 +500,8 @@ export function criarClubAdapter(
             editBody.set("plano", "");
             editBody.set("plano_antigo", bouquets);
             editBody.set("plano_novo", bouquets);
-            editBody.set("plano_opt_edit", "antigo");
+            editBody.set("plano_opt_edit", "on");
+            editBody.set("plano_adulto", comAdultos ? "1" : "0");
             editBody.set("notas", rotulo || conta.reseller_notes || "");
             await apiFetch(token, `listas/${conta.id}/editar`, { method: "POST", body: editBody });
 
