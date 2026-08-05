@@ -79,8 +79,18 @@ export async function migrarContaPainel(idConta: number, idPainelDestino: number
       };
     }
 
+    // contas.id_servidor é FK NOT NULL pra tabela legada public.servidores — precisa acompanhar
+    // o painel novo, senão fica órfão apontando pro id_servidor do painel de origem (achado
+    // 05/08/2026 testando a migração automática com celsogrom: o UPDATE só trocava
+    // id_painel_servidor, deixando id_servidor desatualizado — mesmo bug já corrigido
+    // manualmente antes pro Gilberto e as 5 primeiras contas, mas não replicado aqui).
     await pool.query(
-      `UPDATE public.contas SET id_painel_servidor = $1, vencimento_real_painel = $2, status_conta = 'ok' WHERE id_conta = $3`,
+      `UPDATE public.contas SET
+         id_painel_servidor = $1,
+         id_servidor = (SELECT id_servidor FROM public.painel_servidores WHERE id = $1),
+         vencimento_real_painel = $2,
+         status_conta = 'ok'
+       WHERE id_conta = $3`,
       [idPainelDestino, resultado.vencimento ?? null, idConta]
     );
 
