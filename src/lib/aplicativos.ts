@@ -45,6 +45,42 @@ export type AplicativoRow = {
   playlists: PlaylistRow[];
 };
 
+/**
+ * Verifica se um MAC já está cadastrado pra esse mesmo id_app (constraint ux_aplicativos_mac_app
+ * garante isso no banco; essa função dá uma mensagem amigável ANTES de tentar gravar).
+ * Ignora registros já removido_em (histórico de renovação libera o MAC de novo).
+ * `excluirIdAppRegistro` evita falso positivo ao editar o próprio registro.
+ */
+export async function buscarDonoDoMac(
+  mac: string,
+  id_app: number,
+  excluirIdAppRegistro?: number
+): Promise<{ id_app_registro: number; id_cliente: number | null; nome_cliente: string | null } | null> {
+  const macTrim = mac.trim();
+  if (!macTrim) return null;
+
+  const { rows } = await pool.query<{ id_app_registro: number; id_cliente: number | null; nome_cliente: string | null }>(
+    `SELECT ap.id_app_registro, ap.id_cliente, cl.nome AS nome_cliente
+     FROM public.aplicativos ap
+     LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
+     WHERE UPPER(ap.mac) = UPPER($1) AND ap.id_app = $2 AND ap.removido_em IS NULL
+       ${excluirIdAppRegistro ? "AND ap.id_app_registro <> $3" : ""}
+     LIMIT 1`,
+    excluirIdAppRegistro ? [macTrim, id_app, excluirIdAppRegistro] : [macTrim, id_app]
+  );
+  return rows[0] ?? null;
+}
+
+export function erroMacDuplicado(dono: { id_app_registro: number; id_cliente: number | null; nome_cliente: string | null }): Error {
+  const quem = dono.id_cliente
+    ? `ao cliente "${dono.nome_cliente}" (id ${dono.id_cliente})`
+    : `a um registro sem cliente vinculado (id ${dono.id_app_registro}, provavelmente órfão de sincronização)`;
+  return new Error(
+    `Esse MAC já está cadastrado pra esse mesmo app, pertencente ${quem}. ` +
+    `Edite/vincule esse registro existente em vez de criar um novo.`
+  );
+}
+
 export async function getAplicativosByClienteId(id_cliente: string): Promise<AplicativoRow[]> {
   const { rows } = await pool.query<AplicativoRow>(
     `SELECT

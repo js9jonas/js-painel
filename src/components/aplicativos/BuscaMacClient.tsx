@@ -360,8 +360,8 @@ function AddModal({
         };
         await createAplicativo(clienteSearch.clienteId || "", payload);
         onSaved();
-      } catch {
-        setError("Erro ao cadastrar. Verifique os dados e tente novamente.");
+      } catch (err: any) {
+        setError(err?.message ?? "Erro ao cadastrar. Verifique os dados e tente novamente.");
       }
     });
   }
@@ -545,8 +545,8 @@ function EditModal({
           id_dispositivo: idDispositivo    || null,
         });
         onSaved();
-      } catch {
-        setError("Erro ao salvar. Tente novamente.");
+      } catch (err: any) {
+        setError(err?.message ?? "Erro ao salvar. Tente novamente.");
       }
     });
   }

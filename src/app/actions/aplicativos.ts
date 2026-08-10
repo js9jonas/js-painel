@@ -4,6 +4,7 @@
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { registrarAudit } from "@/lib/audit";
+import { buscarDonoDoMac, erroMacDuplicado } from "@/lib/aplicativos";
 
 export type AplicativoData = {
   id_cliente: string | null;
@@ -19,6 +20,11 @@ export type AplicativoData = {
 };
 
 export async function createAplicativo(id_cliente: string, data: AplicativoData) {
+  if (data.mac?.trim() && data.id_app) {
+    const dono = await buscarDonoDoMac(data.mac, parseInt(data.id_app));
+    if (dono) throw erroMacDuplicado(dono);
+  }
+
   await pool.query(
     `INSERT INTO public.aplicativos
    (id_cliente, id_app, mac, chave, validade, status, observacao,
@@ -46,6 +52,11 @@ export async function updateAplicativo(
   id_cliente: string,
   data: AplicativoData
 ) {
+  if (data.mac?.trim() && data.id_app) {
+    const dono = await buscarDonoDoMac(data.mac, parseInt(data.id_app), id_app_registro);
+    if (dono) throw erroMacDuplicado(dono);
+  }
+
   const client = await pool.connect();
 
   try {

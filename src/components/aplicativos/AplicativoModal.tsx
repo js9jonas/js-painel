@@ -66,8 +66,8 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
         }
         onSaved();
         onClose();
-      } catch {
-        setError("Erro ao salvar. Tente novamente.");
+      } catch (err: any) {
+        setError(err?.message ?? "Erro ao salvar. Tente novamente.");
       }
     });
   }
