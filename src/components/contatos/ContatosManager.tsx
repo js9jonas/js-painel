@@ -40,8 +40,8 @@ export default function ContatosManager({ idCliente, contatos, onSaved }: Props)
         await updateContato(id_contato, idCliente, editValues.telefone, editValues.nome);
         setEditingId(null);
         onSaved();
-      } catch {
-        setError("Erro ao salvar");
+      } catch (err: any) {
+        setError(err?.message ?? "Erro ao salvar");
       }
     });
   }
@@ -66,8 +66,8 @@ export default function ContatosManager({ idCliente, contatos, onSaved }: Props)
         setNewValues({ telefone: "", nome: "" });
         setAddingNew(false);
         onSaved();
-      } catch {
-        setError("Erro ao adicionar");
+      } catch (err: any) {
+        setError(err?.message ?? "Erro ao adicionar");
       }
     });
   }

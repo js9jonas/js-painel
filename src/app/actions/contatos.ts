@@ -3,6 +3,7 @@
 
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { buscarDonoDoTelefone, erroTelefoneDuplicado } from "@/lib/contatos";
 
 export async function addContato(
   id_cliente: string,
@@ -10,6 +11,9 @@ export async function addContato(
   nome?: string
 ) {
   if (!telefone.trim()) throw new Error("Telefone é obrigatório");
+
+  const dono = await buscarDonoDoTelefone(telefone, id_cliente);
+  if (dono) throw erroTelefoneDuplicado(dono);
 
   await pool.query(
     `INSERT INTO public.contatos (id_cliente, telefone, nome, criado_em, atualizado_em)
@@ -28,6 +32,9 @@ export async function updateContato(
   nome?: string
 ) {
   if (!telefone.trim()) throw new Error("Telefone é obrigatório");
+
+  const dono = await buscarDonoDoTelefone(telefone, id_cliente);
+  if (dono) throw erroTelefoneDuplicado(dono);
 
   await pool.query(
     `UPDATE public.contatos

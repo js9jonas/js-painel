@@ -3,6 +3,7 @@
 
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { buscarDonoDoTelefone, erroTelefoneDuplicado } from "@/lib/contatos";
 
 export type NovoClienteData = {
   nome: string;
@@ -29,6 +30,11 @@ function normalizarNome(nome: string): string {
 
 export async function criarClienteComAssinatura(data: NovoClienteData): Promise<string> {
   if (!data.nome.trim()) throw new Error("Nome é obrigatório");
+
+  if (data.telefone?.trim()) {
+    const dono = await buscarDonoDoTelefone(data.telefone);
+    if (dono) throw erroTelefoneDuplicado(dono);
+  }
 
   const client = await pool.connect();
 

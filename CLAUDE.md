@@ -30,6 +30,10 @@ Schema `gestao_comunidade.*` — acessado via tool_use do agente (read-only)
 - IDs castados como `::bigint`
 - `revalidatePath` após toda Server Action mutante
 
+**`contatos.telefone` é único no banco inteiro (10/08/2026)** — índice único parcial `ux_contatos_telefone_global ON contatos(telefone) WHERE telefone IS NOT NULL AND telefone <> '0000000000'` (o placeholder `0000000000`, usado em ~16 clientes sem telefone real, fica de fora da regra). Antes disso só existia `ux_contatos_cliente_telefone` em `(id_cliente, telefone)`, que impedia duplicata dentro do mesmo cliente mas não entre clientes diferentes — brecha que já causou duplicatas reais (família pagando por outro registrada como cliente novo em vez de assinatura extra no cliente existente, ver `reference_merge_clientes.md` na memória).
+
+Toda gravação de telefone (`src/app/actions/novoCliente.ts`, `clientes.ts::salvarContato`, `contatos.ts::addContato`/`updateContato`) faz um pré-check com `buscarDonoDoTelefone()`/`erroTelefoneDuplicado()` (`src/lib/contatos.ts`) antes do INSERT/UPDATE, pra mostrar uma mensagem amigável nomeando o cliente dono do número em vez de deixar estourar o erro cru da constraint. A constraint em si continua como rede de segurança (concorrência). Exceção proposital: `contatos.ts::vincularContatoNoChat` (usado em `VincularClienteModal`) não faz esse check — a função existe justamente pra **reatribuir** um telefone de um cliente pra outro a partir do chat, então tentar impedir duplicata ali quebraria a funcionalidade.
+
 ## Agente IA de análise (`/agente`)
 
 `src/app/api/agent/chat/route.ts` — agente com tool_use (loop até 12 iterações):

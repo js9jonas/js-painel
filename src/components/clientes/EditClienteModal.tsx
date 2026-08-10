@@ -64,9 +64,14 @@ export default function EditClienteModal({
 
   async function handleSalvarContato(idContato: string) {
     if (!editTelefone.trim()) return;
-    await salvarContato(idCliente, { idContato, telefone: editTelefone, nome: editNome || null, referencia: editReferencia || null });
-    setContatos(await getContatosCliente(idCliente));
-    setEditandoId(null);
+    setError(null);
+    try {
+      await salvarContato(idCliente, { idContato, telefone: editTelefone, nome: editNome || null, referencia: editReferencia || null });
+      setContatos(await getContatosCliente(idCliente));
+      setEditandoId(null);
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao salvar contato. Tente novamente.");
+    }
   }
 
   async function handleDeletarContato(idContato: string) {
@@ -77,9 +82,14 @@ export default function EditClienteModal({
 
   async function handleAdicionarContato() {
     if (!novoTelefone.trim()) return;
-    await salvarContato(idCliente, { telefone: novoTelefone, nome: novoNome || null, referencia: novaReferencia || null });
-    setContatos(await getContatosCliente(idCliente));
-    setNovoTelefone(""); setNovoNome(""); setNovaReferencia(""); setAdicionando(false);
+    setError(null);
+    try {
+      await salvarContato(idCliente, { telefone: novoTelefone, nome: novoNome || null, referencia: novaReferencia || null });
+      setContatos(await getContatosCliente(idCliente));
+      setNovoTelefone(""); setNovoNome(""); setNovaReferencia(""); setAdicionando(false);
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao adicionar contato. Tente novamente.");
+    }
   }
 
   const inputClass = "w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";

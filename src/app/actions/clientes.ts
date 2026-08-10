@@ -3,6 +3,7 @@
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { registrarAudit } from "@/lib/audit";
+import { buscarDonoDoTelefone, erroTelefoneDuplicado } from "@/lib/contatos";
 
 export async function updateCliente(
   id: string,
@@ -92,6 +93,11 @@ export async function salvarContato(
   idCliente: string,
   data: { idContato?: string; telefone: string; nome: string | null; referencia: string | null }
 ): Promise<void> {
+  if (data.telefone.trim()) {
+    const dono = await buscarDonoDoTelefone(data.telefone, idCliente);
+    if (dono) throw erroTelefoneDuplicado(dono);
+  }
+
   if (data.idContato) {
     await pool.query(
       `UPDATE public.contatos
