@@ -21,7 +21,7 @@ const ID_APP: Record<string, number> = {
 // não esgotar o pool de conexões do Postgres (max padrão do `pg` é 10).
 const CONCORRENCIA = 6;
 
-type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number; playlists_removidas: number; removidos: number };
+type Stats = { inseridos: number; atualizados: number; playlists_sincronizadas: number; playlists_removidas: number; removidos: number; erros: number };
 type JobState =
   | { done: false }
   | { done: true; ok: true; total_devices: number; stats: Stats; aviso?: string }
@@ -111,109 +111,141 @@ async function executarSync(idPainel: number, jobId: string) {
       getFunPlaysPlaylists;
 
     const devices = await getDevicesFn(jwt);
-    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0, playlists_removidas: 0, removidos: 0 };
+    const stats: Stats = { inseridos: 0, atualizados: 0, playlists_sincronizadas: 0, playlists_removidas: 0, removidos: 0, erros: 0 };
 
     await mapConcorrente(devices, CONCORRENCIA, async (dev) => {
-      const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
-        `SELECT id_app_registro, id_cliente
-         FROM public.aplicativos
-         WHERE UPPER(mac) = UPPER($1) AND id_app = $2
-         LIMIT 1`,
-        [dev.mac, idApp]
-      );
-
-      const validade = dev.activation_expired
-        ? new Date(dev.activation_expired).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
-        : null;
-
-      let idAppRegistro: number;
-
-      if (existentes.length > 0) {
-        idAppRegistro = existentes[0].id_app_registro;
-        await pool.query(
-          `UPDATE public.aplicativos
-           SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW(), removido_em = NULL
-           WHERE id_app_registro = $5`,
-          [validade, dev.model ?? null, String(dev.id), idPainel, idAppRegistro]
-        );
-        stats.atualizados++;
-      } else {
-        const { rows: ins } = await pool.query<{ id_app_registro: number }>(
-          `INSERT INTO public.aplicativos
-             (id_app, mac, chave, validade, modelo, id_painel_servidor,
-              status, data_cadastro, atualizado_em)
-           VALUES ($1, $2, $3, $4, $5, $6, 'ativa', NOW(), NOW())
-           RETURNING id_app_registro`,
-          [idApp, dev.mac, String(dev.id), validade, dev.model ?? null, idPainel]
-        );
-        idAppRegistro = ins[0].id_app_registro;
-        stats.inseridos++;
-      }
-
-      let playlists: AppAcessoPlaylist[] = [];
-      let playlistsOk = true;
       try {
-        playlists = await getPlaylistsFn(jwt, dev.id);
-      } catch {
-        playlistsOk = false; // falha na busca — não mexe nas playlists já salvas deste device
-      }
-
-      for (const pl of playlists) {
-        let idConta: number | null = null;
-        const username = pl.url ? extrairUsernameUrl(pl.url) : null;
-        if (username) {
-          const { rows: contaRows } = await pool.query<{ id_conta: number }>(
-            `SELECT id_conta FROM public.contas WHERE usuario = $1 AND removido_em IS NULL LIMIT 1`,
-            [username]
-          );
-          idConta = contaRows[0]?.id_conta ?? null;
-        }
-
-        await pool.query(
-          `INSERT INTO public.aplicativo_playlists
-             (id_app_registro, playlist_id_externo, nome, url, is_selected, expired_date, id_conta, atualizado_em)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-           ON CONFLICT (id_app_registro, playlist_id_externo)
-           DO UPDATE SET
-             nome         = EXCLUDED.nome,
-             url          = EXCLUDED.url,
-             is_selected  = EXCLUDED.is_selected,
-             expired_date = EXCLUDED.expired_date,
-             id_conta     = EXCLUDED.id_conta,
-             atualizado_em = NOW()`,
-          [idAppRegistro, pl.id, pl.name ?? null, pl.url ?? null, pl.is_selected ?? false, pl.expired_date ?? null, idConta]
-        );
-        stats.playlists_sincronizadas++;
-      }
-
-      // Remove localmente as playlists que sumiram do device no painel remoto —
-      // só quando a busca deu certo (playlistsOk), pra uma falha transitória da API
-      // não apagar playlists que continuam existindo de verdade.
-      if (playlistsOk) {
-        const idsAtuais = playlists.map(p => p.id);
-        const { rowCount } = await pool.query(
-          `DELETE FROM public.aplicativo_playlists
-           WHERE id_app_registro = $1
-             AND playlist_id_externo != ALL($2::bigint[])`,
-          [idAppRegistro, idsAtuais]
-        );
-        stats.playlists_removidas += rowCount ?? 0;
-      }
-
-      // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
-      if ((creds.tipo === "coreplayer" || creds.tipo === "smartone") && !existentes[0]?.id_cliente) {
-        const { rows: vinculoRows } = await pool.query<{ id_cliente: number }>(
-          `SELECT id_cliente FROM public.aplicativos
-           WHERE UPPER(mac) = UPPER($1) AND id_cliente IS NOT NULL AND id_app_registro != $2
+        const { rows: existentes } = await pool.query<{ id_app_registro: number; id_cliente: number | null }>(
+          `SELECT id_app_registro, id_cliente
+           FROM public.aplicativos
+           WHERE UPPER(mac) = UPPER($1) AND id_app = $2
            LIMIT 1`,
-          [dev.mac, idAppRegistro]
+          [dev.mac, idApp]
         );
-        if (vinculoRows.length === 1) {
+
+        const validade = dev.activation_expired
+          ? new Date(dev.activation_expired).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+          : null;
+
+        let idAppRegistro: number;
+
+        if (existentes.length > 0) {
+          idAppRegistro = existentes[0].id_app_registro;
           await pool.query(
-            `UPDATE public.aplicativos SET id_cliente = $1 WHERE id_app_registro = $2`,
-            [vinculoRows[0].id_cliente, idAppRegistro]
+            `UPDATE public.aplicativos
+             SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW(), removido_em = NULL
+             WHERE id_app_registro = $5`,
+            [validade, dev.model ?? null, String(dev.id), idPainel, idAppRegistro]
           );
+          stats.atualizados++;
+        } else {
+          try {
+            const { rows: ins } = await pool.query<{ id_app_registro: number }>(
+              `INSERT INTO public.aplicativos
+                 (id_app, mac, chave, validade, modelo, id_painel_servidor,
+                  status, data_cadastro, atualizado_em)
+               VALUES ($1, $2, $3, $4, $5, $6, 'ativa', NOW(), NOW())
+               RETURNING id_app_registro`,
+              [idApp, dev.mac, String(dev.id), validade, dev.model ?? null, idPainel]
+            );
+            idAppRegistro = ins[0].id_app_registro;
+            stats.inseridos++;
+          } catch (e: unknown) {
+            // Race entre workers concorrentes (CONCORRENCIA=6): o mesmo MAC apareceu 2x
+            // na resposta da API (ou duas execuções pegaram o SELECT "não existe" antes
+            // de qualquer INSERT confirmar) e a constraint ux_aplicativos_mac_app barrou
+            // a segunda tentativa. Em vez de derrubar o sync inteiro (ver incidente
+            // 11/07 e reference_unique_telefone_mac), refaz o SELECT — a linha que
+            // "ganhou" a corrida já deve existir agora — e trata como UPDATE.
+            const codigo = (e as { code?: string } | null)?.code;
+            if (codigo !== "23505") throw e;
+            const { rows: retry } = await pool.query<{ id_app_registro: number }>(
+              `SELECT id_app_registro FROM public.aplicativos WHERE UPPER(mac) = UPPER($1) AND id_app = $2 LIMIT 1`,
+              [dev.mac, idApp]
+            );
+            if (!retry.length) throw e; // não era essa a causa afinal — propaga o erro original
+            idAppRegistro = retry[0].id_app_registro;
+            await pool.query(
+              `UPDATE public.aplicativos
+               SET validade = $1, modelo = $2, chave = $3, id_painel_servidor = $4, atualizado_em = NOW(), removido_em = NULL
+               WHERE id_app_registro = $5`,
+              [validade, dev.model ?? null, String(dev.id), idPainel, idAppRegistro]
+            );
+            stats.atualizados++;
+          }
         }
+
+        let playlists: AppAcessoPlaylist[] = [];
+        let playlistsOk = true;
+        try {
+          playlists = await getPlaylistsFn(jwt, dev.id);
+        } catch {
+          playlistsOk = false; // falha na busca — não mexe nas playlists já salvas deste device
+        }
+
+        for (const pl of playlists) {
+          let idConta: number | null = null;
+          const username = pl.url ? extrairUsernameUrl(pl.url) : null;
+          if (username) {
+            const { rows: contaRows } = await pool.query<{ id_conta: number }>(
+              `SELECT id_conta FROM public.contas WHERE usuario = $1 AND removido_em IS NULL LIMIT 1`,
+              [username]
+            );
+            idConta = contaRows[0]?.id_conta ?? null;
+          }
+
+          await pool.query(
+            `INSERT INTO public.aplicativo_playlists
+               (id_app_registro, playlist_id_externo, nome, url, is_selected, expired_date, id_conta, atualizado_em)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+             ON CONFLICT (id_app_registro, playlist_id_externo)
+             DO UPDATE SET
+               nome         = EXCLUDED.nome,
+               url          = EXCLUDED.url,
+               is_selected  = EXCLUDED.is_selected,
+               expired_date = EXCLUDED.expired_date,
+               id_conta     = EXCLUDED.id_conta,
+               atualizado_em = NOW()`,
+            [idAppRegistro, pl.id, pl.name ?? null, pl.url ?? null, pl.is_selected ?? false, pl.expired_date ?? null, idConta]
+          );
+          stats.playlists_sincronizadas++;
+        }
+
+        // Remove localmente as playlists que sumiram do device no painel remoto —
+        // só quando a busca deu certo (playlistsOk), pra uma falha transitória da API
+        // não apagar playlists que continuam existindo de verdade.
+        if (playlistsOk) {
+          const idsAtuais = playlists.map(p => p.id);
+          const { rowCount } = await pool.query(
+            `DELETE FROM public.aplicativo_playlists
+             WHERE id_app_registro = $1
+               AND playlist_id_externo != ALL($2::bigint[])`,
+            [idAppRegistro, idsAtuais]
+          );
+          stats.playlists_removidas += rowCount ?? 0;
+        }
+
+        // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
+        if ((creds.tipo === "coreplayer" || creds.tipo === "smartone") && !existentes[0]?.id_cliente) {
+          const { rows: vinculoRows } = await pool.query<{ id_cliente: number }>(
+            `SELECT id_cliente FROM public.aplicativos
+             WHERE UPPER(mac) = UPPER($1) AND id_cliente IS NOT NULL AND id_app_registro != $2
+             LIMIT 1`,
+            [dev.mac, idAppRegistro]
+          );
+          if (vinculoRows.length === 1) {
+            await pool.query(
+              `UPDATE public.aplicativos SET id_cliente = $1 WHERE id_app_registro = $2`,
+              [vinculoRows[0].id_cliente, idAppRegistro]
+            );
+          }
+        }
+      } catch (e: unknown) {
+        // Isola falha de UM device — nunca deixa um problema pontual (a race acima já
+        // resolvida à parte, MAC malformado, timeout pontual etc.) abortar o job
+        // inteiro via Promise.all e deixar o resto do sync incompleto sem aviso.
+        stats.erros++;
+        console.error(`[sync-aplicativos] falha no device ${dev.mac} (painel ${idPainel}):`, e instanceof Error ? e.message : e);
       }
     });
 
@@ -241,12 +273,17 @@ async function executarSync(idPainel: number, jobId: string) {
       stats.removidos = rowCount ?? 0;
     }
 
+    const avisos = [
+      !syncConfiavel ? "Sync com retorno insuficiente — remoções ignoradas por segurança." : null,
+      stats.erros > 0 ? `${stats.erros} device(s) falharam individualmente e foram pulados — ver logs do servidor.` : null,
+    ].filter(Boolean);
+
     jobs.set(jobId, {
       done: true,
       ok: true,
       total_devices: devices.length,
       stats,
-      aviso: syncConfiavel ? undefined : "Sync com retorno insuficiente — remoções ignoradas por segurança.",
+      aviso: avisos.length > 0 ? avisos.join(" ") : undefined,
     });
   } catch (e: unknown) {
     jobs.set(jobId, { done: true, ok: false, erro: e instanceof Error ? e.message : "Erro ao sincronizar." });
