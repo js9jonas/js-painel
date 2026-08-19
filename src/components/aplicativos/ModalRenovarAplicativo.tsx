@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void;
 }
 
-const FORMAS = ["PIX", "Nubank", "Nu PJ", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
+const FORMAS = ["INTER", "Nubank", "Nu PJ", "Lotérica", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 
 function hojeStr(): string {
   const d = new Date();
@@ -51,7 +51,7 @@ export default function ModalRenovarAplicativo({
   const [novaValidade, setNovaValidade] = useState(() =>
     isPendente ? (validadeAtual?.split("T")[0] ?? "") : calcNovaValidade(validadeAtual)
   );
-  const [forma, setForma] = useState("PIX");
+  const [forma, setForma] = useState("INTER");
   const [valor, setValor] = useState("20");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");

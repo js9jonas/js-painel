@@ -50,7 +50,7 @@ export default function AlertasAppsClient({
   const [modal, setModal] = useState<ModalData | null>(null);
   const [novaValidadeInput, setNovaValidadeInput] = useState("");
   const [modo, setModo] = useState<"pagamento" | "somente">("pagamento");
-  const [forma, setForma] = useState("Pix");
+  const [forma, setForma] = useState("INTER");
   const [valor, setValor] = useState("20");
   const [isPending, startTransition] = useTransition();
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function AlertasAppsClient({
     });
     setNovaValidadeInput(nova);
     setModo("somente");
-    setForma("PIX");
+    setForma("INTER");
     setValor("20");
   }
 
@@ -306,7 +306,7 @@ export default function AlertasAppsClient({
                     onChange={(e) => setForma(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
                   >
-                    <option>PIX</option>
+                    <option>INTER</option>
                     <option>Dinheiro</option>
                     <option>Cartão</option>
                     <option>Transferência</option>

@@ -87,7 +87,7 @@ export async function PUT(
              VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
                      $7, $8, NOW(), $9::bigint)`,
             [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
-             pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes,
+             pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
              tipoPagSoPag, diasRelSoPag, idAssinatura]
           );
         }
@@ -190,7 +190,7 @@ export async function PUT(
            VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
                    $7, $8, NOW(), $9::bigint)`,
           [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
-           pgto.forma ?? "PIX", pgto.valor ?? 0, detalhes,
+           pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
            tipoPagamento, diasRelVencimento, idAssinatura]
         );
       }

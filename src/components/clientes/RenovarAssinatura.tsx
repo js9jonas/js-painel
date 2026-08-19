@@ -21,7 +21,7 @@ type ResultadoConta = {
     novoVencimento?: string | null;
 };
 
-const FORMAS_PGTO = ["PIX", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
+const FORMAS_PGTO = ["INTER", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
 
 function hojeStr(): string {
@@ -155,7 +155,7 @@ export default function RenovarAssinatura({
     const [periodo, setPeriodo] = useState<Periodo>("mensal");
     const [statusFinal, setStatusFinal] = useState<StatusFinal>("ativo");
     const [loading, setLoading] = useState(false);
-    const [forma, setForma] = useState("PIX");
+    const [forma, setForma] = useState("INTER");
     const [valor, setValor] = useState(() => valorDoPeriodo("mensal"));
     const [vencContrato, setVencContrato] = useState(() => calcVencContrato(contasVencida ? null : vencAtual, "mensal"));
     const [vencContas, setVencContas] = useState(() =>

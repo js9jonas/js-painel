@@ -20,7 +20,7 @@ export async function renovarAplicativo({
   novaValidade,
   modo,
   valor = 0,
-  forma = "PIX",
+  forma = "INTER",
   detalhes = "",
 }: RenovarAplicativoParams) {
   const client = await pool.connect();

@@ -36,7 +36,7 @@ export const STATIC_CONTEXT = `
 - Para histórico de movimentação: public.saldo_servidor_historico
 
 **public.pagamentos** — Histórico de pagamentos recebidos
-- forma: 'pix' | 'dinheiro' | 'cartao' | 'transferencia'
+- forma: 'INTER' (Pix recebido via Banco Inter, forma mais comum), 'Dinheiro', 'Nubank', 'Nu PJ', 'Sicredi', 'Caixa', 'Banrisul', 'Lotérica', 'Cortesia', 'Outro' — nomes de banco/conta que efetivamente recebeu, não o método de transferência em si
 - tipo: tipo da transação (renovacao, novo, cortesia, etc.)
 - data_pgto, valor, id_cliente
 - cliente (text): nome do cliente na época (desnormalizado)
