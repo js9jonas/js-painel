@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 
 # OS / editor
 .DS_Store
+
+# Claude Code — overrides pessoais, não compartilhadas com o time
+.claude/settings.local.json
