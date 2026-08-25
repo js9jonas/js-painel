@@ -40,9 +40,23 @@ function agendarFechamentoPorInatividade() {
   }, IDLE_TIMEOUT_MS);
 }
 
+async function limparLockStale() {
+  // Container Docker é derrubado sem o Chrome fechar de forma limpa (Swarm mata o
+  // processo direto num redeploy) — o SingletonLock fica apontando pro hostname do
+  // container ANTERIOR (cada container tem hostname novo), e o Chrome se recusa a
+  // abrir achando que outro processo "em outra máquina" ainda usa o profile. Como o
+  // container é sempre single-instance (nunca dois Chromes de verdade ao mesmo tempo
+  // nesse profile), é seguro remover esses arquivos de lock antes de cada launch.
+  const fs = await import("fs/promises");
+  for (const f of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+    await fs.unlink(`${PROFILE_DIR}/${f}`).catch(() => {});
+  }
+}
+
 async function garantirNavegadorAberto(): Promise<Page> {
   if (context && page && !page.isClosed()) return page;
 
+  await limparLockStale();
   const { chromium } = await import("playwright");
   context = await chromium.launchPersistentContext(PROFILE_DIR, {
     headless: false, // "headful" real (sob Xvfb) — é o que passa na checagem anti-bot
