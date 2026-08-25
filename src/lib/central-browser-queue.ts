@@ -94,9 +94,18 @@ async function salvarDiagnostico(p: Page, tag: string) {
 // ("Confirme que é humano") — confirmado nos dois sentidos em testes reais no
 // mesmo dia, provavelmente por causa de uso repetido do mesmo profile.
 async function tentarClicarCheckboxTurnstile(p: Page) {
-  const frame = p.frameLocator('iframe[src*="challenges.cloudflare.com"], iframe[title*="human" i], iframe[title*="widget" i]').first();
-  const checkbox = frame.locator('input[type="checkbox"], #challenge-stage, body').first();
-  await checkbox.click({ timeout: 3_000 }).catch(() => {});
+  // O checkbox real do Turnstile mora dentro de um iframe da Cloudflare, às vezes
+  // aninhado (iframe dentro de iframe) — tentar acertar a estrutura interna via
+  // frameLocator é frágil. Mais robusto: clicar por coordenada da TELA (page.mouse),
+  // que o navegador propaga corretamente pro iframe visualmente sobreposto naquele
+  // ponto, sem precisar saber a estrutura de DOM interna. O checkbox fica
+  // imediatamente à esquerda do texto "Confirme que é humano" (~25px antes dele),
+  // na mesma altura vertical — visto nos screenshots de diagnóstico reais.
+  const textoHumano = p.getByText(/confirme que é humano/i).first();
+  const box = await textoHumano.boundingBox({ timeout: 3_000 }).catch(() => null);
+  if (box) {
+    await p.mouse.click(box.x - 25, box.y + box.height / 2).catch(() => {});
+  }
 }
 
 async function desbloquearSessao(p: Page, senha: string): Promise<boolean> {
