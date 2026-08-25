@@ -110,26 +110,31 @@ async function freshLogin(usuario: string, senha: string, onSaveSession: SaveSes
 }
 
 async function apiFetch(token: string, path: string, options: RequestInit = {}) {
-  const res = await fetch(`${API_BASE}/${path}`, {
+  // 25/08/2026: trocado de `fetch` global pra `impit.fetch` (mesma lib usada no login).
+  // Confirmado via captura de rede de um clique real em "Renovar por 1 mês" no navegador
+  // (mesmo endpoint, mesmo body `{mounth:1}`) que funciona — a diferença não é header
+  // nem token, é a impressão digital de rede (TLS/HTTP2) da chamada. `fetch` puro do Node
+  // não imita um Chrome de verdade; `impit` sim (é pra isso que ele existe, já usado no
+  // login via CapSolver). A controle.fit passou a exigir isso também em ações de escrita
+  // (ex: /renew), não só no login — daí o 403 "sessao_nao_renderizada" mesmo com token válido.
+  const res = await impit.fetch(`${API_BASE}/${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      // Origin/Referer/User-Agent adicionados em 25/08/2026: sem eles, ações de escrita
-      // (ex: /renew) passaram a ser rejeitadas com 403 "sessao_nao_renderizada" — a API
-      // aparentemente passou a exigir que a chamada pareça vir do painel.fun de verdade,
-      // não só um Bearer token válido. loginViaCapSolver já enviava isso no login; faltava
-      // aqui, usado em todas as chamadas subsequentes (listagem, renew, etc.).
       Origin: "https://painel.fun",
       Referer: "https://painel.fun/",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       ...(options.headers ?? {}),
     },
   });
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(`controle.fit/${path} → ${res.status}: ${msg.substring(0, 200)}`);
+    const err = new Error(`controle.fit/${path} → ${res.status}: ${msg.substring(0, 200)}`);
+    // Expõe o "code" do corpo (quando existe) pra quem chama decidir se vale tentar
+    // de novo com login novo — ver nota em fetchComRetry sobre "sessao_nao_renderizada".
+    try { (err as any).code = JSON.parse(msg)?.code; } catch {}
+    throw err;
   }
   return res.json();
 }
@@ -158,6 +163,13 @@ export function criarCentralAdapter(
     try {
       return await apiFetch(token, path, options);
     } catch (err: any) {
+      // "sessao_nao_renderizada" não é sessão expirada — é a controle.fit rejeitando a
+      // origem da chamada (provável verificação de IP/dispositivo em ações de escrita,
+      // ver docs/memoria/incident_central_sessao_nao_renderizada.md). Gerar login novo via
+      // CapSolver não resolve isso e ainda destrói uma sessão boa que já estava salva —
+      // não fazer retry nesse caso, só propagar o erro original.
+      if (err.code === "sessao_nao_renderizada") throw err;
+
       if (err.message?.includes("401") || err.message?.includes("403")) {
         _sessionPromise = freshLogin(creds.painel_usuario, creds.painel_senha, onSaveSession);
         return apiFetch(await _sessionPromise, path, options);
