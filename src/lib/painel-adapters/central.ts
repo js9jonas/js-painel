@@ -236,7 +236,7 @@ export function criarCentralAdapter(
       }
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
 
-      const resultado = await renovarViaBrowser(usuario);
+      const resultado = await renovarViaBrowser(usuario, creds.painel_senha);
       if (resultado.ok && resultado.novoVencimento) {
         await onSaveContas(usuario, resultado.novoVencimento);
       }

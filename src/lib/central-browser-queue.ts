@@ -20,6 +20,7 @@ const JOB_TIMEOUT_MS = 45 * 1000; // uma renovação não deveria levar mais que
 
 type Job = {
   usuario: string;
+  senha: string;
   resolve: (r: ResultadoRenovacao) => void;
 };
 
@@ -83,25 +84,59 @@ async function salvarDiagnostico(p: Page, tag: string) {
   } catch {}
 }
 
-async function estaLogado(p: Page): Promise<boolean> {
+// A sessão do Chrome não desloga (nunca vai pra /login) mas "tranca" com uma tela
+// de bloqueio (/lock) após um período de inatividade — pede só a senha de novo,
+// não o Turnstile visível: o widget da tela de lock resolve sozinho em modo managed
+// (poucos segundos, "Sucesso!" automático, sem precisar de CapSolver) porque é um
+// Chrome real de verdade. Só preencher a senha e confirmar.
+async function desbloquearSessao(p: Page, senha: string): Promise<boolean> {
+  log("sessão trancada em /lock, desbloqueando com a senha...");
+  const campoSenha = p.locator('input[type="password"], input[placeholder*="Senha" i]').first();
+  await campoSenha.waitFor({ state: "visible", timeout: 10_000 });
+  await campoSenha.fill(senha);
+
+  // Aguarda o Turnstile managed resolver sozinho antes de clicar (o botão pode
+  // ficar habilitado mas a submissão falhar se o token ainda não estiver pronto).
+  await p.waitForTimeout(4_000);
+
+  const botaoDesbloquear = p.getByRole("button", { name: /desbloquear/i });
+  await botaoDesbloquear.click();
+  await p.waitForTimeout(2_000);
+
+  const url = p.url();
+  log("URL após desbloqueio:", url);
+  return !url.includes("/lock") && !url.includes("/login");
+}
+
+async function estaLogado(p: Page, senha: string): Promise<boolean> {
   log("navegando para /users...");
   await p.goto("https://painel.fun/users", { waitUntil: "domcontentloaded", timeout: 20_000 });
   await p.waitForTimeout(1500);
-  const url = p.url();
+  let url = p.url();
   log("URL após navegação:", url);
-  return !url.includes("/login");
+
+  if (url.includes("/lock")) {
+    const desbloqueou = await desbloquearSessao(p, senha);
+    if (!desbloqueou) return false;
+    await p.goto("https://painel.fun/users", { waitUntil: "domcontentloaded", timeout: 20_000 });
+    await p.waitForTimeout(1500);
+    url = p.url();
+    log("URL após desbloqueio + renavegação:", url);
+  }
+
+  return !url.includes("/login") && !url.includes("/lock");
 }
 
-async function executarRenovacao(p: Page, usuario: string): Promise<ResultadoRenovacao> {
+async function executarRenovacao(p: Page, usuario: string, senha: string): Promise<ResultadoRenovacao> {
   log("iniciando renovação de", usuario);
-  if (!(await estaLogado(p))) {
+  if (!(await estaLogado(p, senha))) {
     await salvarDiagnostico(p, "nao-logado");
-    // Login automatizado (preencher formulário + Turnstile) não está implementado —
-    // o profile é bootstrapado já logado (cópia do profile do desktop) e a sessão do
-    // Chrome tende a durar bem mais que a sessão de API (é a mesma técnica usada pelo
-    // central_refresh_token.js, que já roda estável há semanas). Se cair aqui, precisa
-    // de reautenticação manual (abrir esse profile e logar uma vez).
-    return { ok: false, erro: "Profile do Chrome (CENTRAL) não está logado — precisa reautenticação manual do profile persistente." };
+    // Login automatizado completo (preencher usuário+senha do zero + Turnstile) não
+    // está implementado — o profile é bootstrapado já logado (cópia do profile do
+    // desktop) e a sessão do Chrome tende a durar bem mais que a sessão de API. Se
+    // cair aqui mesmo após tentar desbloquear, precisa de reautenticação manual
+    // (abrir esse profile e logar do zero uma vez).
+    return { ok: false, erro: "Profile do Chrome (CENTRAL) não está logado/desbloqueado — precisa reautenticação manual do profile persistente." };
   }
   log("logado com sucesso, buscando campo de busca...");
 
@@ -178,7 +213,7 @@ async function processarFila() {
       try {
         const p = await garantirNavegadorAberto();
         const resultado = await Promise.race([
-          executarRenovacao(p, job.usuario),
+          executarRenovacao(p, job.usuario, job.senha),
           new Promise<ResultadoRenovacao>((resolve) =>
             setTimeout(() => resolve({ ok: false, erro: "Timeout aguardando renovação via navegador." }), JOB_TIMEOUT_MS)
           ),
@@ -196,9 +231,9 @@ async function processarFila() {
   }
 }
 
-export function renovarViaBrowser(usuario: string): Promise<ResultadoRenovacao> {
+export function renovarViaBrowser(usuario: string, senha: string): Promise<ResultadoRenovacao> {
   return new Promise((resolve) => {
-    fila.push({ usuario, resolve });
+    fila.push({ usuario, senha, resolve });
     processarFila();
   });
 }
