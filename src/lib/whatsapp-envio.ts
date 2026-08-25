@@ -3,27 +3,43 @@ import { pool } from '@/lib/db'
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID
 
+/**
+ * Retry único em erro transitório da própria Meta (ex: "(#2) Service temporarily
+ * unavailable", error.is_transient === true) — a API já sinaliza "tente de novo",
+ * então uma segunda tentativa após um pequeno delay costuma resolver sozinha, sem
+ * precisar cair em nenhum fallback. Encontrado em produção 25/08/2026: uma
+ * instabilidade de alguns segundos da Meta derrubou uma notificação de renovação
+ * que tinha janela de 24h ativa (não era falta de conversa, era a Meta fora do ar
+ * por um instante) — ver notificar-renovacao.ts.
+ */
 export async function enviarTextoWhatsapp(telefone: string, texto: string): Promise<string | null> {
-  const response = await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to: telefone,
-      type: 'text',
-      text: { body: texto },
-    }),
-  })
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    const response = await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: telefone,
+        type: 'text',
+        text: { body: texto },
+      }),
+    })
 
-  const data = await response.json()
-  if (!response.ok) {
+    const data = await response.json()
+    if (response.ok) return data.messages?.[0]?.id ?? null
+
     console.error('[WhatsappEnvio] Erro ao enviar texto:', data)
+    const transitorio = data?.error?.is_transient === true
+    if (transitorio && tentativa === 1) {
+      await new Promise((r) => setTimeout(r, 1500))
+      continue
+    }
     return null
   }
-  return data.messages?.[0]?.id ?? null
+  return null
 }
 
 export interface EnvioImagemResultado {

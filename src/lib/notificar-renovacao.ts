@@ -64,15 +64,18 @@ export async function notificarRenovacao(
     [idCliente]
   )
 
+  const haviaJanelaAberta = !!telefoneAtivo.rows[0]
   if (telefoneAtivo.rows[0]) {
     const telefone = telefoneAtivo.rows[0].telefone
     const msgId = await enviarTextoWhatsapp(telefone, texto)
     await registrarMensagemWhatsapp(msgId, telefone, texto, { source: ehNovo ? 'notificacao-boas-vindas' : 'notificacao-renovacao' })
     if (msgId) return { enviado: true, telefone }
-    // Falha no envio direto mesmo com janela aberta — segue pro fallback Telegram como rede de segurança
+    // Falha no envio direto mesmo com janela aberta (já passou pelo retry de erro
+    // transitório em enviarTextoWhatsapp) — segue pro fallback Telegram como rede
+    // de segurança, mas avisando que o motivo foi outro, não falta de conversa.
   }
 
-  return notificarRenovacaoTelegram({ idCliente, nomeCliente: cliente.rows[0].nome, texto, ehNovo })
+  return notificarRenovacaoTelegram({ idCliente, nomeCliente: cliente.rows[0].nome, texto, ehNovo, haviaJanelaAberta })
 }
 
 /**
@@ -85,11 +88,16 @@ async function notificarRenovacaoTelegram({
   nomeCliente,
   texto,
   ehNovo,
+  haviaJanelaAberta,
 }: {
   idCliente: string
   nomeCliente: string | null
   texto: string
   ehNovo: boolean
+  /** true quando a janela de 24h estava aberta mas o envio direto falhou por outro
+   * motivo (ex: instabilidade transitória da Meta) — diferencia do caso "sem
+   * conversa ativa" na mensagem do Telegram, pra não parecer sempre a mesma causa. */
+  haviaJanelaAberta: boolean
 }): Promise<NotificarRenovacaoResultado> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID_JONAS
@@ -127,15 +135,24 @@ async function notificarRenovacaoTelegram({
   const numero = digits.startsWith('55') ? digits : `55${digits}`
   const linkWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(texto).replace(/!/g, '%21')}`
 
+  // Título e motivo dependem da causa real: falta de janela de 24h é diferente de
+  // "tinha janela, mas o envio direto falhou" (ex: instabilidade transitória da
+  // Meta) — achado em produção 25/08/2026, a mensagem genérica anterior sempre
+  // dizia "sem conversa ativa" mesmo quando o motivo era outro.
+  const tituloAcao = ehNovo ? 'Boas-vindas' : 'Renovação'
+  const causa = haviaJanelaAberta
+    ? 'envio direto falhou (provável instabilidade temporária da Meta), mesmo com conversa ativa'
+    : 'sem conversa ativa nas últimas 24h'
+
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: ehNovo
-          ? `🎉 *Boas-vindas sem conversa ativa — ${nomeCliente ?? 'cliente'}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`
-          : `🔰 *Renovação sem conversa ativa — ${nomeCliente ?? 'cliente'}*\n\nClique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
+        text: `${ehNovo ? '🎉' : '🔰'} *${tituloAcao} — ${nomeCliente ?? 'cliente'}*\n\n` +
+          `${haviaJanelaAberta ? '⚠️ Envio direto falhou (provável instabilidade da Meta), não é falta de conversa ativa.' : 'Sem conversa ativa nas últimas 24h.'}\n\n` +
+          `Clique no botão pra abrir o WhatsApp com a mensagem pronta e enviar.`,
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [[{ text: '📲 Abrir no WhatsApp', url: linkWhatsapp }]],
@@ -156,7 +173,7 @@ async function notificarRenovacaoTelegram({
   return {
     enviado: false,
     viaTelegram: true,
-    motivo: 'Sem conversa ativa nas últimas 24h — link enviado ao Telegram para envio manual',
+    motivo: `${causa} — link enviado ao Telegram para envio manual`,
     telefone: telefoneRaw,
   }
 }
