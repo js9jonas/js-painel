@@ -1,0 +1,65 @@
+# Memória do projeto — js-painel
+
+Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
+
+- [incident_central_capsolver_bot_detection](incident_central_capsolver_bot_detection.md) — Card CENTRAL em /conexoes do js-painel dando 'CapSolver falhou: Bot behavior detected, error code:600010' — causa raiz e correção (22/07/202
+- [incident_funplay_url_change](incident_funplay_url_change.md) — Sinistro recorrente — FunPlay altera URLs de playlists para hosts reserverdns*.com durante sync; procedimento completo de detecção e correçã
+- [incident_notificacao_vencimento_falha_burst](incident_notificacao_vencimento_falha_burst.md) — 09/07/2026 — 26% dos templates de vencimento falharam silenciosamente por disparo em burst; painel não mostrava a falha
+- [incident_sync_aplicativos_duplicata_mac](incident_sync_aplicativos_duplicata_mac.md) — Sync de apps (aplicativos) duplicou registro pro mesmo MAC em vez de atualizar — root cause suspeita em 11/07, confirmada e corrigida no cód
+- [incident_central_sessao_nao_renderizada](incident_central_sessao_nao_renderizada.md) — Renovação via API no CENTRAL dava 403 "sessao_nao_renderizada"; causa raiz era fingerprint TLS/HTTP2 do fetch (não sessão/token) — corrigido usando impit.fetch (25/08/2026)
+- [iptv_panel_adapters](iptv_panel_adapters.md) — Estado atual da automação de renovação nos painéis IPTV, estrutura de adapters, endpoints CLUB, e tela de vinculação
+- [project_auto_resposta_suporte_status](project_auto_resposta_suporte_status.md) — auto-resposta-suporte.ts responde aos botões WhatsApp independente do status da assinatura — decisão explícita 05/08/2026
+- [project_agenda_whatsapp](project_agenda_whatsapp.md) — Ideia pendente — agenda de contatos WhatsApp sincronizada via Google People API para busca por nome
+- [project_bsp_tech_provider](project_bsp_tech_provider.md) — Interesse em se tornar BSP/Tech Provider Meta — permite onboarding de clientes B2B sem App Review próprio
+- [project_central_dominio_personalizado](project_central_dominio_personalizado.md) — Processo confirmado ponta a ponta para adicionar um domínio personalizado (comprado no Namecheap) ao painel CENTRAL (painel.fun) — Cloudflar
+- [project_chat_ia_aprendizado_historico](project_chat_ia_aprendizado_historico.md) — 11/08/2026 — ideia (não iniciada): agente de sugestão de mensagem do /chat aprender com histórico real de conversas, não só com sugestões ac
+- [project_chat_page](project_chat_page.md) — Estado atual da página de chat WhatsApp (clientes IPTV): arquitetura, features implementadas, componentes compartilhados e APIs
+- [project_chat_stickers_gifs](project_chat_stickers_gifs.md) — Implementação de stickers e GIFs no chat WhatsApp do js-painel — arquitetura, arquivos, bugs corrigidos e pendências
+- [project_clientes_assinaturas_layout](project_clientes_assinaturas_layout.md) — Redesign do layout de assinaturas em clientes/[id] — cards expandidos para todas as relevantes, inativas recolhidas
+- [project_club_migracao_painel](project_club_migracao_painel.md) — Migração de contas do painel CLUB antigo para um painel CLUB novo (fornecedor trocado) — arquitetura, automação criada e estado do rollout
+- [project_club_token_expiry](project_club_token_expiry.md) — CLUB (pdcapi.io) — auto-relogin implementado em 16/06/2026; bug do falso \"Renovado\" corrigido
+- [project_conexoes_paineis](project_conexoes_paineis.md) — Página \"Conexões\" no js-painel para gerenciar painéis IPTV via API direta — cadastro, cards com status e automações de renovação/criação d
+- [project_cortesia_telegram_notificacao](project_cortesia_telegram_notificacao.md) — Cortesia de indicação notifica via Telegram (botão wa.me) em vez de template Meta não aprovado; bugs de mídia arquivada e timeout corrigidos
+- [project_criar_teste_conta](project_criar_teste_conta.md) — Feature 'Criar teste' no modal + Conta (clientes/[id]) — usa gerarTeste() dos adapters (nunca chamado antes), com correções específicas por 
+- [project_drive_service_account_fix](project_drive_service_account_fix.md) — Causa raiz do invalid_grant no Google Drive do js-painel; leitura fixada com conta de serviço; mídia nova migrada pra armazenamento local na
+- [project_editar_conta_modal](project_editar_conta_modal.md) — Modal de edição de conta em clientes/[id] — implementado 18/06/2026 — campos desabilitados por tipo de painel
+- [project_funplay_licencas_livres](project_funplay_licencas_livres.md) — Relatório periódico de licenças FunPlay livres e inativos — metodologia, critérios e como reproduzir
+- [project_iphone_dados_acesso](project_iphone_dados_acesso.md) — Opção 'Enviar dados para iPhone' no balão de conta — gera screenshot do Smarters Player Lite já preenchida com usuário/senha/URL reais e env
+- [project_iptv_keepalive](project_iptv_keepalive.md) — Script Tampermonkey unificado que mantém sessões de 9 painéis IPTV ativas — todos implementados na v2.5
+- [project_iptv_monitor](project_iptv_monitor.md) — Interesse em construir ferramenta para monitorar listas IPTV e notificar quando streams caem — app local com ffprobe + banco central
+- [project_iptv_panel_types](project_iptv_panel_types.md) — Distinção arquitetural entre painéis de app (MAC) e painéis de servidor (lista M3U) — fundamental para os adapters
+- [project_jspainel_roles](project_jspainel_roles.md) — Usuários do js-painel, roles e páginas que basico acessa mas não deveria (pendente de restrição)
+- [project_label_sync](project_label_sync.md) — Sincronização automática de etiquetas WA por painel IPTV ativo — js-painel, Meta Cloud API, ativo desde 09/06/2026
+- [project_merge_telefones_duplicados](project_merge_telefones_duplicados.md) — 09/07/2026 — levantamento de clientes distintos com mesmo telefone cadastrado, pra futura mesclagem (1 cliente real + assinaturas com campo 
+- [project_meta_app_review](project_meta_app_review.md) — App Review Meta/Facebook para jswhats (ID 1060517628167041) — permissões WhatsApp Business API, status, requisitos e histórico de bloqueio
+- [project_n8n_atualiza_status_assinaturas](project_n8n_atualiza_status_assinaturas.md) — Workflow n8n 'Automações JS' — job diário que ajusta status das assinaturas (ativo/atrasado/vencido/inativo/cancelado); fix de 06/07/2026 pr
+- [project_n8n_comprovante](project_n8n_comprovante.md) — Workflow n8n análise de comprovante WhatsApp — migrado para Meta Cloud API em jun/2026
+- [project_notificacao_renovacao](project_notificacao_renovacao.md) — Notificação WhatsApp ao renovar assinatura (RenovarAssinatura.tsx) — texto livre dentro da janela de 24h, com telas e vencimento
+- [project_notificacao_vencimento_clientes_novos](project_notificacao_vencimento_clientes_novos.md) — Pendência futura: diferenciar clientes novos (sem assinatura ativada) na notificação de vencimento e criar follow-up baseado no horário de c
+- [project_painel_acesso_web](project_painel_acesso_web.md) — Campo url_acesso_web em painel_servidores + opção 'Enviar acesso web' no balão de conta (/clientes/[id] e /chat); limpeza de campos sem uso 
+- [project_painel_notificacao_vencimento](project_painel_notificacao_vencimento.md) — Painel na página de chat (área vazia) com botões \"Notificar vencidos\"/\"Notificar vencem amanhã\", listas com checkbox, substitui script a
+- [project_pix_automatico_inter](project_pix_automatico_inter.md) — Pix Automático (Banco Inter) para renovação recorrente — ❌ removido do projeto js-painel em 22/07/2026 a pedido do Jonas (não só pausado). V
+- [project_player_iptv](project_player_iptv.md) — Página /player do js-painel: arquitetura, bugs corrigidos em mai/2026 e limitações conhecidas
+- [project_proxy_nova_vps](project_proxy_nova_vps.md) — Lembrete para testar necessidade do proxy Webshare após migração para novo servidor VPS
+- [project_renovacao_comprovante](project_renovacao_comprovante.md) — Fluxo de renovação de assinatura disparado por comprovante enviado pelo cliente via WhatsApp
+- [project_template_lembrete_vencimento](project_template_lembrete_vencimento.md) — Template Meta \"lembrete_vencimento\" para avisar clientes que vencem amanhã — parâmetros e status de implementação
+- [project_uniplay_bloqueio_ip](project_uniplay_bloqueio_ip.md) — Bloqueio de IP na API gesapioffice.com contornado com proxy residencial Webshare; 23/07 achado variante — IP do próprio pool rotativo cai no
+- [project_venc_contas_design](project_venc_contas_design.md) — Decisão de design sobre como datas de vencimento do painel devem alimentar o controle de renovações
+- [project_vinculo_assinaturas_paineis](project_vinculo_assinaturas_paineis.md) — Bloqueador para automação dos adapters — vincular contas dos painéis externos às assinaturas do js-painel
+- [project_whatsapp_cloud_strategy](project_whatsapp_cloud_strategy.md) — Estratégia WhatsApp: dois números distintos, CoEx pós-aprovação, Chatwoot para atendimento mobile
+- [project_whatsapp_token_expiry](project_whatsapp_token_expiry.md) — Token WhatsApp Cloud API permanente (System User) gerado em 06/07/2026 — substituiu o temporário de 60 dias
+- [reference_adapters_paineis_iptv](reference_adapters_paineis_iptv.md) — Especificações técnicas detalhadas de cada adapter de painel IPTV no js-painel — autenticação, endpoints, quirks, status de funcionamento e 
+- [reference_auditoria_merge_clientes](reference_auditoria_merge_clientes.md) — Registro de auditoria de operações de merge de clientes duplicados — histórico permanente para eventual reversão ou auditoria
+- [reference_central_add_days](reference_central_add_days.md) — Endpoint CENTRAL para adicionar dias a uma conta — usar em alertas quando vencimento do contrato < 30 dias do novo vencimento
+- [reference_endpoints_paineis_iptv](reference_endpoints_paineis_iptv.md) — Mapeamento completo de endpoints REST de cada painel IPTV — implementados e pendentes — descobertos via inspeção de JS e monitoramento Playw
+- [reference_funplay_licencas_sem_contrato](reference_funplay_licencas_sem_contrato.md) — Query e contexto para listar licenças Fun Play ativas sem contrato IPTV ativo — usada para identificar licenças candidatas a transferência
+- [reference_funplays_api](reference_funplays_api.md) — FunPlays reseller panel — endpoints, auth, estrutura de device e quirks para construção do adapter
+- [reference_funplays_licenca_transferencia](reference_funplays_licenca_transferencia.md) — Regra de transferência de licença FunPlay — só funciona para dispositivos novos sem licença paga anterior
+- [reference_internal_api_keys](reference_internal_api_keys.md) — Chaves internas (não-secretas em valor, mas documentadas) para APIs internas do js-painel acessadas por automações (n8n, scripts)
+- [reference_merge_clientes](reference_merge_clientes.md) — Procedimento e constraints a tratar ao unificar dois id_cliente no banco js (schema public)
+- [reference_query_assinaturas_vencidas](reference_query_assinaturas_vencidas.md) — Padrão de consulta SQL para listar assinaturas vencidas numa data — campos, joins e observações sobre contatos múltiplos
+- [reference_server_ids](reference_server_ids.md) — IDs dos painéis/servidores IPTV nas tabelas do banco js — servidores (conteúdo M3U), painel_servidores (app MAC), aplicativos.id_app
+- [reference_unique_telefone_mac](reference_unique_telefone_mac.md) — 10/08/2026 — constraints unique aplicadas em contatos.telefone (global) e aplicativos.mac (por id_app), pra bloquear duplicatas de cliente/d
+- [reference_venc_contas_trigger](reference_venc_contas_trigger.md) — Distinção venc_contrato vs venc_contas e trigger trg_sync_venc_contas criado em 08/06/2026
+- [schema_planos_pacotes](schema_planos_pacotes.md) — Estrutura definitiva de planos e pacotes do js-painel após migração de 08/06/2026
+- [schema_public_tables](schema_public_tables.md) — Colunas reais das tabelas public.assinaturas, public.clientes, public.pacote e public.pagamentos no banco js
