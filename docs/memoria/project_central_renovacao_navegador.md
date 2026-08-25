@@ -57,6 +57,7 @@ Tags salvas: `nao-logado`, `campo-busca-nao-encontrado`, `linha-nao-encontrada`,
 
 ## Próximos passos (quando retomar)
 
+0. **Aguardando resposta externa (25/08/2026):** Jonas preparou uma mensagem técnica descrevendo o problema (endereço do painel, abordagens já tentadas, bloqueio atual) pra encaminhar a uma equipe técnica parceira, perguntando se conhecem alguma solução/material já validado pra resolver Turnstile interativo em automação legítima. Se vier resposta com técnica nova, aplicar antes de repetir as tentativas já esgotadas abaixo.
 1. Esperar algumas horas (ou até o dia seguinte) antes de testar de novo — deixar o risk score da Cloudflare baixar.
 2. Confirmar se a versão com trajetória de mouse (`fix/central-turnstile-mouse-trajectory`, já no `main`) resolve o checkbox quando ele aparecer de novo, isolado de outras tentativas no mesmo dia.
 3. Se ainda falhar: considerar que resolver um Turnstile interativo de forma 100% confiável via automação pode não ser viável — nesse caso, a rota B do plano original (job+polling já pronto, só troca o "quem executa": deixar como fallback pro Jonas resolver manualmente quando a automação falhar, similar ao padrão já usado no CLUB `renovar-sessao`) é a saída pragmática.
