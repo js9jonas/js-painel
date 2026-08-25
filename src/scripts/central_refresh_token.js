@@ -18,7 +18,7 @@ const { chromium } = require("/home/jonas/.npm/_npx/e41f203b7505f1fb/node_module
 // desktop. Reaproveita o bypass genérico de rota interna do proxy.ts (x-internal-token).
 const APP_URL = process.env.CENTRAL_APP_URL || "https://painel.jssistemas.online";
 const INTERNAL_API_TOKEN =
-  process.env.INTERNAL_API_TOKEN || "aa128938d9c47cc233b647fccf55d69f48f331dbb9b5779d";
+  process.env.INTERNAL_API_TOKEN || "656f9f41f061edfb189b3f8a2c497493b6cca421f0a58cc9";
 
 const USUARIO = "Jonas3468";
 const SENHA = "683468";

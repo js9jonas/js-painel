@@ -116,6 +116,14 @@ async function apiFetch(token: string, path: string, options: RequestInit = {}) 
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Accept: "application/json",
+      // Origin/Referer/User-Agent adicionados em 25/08/2026: sem eles, ações de escrita
+      // (ex: /renew) passaram a ser rejeitadas com 403 "sessao_nao_renderizada" — a API
+      // aparentemente passou a exigir que a chamada pareça vir do painel.fun de verdade,
+      // não só um Bearer token válido. loginViaCapSolver já enviava isso no login; faltava
+      // aqui, usado em todas as chamadas subsequentes (listagem, renew, etc.).
+      Origin: "https://painel.fun",
+      Referer: "https://painel.fun/",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       ...(options.headers ?? {}),
     },
   });
