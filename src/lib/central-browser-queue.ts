@@ -16,7 +16,10 @@ import type { ResultadoRenovacao } from "./painel-adapters/types";
 const PROFILE_DIR = process.env.CENTRAL_CHROME_PROFILE_DIR || "/app/.central-profile";
 const CHROME_PATH = process.env.GOOGLE_CHROME_PATH || "/usr/bin/google-chrome-stable";
 const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // fecha o Chrome após 8min sem jobs
-const JOB_TIMEOUT_MS = 45 * 1000; // uma renovação não deveria levar mais que isso
+// 90s (não 45s): quando a sessão cai em /lock, o desbloqueio já pode levar até
+// ~30s sozinho esperando o Turnstile managed resolver — precisa de folga pra
+// ainda sobrar tempo pra renovação de verdade depois.
+const JOB_TIMEOUT_MS = 90 * 1000;
 
 type Job = {
   usuario: string;
@@ -91,15 +94,36 @@ async function salvarDiagnostico(p: Page, tag: string) {
 // Chrome real de verdade. Só preencher a senha e confirmar.
 async function desbloquearSessao(p: Page, senha: string): Promise<boolean> {
   log("sessão trancada em /lock, desbloqueando com a senha...");
+  await salvarDiagnostico(p, "lock-inicial");
+
   const campoSenha = p.locator('input[type="password"], input[placeholder*="Senha" i]').first();
   await campoSenha.waitFor({ state: "visible", timeout: 10_000 });
   await campoSenha.fill(senha);
+  await salvarDiagnostico(p, "lock-apos-senha");
 
-  // Aguarda o Turnstile managed resolver sozinho antes de clicar (o botão pode
-  // ficar habilitado mas a submissão falhar se o token ainda não estiver pronto).
-  await p.waitForTimeout(4_000);
-
+  // O botão "Desbloquear" só habilita quando o Turnstile managed termina de
+  // resolver — no teste manual isso levou ~3s ("Sucesso!" automático), mas nem
+  // sempre é instantâneo (pode escalar pra um desafio real). Poll até 25s em vez
+  // de um delay fixo, com diagnóstico se ainda estiver travado na metade do tempo.
   const botaoDesbloquear = p.getByRole("button", { name: /desbloquear/i });
+  await botaoDesbloquear.waitFor({ state: "visible", timeout: 10_000 });
+
+  const inicio = Date.now();
+  let habilitado = false;
+  while (Date.now() - inicio < 25_000) {
+    habilitado = await botaoDesbloquear.isEnabled();
+    if (habilitado) break;
+    if (Date.now() - inicio > 12_000 && Date.now() - inicio < 14_000) {
+      await salvarDiagnostico(p, "lock-ainda-travado");
+    }
+    await p.waitForTimeout(1_000);
+  }
+  log("botão Desbloquear habilitado?", habilitado, "após", Date.now() - inicio, "ms");
+  if (!habilitado) {
+    await salvarDiagnostico(p, "lock-turnstile-nunca-resolveu");
+    return false;
+  }
+
   await botaoDesbloquear.click();
   await p.waitForTimeout(2_000);
 
