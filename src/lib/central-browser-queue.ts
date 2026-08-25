@@ -88,10 +88,17 @@ async function salvarDiagnostico(p: Page, tag: string) {
 }
 
 // A sessão do Chrome não desloga (nunca vai pra /login) mas "tranca" com uma tela
-// de bloqueio (/lock) após um período de inatividade — pede só a senha de novo,
-// não o Turnstile visível: o widget da tela de lock resolve sozinho em modo managed
-// (poucos segundos, "Sucesso!" automático, sem precisar de CapSolver) porque é um
-// Chrome real de verdade. Só preencher a senha e confirmar.
+// de bloqueio (/lock) após um período de inatividade — pede a senha de novo +
+// Turnstile. O Turnstile dessa tela varia: às vezes resolve sozinho em modo managed
+// ("Sucesso!" automático em ~3s), às vezes exige clique num checkbox real
+// ("Confirme que é humano") — confirmado nos dois sentidos em testes reais no
+// mesmo dia, provavelmente por causa de uso repetido do mesmo profile.
+async function tentarClicarCheckboxTurnstile(p: Page) {
+  const frame = p.frameLocator('iframe[src*="challenges.cloudflare.com"], iframe[title*="human" i], iframe[title*="widget" i]').first();
+  const checkbox = frame.locator('input[type="checkbox"], #challenge-stage, body').first();
+  await checkbox.click({ timeout: 3_000 }).catch(() => {});
+}
+
 async function desbloquearSessao(p: Page, senha: string): Promise<boolean> {
   log("sessão trancada em /lock, desbloqueando com a senha...");
   await salvarDiagnostico(p, "lock-inicial");
@@ -101,24 +108,30 @@ async function desbloquearSessao(p: Page, senha: string): Promise<boolean> {
   await campoSenha.fill(senha);
   await salvarDiagnostico(p, "lock-apos-senha");
 
-  // O botão "Desbloquear" só habilita quando o Turnstile managed termina de
-  // resolver — no teste manual isso levou ~3s ("Sucesso!" automático), mas nem
-  // sempre é instantâneo (pode escalar pra um desafio real). Poll até 25s em vez
-  // de um delay fixo, com diagnóstico se ainda estiver travado na metade do tempo.
+  // O botão "Desbloquear" só habilita quando o Turnstile termina de resolver.
+  // Poll até 35s, tentando clicar no checkbox do widget a cada volta (não-op se
+  // for o modo managed automático, que não tem checkbox nenhum pra clicar).
   const botaoDesbloquear = p.getByRole("button", { name: /desbloquear/i });
   await botaoDesbloquear.waitFor({ state: "visible", timeout: 10_000 });
 
   const inicio = Date.now();
   let habilitado = false;
-  while (Date.now() - inicio < 25_000) {
+  let tentouCheckbox = false;
+  while (Date.now() - inicio < 35_000) {
     habilitado = await botaoDesbloquear.isEnabled();
     if (habilitado) break;
+    // Só tenta o checkbox depois de ~3s (dar tempo do modo managed resolver sozinho
+    // primeiro, sem atrapalhar clicando à toa num widget que nem precisa de clique).
+    if (Date.now() - inicio > 3_000) {
+      await tentarClicarCheckboxTurnstile(p);
+      tentouCheckbox = true;
+    }
     if (Date.now() - inicio > 12_000 && Date.now() - inicio < 14_000) {
       await salvarDiagnostico(p, "lock-ainda-travado");
     }
-    await p.waitForTimeout(1_000);
+    await p.waitForTimeout(1_500);
   }
-  log("botão Desbloquear habilitado?", habilitado, "após", Date.now() - inicio, "ms");
+  log("botão Desbloquear habilitado?", habilitado, "após", Date.now() - inicio, "ms | tentou clicar checkbox:", tentouCheckbox);
   if (!habilitado) {
     await salvarDiagnostico(p, "lock-turnstile-nunca-resolveu");
     return false;
