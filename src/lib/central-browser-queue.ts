@@ -1,0 +1,148 @@
+// Fila serializada de renovação do CENTRAL via navegador real (Playwright + Chrome
+// real + Xvfb). Existe porque a controle.fit passou a rejeitar POST /users/{id}/renew
+// vindo de fora de um navegador renderizado (403 "sessao_nao_renderizada") — confirmado
+// em 25/08/2026 que não é payload nem sessão expirada nem header faltando: é fingerprint
+// de transporte (TLS/HTTP2) que nenhuma lib HTTP em Node reproduz. API oficial negada
+// pela controle.fit. Ver docs/memoria/incident_central_sessao_nao_renderizada.md.
+//
+// Singleton em memória — ok pra single instance (Easypanel não é serverless, mesmo
+// padrão já usado em renovar-sessao/route.ts). Mantém UM Chrome aberto, reaproveitado
+// entre chamadas (o uso real é em rajada: várias renovações em poucos minutos via
+// /alertas à noite), fechando por inatividade pra liberar memória.
+
+import type { BrowserContext, Page } from "playwright";
+import type { ResultadoRenovacao } from "./painel-adapters/types";
+
+const PROFILE_DIR = process.env.CENTRAL_CHROME_PROFILE_DIR || "/app/.central-profile";
+const CHROME_PATH = process.env.GOOGLE_CHROME_PATH || "/usr/bin/google-chrome-stable";
+const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // fecha o Chrome após 8min sem jobs
+const JOB_TIMEOUT_MS = 45 * 1000; // uma renovação não deveria levar mais que isso
+
+type Job = {
+  usuario: string;
+  resolve: (r: ResultadoRenovacao) => void;
+};
+
+let context: BrowserContext | null = null;
+let page: Page | null = null;
+let idleTimer: NodeJS.Timeout | null = null;
+const fila: Job[] = [];
+let processando = false;
+
+function agendarFechamentoPorInatividade() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(async () => {
+    if (context) {
+      await context.close().catch(() => {});
+      context = null;
+      page = null;
+    }
+  }, IDLE_TIMEOUT_MS);
+}
+
+async function garantirNavegadorAberto(): Promise<Page> {
+  if (context && page && !page.isClosed()) return page;
+
+  const { chromium } = await import("playwright");
+  context = await chromium.launchPersistentContext(PROFILE_DIR, {
+    headless: false, // "headful" real (sob Xvfb) — é o que passa na checagem anti-bot
+    executablePath: CHROME_PATH,
+    args: ["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+    ignoreDefaultArgs: ["--enable-automation"],
+    viewport: { width: 1600, height: 900 },
+  });
+  page = context.pages()[0] ?? (await context.newPage());
+  return page;
+}
+
+async function estaLogado(p: Page): Promise<boolean> {
+  await p.goto("https://painel.fun/users", { waitUntil: "domcontentloaded", timeout: 20_000 });
+  await p.waitForTimeout(1500);
+  return !p.url().includes("/login");
+}
+
+async function executarRenovacao(p: Page, usuario: string): Promise<ResultadoRenovacao> {
+  if (!(await estaLogado(p))) {
+    // Login automatizado (preencher formulário + Turnstile) não está implementado —
+    // o profile é bootstrapado já logado (cópia do profile do desktop) e a sessão do
+    // Chrome tende a durar bem mais que a sessão de API (é a mesma técnica usada pelo
+    // central_refresh_token.js, que já roda estável há semanas). Se cair aqui, precisa
+    // de reautenticação manual (abrir esse profile e logar uma vez).
+    return { ok: false, erro: "Profile do Chrome (CENTRAL) não está logado — precisa reautenticação manual do profile persistente." };
+  }
+
+  // Busca a conta
+  const campoBusca = p.locator('input[placeholder*="Usuário" i], input[placeholder*="Mac" i]').first();
+  await campoBusca.click();
+  await campoBusca.fill("");
+  await campoBusca.fill(usuario);
+  await p.waitForTimeout(1500);
+
+  const linha = p.locator("table tbody tr").filter({ hasText: usuario }).first();
+  const existe = await linha.count();
+  if (!existe) {
+    return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL (via navegador).` };
+  }
+
+  // Intercepta a resposta real do /renew pra extrair o exp_date, igual à técnica
+  // usada na investigação (ver incident_central_sessao_nao_renderizada.md).
+  const respostaPromise = p.waitForResponse(
+    (res) => res.url().includes("/renew") && res.request().method() === "POST",
+    { timeout: JOB_TIMEOUT_MS }
+  );
+
+  const botaoRenovar = linha.getByTitle(/renovar por 1 mês/i).or(linha.locator('button:has-text("Renovar")')).first();
+  await botaoRenovar.click();
+  await p.waitForTimeout(800);
+
+  const botaoConfirmar = p.getByRole("button", { name: /sim, renovar por 1 mês/i });
+  await botaoConfirmar.waitFor({ timeout: 8_000 });
+  await botaoConfirmar.click();
+
+  const resposta = await respostaPromise;
+  const body = await resposta.json().catch(() => null);
+
+  // Fecha o modal de sucesso pra deixar a página pronta pro próximo job da fila
+  const botaoFechar = p.getByRole("button", { name: /fechar/i });
+  await botaoFechar.click({ timeout: 5_000 }).catch(() => {});
+
+  if (!resposta.ok() || !body?.exp_date) {
+    return { ok: false, erro: `Renovação via navegador falhou (HTTP ${resposta.status()}).` };
+  }
+
+  const novoVenc = new Date(Number(body.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  return { ok: true, novoVencimento: novoVenc };
+}
+
+async function processarFila() {
+  if (processando) return;
+  processando = true;
+  try {
+    while (fila.length > 0) {
+      if (idleTimer) clearTimeout(idleTimer);
+      const job = fila.shift()!;
+      try {
+        const p = await garantirNavegadorAberto();
+        const resultado = await Promise.race([
+          executarRenovacao(p, job.usuario),
+          new Promise<ResultadoRenovacao>((resolve) =>
+            setTimeout(() => resolve({ ok: false, erro: "Timeout aguardando renovação via navegador." }), JOB_TIMEOUT_MS)
+          ),
+        ]);
+        job.resolve(resultado);
+      } catch (err: unknown) {
+        job.resolve({ ok: false, erro: err instanceof Error ? err.message : "Erro na automação de navegador." });
+      }
+    }
+  } finally {
+    processando = false;
+    agendarFechamentoPorInatividade();
+  }
+}
+
+export function renovarViaBrowser(usuario: string): Promise<ResultadoRenovacao> {
+  return new Promise((resolve) => {
+    fila.push({ usuario, resolve });
+    processarFila();
+  });
+}

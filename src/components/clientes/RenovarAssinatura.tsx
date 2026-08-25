@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { renovarComPolling } from "@/lib/renovar-polling";
 
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 type StatusFinal = "ativo" | "pendente";
@@ -80,22 +81,20 @@ function formatarErroSalvar(endpoint: string, status: number, jsonOk: boolean, j
 async function renovarContasViaAPI(contas: ContaVinculada[]): Promise<ResultadoConta[]> {
     return Promise.all(
         contas.map(async (c) => {
+            if (c.id_painel_servidor === null) {
+                return { usuario: c.usuario, nome_painel: c.nome_painel, ok: false, mensagem: "Conta sem painel configurado." };
+            }
             try {
-                const res = await fetch(`/api/paineis/servidores/${c.id_painel_servidor}/renovar`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ usuario: c.usuario }),
-                });
-                const json = await res.json();
-                if (!res.ok || json.erro) {
-                    return { usuario: c.usuario, nome_painel: c.nome_painel, ok: false, mensagem: json.erro ?? "Erro ao renovar." };
+                const resultado = await renovarComPolling(c.id_painel_servidor, c.usuario);
+                if (!resultado.ok) {
+                    return { usuario: c.usuario, nome_painel: c.nome_painel, ok: false, mensagem: resultado.erro ?? "Erro ao renovar." };
                 }
                 return {
                     usuario: c.usuario,
                     nome_painel: c.nome_painel,
                     ok: true,
-                    mensagem: json.mensagem ?? "Renovado!",
-                    novoVencimento: json.novoVencimento ?? null,
+                    mensagem: resultado.mensagem ?? "Renovado!",
+                    novoVencimento: resultado.novoVencimento ?? null,
                 };
             } catch {
                 return { usuario: c.usuario, nome_painel: c.nome_painel, ok: false, mensagem: "Erro de rede." };

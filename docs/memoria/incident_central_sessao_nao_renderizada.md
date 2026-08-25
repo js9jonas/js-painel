@@ -38,3 +38,15 @@ A diferença real: `loginViaCapSolver` usa a lib **`impit`** (`browser: "chrome"
 Quando **login funciona mas uma ação de escrita específica é rejeitada com uma mensagem tipo "só pode ser feito pelo painel/navegador"**, considerar fingerprint de rede (TLS/HTTP2, bot management tipo Cloudflare) antes de token/sessão/headers — e a forma mais rápida de confirmar é **capturar o tráfego de um clique real na UI** (Playwright reaproveitando um profile já autenticado) e comparar byte a byte com o que o adapter envia. Se o request for idêntico e mesmo assim só o real funciona, o suspeito é a camada de transporte (TLS/HTTP2 client), não a aplicação.
 
 **Como reproduzir a captura, se precisar de novo:** abrir `chromium.launchPersistentContext("/home/jonas/.config/playwright-profile", {headless:false, executablePath:"/usr/bin/google-chrome-stable", ...})` via `xvfb-run`, registrar listeners `page.on("request"/"response")` filtrando a URL da API, navegar/clicar manualmente na ação suspeita, salvar os requests capturados. Tirar cuidado: qualquer ação real clicada tem efeito real (a renovação de teste de fato estendeu o vencimento do `marcsfl`).
+
+## ⚠️ Reincidência (25/08/2026) — `impit.fetch` não resolve mais; causa não é payload
+
+O erro voltou a acontecer em produção (`/alertas` → renovar `vanessaqd`, id `227277962`) mesmo com `apiFetch` já usando `impit.fetch` (fix acima, já deployado). Investigação nova, com sessão **recém-gerada** (login fresco via CapSolver, elimina hipótese de token expirado):
+
+1. `POST /renew` com `{"mounth":1}` via `impit.fetch` (Node, backend) → **403 sessao_nao_renderizada**.
+2. Mesmo `POST /renew` com `{"mounth":1,"plan_id":130608,"amount":35}` (payload idêntico ao que a UI manda, plan_id do plano "Mensal" do módulo financeiro lançado hoje) via `impit.fetch` → **403 sessao_nao_renderizada** — descarta de vez a hipótese de `plan_id`/`amount` faltando.
+3. Clique real no botão "Renovar por 1 mês" da UI, mesmíssima conta, poucos segundos depois → **200, sucesso**.
+
+**Conclusão:** `impit` (fingerprint TLS/HTTP2 de Chrome) não é mais suficiente — a controle.fit endureceu a proteção anti-bot na rota `/renew` além do que a impressão digital de transporte cobre (plausivelmente Cloudflare Bot Management com verificação adicional tipo `cf_clearance`/challenge JS executado, que só um browser real com engine JS completa resolve; coincide de novo com o módulo financeiro lançado hoje 03:14 UTC). Retry automático continua correto em não tentar de novo nesse código de erro (não é sessão expirada).
+
+**Implicação:** renovação via API para o CENTRAL não é mais confiável enquanto essa proteção estiver ativa — precisa ou (a) automação de browser real (Playwright headful com profile persistente logado, custo de infra/latência maior) ou (b) continuar renovando manualmente pelo painel quando a rota `/alertas` falhar com esse código. Não implementado ainda — decisão de arquitetura pendente com o Jonas.

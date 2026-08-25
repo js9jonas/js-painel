@@ -1,5 +1,6 @@
 import { Impit } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { renovarViaBrowser } from "../central-browser-queue";
 
 // API base: https://api.controle.fit/api
 // Auth: JWT Bearer, expira em 1h
@@ -215,6 +216,14 @@ export function criarCentralAdapter(
     },
 
     async renovar(usuario: string, _meses = 1): Promise<ResultadoRenovacao> {
+      // 25/08/2026: POST /renew via API (mesmo com token válido, fingerprint via impit,
+      // com ou sem plan_id/amount) passou a ser rejeitado com 403 "sessao_nao_renderizada" —
+      // confirmado com testes reais que não é payload nem sessão expirada, é fingerprint de
+      // transporte que só um Chrome de verdade produz. API oficial negada pela controle.fit.
+      // Ver docs/memoria/incident_central_sessao_nao_renderizada.md.
+      //
+      // Ainda vale checar a existência da conta via API primeiro (rápido, sem custo de
+      // navegador) — falha rápido com mensagem clara antes de abrir o Chrome à toa.
       let page = 1;
       const per = 100;
       let conta: any = null;
@@ -227,23 +236,11 @@ export function criarCentralAdapter(
       }
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
 
-      // mounth (typo intencional do servidor)
-      // 25/08/2026: removida a chamada extra a set-expiry-time — a controle.fit passou a
-      // cravar o vencimento em 23:59 direto na resposta do /renew (confirmado via captura de
-      // rede de um clique real em "Renovar por 1 mês": só o /renew disparou, sem segunda
-      // chamada, e o vencimento já veio certo). A chamada extra ficou redundante e é a
-      // suspeita mais provável para o erro de renew relatado no js-painel.
-      const renewed = await fetchComRetry(`users/${conta.id}/renew`, {
-        method: "POST",
-        body: JSON.stringify({ mounth: 1 }),
-      });
-      const expTs = renewed?.exp_date;
-
-      const novoVenc = expTs
-        ? new Date(Number(expTs) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
-        : undefined;
-      if (novoVenc) await onSaveContas(usuario, novoVenc);
-      return { ok: true, novoVencimento: novoVenc };
+      const resultado = await renovarViaBrowser(usuario);
+      if (resultado.ok && resultado.novoVencimento) {
+        await onSaveContas(usuario, resultado.novoVencimento);
+      }
+      return resultado;
     },
 
     async editarConta(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
