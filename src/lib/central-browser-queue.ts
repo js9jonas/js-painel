@@ -104,7 +104,17 @@ async function tentarClicarCheckboxTurnstile(p: Page) {
   const textoHumano = p.getByText(/confirme que é humano/i).first();
   const box = await textoHumano.boundingBox({ timeout: 3_000 }).catch(() => null);
   if (box) {
-    await p.mouse.click(box.x - 25, box.y + box.height / 2).catch(() => {});
+    const x = box.x - 25;
+    const y = box.y + box.height / 2;
+    // Clique direto (sem trajetória) tem cara de bot pro próprio Cloudflare — o
+    // Turnstile é desenhado pra reconhecer isso. Move o mouse em passos a partir de
+    // um ponto distante antes de descer o botão, mais parecido com movimento humano.
+    await p.mouse.move(x - 200, y - 100, { steps: 1 }).catch(() => {});
+    await p.mouse.move(x, y, { steps: 20 }).catch(() => {});
+    await p.waitForTimeout(150);
+    await p.mouse.down().catch(() => {});
+    await p.waitForTimeout(80);
+    await p.mouse.up().catch(() => {});
   }
 }
 
