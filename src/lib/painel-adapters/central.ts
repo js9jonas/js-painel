@@ -117,6 +117,10 @@ async function apiFetch(token: string, path: string, options: RequestInit = {}) 
   // não imita um Chrome de verdade; `impit` sim (é pra isso que ele existe, já usado no
   // login via CapSolver). A controle.fit passou a exigir isso também em ações de escrita
   // (ex: /renew), não só no login — daí o 403 "sessao_nao_renderizada" mesmo com token válido.
+  // impit tem seu próprio tipo de opções (method restrito a HttpMethod, body sem
+  // aceitar null, etc.), incompatível ponto a ponto com o `RequestInit` padrão do
+  // apiFetch — cast pro `any` aqui só pra satisfazer o TS, sem mudar nada em runtime
+  // (a lib aceita as mesmas opções de sempre: method string, headers, body string).
   const res = await impit.fetch(`${API_BASE}/${path}`, {
     ...options,
     headers: {
@@ -127,7 +131,7 @@ async function apiFetch(token: string, path: string, options: RequestInit = {}) 
       Referer: "https://painel.fun/",
       ...(options.headers ?? {}),
     },
-  });
+  } as any);
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
     const err = new Error(`controle.fit/${path} → ${res.status}: ${msg.substring(0, 200)}`);
