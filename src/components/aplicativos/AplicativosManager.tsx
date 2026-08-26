@@ -38,6 +38,20 @@ function formatDate(d: string | null) {
   return d.split("T")[0].split("-").reverse().join("/");
 }
 
+// Data + hora (fuso de Cuiabá/SP) pro tooltip de "quando foi removido" — mais preciso
+// que só a data, já que a remoção normalmente acontece durante um sync pontual.
+function formatDataHora(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // Compara só a data (YYYY-MM-DD), não o timestamp — comparar com `new Date()` direto
 // marca o dia de hoje como vencido a qualquer hora após meia-noite UTC.
 function hojeStr(): string {
@@ -310,7 +324,9 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
   // a um painel — só usa sessão já em cache (sem forçar relogin síncrono, que pode
   // travar a página por até ~2min em painéis com captcha). Ver feedback_avaliacao_playlist_live.
   useEffect(() => {
-    const candidatos = aplicativos.filter((a) => a.id_painel_servidor && a.chave);
+    // Apps já removidos remotamente não existem mais do lado do painel — buscar playlist
+    // ao vivo pra eles só geraria erro/timeout sem necessidade.
+    const candidatos = aplicativos.filter((a) => a.id_painel_servidor && a.chave && !a.removido_em);
     candidatos.forEach((a) => recarregarPlaylistsAoVivo(a.id_app_registro));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idCliente]);
@@ -345,6 +361,8 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
     });
   }
 
+  const removidosCount = aplicativos.filter((a) => a.removido_em).length;
+
   return (
     <div className="rounded-2xl border bg-white overflow-hidden">
       <div className="px-4 py-3 border-b bg-zinc-50 flex items-center justify-between">
@@ -352,6 +370,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
           <span className="text-sm font-medium text-zinc-700">📱 Aplicativos</span>
           <span className="ml-2 text-xs text-zinc-400">
             {aplicativos.length} registro{aplicativos.length !== 1 ? "s" : ""}
+            {removidosCount > 0 && ` (${removidosCount} removido${removidosCount !== 1 ? "s" : ""})`}
           </span>
         </div>
         <button
@@ -396,12 +415,20 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                   { vinculada: 0, expirada: 0, nao_reconhecida: 0 }
                 );
 
+                const removido = !!a.removido_em;
+
                 return (
                   <Fragment key={a.id_app_registro}>
-                    <tr className="hover:bg-zinc-50/50 transition-colors">
+                    <tr
+                      className={`transition-colors ${
+                        removido
+                          ? "bg-zinc-50/60 italic text-zinc-400"
+                          : "hover:bg-zinc-50/50"
+                      }`}
+                    >
                       {/* App */}
                       <td className="px-4 py-3">
-                        <div className="font-medium text-zinc-900 flex items-center gap-1.5">
+                        <div className={`font-medium flex items-center gap-1.5 ${removido ? "" : "text-zinc-900"}`}>
                           {a.nome_app ?? (a.id_app ? `App #${a.id_app}` : "App sem tipo")}
                           {atualizadoAoVivo.has(a.id_app_registro) && (
                             <span
@@ -409,9 +436,17 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                               className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"
                             />
                           )}
+                          {removido && (
+                            <span
+                              title={`Removido do painel remoto em ${formatDataHora(a.removido_em)} — o device não apareceu mais na sincronização com ${a.nome_app ?? "o painel"}. Fica visível aqui como histórico, mas não existe mais do lado do provedor.`}
+                              className="not-italic inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-500 cursor-help shrink-0"
+                            >
+                              🚫 Removido
+                            </span>
+                          )}
                         </div>
                         {a.exige_licenca && (
-                          <div className="text-xs text-amber-600 mt-0.5">🔑 Exige licença</div>
+                          <div className="text-xs text-amber-600 mt-0.5 not-italic">🔑 Exige licença</div>
                         )}
                       </td>
 
@@ -463,7 +498,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           ) : (
                             <span className="text-zinc-300 text-xs">—</span>
                           )}
-                          {a.id_painel_servidor && a.chave && (
+                          {a.id_painel_servidor && a.chave && !removido && (
                             <button
                               type="button"
                               onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: a.tipo_painel })}
@@ -484,26 +519,31 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                       </td>
 
                       {/* Ações */}
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 not-italic">
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setModalApp(a)}
-                            className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
-                          >
-                            ✏️ Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setAppPgto(a)}
-                            className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
-                          >
-                            ⚙️ Gerenciar
-                          </button>
+                          {!removido && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setModalApp(a)}
+                                className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAppPgto(a)}
+                                className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                              >
+                                ⚙️ Gerenciar
+                              </button>
+                            </>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDelete(a.id_app_registro)}
                             disabled={isPending && deletingId === a.id_app_registro}
+                            title={removido ? "Excluir permanentemente este registro histórico" : undefined}
                             className="h-8 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
                           >
                             🗑

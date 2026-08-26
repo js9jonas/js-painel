@@ -47,13 +47,17 @@ export default async function ClienteDetalhePage({ params }: Props) {
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId).trim();
 
-  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, apps, indicacoesStats, parceiro, auditLog, contasPainel, paineisList] = await Promise.all([
+  const [cliente, assinaturas, todosPagamentos, planos, pacotes, aplicativos, aplicativosTodos, apps, indicacoesStats, parceiro, auditLog, contasPainel, paineisList] = await Promise.all([
     getClienteById(id),
     getAssinaturasByClienteId(id),
     getPagamentosByClienteId(id, 999),
     getPlanos(),
     getPacotes(),
     getAplicativosByClienteId(id),
+    // Versão com removidos só pra exibição no AplicativosManager (histórico) — a lógica de
+    // negócio acima (appsPorConta, podeExcluirPorAssinatura) usa a lista só-ativos `aplicativos`,
+    // senão um app já removido remotamente continuaria "bloqueando" a exclusão da assinatura.
+    getAplicativosByClienteId(id, { incluirRemovidos: true }),
     getApps(),
     getIndicacoesStatsByParceiroId(id),
     getParceiroByIndicadoId(id),
@@ -237,7 +241,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
         <AplicativosManager
           idCliente={id}
           nomeCliente={cliente?.nome ?? ""}
-          aplicativos={aplicativos}
+          aplicativos={aplicativosTodos}
           apps={apps}
         />
 
