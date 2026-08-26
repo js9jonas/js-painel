@@ -54,6 +54,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [reference_auditoria_merge_clientes](reference_auditoria_merge_clientes.md) — Registro de auditoria de operações de merge de clientes duplicados — histórico permanente para eventual reversão ou auditoria
 - [reference_central_add_days](reference_central_add_days.md) — Endpoint CENTRAL para adicionar dias a uma conta — usar em alertas quando vencimento do contrato < 30 dias do novo vencimento
 - [reference_endpoints_paineis_iptv](reference_endpoints_paineis_iptv.md) — Mapeamento completo de endpoints REST de cada painel IPTV — implementados e pendentes — descobertos via inspeção de JS e monitoramento Playw
+- [reference_env_local_crlf](reference_env_local_crlf.md) — `.env.local` tem linhas com CRLF (`\r`) — sanitizar com `tr -d '\r\n'` ao ler valores via shell (grep/cut), senão scripts externos (ex: mintar cookie NextAuth) quebram silenciosamente
 - [reference_funplay_licencas_sem_contrato](reference_funplay_licencas_sem_contrato.md) — Query e contexto para listar licenças Fun Play ativas sem contrato IPTV ativo — usada para identificar licenças candidatas a transferência
 - [reference_funplays_api](reference_funplays_api.md) — FunPlays reseller panel — endpoints, auth, estrutura de device e quirks para construção do adapter
 - [reference_funplays_licenca_transferencia](reference_funplays_licenca_transferencia.md) — Regra de transferência de licença FunPlay — só funciona para dispositivos novos sem licença paga anterior

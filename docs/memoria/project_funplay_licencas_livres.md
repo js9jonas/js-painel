@@ -16,7 +16,7 @@ Relatório executado periodicamente para identificar oportunidades de reuso de l
 
 **Esclarecimento do uso real (27/07/2026):** o que Jonas reaproveita é o **device físico já ativado** (o aparelho/app do cliente que não renovou), reconfigurando-o (playlist/M3U) para um cliente diferente que **já tem assinatura ativa** — não é uma "transferência de licença" dentro da plataforma FunPlay (isso [[reference-funplays-licenca-transferencia]] confirma que não é possível entre devices já pagos). É reuso físico do hardware/MAC já licenciado, evitando o custo de 1 crédito de ativação nova. Por isso a lista precisa cruzar "device com licença válida parada" × "cliente pagante que precisa de app".
 
-**How to apply:** Rodar o script quando o Jonas pedir "lista atualizada FunPlay" ou "licenças livres". Entregar só via chat/artifact — **não gerar CSV em disco** (ver [[feedback_sem_csv_redundante]], pedido 21/08/2026).
+**How to apply:** Rodar o script quando o Jonas pedir "lista atualizada FunPlay", "licenças livres", "fun plays disponíveis pra usar a licença" ou o equivalente pedindo SmartOne. Entregar só via chat/artifact — **não gerar CSV em disco** (ver [[feedback_sem_csv_redundante]], pedido 21/08/2026).
 
 ## Critérios
 
@@ -129,5 +129,15 @@ Entreguei como artifact (mesmo formato de 18/08: stat tiles de urgência no topo
 **Mesmo dia, na sequência, Jonas pediu SmartOne também** (`id_app=4`, mesma query trocando o app). Resultado: **37 "prontas"** (0 críticas ≤7d, 1 atenção 8-30d, 36 OK >30d). Confirmado de novo o problema já visto em 13/08: **14 devices** com `status='ativa'` + cliente sem assinatura ativa mas `validade` NULL — ficam fora da lista "pronta" por falta de dado confiável, sinalizados à parte no artifact (callout) em vez de simplesmente omitidos sem explicação. Artifact — https://claude.ai/code/artifact/6f7ac632-9d8f-472f-b8f5-7446a8509b8d. CSV em `/home/jonas/smartone_lista_20260821.csv`.
 
 ⚠️ **Nota sobre o túnel:** na sequência do pedido do FunPlays, o túnel SSH (`dbtunnel`) já estava "zumbi" (porta escutando no `ss`, mas query pendurou até timeout) — precisou matar o processo `ssh` antigo e abrir de novo antes da query do SmartOne funcionar. Reforça [[feedback_acesso_banco]]: nunca confiar só em `ss -ltnp`, sempre validar com uma query real primeiro.
+
+## Resultados em 2026-08-26 — pedido "lista dos fun plays disponíveis pra usar a licença"
+
+Jonas usou uma frase nova ("fun plays disponíveis pra usar a licença") para pedir o mesmo relatório — não reconheci de imediato e perguntei contexto antes de encontrar este arquivo via grep no repo. Apliquei direto o critério "prontos" pra FunPlays: **99 devices** (status='ativa' + validade≥hoje + cliente sem assinatura ativa). Distribuição: 2 críticas (≤7d: Bruna Gabriely Sell 2d, Kawan Cristian Maia da Silva 5d), 3 atenção (8–30d), 94 OK.
+
+Entregue como artifact — https://claude.ai/code/artifact/f0965825-56f8-4da6-84f8-c06876ddca2d. Sem CSV, conforme [[feedback_sem_csv_redundante]].
+
+**Mesmo dia, na sequência, Jonas pediu "execute de novo pra atualizar a lista"** — reexecutei a mesma query e republiquei no mesmo link (atualizar in-place, não criar artifact novo). Resultado: **96 devices** (3 a menos: Laura Posselt Kretschmer MAC `20:15:de:06:8a:e4`, Leonardo Lopes MAC `65:19:fb:14:e9:a5`, Lunara Graziela MAC `AC:5A:F0:30:FD:FC` saíram da lista, nenhum novo entrou). Confirma que "execute de novo"/"atualizar" nesse contexto significa: reabrir túnel, rodar a mesma query, e republicar no artifact existente (não criar um novo link).
+
+**Na sequência, Jonas pediu "agora quero pra smartone"** — mesma query trocando `id_app` pra 4, critério "prontos" idêntico. Resultado: **42 devices** (0 críticas ≤7d, 4 atenção 8-30d, 38 OK), + **18 excluídos** por `validade` NULL (mesmo problema documentado em 13/08 e 21/08 — SmartOne às vezes não grava esse campo, diferente do FunPlay). Artifact separado (link próprio, não reaproveita o do FunPlay) — https://claude.ai/code/artifact/0b7f7f4c-3ef6-42f8-95c9-f54854f62372, com callout explicando os 18 excluídos em vez de omiti-los silenciosamente.
 
 Ver também: [[reference-funplay-licencas-sem-contrato]], [[reference-funplays-api]], [[reference-funplays-licenca-transferencia]]
