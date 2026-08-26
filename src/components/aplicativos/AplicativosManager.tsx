@@ -521,23 +521,22 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                       {/* Ações */}
                       <td className="px-4 py-3 not-italic">
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setModalApp(a)}
+                            title={removido ? "Editar os campos locais deste registro histórico" : undefined}
+                            className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
+                          >
+                            ✏️ Editar
+                          </button>
                           {!removido && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setModalApp(a)}
-                                className="h-8 rounded-lg border border-zinc-300 bg-white px-3 text-xs font-medium hover:bg-zinc-50 transition-colors"
-                              >
-                                ✏️ Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setAppPgto(a)}
-                                className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
-                              >
-                                ⚙️ Gerenciar
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              onClick={() => setAppPgto(a)}
+                              className="h-8 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                            >
+                              ⚙️ Gerenciar
+                            </button>
                           )}
                           <button
                             type="button"
