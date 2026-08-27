@@ -1,11 +1,25 @@
 ---
 name: project-central-renovacao-navegador
-description: "Automação de renovação do CENTRAL via navegador real (Playwright+Chrome+Xvfb) rodando na VPS — infra pronta e deployada, mas travada num desafio interativo do Turnstile na tela de bloqueio de sessão (25/08/2026)"
+description: "Automação de renovação do CENTRAL via navegador real (Playwright+Chrome+Xvfb) na VPS — ABANDONADA e revertida em 27/08/2026 após 0/4 sucessos reais em produção contra o Turnstile interativo; CENTRAL voltou a não ter renovação automática confiável"
 metadata:
   node_type: memory
   type: project
-  modified: 2026-08-25T16:40:00.000Z
+  modified: 2026-08-27T13:30:00.000Z
 ---
+
+## ⛔ Resultado final: abandonado e revertido (27/08/2026)
+
+Depois de pausado em 25/08 pra "deixar o profile esfriar", a fila continuou ativa em produção (o botão de renovar no painel não foi desligado) e processou **4 tentativas reais** em 27/08 (`philipbar` 10:37, `philipp` 10:38, `vitorolv` 11:48, `fagrosa` 12:54) — **0/4 sucessos**, todas travadas no mesmo checkbox interativo do Turnstile (`botão Desbloquear habilitado? false após ~39s`), mesmo com o fix de trajetória de mouse (`8d93ca6`) já deployado. Como as tentativas tinham >1h de intervalo entre si, isso também derruba a hipótese de "risk score por volume" do parágrafo abaixo — o bloqueio parece consistente, não intermitente. Jonas renovou os 4 clientes manualmente ao perceber a falha.
+
+**Decisão do Jonas:** reverter a implementação (commit `ddefcaf`, reverte a série `8707620..8d93ca6`) — não vale manter Chrome+Xvfb rodando 24/7 na VPS pra uma automação que não resolve. O CENTRAL voltou a renovar via `POST /renew` puro (`impit`), que falha rápido com `403 sessao_nao_renderizada` em vez de gastar ~40s de Chrome por tentativa sem sucesso.
+
+**Pergunta respondida: por que não reusar o padrão `renovar-sessao` do CLUB pra resolver isso?** Porque não é o mesmo tipo de problema. `renovar-sessao/route.ts` do CLUB (`loginClub`) é só um HTTP POST puro pra reautenticar — funciona porque a API do CLUB não faz fingerprint de transporte, só valida usuário/senha. Já a causa raiz do CENTRAL (documentada em [incident_central_sessao_nao_renderizada](incident_central_sessao_nao_renderizada.md)) é a controle.fit bloqueando no nível de handshake TLS/HTTP2 + challenge JS (Cloudflare Bot Management) qualquer cliente que não seja um navegador real renderizando a página — **nenhuma chamada HTTP pura, por melhor que seja o fingerprint (já tentamos `impit` imitando Chrome), passa por isso**. Copiar a estrutura de job+polling do CLUB não muda esse fato; só o navegador real resolvia, e é exatamente esse navegador real que está travado no Turnstile. A única forma de "usar o padrão do CLUB" que funcionaria seria trocar quem executa a ação de automático pra manual (Jonas clicando), o que era a "rota B" cogitada abaixo — não uma correção técnica automática.
+
+**Se for retomar no futuro:** o caminho realista não é mais tentar vencer o Turnstile via automação (já esgotamos as abordagens óbvias de clique/trajetória). É assumir que CENTRAL não tem renovação automática viável enquanto essa proteção estiver ativa, e ou (a) manter renovação 100% manual pelo painel quando `/alertas` falhar com `sessao_nao_renderizada`, ou (b) revisitar se a controle.fit mudou de postura / abre API oficial no futuro.
+
+---
+
+## Histórico (contexto de quando a automação foi tentada, 24-25/08/2026)
 
 ## Contexto
 
