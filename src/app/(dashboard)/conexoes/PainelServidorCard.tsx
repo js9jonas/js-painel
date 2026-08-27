@@ -52,9 +52,26 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
     (painel.tem_session &&
       (!painel.session_expiry || new Date(painel.session_expiry) > new Date()));
 
+  // Status ao vivo (créditos/contagens) só era buscado uma vez ao montar o card — se a aba
+  // ficasse aberta, o número ficava parado até um clique manual em "Atualizar status" ou reload
+  // da página. Agora também refaz a cada 10min (mesma cadência do keepalive de sessão CLUB) e ao
+  // voltar o foco na aba (visibilitychange) — cobre tanto quem deixa a página aberta o dia todo
+  // quanto quem só dá uma olhada de vez em quando.
   useEffect(() => {
     if (!podeBuscarStatus) return;
     buscarStatus();
+
+    const REFRESH_MS = 10 * 60 * 1000;
+    const intervalId = setInterval(buscarStatus, REFRESH_MS);
+    function aoVoltarFoco() {
+      if (document.visibilityState === "visible") buscarStatus();
+    }
+    document.addEventListener("visibilitychange", aoVoltarFoco);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", aoVoltarFoco);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [painel.id]);
 

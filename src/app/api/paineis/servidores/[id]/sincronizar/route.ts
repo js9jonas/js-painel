@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getAdapterPainel } from "@/lib/painel-adapters";
+import { reconciliarSaldoServidor } from "@/lib/saldoServidor";
 
 export async function POST(
   _req: NextRequest,
@@ -103,44 +104,10 @@ export async function POST(
   let saldoAtualizado = false;
   try {
     const idServidorSaldo = painelMeta[0]?.id_servidor ?? null;
-
-    if (idServidorSaldo !== null) {
-      const idServidor = idServidorSaldo;
-      const creditos = adapter.getCreditos ? await adapter.getCreditos() : null;
-      if (creditos !== null) {
-        const creditosInt = Math.round(creditos);
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
-          await client.query(
-            `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
-             VALUES ($1, 0) ON CONFLICT (id_servidor) DO NOTHING`,
-            [idServidor]
-          );
-          const { rows: saldoRows } = await client.query(
-            `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
-            [idServidor]
-          );
-          const saldoAnterior: number = saldoRows[0]?.saldo_atual ?? 0;
-          const delta = creditosInt - saldoAnterior;
-          await client.query(
-            `UPDATE public.saldo_servidor SET saldo_atual = $1, atualizado_em = NOW() WHERE id_servidor = $2`,
-            [creditosInt, idServidor]
-          );
-          await client.query(
-            `INSERT INTO public.saldo_servidor_historico
-               (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao)
-             VALUES ($1, 'ajuste', $2, $3, $4, 'Sync automático via painel')`,
-            [idServidor, delta, saldoAnterior, creditosInt]
-          );
-          await client.query("COMMIT");
-          saldoAtualizado = true;
-        } catch {
-          await client.query("ROLLBACK");
-        } finally {
-          client.release();
-        }
-      }
+    const creditos = idServidorSaldo !== null && adapter.getCreditos ? await adapter.getCreditos() : null;
+    if (idServidorSaldo !== null && creditos !== null) {
+      await reconciliarSaldoServidor(idServidorSaldo, creditos, "Sync manual via painel");
+      saldoAtualizado = true;
     }
   } catch {
     // Falha no saldo não interrompe o sync

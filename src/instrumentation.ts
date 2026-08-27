@@ -12,4 +12,7 @@ export async function register() {
 
   const { iniciarKeepaliveClub } = await import("@/lib/club-keepalive");
   iniciarKeepaliveClub();
+
+  const { iniciarKeepaliveSaldo } = await import("@/lib/saldo-keepalive");
+  iniciarKeepaliveSaldo();
 }

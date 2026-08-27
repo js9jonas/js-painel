@@ -119,6 +119,60 @@ export async function getConsumoMensal(): Promise<ConsumoMensalRow[]> {
   return rows;
 }
 
+/**
+ * Reconcilia o saldo local (`saldo_servidor.saldo_atual`) com o saldo real lido no painel do
+ * fornecedor (`adapter.getCreditos()`). Usada tanto pelo botão manual "Sincronizar" em /conexoes
+ * quanto pelo cron periódico (lib/saldo-keepalive.ts) — o saldo local é só uma estimativa que
+ * abate 1 crédito por conta a cada renovação (abaterCreditoRenovacao acima); esta função é o
+ * único ponto que corrige eventual desvio contra o valor real do fornecedor.
+ * Não grava histórico quando o valor já bate (evita poluir o histórico com "ajuste de 0" toda
+ * vez que o cron roda e não havia desvio).
+ */
+export async function reconciliarSaldoServidor(
+  idServidor: number,
+  creditosReais: number,
+  observacao: string
+): Promise<{ atualizou: boolean; saldoAnterior: number; saldoNovo: number }> {
+  const creditosInt = Math.round(creditosReais);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO public.saldo_servidor (id_servidor, saldo_atual)
+       VALUES ($1, 0) ON CONFLICT (id_servidor) DO NOTHING`,
+      [idServidor]
+    );
+    const { rows } = await client.query(
+      `SELECT saldo_atual FROM public.saldo_servidor WHERE id_servidor = $1 FOR UPDATE`,
+      [idServidor]
+    );
+    const saldoAnterior: number = rows[0]?.saldo_atual ?? 0;
+    if (saldoAnterior === creditosInt) {
+      await client.query("COMMIT");
+      return { atualizou: false, saldoAnterior, saldoNovo: saldoAnterior };
+    }
+
+    const delta = creditosInt - saldoAnterior;
+    await client.query(
+      `UPDATE public.saldo_servidor SET saldo_atual = $1, atualizado_em = NOW() WHERE id_servidor = $2`,
+      [creditosInt, idServidor]
+    );
+    await client.query(
+      `INSERT INTO public.saldo_servidor_historico
+         (id_servidor, tipo, quantidade, saldo_anterior, saldo_novo, observacao)
+       VALUES ($1, 'ajuste', $2, $3, $4, $5)`,
+      [idServidor, delta, saldoAnterior, creditosInt, observacao]
+    );
+    await client.query("COMMIT");
+    return { atualizou: true, saldoAnterior, saldoNovo: creditosInt };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getHistoricoSaldo(
   idServidor: string,
   limite = 20
