@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { renovarComPolling } from "@/lib/renovar-polling";
 
 type Props = {
     idPainelServidor: number | null;
@@ -21,17 +20,24 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
         setEstado("loading");
         setMensagem(null);
         try {
-            const resultado = await renovarComPolling(idPainelServidor!, usuario, setMensagem);
-            if (!resultado.ok) {
+            const res = await fetch(`/api/paineis/servidores/${idPainelServidor}/renovar`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ usuario }),
+            });
+            const text = await res.text();
+            let json: any;
+            try { json = JSON.parse(text); } catch { throw new Error(`HTTP ${res.status} — ${text.slice(0, 150)}`); }
+            if (!res.ok || json.erro) {
                 setEstado("erro");
-                setMensagem(resultado.erro ?? "Erro ao renovar.");
+                setMensagem(json.erro ?? `Erro ${res.status}.`);
             } else {
                 setEstado("ok");
-                setMensagem(resultado.mensagem ?? "Renovado!");
-                setMigrado(resultado.migrado === true);
-                if (resultado.novoVencimento) {
-                    setNovaData(resultado.novoVencimento.split("-").reverse().join("/"));
-                    onRenovado?.(resultado.novoVencimento);
+                setMensagem(json.mensagem ?? "Renovado!");
+                setMigrado(json.migrado === true);
+                if (json.novoVencimento) {
+                    setNovaData(json.novoVencimento.split("-").reverse().join("/"));
+                    onRenovado?.(json.novoVencimento);
                 }
             }
         } catch (e: unknown) {
@@ -73,9 +79,6 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
             </button>
             {estado === "erro" && mensagem && (
                 <p className="text-xs text-red-600">{mensagem}</p>
-            )}
-            {estado === "loading" && mensagem && (
-                <p className="text-xs text-zinc-500">{mensagem}</p>
             )}
         </div>
     );
