@@ -29,6 +29,32 @@ export async function migrarContaPainel(idConta: number, idPainelDestino: number
     return { ok: false, erro: "Painel de destino é igual ao de origem.", status: 422 };
   }
 
+  // Exige sessão CLUB ativa nos dois lados ANTES do ponto de não-retorno (exclusão na origem).
+  // Sem isso já aconteceu de a origem estar conectada, a exclusão suceder, e a criação no
+  // destino falhar por sessão morta — deixando a conta órfã (não existe em nenhum painel), ver
+  // docs/memoria/project_club_migracao_painel.md. getAdapterPainel() logo abaixo só confirma que
+  // o painel existe e o tipo é suportado, não que a sessão está viva — por isso o check é feito
+  // aqui, direto no banco. Escopo limitado a tipo='club': outros adapters usam token permanente
+  // sem esse conceito de sessão expirável (ex: CENTRAL), então não devem ser bloqueados por isso.
+  const { rows: sessoes } = await pool.query<{ id: number; tipo: string; session_cookie: string | null; session_expiry: Date | null }>(
+    `SELECT id, tipo, session_cookie, session_expiry FROM public.painel_servidores WHERE id IN ($1, $2)`,
+    [idPainelOrigem, idPainelDestino]
+  );
+  const MARGEM_SESSAO_MS = 5 * 60 * 1000; // mesma lógica de folga do keepalive — evita começar a migrar com a sessão prestes a cair no meio do processo
+  for (const idAlvo of [idPainelOrigem, idPainelDestino]) {
+    const painel = sessoes.find((s) => s.id === idAlvo);
+    if (painel?.tipo !== "club") continue;
+    const ativa = !!painel.session_cookie && !!painel.session_expiry
+      && new Date(painel.session_expiry).getTime() - Date.now() > MARGEM_SESSAO_MS;
+    if (!ativa) {
+      return {
+        ok: false,
+        erro: `Painel CLUB ${idAlvo === idPainelOrigem ? "de origem" : "de destino"} (id ${idAlvo}) sem sessão ativa — migração abortada antes de excluir qualquer coisa. A renovação automática roda a cada 10min (ver club-keepalive.ts); tente novamente em alguns minutos.`,
+        status: 409,
+      };
+    }
+  }
+
   // Valida os dois adapters ANTES de mexer em qualquer coisa no painel
   let adapterOrigem, adapterDestino;
   try {

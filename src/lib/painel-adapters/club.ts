@@ -2,7 +2,12 @@ import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ResultadoCriacao, DetalhesConta, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 
-// API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN (~7 dias)
+// API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN
+// ⚠️ Duração real da sessão observada em produção: ~1h ou menos (não os "~7 dias" nominais que
+// uma nota antiga chegou a registrar) — parseJwtExpiry() abaixo lê o exp real do JWT a cada
+// login, então session_expiry no banco já reflete a duração verdadeira independente deste
+// comentário. Ver docs/memoria/project_club_token_expiry.md e club-keepalive.ts (renovação
+// preventiva, criada 27/08/2026 por causa dessa duração curta).
 // Login: 2captcha (HCaptchaTaskProxyless) → POST pdcapi.io/login (URL-encoded)
 // hCaptcha sitekey dashboard.bz: 8cf2ef3e-6e60-456a-86ca-6f2c855c3a06
 // Nota: CapSolver HCaptchaTaskProxyLess testado e não resolveu este challenge
@@ -22,8 +27,13 @@ const BOUQUET_COMPLETO_COM_ADULTO = "216,218,220,222,224,225";
 // janela pro retry de proxy-retry.ts tentar outro IP do pool antes do status check desistir)
 const impit       = new Impit({ browser: "chrome", proxyUrl: process.env.UNIPLAY_PROXY_URL, timeout: 10_000 });
 
-// Evita múltiplos logins simultâneos para o mesmo painel (sync + status ao mesmo tempo)
-const loginEmProgresso = new Map<number, Promise<string | void>>();
+// Evita múltiplos logins simultâneos para o mesmo painel (sync + status ao mesmo tempo).
+// Compartilhado entre withRelogin (relogin reativo), o botão "Renovar Sessão" (renovar-sessao/
+// route.ts) e o cron preventivo (lib/club-keepalive.ts) — os três chamam dispararLoginClub(),
+// então nunca resolvem 2 hCaptchas em paralelo pro mesmo painel (evita gastar crédito à toa e
+// reduz o risco do hCaptcha adaptativo escalar dificuldade por excesso de tentativas seguidas,
+// ver project_club_migracao_painel).
+const loginEmProgresso = new Map<number, Promise<{ token: string; expiry: Date }>>();
 
 // Gera username aleatório: 9 chars alfanuméricos minúsculos
 function gerarUsername(): string {
@@ -132,6 +142,29 @@ export async function loginClub(creds: ServidorCredenciais, onSaveSession: SaveS
   return { token, expiry };
 }
 
+// Dispara um login pro painel `id`, reaproveitando um em andamento se já houver um (dedup via
+// loginEmProgresso) — chamado por withRelogin, pelo botão "Renovar Sessão" e pelo cron
+// preventivo (club-keepalive.ts). Quem chama recebe o erro real (não é engolido aqui): o
+// `.catch(() => {})` abaixo é só um handler "silencioso" pra não estourar unhandledRejection no
+// processo — como é anexado à MESMA promise `p` (não a uma derivada), não afeta o que os
+// awaiters de fato recebem via `await dispararLoginClub(...)`.
+export function dispararLoginClub(
+  id: number,
+  creds: ServidorCredenciais,
+  onSaveSession: SaveSession
+): Promise<{ token: string; expiry: Date }> {
+  const existente = loginEmProgresso.get(id);
+  if (existente) return existente;
+  const p = loginClub(creds, onSaveSession);
+  loginEmProgresso.set(id, p);
+  p.catch(() => {}).finally(() => loginEmProgresso.delete(id));
+  return p;
+}
+
+export function loginClubEmProgresso(id: number): boolean {
+  return loginEmProgresso.has(id);
+}
+
 // pdcapi.io responde HTTP 200 com {result:false, msg:"A sessão está expirada (N)"}
 // para token morto — não é um erro HTTP, então precisa ser detectado no corpo da resposta.
 class ClubSessionExpiredError extends Error {}
@@ -173,13 +206,6 @@ export function criarClubAdapter(
   let sessionCache = creds.session_cookie ?? "";
   let expiryCache = creds.session_expiry;
 
-  async function doLogin(): Promise<string> {
-    const { token, expiry } = await loginClub(creds, onSaveSession);
-    sessionCache = token;
-    expiryCache = expiry;
-    return token;
-  }
-
   function cachedToken(): string | null {
     if (!sessionCache) return null;
     const expirado = expiryCache && new Date(expiryCache) <= new Date();
@@ -187,20 +213,22 @@ export function criarClubAdapter(
   }
 
   function dispararLogin() {
-    if (loginEmProgresso.has(id)) return; // já há um login rodando para este painel
-    const p = doLogin()
-      .catch(() => {})
-      .finally(() => loginEmProgresso.delete(id));
-    loginEmProgresso.set(id, p);
+    // Atualiza o cache local desta instância quando o login (compartilhado via dispararLoginClub)
+    // terminar — erro real já foi reportado ao chamador original de withRelogin, então aqui só
+    // evita um unhandled rejection residual.
+    dispararLoginClub(id, creds, onSaveSession)
+      .then((r) => { sessionCache = r.token; expiryCache = r.expiry; })
+      .catch(() => {});
   }
 
-  // Re-login nunca bloqueia o request — qualquer ausência ou quebra de sessão
-  // dispara doLogin() em background (apenas um por painel) e falha imediatamente.
+  // Re-login nunca bloqueia o request — qualquer ausência ou quebra de sessão dispara login em
+  // background (dedup compartilhado com o cron/botão manual via dispararLoginClub) e falha
+  // imediatamente.
   async function withRelogin<T>(fn: (token: string) => Promise<T>): Promise<T> {
     const cached = cachedToken();
     if (!cached) {
       dispararLogin();
-      const jaReconectando = loginEmProgresso.has(id);
+      const jaReconectando = loginClubEmProgresso(id);
       throw new Error(
         jaReconectando
           ? "CLUB: reconectando em background (2captcha, ~5min). Aguarde e tente novamente."

@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { loginClub } from "@/lib/painel-adapters/club";
+import { dispararLoginClub } from "@/lib/painel-adapters/club";
 import type { ServidorCredenciais, SaveSession } from "@/lib/painel-adapters/types";
 
 type JobState = { done: false } | { done: true; ok: true } | { done: true; ok: false; erro: string };
@@ -32,7 +32,9 @@ async function executarLogin(idPainel: number, jobId: string) {
   };
 
   try {
-    await loginClub(creds, onSaveSession);
+    // dispararLoginClub reaproveita um login já em andamento (ex: disparado pelo cron
+    // preventivo em lib/club-keepalive.ts) em vez de resolver outro hCaptcha em paralelo.
+    await dispararLoginClub(idPainel, creds, onSaveSession);
     jobs.set(jobId, { done: true, ok: true });
   } catch (err: unknown) {
     jobs.set(jobId, { done: true, ok: false, erro: err instanceof Error ? err.message : String(err) });

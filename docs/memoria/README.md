@@ -20,13 +20,14 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [project_chat_stickers_gifs](project_chat_stickers_gifs.md) — Implementação de stickers e GIFs no chat WhatsApp do js-painel — arquitetura, arquivos, bugs corrigidos e pendências
 - [project_clientes_assinaturas_layout](project_clientes_assinaturas_layout.md) — Redesign do layout de assinaturas em clientes/[id] — cards expandidos para todas as relevantes, inativas recolhidas
 - [project_club_migracao_painel](project_club_migracao_painel.md) — Migração de contas do painel CLUB antigo para um painel CLUB novo (fornecedor trocado) — arquitetura, automação criada e estado do rollout
-- [project_club_token_expiry](project_club_token_expiry.md) — CLUB (pdcapi.io) — auto-relogin implementado em 16/06/2026; bug do falso \"Renovado\" corrigido
+- [project_club_token_expiry](project_club_token_expiry.md) — CLUB (pdcapi.io) — auto-relogin implementado em 16/06/2026; bug do falso \"Renovado\" corrigido; 27/08/2026: duração real da sessão corrigida (~1h, não 7 dias) + cron de renovação preventiva + fix de migração deixando conta órfã
 - [project_conexoes_paineis](project_conexoes_paineis.md) — Página \"Conexões\" no js-painel para gerenciar painéis IPTV via API direta — cadastro, cards com status e automações de renovação/criação d
 - [project_cortesia_telegram_notificacao](project_cortesia_telegram_notificacao.md) — Cortesia de indicação notifica via Telegram (botão wa.me) em vez de template Meta não aprovado; bugs de mídia arquivada e timeout corrigidos
 - [project_criar_teste_conta](project_criar_teste_conta.md) — Feature 'Criar teste' no modal + Conta (clientes/[id]) — usa gerarTeste() dos adapters (nunca chamado antes), com correções específicas por 
 - [project_drive_service_account_fix](project_drive_service_account_fix.md) — Causa raiz do invalid_grant no Google Drive do js-painel; leitura fixada com conta de serviço; mídia nova migrada pra armazenamento local na
 - [project_editar_conta_modal](project_editar_conta_modal.md) — Modal de edição de conta em clientes/[id] — implementado 18/06/2026 — campos desabilitados por tipo de painel
 - [project_funplay_licencas_livres](project_funplay_licencas_livres.md) — Relatório periódico de licenças FunPlay livres e inativos — metodologia, critérios e como reproduzir
+- [project_teste_listas_relatorio_26ago](project_teste_listas_relatorio_26ago.md) — Teste de conexão + catálogo dos 8 servidores em `m3u_listas` (26/08/2026) via página `/teste-listas`, comparado com fornecedor xc.s-dns.org em avaliação
 - [project_iphone_dados_acesso](project_iphone_dados_acesso.md) — Opção 'Enviar dados para iPhone' no balão de conta — gera screenshot do Smarters Player Lite já preenchida com usuário/senha/URL reais e env
 - [project_iptv_keepalive](project_iptv_keepalive.md) — Script Tampermonkey unificado que mantém sessões de 9 painéis IPTV ativas — todos implementados na v2.5
 - [project_iptv_monitor](project_iptv_monitor.md) — Interesse em construir ferramenta para monitorar listas IPTV e notificar quando streams caem — app local com ffprobe + banco central
