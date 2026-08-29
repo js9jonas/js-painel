@@ -18,6 +18,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [project_central_dominio_personalizado](project_central_dominio_personalizado.md) — Processo confirmado ponta a ponta para adicionar um domínio personalizado (comprado no Namecheap) ao painel CENTRAL (painel.fun) — Cloudflar
 - [project_chat_ia_aprendizado_historico](project_chat_ia_aprendizado_historico.md) — 11/08/2026 — ideia (não iniciada): agente de sugestão de mensagem do /chat aprender com histórico real de conversas, não só com sugestões ac
 - [project_chat_page](project_chat_page.md) — Estado atual da página de chat WhatsApp (clientes IPTV): arquitetura, features implementadas, componentes compartilhados e APIs
+- [project_chat_sse_polling_para_push](project_chat_sse_polling_para_push.md) — Pendente, não agendado — trocar polling do /chat por SSE; tentativa anterior não funcionou (motivo desconhecido) — ao retomar, testar pelo `npm run dev` local antes de validar em produção
 - [project_chat_stickers_gifs](project_chat_stickers_gifs.md) — Implementação de stickers e GIFs no chat WhatsApp do js-painel — arquitetura, arquivos, bugs corrigidos e pendências
 - [project_clientes_assinaturas_layout](project_clientes_assinaturas_layout.md) — Redesign do layout de assinaturas em clientes/[id] — cards expandidos para todas as relevantes, inativas recolhidas
 - [project_club_migracao_painel](project_club_migracao_painel.md) — Migração de contas do painel CLUB antigo para um painel CLUB novo (fornecedor trocado) — arquitetura, automação criada e estado do rollout
