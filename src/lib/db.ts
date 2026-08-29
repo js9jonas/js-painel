@@ -12,4 +12,8 @@ export const pool = new Pool({
 
 pool.on("connect", (client) => {
   client.query("SET timezone = 'America/Sao_Paulo'");
+  // Trava de segurança: nenhuma query pode travar o pool indefinidamente.
+  // Sem isso, uma consulta lenta (ex: polling que se sobrepõe) se acumula
+  // sem limite e sufoca todo o app, que compartilha este mesmo pool.
+  client.query("SET statement_timeout = 15000");
 });

@@ -438,6 +438,7 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
   const gravarTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const carregandoConversasRef = useRef(false)
 
   useEffect(() => {
     return () => { if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current) }
@@ -445,8 +446,16 @@ export default function ChatPage() {
 
   const carregarConversas = useCallback(async () => {
     if (document.visibilityState === 'hidden') return
-    const res = await fetch('/api/whatsapp/conversas')
-    if (res.ok) setConversas(await res.json())
+    // Evita empilhar chamadas: se a consulta anterior (que pode ser lenta)
+    // ainda não voltou, pula este ciclo do polling em vez de disparar outra.
+    if (carregandoConversasRef.current) return
+    carregandoConversasRef.current = true
+    try {
+      const res = await fetch('/api/whatsapp/conversas')
+      if (res.ok) setConversas(await res.json())
+    } finally {
+      carregandoConversasRef.current = false
+    }
   }, [])
 
   useEffect(() => {
