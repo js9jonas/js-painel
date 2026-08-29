@@ -2,6 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
+- [incident_chat_pool_esgotado_29ago2026](incident_chat_pool_esgotado_29ago2026.md) — 29/08/2026 — polling do /chat sem trava de sobreposição esgotou o pool do Postgres, travando /chat + /conexoes + renovar juntos; corrigido com trava no cliente + statement_timeout + tabela-resumo incremental `chat_conversas_resumo`
 - [incident_central_capsolver_bot_detection](incident_central_capsolver_bot_detection.md) — Card CENTRAL em /conexoes do js-painel dando 'CapSolver falhou: Bot behavior detected, error code:600010' — causa raiz e correção (22/07/202
 - [incident_funplay_url_change](incident_funplay_url_change.md) — Sinistro recorrente — FunPlay altera URLs de playlists para hosts reserverdns*.com durante sync; procedimento completo de detecção e correçã
 - [incident_notificacao_vencimento_falha_burst](incident_notificacao_vencimento_falha_burst.md) — 09/07/2026 — 26% dos templates de vencimento falharam silenciosamente por disparo em burst; painel não mostrava a falha

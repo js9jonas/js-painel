@@ -9,44 +9,15 @@ export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   try {
+    // Lê da tabela-resumo (mantida incremental por trigger em cada escrita
+    // em whatsapp_mensagens/whatsapp_leituras — ver docs/memoria) em vez de
+    // recalcular tudo a cada chamada. Essa rota é chamada por polling a cada
+    // 10s pelo /chat; recalcular do zero toda vez foi o que travou o app
+    // inteiro sob uso concorrente (incidente 29/08/2026).
     const result = await pool.query(`
-      SELECT
-        wm.telefone,
-        MAX(wm.nome_contato)  AS nome_contato,
-        MAX(ct.id_cliente)    AS id_cliente,
-        MAX(c.nome)           AS nome_cliente,
-        MAX(ct.foto_url)      AS foto_url,
-        MAX(wm.recebida_em)   AS ultima_mensagem_em,
-        (
-          SELECT conteudo FROM public.whatsapp_mensagens
-          WHERE telefone = wm.telefone
-          ORDER BY recebida_em DESC LIMIT 1
-        ) AS ultima_mensagem,
-        (
-          SELECT tipo FROM public.whatsapp_mensagens
-          WHERE telefone = wm.telefone
-          ORDER BY recebida_em DESC LIMIT 1
-        ) AS ultimo_tipo,
-        COUNT(*) FILTER (
-          WHERE wm.origem = 'cliente'
-            AND wm.recebida_em > COALESCE(
-              GREATEST(
-                (SELECT MAX(m2.recebida_em) FROM public.whatsapp_mensagens m2
-                 WHERE m2.telefone = wm.telefone AND m2.origem != 'cliente'),
-                (SELECT lido_em FROM public.whatsapp_leituras
-                 WHERE telefone = wm.telefone)
-              ),
-              '1970-01-01'
-            )
-        ) AS nao_lidas
-      FROM public.whatsapp_mensagens wm
-      LEFT JOIN public.contatos ct ON (
-        ct.telefone = wm.telefone
-        OR ct.telefone = SUBSTRING(wm.telefone, 3)
-        OR ct.telefone = SUBSTRING(wm.telefone, 3, 2) || '9' || SUBSTRING(wm.telefone, 5)
-      )
-      LEFT JOIN public.clientes c ON c.id_cliente = ct.id_cliente
-      GROUP BY wm.telefone
+      SELECT telefone, nome_contato, id_cliente, nome_cliente, foto_url,
+             ultima_mensagem_em, ultima_mensagem, ultimo_tipo, nao_lidas
+      FROM public.chat_conversas_resumo
       ORDER BY ultima_mensagem_em DESC
     `)
 
