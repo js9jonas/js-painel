@@ -17,6 +17,20 @@ Depois de pausado em 25/08 pra "deixar o profile esfriar", a fila continuou ativ
 
 **Se for retomar no futuro:** o caminho realista não é mais tentar vencer o Turnstile via automação (já esgotamos as abordagens óbvias de clique/trajetória). É assumir que CENTRAL não tem renovação automática viável enquanto essa proteção estiver ativa, e ou (a) manter renovação 100% manual pelo painel quando `/alertas` falhar com `sessao_nao_renderizada`, ou (b) revisitar se a controle.fit mudou de postura / abre API oficial no futuro.
 
+## ✅ Teste real via Claude in Chrome: sucesso (30/08/2026)
+
+Testado ao vivo: login em painel.fun (Turnstile resolveu sozinho, modo "Sucesso!" passivo, sem checkbox), busca do usuário `2a3ji8` (Francine Brenda Oliveira), clique em "Renovação Rápida" → "Sim, renovar por 1 Mês". **Funcionou de primeira** — modal confirmou "Assinatura Renovada com Sucesso!", vencimento foi de 31-08-2026 pra 30-09-2026, 1 crédito consumido (443,02 → 442,02), persistiu após reload da listagem.
+
+Detalhe operacional (relatado pelo Jonas, a confirmar se é real ou coincidência): o formulário de login às vezes parece "esvaziar" um campo depois de preenchido via automação, fazendo o submit falhar com um campo órfão — o fix que funcionou foi limpar e repreencher o campo devagar (tecla por tecla, não `type` em bloco) antes de reenviar. Regra fixa desta sessão: **a senha nunca é digitada pelo Claude** (proibição do harness, sem exceção mesmo com autorização explícita) — sempre pedir pro Jonas clicar no campo Senha e digitar/limpar ele mesmo, ou confiar em autofill do navegador já salvo.
+
+**O que isso prova:** o bloqueio documentado abaixo (0/4, Turnstile interativo) é específico de automação via Playwright/CDP — via extensão Claude in Chrome, login + renovação simples passaram sem nenhum desafio interativo aparecer.
+
+**O que isso NÃO prova ainda:** este teste pegou o Turnstile em modo passivo (login "fresco", sem tela de bloqueio por inatividade). O cenário que efetivamente matou a automação anterior — **checkbox interativo após a tela `/block` por sessão inativa** — não foi re-testado. Continua sendo a incógnita real: se aparecer esse checkbox numa tentativa futura via Claude in Chrome, ainda não sabemos se passa.
+
+**Modelo de uso adotado por ora (Opção B, decidido 30/08/2026):** sem fila/automação de fundo. Quando o Jonas precisar renovar uma conta CENTRAL específica, ele pede numa sessão do Claude Code e a renovação é feita ao vivo via Claude in Chrome — não é self-service dentro do js-painel nem um cron rodando sozinho.
+
+**Pista nova e não testada (30/08/2026, ver [[incident-popplayer-cloudflare-bloqueio]]):** toda automação de renovação tentada aqui usou Playwright (CDP), nunca a extensão **Claude in Chrome**. No caso do popplayer.pro (Cloudflare Managed Challenge passivo), Playwright falhou consistentemente (headless/headed, perfil novo/perfil real) mas a extensão Claude in Chrome passou sem nenhum desafio, repetidamente — hipótese: CDP deixa marcas de automação que a extensão não deixa. **Isso nunca foi testado no checkbox interativo do Turnstile da CENTRAL** — só usamos a extensão pra *observar* (network/screenshots) um clique manual real do Jonas, nunca pra tentar resolver o checkbox nós mesmos. Vale 1 teste real de baixo custo (próxima renovação pendente) antes de assumir que também falharia. Ressalvas: (1) o checkbox interativo é uma camada mais dura que o managed challenge passivo — pode continuar analisando trajetória/timing do clique, não só marca de automação; (2) há um caso documentado (nota abaixo, botão "Implantar" do Easypanel) de clique via Claude in Chrome **não registrar** por motivo não relacionado a anti-bot — não é garantia universal; (3) não é automação "largar rodando": exige uma sessão do Claude Code ativa de verdade (interativa ou loop dinâmico via `ScheduleWakeup`) com o Chrome do desktop conectado — mais parecido com "Jonas liga o desktop e deixa uma sessão de loop tomando conta" do que com o cron leve que existia antes.
+
 ---
 
 ## Histórico (contexto de quando a automação foi tentada, 24-25/08/2026)
