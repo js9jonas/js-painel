@@ -262,15 +262,36 @@ async function executarSync(idPainel: number, jobId: string) {
 
     if (syncConfiavel) {
       const macsAtuais = devices.map(d => d.mac.toUpperCase());
-      const { rowCount } = await pool.query(
+      const { rows: removidosRows } = await pool.query<{ id_app_registro: number }>(
         `UPDATE public.aplicativos
          SET removido_em = NOW()
          WHERE id_painel_servidor = $1
            AND UPPER(mac) != ALL($2::text[])
-           AND removido_em IS NULL`,
+           AND removido_em IS NULL
+         RETURNING id_app_registro`,
         [idPainel, macsAtuais]
       );
-      stats.removidos = rowCount ?? 0;
+      stats.removidos = removidosRows.length;
+
+      // Device sumiu do painel remoto = licença reaproveitada em outro device (regra
+      // confirmada com o Jonas 31/08/2026: FunPlay/LazerPlay/SmartOne não permitem
+      // transferência pra device já pago, só reuso do zero — então o desaparecimento
+      // aqui só acontece quando o fornecedor já migrou a licença). A playlist antiga
+      // (aplicativo_playlists) e a validade ficam órfãs/sem sentido, então limpa junto.
+      // Escopo só nos devices que acabaram de sumir NESTA sync — nunca varre o histórico
+      // inteiro de removidos, pra não mexer em nada fora do que essa execução decidiu.
+      if (removidosRows.length > 0) {
+        const idsRemovidos = removidosRows.map(r => r.id_app_registro);
+        const { rowCount: playlistsOrfas } = await pool.query(
+          `DELETE FROM public.aplicativo_playlists WHERE id_app_registro = ANY($1::bigint[])`,
+          [idsRemovidos]
+        );
+        stats.playlists_removidas += playlistsOrfas ?? 0;
+        await pool.query(
+          `UPDATE public.aplicativos SET validade = NULL WHERE id_app_registro = ANY($1::bigint[])`,
+          [idsRemovidos]
+        );
+      }
     }
 
     const avisos = [
