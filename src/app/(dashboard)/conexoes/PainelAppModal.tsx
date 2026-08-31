@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import type { PainelAppRow } from "@/lib/paineis";
 import { salvarPainelApp } from "@/app/actions/paineis";
+import { Select } from "@/components/ui/select";
 
 const TIPOS_APP = ["funplays", "lazerplay", "smartone", "outro"];
 
@@ -75,11 +76,12 @@ export default function PainelAppModal({ app, onClose, onSalvo }: Props) {
             <input className={input} value={form.nome} onChange={(e) => set("nome", e.target.value)} required />
           </Field>
           <Field label="Tipo *">
-            <select className={input} value={form.tipo} onChange={(e) => set("tipo", e.target.value)}>
-              {TIPOS_APP.map((t) => (
-                <option key={t} value={t}>{t.toUpperCase()}</option>
-              ))}
-            </select>
+            <Select
+              className={input}
+              value={form.tipo}
+              onChange={(v) => set("tipo", v)}
+              options={TIPOS_APP.map((t) => ({ value: t, label: t.toUpperCase() }))}
+            />
           </Field>
         </div>
 

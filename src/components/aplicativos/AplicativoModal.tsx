@@ -3,6 +3,7 @@
 
 import { useState, useTransition } from "react";
 import { createAplicativo, updateAplicativo, type AplicativoData } from "@/app/actions/aplicativos";
+import { Select } from "@/components/ui/select";
 import type { AplicativoRow, AppRow } from "@/lib/aplicativos";
 
 type Props = {
@@ -101,19 +102,18 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
           {/* App */}
           <div>
             <label className={labelClass}>Aplicativo</label>
-            <select
+            <Select
               value={idApp}
-              onChange={(e) => setIdApp(e.target.value)}
+              onChange={setIdApp}
               className={selectClass}
-            >
-              <option value="">— Selecione —</option>
-              {apps.map((a) => (
-                <option key={a.id_app} value={a.id_app}>
-                  {a.nome_app}
-                  {a.exige_licenca ? " 🔑" : ""}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "— Selecione —" },
+                ...apps.map((a) => ({
+                  value: a.id_app,
+                  label: `${a.nome_app}${a.exige_licenca ? " 🔑" : ""}`,
+                })),
+              ]}
+            />
             {appSelecionado?.url_referencia && (
               <a
                 href={appSelecionado.url_referencia}
@@ -133,13 +133,15 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
+              <Select
+                value={status}
+                onChange={setStatus}
+                className={selectClass}
+                options={STATUS_OPTIONS.map((s) => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1),
+                }))}
+              />
             </div>
             <div>
               <label className={labelClass}>Validade</label>

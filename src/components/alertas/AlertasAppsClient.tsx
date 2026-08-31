@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
+import { Select } from "@/components/ui/select";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
 
@@ -301,16 +302,15 @@ export default function AlertasAppsClient({
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-zinc-500 mb-1 block">Forma de pagamento</label>
-                  <select
+                  <Select
                     value={forma}
-                    onChange={(e) => setForma(e.target.value)}
+                    onChange={setForma}
                     className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-                  >
-                    <option>INTER</option>
-                    <option>Dinheiro</option>
-                    <option>Cartão</option>
-                    <option>Transferência</option>
-                  </select>
+                    options={["INTER", "Dinheiro", "Cartão", "Transferência"].map((f) => ({
+                      value: f,
+                      label: f,
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-zinc-500 mb-1 block">Valor (R$)</label>

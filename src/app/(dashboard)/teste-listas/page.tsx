@@ -8,6 +8,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { Select } from '@/components/ui/select'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -589,9 +590,12 @@ function ModalLista({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Intervalo de teste (min)</label>
-              <select className={inputCls} value={form.intervalo_teste_min} onChange={e => set('intervalo_teste_min', e.target.value)}>
-                {[5, 10, 15, 30, 60].map(v => <option key={v} value={v}>A cada {v} min</option>)}
-              </select>
+              <Select
+                className={inputCls}
+                value={form.intervalo_teste_min}
+                onChange={(v) => set('intervalo_teste_min', v)}
+                options={[5, 10, 15, 30, 60].map((v) => ({ value: String(v), label: `A cada ${v} min` }))}
+              />
             </div>
             <div className="flex flex-col justify-end gap-2">
               <label className="flex items-center gap-2 cursor-pointer">

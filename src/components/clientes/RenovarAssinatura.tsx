@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Select } from "@/components/ui/select";
 
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 type StatusFinal = "ativo" | "pendente";
@@ -371,12 +372,17 @@ export default function RenovarAssinatura({
 
                                         <div className="space-y-1.5">
                                             <label className={labelClass}>Periodo</label>
-                                            <select className={inputClass} value={periodo} onChange={(e) => handlePeriodoChange(e.target.value as Periodo)}>
-                                                <option value="mensal">Mensal (1 mes)</option>
-                                                <option value="trimestral">Trimestral (3 meses)</option>
-                                                <option value="semestral">Semestral (6 meses)</option>
-                                                <option value="anual">Anual (12 meses)</option>
-                                            </select>
+                                            <Select
+                                                className={inputClass}
+                                                value={periodo}
+                                                onChange={(v) => handlePeriodoChange(v as Periodo)}
+                                                options={[
+                                                    { value: "mensal", label: "Mensal (1 mes)" },
+                                                    { value: "trimestral", label: "Trimestral (3 meses)" },
+                                                    { value: "semestral", label: "Semestral (6 meses)" },
+                                                    { value: "anual", label: "Anual (12 meses)" },
+                                                ]}
+                                            />
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
@@ -474,9 +480,12 @@ export default function RenovarAssinatura({
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="space-y-1.5">
                                                 <label className={labelClass}>Forma</label>
-                                                <select className={inputClass} value={forma} onChange={(e) => setForma(e.target.value)}>
-                                                    {FORMAS_PGTO.map((f) => <option key={f} value={f}>{f}</option>)}
-                                                </select>
+                                                <Select
+                                                    className={inputClass}
+                                                    value={forma}
+                                                    onChange={setForma}
+                                                    options={FORMAS_PGTO.map((f) => ({ value: f, label: f }))}
+                                                />
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className={labelClass}>Valor (R$)</label>

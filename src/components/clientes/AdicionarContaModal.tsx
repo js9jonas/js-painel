@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import { buscarContasLivres, vincularContaExistente, criarContaTeste, type ContaLivre, type ResultadoCriarTeste } from "@/app/actions/contasVinculo";
+import { Select } from "@/components/ui/select";
 
 type Painel = { id: number; nome: string; tipo: string };
 
@@ -123,16 +124,15 @@ export default function AdicionarContaModal({ idAssinatura, idCliente, paineis, 
             <div className="px-5 pt-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-600 mb-1">Painel</label>
-                <select
-                  value={idPainel}
-                  onChange={(e) => onPainelChange(e.target.value ? Number(e.target.value) : "")}
+                <Select
+                  value={idPainel === "" ? "" : String(idPainel)}
+                  onChange={(v) => onPainelChange(v ? Number(v) : "")}
                   className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione um painel…</option>
-                  {paineis.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nome}</option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "Selecione um painel…" },
+                    ...paineis.map((p) => ({ value: String(p.id), label: p.nome })),
+                  ]}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-zinc-600 mb-1">Buscar conta</label>

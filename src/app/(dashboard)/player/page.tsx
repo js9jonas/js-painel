@@ -3,6 +3,7 @@
 
 import { Suspense, useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Select } from '@/components/ui/select'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -546,15 +547,12 @@ function ListaCanais({
             autoFocus
           />
           {grupos.length > 2 && (
-            <select
+            <Select
               className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 dark:text-gray-300"
               value={grupoFiltro}
-              onChange={e => setGrupoFiltro(e.target.value)}
-            >
-              {grupos.map(g => (
-                <option key={g} value={g}>{g === 'Todos' ? '— Todos os grupos —' : g}</option>
-              ))}
-            </select>
+              onChange={setGrupoFiltro}
+              options={grupos.map(g => ({ value: g, label: g === 'Todos' ? '— Todos os grupos —' : g }))}
+            />
           )}
         </div>
       </div>

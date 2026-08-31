@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
+import { Select } from "@/components/ui/select";
 
 interface Props {
   id_app_registro: number;
@@ -143,9 +144,12 @@ export default function ModalRenovarAplicativo({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-zinc-700 mb-1.5 block">Forma</label>
-                <select value={forma} onChange={(e) => setForma(e.target.value)} className={inputClass}>
-                  {FORMAS.map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <Select
+                  value={forma}
+                  onChange={setForma}
+                  className={inputClass}
+                  options={FORMAS.map((f) => ({ value: f, label: f }))}
+                />
               </div>
               <div>
                 <label className="text-xs font-semibold text-zinc-700 mb-1.5 block">Valor (R$)</label>

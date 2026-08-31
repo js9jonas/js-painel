@@ -6,6 +6,7 @@ import { buscarPorMac, type ResultadoMac } from "@/app/actions/buscarPorMac";
 import { buscarClientes, type ClienteBuscaRow } from "@/app/actions/buscarClientes";
 import { updateAplicativo, createAplicativo, type AplicativoData } from "@/app/actions/aplicativos";
 import type { AppRow } from "@/lib/aplicativos";
+import { Select } from "@/components/ui/select";
 
 type Props = { apps: AppRow[] };
 
@@ -387,28 +388,27 @@ function AddModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Aplicativo</label>
-              <select
+              <Select
                 value={idApp}
-                onChange={(e) => setIdApp(e.target.value)}
+                onChange={setIdApp}
                 className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all bg-white"
-              >
-                <option value="">— Selecione —</option>
-                {apps.map((a) => (
-                  <option key={a.id_app} value={a.id_app}>{a.nome_app}</option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "— Selecione —" },
+                  ...apps.map((a) => ({ value: a.id_app, label: a.nome_app })),
+                ]}
+              />
             </div>
             <div>
               <label className={labelClass}>Status</label>
-              <select
+              <Select
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={setStatus}
                 className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all bg-white"
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                ))}
-              </select>
+                options={STATUS_OPTIONS.map((s) => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1),
+                }))}
+              />
             </div>
           </div>
 
@@ -569,22 +569,27 @@ function EditModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Aplicativo</label>
-              <select value={idApp} onChange={(e) => setIdApp(e.target.value)}
-                className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all bg-white">
-                <option value="">— Selecione —</option>
-                {apps.map((a) => (
-                  <option key={a.id_app} value={a.id_app}>{a.nome_app}</option>
-                ))}
-              </select>
+              <Select
+                value={idApp}
+                onChange={setIdApp}
+                className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all bg-white"
+                options={[
+                  { value: "", label: "— Selecione —" },
+                  ...apps.map((a) => ({ value: a.id_app, label: a.nome_app })),
+                ]}
+              />
             </div>
             <div>
               <label className={labelClass}>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)}
-                className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all bg-white">
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                ))}
-              </select>
+              <Select
+                value={status}
+                onChange={setStatus}
+                className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all bg-white"
+                options={STATUS_OPTIONS.map((s) => ({
+                  value: s,
+                  label: s.charAt(0).toUpperCase() + s.slice(1),
+                }))}
+              />
             </div>
           </div>
 

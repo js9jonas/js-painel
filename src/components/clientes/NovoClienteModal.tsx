@@ -4,6 +4,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarClienteComAssinatura } from "@/app/actions/novoCliente";
+import { Select } from "@/components/ui/select";
 import type { PlanoRow } from "@/lib/planos";
 import type { PacoteRow } from "@/lib/pacotes";
 
@@ -145,33 +146,45 @@ export default function NovoClienteModal({ planos, pacotes, onClose, onSuccess, 
                 <div className="space-y-4">
                   <div>
                     <label className={labelClass}>Status</label>
-                    <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectClass}>
-                      {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-                    </select>
+                    <Select
+                      value={status}
+                      onChange={setStatus}
+                      className={selectClass}
+                      options={STATUS_OPTIONS.map((s) => ({
+                        value: s,
+                        label: s.charAt(0).toUpperCase() + s.slice(1),
+                      }))}
+                    />
                   </div>
                   <div>
                     <label className={labelClass}>Pacote</label>
-                    <select value={idPacote} onChange={(e) => setIdPacote(e.target.value)} className={selectClass}>
-                      <option value="">— Nenhum —</option>
-                      {pacotes.map((p) => (
-                        <option key={p.id_pacote} value={p.id_pacote}>
-                          {p.contrato ?? `Pacote #${p.id_pacote}`}{p.telas ? ` (${p.telas} tela${p.telas !== 1 ? "s" : ""})` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={idPacote}
+                      onChange={setIdPacote}
+                      className={selectClass}
+                      options={[
+                        { value: "", label: "— Nenhum —" },
+                        ...pacotes.map((p) => ({
+                          value: p.id_pacote,
+                          label: `${p.contrato ?? `Pacote #${p.id_pacote}`}${p.telas ? ` (${p.telas} tela${p.telas !== 1 ? "s" : ""})` : ""}`,
+                        })),
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className={labelClass}>Plano</label>
-                    <select value={idPlano} onChange={(e) => setIdPlano(e.target.value)} className={selectClass}>
-                      <option value="">— Nenhum —</option>
-                      {planos.map((p) => (
-                        <option key={p.id_plano} value={p.id_plano}>
-                          {p.tipo ?? `Plano #${p.id_plano}`}
-                          {p.meses ? ` — ${p.meses} ${p.meses === 1 ? "mês" : "meses"}` : ""}
-                          {p.valor ? ` — R$ ${parseFloat(p.valor).toFixed(2).replace(".", ",")}` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      value={idPlano}
+                      onChange={setIdPlano}
+                      className={selectClass}
+                      options={[
+                        { value: "", label: "— Nenhum —" },
+                        ...planos.map((p) => ({
+                          value: p.id_plano,
+                          label: `${p.tipo ?? `Plano #${p.id_plano}`}${p.meses ? ` — ${p.meses} ${p.meses === 1 ? "mês" : "meses"}` : ""}${p.valor ? ` — R$ ${parseFloat(p.valor).toFixed(2).replace(".", ",")}` : ""}`,
+                        })),
+                      ]}
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

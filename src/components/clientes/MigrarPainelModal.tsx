@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Select } from "@/components/ui/select";
 
 type PainelResumo = { id: number; nome: string; tipo: string };
 // Campos mínimos usados pelo modal — aceita tanto ContaPainelVinculada (clientes/[id])
@@ -59,16 +60,13 @@ export default function MigrarPainelModal({ conta, opcoes, onClose, onMigrado }:
 
         <div>
           <label className="text-xs text-zinc-500">Painel de destino</label>
-          <select
+          <Select
             className="w-full mt-1 rounded-lg border border-zinc-300 px-2 py-1.5 text-sm"
-            value={idDestino}
-            onChange={(e) => setIdDestino(Number(e.target.value))}
+            value={String(idDestino)}
+            onChange={(v) => setIdDestino(Number(v))}
             disabled={enviando}
-          >
-            {opcoes.map((p) => (
-              <option key={p.id} value={p.id}>{p.nome}</option>
-            ))}
-          </select>
+            options={opcoes.map((p) => ({ value: String(p.id), label: p.nome }))}
+          />
         </div>
 
         {erro && (

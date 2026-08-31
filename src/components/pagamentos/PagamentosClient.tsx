@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { PagamentoFullRow } from "@/lib/pagamentos";
 import PagamentoModal from "./PagamentoModal";
+import { Select } from "@/components/ui/select";
 
 type Props = {
   data: PagamentoFullRow[];
@@ -149,20 +150,21 @@ function FormaCell({ id, forma, onDone }: { id: number; forma: string | null; on
 
   if (editando) {
     return (
-      <select
+      <Select
         autoFocus
         value={valor}
         disabled={saving}
-        onChange={(e) => setValor(e.target.value)}
-        onBlur={() => salvar(valor)}
+        // Salva assim que uma opção é escolhida — não dá pra depender de onBlur aqui:
+        // diferente do <select> nativo (cujo popup é OS-level e não mexe no foco do
+        // DOM), o Radix move o foco do trigger pra dentro do próprio dropdown ao abrir,
+        // o que já disparava blur (e fechava o campo) antes do clique na opção.
+        onChange={(v) => { setValor(v); salvar(v); }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") salvar(valor);
           if (e.key === "Escape") setEditando(false);
         }}
         className="h-7 rounded-lg border border-blue-400 bg-white px-2 text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-      >
-        {FORMAS.map((f) => <option key={f} value={f}>{f}</option>)}
-      </select>
+        options={FORMAS.map((f) => ({ value: f, label: f }))}
+      />
     );
   }
 
@@ -233,16 +235,17 @@ export default function PagamentosClient({
               className="h-10 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
             />
           </div>
-          <select
+          <Select
             name="pageSize"
             defaultValue={String(pageSize)}
             className="h-10 rounded-xl border border-zinc-300 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all"
-          >
-            <option value="25">25 por página</option>
-            <option value="50">50 por página</option>
-            <option value="100">100 por página</option>
-            <option value="200">200 por página</option>
-          </select>
+            options={[
+              { value: "25", label: "25 por página" },
+              { value: "50", label: "50 por página" },
+              { value: "100", label: "100 por página" },
+              { value: "200", label: "200 por página" },
+            ]}
+          />
           {somentePendentes && (
             <input type="hidden" name="pendentes" value="1" />
           )}

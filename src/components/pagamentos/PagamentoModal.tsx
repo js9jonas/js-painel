@@ -5,6 +5,7 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import { updatePagamento } from "@/app/actions/pagamentos";
 import { buscarClientes, type ClienteBuscaRow } from "@/app/actions/buscarClientes";
 import type { PagamentoFullRow } from "@/lib/pagamentos";
+import { Select } from "@/components/ui/select";
 
 type Props = {
   pagamento: PagamentoFullRow;
@@ -232,16 +233,18 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Forma</label>
-              <select
+              <Select
                 value={forma}
-                onChange={(e) => setForma(e.target.value)}
+                onChange={setForma}
                 className={inputClass}
-              >
-                <option value="">— Selecione —</option>
-                {["INTER", "Nubank", "Nu PJ", "Lotérica", "Cortesia","Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"].map((f) => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "— Selecione —" },
+                  ...["INTER", "Nubank", "Nu PJ", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"].map((f) => ({
+                    value: f,
+                    label: f,
+                  })),
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Tipo</label>

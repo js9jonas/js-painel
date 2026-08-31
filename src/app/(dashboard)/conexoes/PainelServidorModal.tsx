@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import type { PainelServidorRow, ServidorVinculoRow } from "@/lib/paineis";
 import { salvarPainelServidor } from "@/app/actions/paineis";
+import { Select } from "@/components/ui/select";
 
 const TIPOS_SERVIDOR = [
   "club", "central", "uniplay", "now", "unitv", "liebe", "fast", "natv", "outro",
@@ -79,11 +80,12 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
             <input className={input} value={form.nome} onChange={(e) => set("nome", e.target.value)} required />
           </Field>
           <Field label="Tipo *">
-            <select className={input} value={form.tipo} onChange={(e) => set("tipo", e.target.value)}>
-              {TIPOS_SERVIDOR.map((t) => (
-                <option key={t} value={t}>{t.toUpperCase()}</option>
-              ))}
-            </select>
+            <Select
+              className={input}
+              value={form.tipo}
+              onChange={(v) => set("tipo", v)}
+              options={TIPOS_SERVIDOR.map((t) => ({ value: t, label: t.toUpperCase() }))}
+            />
           </Field>
         </div>
 
@@ -124,18 +126,18 @@ export default function PainelServidorModal({ painel, servidores, onClose, onSal
         </label>
 
         <Field label="Servidor vinculado (saldo automático)">
-          <select
+          <Select
             className={input}
-            value={form.id_servidor ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, id_servidor: e.target.value ? Number(e.target.value) : null }))}
-          >
-            <option value="">— Nenhum —</option>
-            {servidores.map((s) => (
-              <option key={s.id_servidor} value={s.id_servidor}>
-                {s.codigo_publico} — {s.nome_interno}
-              </option>
-            ))}
-          </select>
+            value={form.id_servidor != null ? String(form.id_servidor) : ""}
+            onChange={(v) => setForm((f) => ({ ...f, id_servidor: v ? Number(v) : null }))}
+            options={[
+              { value: "", label: "— Nenhum —" },
+              ...servidores.map((s) => ({
+                value: String(s.id_servidor),
+                label: `${s.codigo_publico} — ${s.nome_interno}`,
+              })),
+            ]}
+          />
         </Field>
 
         {erro && <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">{erro}</p>}

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateAssinatura } from "@/app/actions/assinaturas";
+import { Select } from "@/components/ui/select";
 import type { PlanoRow } from "@/lib/planos";
 import type { PacoteRow } from "@/lib/pacotes";
 
@@ -111,17 +112,15 @@ export default function EditAssinaturaModal({
             <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
               Status
             </label>
-            <select
+            <Select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={setStatus}
               className={selectClass}
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
+              options={STATUS_OPTIONS.map((s) => ({
+                value: s,
+                label: s.charAt(0).toUpperCase() + s.slice(1),
+              }))}
+            />
           </div>
 
           {/* Pacote */}
@@ -129,19 +128,18 @@ export default function EditAssinaturaModal({
             <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
               Pacote
             </label>
-            <select
+            <Select
               value={idPacote}
-              onChange={(e) => handlePacoteChange(e.target.value)}
+              onChange={handlePacoteChange}
               className={selectClass}
-            >
-              <option value="">— Nenhum —</option>
-              {pacotes.map((p) => (
-                <option key={p.id_pacote} value={p.id_pacote}>
-                  {p.contrato ?? `Pacote #${p.id_pacote}`}
-                  {p.telas ? ` (${p.telas} tela${p.telas !== 1 ? "s" : ""})` : ""}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "— Nenhum —" },
+                ...pacotes.map((p) => ({
+                  value: p.id_pacote,
+                  label: `${p.contrato ?? `Pacote #${p.id_pacote}`}${p.telas ? ` (${p.telas} tela${p.telas !== 1 ? "s" : ""})` : ""}`,
+                })),
+              ]}
+            />
           </div>
 
           {/* Plano */}
@@ -154,19 +152,18 @@ export default function EditAssinaturaModal({
                 </span>
               )}
             </label>
-            <select
+            <Select
               value={idPlano}
-              onChange={(e) => setIdPlano(e.target.value)}
+              onChange={setIdPlano}
               className={selectClass}
-            >
-              <option value="">— Nenhum —</option>
-              {planosFiltrados.map((p) => (
-                <option key={p.id_plano} value={p.id_plano}>
-                  {p.tipo ?? `Plano #${p.id_plano}`}
-                  {p.valor ? ` — R$ ${parseFloat(p.valor).toFixed(2).replace(".", ",")}` : ""}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "— Nenhum —" },
+                ...planosFiltrados.map((p) => ({
+                  value: p.id_plano,
+                  label: `${p.tipo ?? `Plano #${p.id_plano}`}${p.valor ? ` — R$ ${parseFloat(p.valor).toFixed(2).replace(".", ",")}` : ""}`,
+                })),
+              ]}
+            />
           </div>
 
           {/* Vencimentos */}
