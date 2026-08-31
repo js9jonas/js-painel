@@ -140,4 +140,36 @@ Entregue como artifact — https://claude.ai/code/artifact/f0965825-56f8-4da6-84
 
 **Na sequência, Jonas pediu "agora quero pra smartone"** — mesma query trocando `id_app` pra 4, critério "prontos" idêntico. Resultado: **42 devices** (0 críticas ≤7d, 4 atenção 8-30d, 38 OK), + **18 excluídos** por `validade` NULL (mesmo problema documentado em 13/08 e 21/08 — SmartOne às vezes não grava esse campo, diferente do FunPlay). Artifact separado (link próprio, não reaproveita o do FunPlay) — https://claude.ai/code/artifact/0b7f7f4c-3ef6-42f8-95c9-f54854f62372, com callout explicando os 18 excluídos em vez de omiti-los silenciosamente.
 
+## Extensão pra Clouddy (30/08/2026)
+
+Jonas pediu a mesma lista pra **Clouddy** (`nome_app = 'Clouddy'` em `public.apps`, sem `id_app` fixo memorizado — buscar por nome, já que Clouddy não tem adapter/sync e por isso não está em `reference_server_ids.md`). Mesmo critério já estabelecido em 27/07 (status inativo OU cliente sem assinatura ativa, mas só entra quem já tem ≥1 assinatura cadastrada — exclui revendedores tipo "Andrew Borges"/"Marcia IPTV 54" que têm dezenas de MACs Clouddy cada e nenhuma assinatura no sistema).
+
+**Diferença importante pedida por ele:** incluir a coluna de validade do próprio Clouddy (`ap.validade`, não só `venc_contrato` do cliente) — igual já fazíamos pro FunPlay/SmartOne. Clouddy tem `validade` **sempre preenchida** (diferente do SmartOne, que às vezes vem NULL).
+
+Isso revelou um achado de qualidade de dado: **6 dos 18 registros com `status='ativa'` no js-painel já tinham `validade` vencida de verdade** — o campo `status` local não é sincronizado automaticamente pra esse app (sem adapter), então fica desatualizado. Apliquei o mesmo subcritério "prontos" do FunPlay/SmartOne (`status='ativa'` E `dias_restantes >= 0`) pra separar quem é reuso imediato de quem precisaria de crédito novo pra reativar.
+
+**Query (mesmo padrão, trocando `ap.id_app = 3` por join em `apps.nome_app`):**
+```sql
+SELECT ap.id_app_registro, cl.id_cliente, cl.nome AS cliente, ap.mac, ap.status AS status_aplicativo,
+  ap.validade::text AS validade_app,
+  (ap.validade - CURRENT_DATE)::int AS dias_restantes,
+  (SELECT MAX(a2.venc_contrato) FROM assinaturas a2 WHERE a2.id_cliente = ap.id_cliente)::text AS ultimo_venc_contrato,
+  (SELECT COUNT(*) FROM assinaturas a3 WHERE a3.id_cliente = ap.id_cliente) AS qtd_assinaturas
+FROM aplicativos ap
+JOIN apps app ON app.id_app = ap.id_app
+JOIN clientes cl ON cl.id_cliente = ap.id_cliente
+WHERE app.nome_app = 'Clouddy'
+  AND ap.removido_em IS NULL
+  AND EXISTS (SELECT 1 FROM assinaturas a WHERE a.id_cliente = ap.id_cliente)
+  AND (
+    ap.status = 'inativa'
+    OR NOT EXISTS (SELECT 1 FROM assinaturas a WHERE a.id_cliente = ap.id_cliente AND a.venc_contrato >= CURRENT_DATE)
+  )
+ORDER BY cl.nome, ap.mac
+```
+
+**Resultado 30/08/2026:** 26 devices / 24 clientes únicos — **12 "prontos"** (ativa + validade futura), **6 ativa mas validade já vencida** (precisa crédito pra reativar), **8 com `status='inativa'`**. Uma das contas "inativa" é "JS Contas" (2 registros) — conta própria de testes do Jonas, sinalizada como não-candidata real, mesmo padrão do achado no POP Player (`incident_popplayer_cloudflare_bloqueio.md`).
+
+**How to apply (geral, pra qualquer app novo que ele peça esse relatório):** sempre incluir a coluna de validade própria do app (`ap.validade`) além do `ultimo_venc_contrato`, e separar em "prontos" (ativa + validade futura) vs "vencida" (ativa mas validade já passou — sinaliza status local desatualizado) vs "inativa" — não só entregar a lista plana. Perguntar/checar se `ap.validade` vem NULL com frequência nesse app (caso do SmartOne) antes de montar os "prontos".
+
 Ver também: [[reference-funplay-licencas-sem-contrato]], [[reference-funplays-api]], [[reference-funplays-licenca-transferencia]]
