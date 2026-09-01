@@ -172,4 +172,26 @@ ORDER BY cl.nome, ap.mac
 
 **How to apply (geral, pra qualquer app novo que ele peça esse relatório):** sempre incluir a coluna de validade própria do app (`ap.validade`) além do `ultimo_venc_contrato`, e separar em "prontos" (ativa + validade futura) vs "vencida" (ativa mas validade já passou — sinaliza status local desatualizado) vs "inativa" — não só entregar a lista plana. Perguntar/checar se `ap.validade` vem NULL com frequência nesse app (caso do SmartOne) antes de montar os "prontos".
 
+## Limpeza de `removido_em` + automação no sync (31/08/2026)
+
+Jonas pediu a lista "prontos pra transferir" de novo (FunPlay), e a partir dela abriu uma nova frente: identificar devices que **já sumiram do painel remoto** (licença reaproveitada pelo fornecedor em outro device — `aplicativos.removido_em` preenchido pelo próprio `sync-aplicativos/route.ts`, ver [[reference-adapters-paineis-iptv]]) e limpar o lixo órfão que ficava associado a eles:
+
+- **`aplicativo_playlists`** — linha da playlist configurada no device, ligada por `id_app_registro`. Depois que o device é removido, essa playlist não representa mais nada real (aponta pra um registro morto).
+- **`aplicativos.validade`** — depois que a licença migrou pra outro device, a validade gravada localmente não tem mais significado (a licença "virou" de outro cliente).
+
+**Critério:** `id_app IN (3,2,4)` (FunPlay/LazerPlay/SmartOne) `AND removido_em IS NOT NULL`. Join `aplicativo_playlists.id_app_registro = aplicativos.id_app_registro`.
+
+**Resultado da limpeza manual (uma vez, dados acumulados até então):**
+| App | Playlists órfãs excluídas | `validade` zerada |
+|---|---|---|
+| FunPlay | 67 | 70 (3 a mais que surgiram durante a própria limpeza — sync roda em produção o tempo todo) |
+| LazerPlay | 1 | 2 |
+| SmartOne | 9 | 24 |
+
+`public.contas` (a conta IPTV real, com billing/servidor) **não é afetada** — é uma tabela separada, com seu próprio `removido_em`, independente do Fun Play/app do device.
+
+**Automatizado direto no sync (permanente):** `src/app/api/paineis/servidores/[id]/sync-aplicativos/route.ts` agora faz essa limpeza sozinho, todo sync, restrito exatamente aos devices que **aquela execução** acabou de marcar como removidos (via `RETURNING id_app_registro` do próprio `UPDATE ... SET removido_em`), nunca uma varredura do histórico inteiro — dentro do guard-rail `syncConfiavel` já existente (aborta remoções se a API devolver <50% do volume esperado). Cobre os 4 apps que passam por essa rota (funplays/lazerplay/coreplayer/smartone) — não é código específico de um app só.
+
+**How to apply:** não precisa mais rodar essa limpeza manualmente — já acontece a cada sync. Só relevante lembrar disso se um relatório de "licenças livres" antigo vier com `validade` preenchida em devices `removido_em IS NOT NULL` — indica dado de antes de 31/08/2026, desatualizado.
+
 Ver também: [[reference-funplay-licencas-sem-contrato]], [[reference-funplays-api]], [[reference-funplays-licenca-transferencia]]
