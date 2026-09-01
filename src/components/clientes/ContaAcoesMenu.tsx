@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { ContaPainelVinculada } from "@/lib/clientes";
 import { enviarDadosAcesso, type FormatoEnvio, type ResultadoEnvioDados } from "@/app/actions/dadosAcessoIptv";
 import { enviarDadosAcessoIphone } from "@/app/actions/dadosAcessoIphone";
+import { enviarDadosAcessoAndroid } from "@/app/actions/dadosAcessoAndroid";
 import { montarLinkM3u } from "@/lib/dados-acesso-iptv-formato";
 import EditarContaModal from "./EditarContaModal";
 import MigrarPainelModal from "./MigrarPainelModal";
@@ -81,6 +82,15 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
     });
   }
 
+  function enviarAndroid() {
+    setResultado(null);
+    setCopiadoModelo(false);
+    startTransition(async () => {
+      const r = await enviarDadosAcessoAndroid(idCliente);
+      setResultado({ ...r, texto: "" });
+    });
+  }
+
   function copiarModelo() {
     if (!resultado) return;
     navigator.clipboard.writeText(resultado.texto);
@@ -120,6 +130,12 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
                 📱 Enviar dados para iPhone
               </DropdownMenuItem>
             </>
+          )}
+
+          {!isUnitv && (
+            <DropdownMenuItem onSelect={enviarAndroid}>
+              🤖 Enviar dados para Android
+            </DropdownMenuItem>
           )}
 
           {isUnitv && (
