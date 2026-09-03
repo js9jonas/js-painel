@@ -2,6 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
+- [incident_react_compiler_select_stale_value](incident_react_compiler_select_stale_value.md) — 03/09/2026 — `<Select>` (Radix) em modal de edição abria sem opção marcada mesmo com valor certo no state; causa era padrão `setState`-dentro-de-`useEffect` pra popular form a partir de props, que o React Compiler memoiza errado; corrigido com estado inicial preguiçoso + `key` no call site
 - [incident_select_nativo_linux_click_drag](incident_select_nativo_linux_click_drag.md) — 31/08/2026 — `<select>` nativo no Linux/Chrome do Jonas usa modelo GTK de clicar-e-arrastar (clique rápido já "seleciona" errado); trocado por componente próprio (`@/components/ui/select`, Radix) em todo o app, 16 arquivos/29 selects
 - [incident_build_oom_easypanel](incident_build_oom_easypanel.md) — 31/08/2026 — deploy falhou com heap out of memory na checagem de TypeScript do `next build`; corrigido com `NODE_OPTIONS=--max-old-space-size=4096` no script de build
 - [incident_chat_pool_esgotado_29ago2026](incident_chat_pool_esgotado_29ago2026.md) — 29/08/2026 — polling do /chat sem trava de sobreposição esgotou o pool do Postgres, travando /chat + /conexoes + renovar juntos; corrigido com trava no cliente + statement_timeout + tabela-resumo incremental `chat_conversas_resumo`

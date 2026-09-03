@@ -138,6 +138,7 @@ export default function ConexoesClient({ servidores, apps, appSync, servidoresVi
       {/* Modais */}
       {modalServidor !== null && (
         <PainelServidorModal
+          key={modalServidor === "novo" ? "novo" : modalServidor.id}
           painel={modalServidor === "novo" ? null : modalServidor}
           servidores={servidoresVinculo}
           onClose={() => setModalServidor(null)}

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { PainelServidorRow, ServidorVinculoRow } from "@/lib/paineis";
 import { salvarPainelServidor } from "@/app/actions/paineis";
 import { Select } from "@/components/ui/select";
@@ -21,31 +21,37 @@ const VAZIO = {
   ativo: true, id_servidor: null as number | null,
 };
 
+// Estado inicial derivado direto do painel (sem useEffect+setState) — o antipadrão
+// anterior ("sincronizar prop pra state via effect") fazia o React Compiler memoizar
+// o JSX dos <Select> de Tipo/Servidor vinculado com um valor desatualizado: o dropdown
+// abria sem nada marcado mesmo com form.tipo/form.id_servidor já certos, porque a
+// atualização de fora do fluxo normal de render (setState dentro de effect) não invalida
+// o cache do Compiler do mesmo jeito que um estado inicial já correto. Bug real, achado
+// em produção 03/09/2026: dado chegava certo no payload SSR, mas o Select nunca refletia.
+// Ver docs/memoria/incident_react_compiler_select_stale_value.md.
+// A prop `key` no call site (ConexoesClient) garante um componente novo por painel/"novo",
+// então essa inicialização "roda" de novo a cada troca de registro sem precisar de effect.
+function formInicial(painel: PainelServidorRow | null) {
+  if (!painel) return { ...VAZIO };
+  return {
+    nome:           painel.nome,
+    tipo:           painel.tipo,
+    url_painel:     painel.url_painel ?? "",
+    host_stream:    painel.host_stream ?? "",
+    url_acesso_web: painel.url_acesso_web ?? "",
+    usuario:        painel.usuario ?? "",
+    senha:          "",
+    master:         painel.master ?? "",
+    contato_master: painel.contato_master ?? "",
+    ativo:          painel.ativo,
+    id_servidor:    painel.id_servidor ?? null,
+  };
+}
+
 export default function PainelServidorModal({ painel, servidores, onClose, onSalvo }: Props) {
-  const [form, setForm] = useState({ ...VAZIO });
+  const [form, setForm] = useState(() => formInicial(painel));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (painel) {
-      setForm({
-        nome:           painel.nome,
-        tipo:           painel.tipo,
-        url_painel:     painel.url_painel ?? "",
-        host_stream:    painel.host_stream ?? "",
-        url_acesso_web: painel.url_acesso_web ?? "",
-        usuario:        painel.usuario ?? "",
-        senha:          "",
-        master:         painel.master ?? "",
-        contato_master: painel.contato_master ?? "",
-        ativo:          painel.ativo,
-        id_servidor:    painel.id_servidor ?? null,
-      });
-    } else {
-      setForm({ ...VAZIO });
-    }
-    setErro(null);
-  }, [painel]);
 
   function set(field: string, value: string | boolean) {
     setForm((f) => ({ ...f, [field]: value }));
