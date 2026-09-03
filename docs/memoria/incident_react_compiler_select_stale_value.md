@@ -75,14 +75,43 @@ vínculos que estavam pendentes (inclusive achou e preencheu um painel que tamb�
 estava sem URL do painel cadastrada, detectado só porque agora dava pra ver o form
 populado corretamente).
 
+## Segunda ocorrência: `EditarContaModal.tsx` (03/09/2026)
+
+Ao trocar usuário/senha de uma conta CLUB pela UI, Jonas relatou "não deu certo" —
+investigando junto com ele: a **primeira tentativa funcionou de verdade** no painel
+(confirmado reproduzindo a chamada real do adapter direto, fora da UI — o CLUB aceitou
+e trocou usuário/senha sem erro), mas a tela não refletiu a troca, então ele tentou de
+novo — e a segunda tentativa falhou com "usuário não encontrado", porque o código
+mandava `usuario: conta.usuario` (valor antigo, vindo da prop) como identificador de
+busca no painel, e esse usuário já não existia mais lá (tinha acabado de ser renomeado
+na primeira tentativa).
+
+Causa: `EditarContaModal` também tinha `useState(vazio-ish) + useEffect(() => sync a
+partir de conta, [open, conta])`, o mesmo antipadrão da causa raiz original. Diferença
+aqui: o componente ficava **sempre montado** (visibilidade controlada por uma prop
+`open`, não por render condicional), então o fix de "state inicial preguiçoso + key"
+sozinho não bastava.
+
+**Fix:** `ContaAcoesMenu.tsx` passou a montar `EditarContaModal` só enquanto aberto
+(`{editarAberto && <EditarContaModal .../>}`, mesmo padrão do `MigrarPainelModal`
+logo acima no mesmo arquivo) — `open`/`useEffect` saíram, state nasce direto da prop
+via inicializador do `useState`. Além disso, o identificador usado pra localizar a
+conta no painel (`usuario: conta.usuario` no body do POST) passou a vir de um state
+local (`usuarioNoPainel`) que é atualizado pro valor novo assim que uma troca de
+usuário é salva com sucesso — não depende mais do `router.refresh()` repropagar a prop
+`conta` a tempo de uma tentativa seguinte. Resolve o "não deu certo, tentei de novo"
+mesmo que o refresh do Next ainda não tenha chegado.
+
 ## Se aparecer de novo
 
 Esse padrão (`useState(vazio)` + `useEffect(() => setForm(dadosDaProps), [prop])`)
 existe em outros modais de edição do app que precisam popular um form a partir de um
 registro existente — qualquer um com o mesmo padrão está potencialmente sujeito ao
 mesmo bug sob o React Compiler, especialmente se usar `<Select>` do
-`@/components/ui/select` pra mostrar um valor pré-selecionado. **Ainda não mapeado
-quais outros modais têm o padrão** — Jonas decidiu (03/09/2026) corrigir só esse
-arquivo primeiro e validar antes de decidir se vale varrer o app inteiro atrás do
-mesmo antipadrão. Rodar `npx eslint` no arquivo suspeito é o jeito mais rápido de
+`@/components/ui/select` pra mostrar um valor pré-selecionado, ou (como no caso do
+`EditarContaModal`, segunda ocorrência acima) se algum campo derivado da prop for usado
+como identificador/chave de busca numa chamada subsequente. **Ainda não mapeado
+quais outros modais têm o padrão** — já são 2 achados de forma reativa (um por
+teste manual, outro relatado pelo Jonas), nenhuma varredura sistemática ainda. Rodar
+`npx eslint` no arquivo suspeito é o jeito mais rápido de
 confirmar (`react-hooks/set-state-in-effect` acusa o padrão direto).

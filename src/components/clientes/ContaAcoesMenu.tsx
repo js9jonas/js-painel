@@ -167,13 +167,14 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
         />
       )}
 
-      <EditarContaModal
-        conta={conta}
-        appsVinculados={appsVinculados}
-        open={editarAberto}
-        onClose={() => setEditarAberto(false)}
-        onSaved={onContaChanged}
-      />
+      {editarAberto && (
+        <EditarContaModal
+          conta={conta}
+          appsVinculados={appsVinculados}
+          onClose={() => setEditarAberto(false)}
+          onSaved={onContaChanged}
+        />
+      )}
 
       {(resultado || isPending) && (
         <div

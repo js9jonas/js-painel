@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ContaPainelVinculada } from "@/lib/clientes";
 
@@ -9,7 +9,6 @@ type AppVinculado = { id_app_registro: number; nome_app: string | null };
 type Props = {
   conta: ContaPainelVinculada;
   appsVinculados: AppVinculado[];
-  open: boolean;
   onClose: () => void;
   /** Chamado após salvar com sucesso, além do router.refresh() — necessário em páginas
    * que buscam as contas via fetch client-side (ex: chat) em vez de props de Server Component. */
@@ -32,29 +31,33 @@ function caps(tipo: string) {
   return CAPS[tipo] ?? { usuario: false, senha: false };
 }
 
-export default function EditarContaModal({ conta, appsVinculados, open, onClose, onSaved }: Props) {
+// O componente só é montado enquanto o modal está aberto (ver ContaAcoesMenu:
+// `{editarAberto && <EditarContaModal .../>}`) — sem isso, um `useEffect` sincronizando
+// `conta` (prop) pro state a cada abertura reintroduziria o mesmo antipadrão já corrigido
+// em PainelServidorModal (setState-dentro-de-effect memoizado errado pelo React Compiler,
+// ver docs/memoria/incident_react_compiler_select_stale_value.md).
+//
+// `usuarioNoPainel` é tratado à parte de `conta.usuario`: é o identificador usado pra
+// localizar a conta no painel remoto (campo `usuario` enviado no POST). Ele nasce da prop,
+// mas depois de um `novoUsuario` salvo com sucesso passa a refletir o valor JÁ TROCADO —
+// sem depender de o `router.refresh()` repropagar a prop `conta` fresca a tempo. Sem isso,
+// uma tentativa de salvar de novo antes do refresh completar reenviaria o usuário antigo,
+// que o painel já não reconhece mais (causa real de um caso em produção 03/09/2026: primeira
+// tentativa funcionou, mas a tela não refletiu e a segunda tentativa falhou com "usuário não
+// encontrado" — o usuário já tinha sido trocado no painel).
+export default function EditarContaModal({ conta, appsVinculados, onClose, onSaved }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const c = caps(conta.tipo_painel);
 
-  const [rotulo, setRotulo]     = useState(conta.rotulo   ?? "");
-  const [senha,  setSenha]      = useState(conta.senha    ?? "");
-  const [usuario, setUsuario]   = useState(conta.usuario  ?? "");
-  const [erro,   setErro]       = useState<string | null>(null);
-  const [aviso,  setAviso]      = useState<string | null>(null);
-  const [ok,     setOk]         = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setRotulo(conta.rotulo  ?? "");
-      setSenha(conta.senha    ?? "");
-      setUsuario(conta.usuario ?? "");
-      setErro(null);
-      setAviso(null);
-      setOk(false);
-    }
-  }, [open, conta]);
+  const [rotulo, setRotulo]               = useState(conta.rotulo  ?? "");
+  const [senha,  setSenha]                = useState(conta.senha   ?? "");
+  const [usuario, setUsuario]             = useState(conta.usuario ?? "");
+  const [usuarioNoPainel, setUsuarioNoPainel] = useState(conta.usuario ?? "");
+  const [erro,   setErro]                 = useState<string | null>(null);
+  const [aviso,  setAviso]                = useState<string | null>(null);
+  const [ok,     setOk]                   = useState(false);
 
   function salvar() {
     setErro(null);
@@ -65,11 +68,11 @@ export default function EditarContaModal({ conta, appsVinculados, open, onClose,
       try {
         const body: Record<string, unknown> = {
           idConta: Number(conta.id_conta),
-          usuario: conta.usuario,
+          usuario: usuarioNoPainel,
         };
-        if (rotulo !== (conta.rotulo ?? ""))           body.novoRotulo  = rotulo;
-        if (c.senha  && senha   !== (conta.senha ?? "")) body.novaSenha   = senha;
-        if (c.usuario && usuario !== conta.usuario)     body.novoUsuario = usuario;
+        if (rotulo !== (conta.rotulo ?? ""))              body.novoRotulo  = rotulo;
+        if (c.senha  && senha   !== (conta.senha ?? ""))  body.novaSenha   = senha;
+        if (c.usuario && usuario !== usuarioNoPainel)     body.novoUsuario = usuario;
 
         // Nada mudou
         if (Object.keys(body).length === 2) {
@@ -93,6 +96,11 @@ export default function EditarContaModal({ conta, appsVinculados, open, onClose,
         if (json.aviso) setAviso(json.aviso);
         else setOk(true);
 
+        // Trava o identificador de busca no valor recém-salvo, pra uma eventual próxima
+        // tentativa nesta mesma sessão do modal (ex: editar de novo antes do refresh
+        // propagar) continuar achando a conta certa no painel.
+        if (typeof body.novoUsuario === "string") setUsuarioNoPainel(body.novoUsuario);
+
         router.refresh();
         onSaved?.();
       } catch (e) {
@@ -100,8 +108,6 @@ export default function EditarContaModal({ conta, appsVinculados, open, onClose,
       }
     });
   }
-
-  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
