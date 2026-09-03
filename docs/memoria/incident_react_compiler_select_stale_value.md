@@ -67,6 +67,14 @@ o sintoma nesse arquivo — o padrão setState-em-effect continuaria ali, o lint
 continuaria reclamando, e qualquer outro componente com o mesmo padrão teria o mesmo
 bug. A correção adotada resolve a causa, não só o sintoma.
 
+## ✅ Validado em produção (03/09/2026)
+
+Jonas deployou no Easypanel e confirmou: cadastro/edição dos campos Tipo e Servidor
+vinculado voltou a funcionar normal em `/conexoes`. Aproveitou pra corrigir de vez os
+vínculos que estavam pendentes (inclusive achou e preencheu um painel que também
+estava sem URL do painel cadastrada, detectado só porque agora dava pra ver o form
+populado corretamente).
+
 ## Se aparecer de novo
 
 Esse padrão (`useState(vazio)` + `useEffect(() => setForm(dadosDaProps), [prop])`)
