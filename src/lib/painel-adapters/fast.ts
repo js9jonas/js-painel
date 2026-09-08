@@ -42,8 +42,23 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
   return {
     async listarContas(): Promise<ContaPainel[]> {
       const { token, secret } = getCredentials(creds);
-      const data = await apiFetch(token, "get_clients_all", { secret, limit: 500 });
-      const clients: any[] = Array.isArray(data) ? data : Object.values(data);
+      const LIMIT = 500;
+      const MAX_PAGINAS = 50; // trava de segurança (25 mil contas) contra loop infinito
+      const vistos = new Set<string>();
+      const clients: any[] = [];
+
+      for (let page = 1; page <= MAX_PAGINAS; page++) {
+        const data = await apiFetch(token, "get_clients_all", { secret, limit: LIMIT, page });
+        const pagina: any[] = Array.isArray(data) ? data : Object.values(data);
+        if (pagina.length === 0) break;
+
+        const novos = pagina.filter((c: any) => !vistos.has(c.username));
+        if (novos.length === 0) break; // API ignorou "page" e repetiu a mesma página → evita loop infinito
+        novos.forEach((c: any) => vistos.add(c.username));
+        clients.push(...novos);
+
+        if (pagina.length < LIMIT) break; // última página
+      }
 
       return clients.map((c: any) => ({
         usuario: c.username,

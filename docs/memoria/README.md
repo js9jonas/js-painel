@@ -2,6 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
+- [incident_fast_unitv_paginacao_listarcontas](incident_fast_unitv_paginacao_listarcontas.md) — 08/09/2026 — `listarContas()` do FAST e UNITV só buscava a 1ª página (`limit`/`pageSize` 500) sem paginar, contas além da 500ª sumiam do sync sem erro; corrigido com loop de paginação + trava anti-loop-infinito; pendente validar indexação de `page` (0 ou 1-based) e corrigir os ~7 lookups por `sn` no UNITV que ainda usam só `page:1`
 - [incident_react_compiler_select_stale_value](incident_react_compiler_select_stale_value.md) — 03/09/2026 — `<Select>` (Radix) em modal de edição abria sem opção marcada mesmo com valor certo no state; causa era padrão `setState`-dentro-de-`useEffect` pra popular form a partir de props, que o React Compiler memoiza errado; corrigido com estado inicial preguiçoso + `key` no call site
 - [incident_select_nativo_linux_click_drag](incident_select_nativo_linux_click_drag.md) — 31/08/2026 — `<select>` nativo no Linux/Chrome do Jonas usa modelo GTK de clicar-e-arrastar (clique rápido já "seleciona" errado); trocado por componente próprio (`@/components/ui/select`, Radix) em todo o app, 16 arquivos/29 selects
 - [incident_build_oom_easypanel](incident_build_oom_easypanel.md) — 31/08/2026 — deploy falhou com heap out of memory na checagem de TypeScript do `next build`; corrigido com `NODE_OPTIONS=--max-old-space-size=4096` no script de build

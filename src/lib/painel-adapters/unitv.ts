@@ -199,15 +199,31 @@ export function criarUnitvAdapter(
 
   return {
     async listarContas(): Promise<ContaPainel[]> {
-      const data = await callWithRelogin("account", (token) => ({
-        package_id: 1,
-        dealer_token: token,
-        dealer_name: usuario,
-        time_zone: "America/Sao_Paulo",
-        page: 1,
-        pageSize: 500,
-      }));
-      const list: any[] = data.list ?? [];
+      const PAGE_SIZE = 500;
+      const MAX_PAGINAS = 50; // trava de segurança (25 mil contas) contra loop infinito
+      const vistos = new Set<string>();
+      const list: any[] = [];
+
+      for (let page = 1; page <= MAX_PAGINAS; page++) {
+        const data = await callWithRelogin("account", (token) => ({
+          package_id: 1,
+          dealer_token: token,
+          dealer_name: usuario,
+          time_zone: "America/Sao_Paulo",
+          page,
+          pageSize: PAGE_SIZE,
+        }));
+        const pagina: any[] = data.list ?? [];
+        if (pagina.length === 0) break;
+
+        const novos = pagina.filter((u: any) => !vistos.has(u.sn));
+        if (novos.length === 0) break; // API ignorou "page" e repetiu a mesma página → evita loop infinito
+        novos.forEach((u: any) => vistos.add(u.sn));
+        list.push(...novos);
+
+        if (pagina.length < PAGE_SIZE) break; // última página
+      }
+
       return list.map((u) => ({
         usuario: u.sn,
         rotulo: u.snName || "",

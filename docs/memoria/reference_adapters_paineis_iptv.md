@@ -25,7 +25,7 @@ Arquivo de referência vivo. Atualizar conforme Jonas reportar resultados dos te
 - **Auth:** TOKEN permanente na URL + SECRET no body JSON — sem expiração, sem captcha
 - **Swagger:** `https://painelcliente.com/swagger` (público, OAS 3.0)
 - **Endpoints usados:**
-  - `POST /get_clients_all/{token}` — body `{secret, limit:500}` — lista todas as contas
+  - `POST /get_clients_all/{token}` — body `{secret, limit:500, page:N}` — lista contas, **paginado desde 08/09/2026** (ver [[incident_fast_unitv_paginacao_listarcontas]] — antes só pegava a 1ª página, contas além da 500ª sumiam do sync silenciosamente)
   - `POST /renew_client/{token}` — body `{secret, username, month:N}` — renova
   - `POST /profile/{token}` — body `{secret}` — retorna créditos (campo exato a confirmar em teste)
 - **Formato resposta:** `{statusCode:200, result:true, data:{...}}` / erro: `result:false, mens:"..."`
@@ -142,7 +142,7 @@ Arquivo de referência vivo. Atualizar conforme Jonas reportar resultados dos te
 - **Sessão salva:** JSON `{token}` em `painel_servidores.session_cookie` (sem cfClearance)
 - **Re-login:** automático em returnCode 300
 - **Proxy Webshare:** obrigatório — IP do datacenter bloqueado pelo Cloudflare do revenda.watch
-- **Listar:** `POST /api/account` body AES criptografado, `pageSize:500`
+- **Listar:** `POST /api/account` body AES criptografado, `pageSize:500`, **paginado desde 08/09/2026** (ver [[incident_fast_unitv_paginacao_listarcontas]]) em `listarContas()` — ⚠️ os outros ~7 pontos que buscam uma conta específica via `.find(u => u.sn === X)` (renovar, editarConta, gerarTeste etc.) ainda fazem só `page:1`, não corrigidos
 - **Renovar:** `POST /api/account/renew` com sign = `MD5("dealer" + id + "1" + meses)`
 - **getCreditos():** `POST /api/getDealerInfo` → `package_objs.find(p.package_id===1).points` ⚠️ **não usar** `dealerInfo.points` (agregado geral incorreto)
 - **Renovar quirks:** `account/renew` retorna `data:null` → usar `requireData=false` no apiCall; aguardar 5s antes de buscar `expireTime` na listagem (API leva 3-5s para processar)
