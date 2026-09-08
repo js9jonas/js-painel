@@ -2,8 +2,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
 import { auth } from '@/auth'
+import { extractLearningFromEdicao } from '@/lib/chat-ia-learning'
 
 export const dynamic = 'force-dynamic'
+
+// Últimas mensagens da conversa, no mesmo formato usado pra gerar a sugestão original —
+// dá contexto pro extrator de aprendizado entender o que motivou a edição.
+async function buildHistoricoParaAprendizado(telefone: string): Promise<string> {
+  try {
+    const { rows } = await pool.query<{ conteudo: string | null; origem: string; tipo: string }>(
+      `SELECT conteudo, origem, tipo FROM public.whatsapp_mensagens
+       WHERE telefone = $1 ORDER BY recebida_em DESC LIMIT 10`,
+      [telefone]
+    )
+    return rows.reverse()
+      .map((m) => `${m.origem === 'cliente' ? 'Cliente' : 'Jonas'}: ${m.tipo === 'text' ? (m.conteudo ?? '') : `[${m.tipo}]`}`)
+      .join('\n')
+  } catch {
+    return ''
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -84,6 +102,14 @@ export async function POST(req: NextRequest) {
       reply_conteudo ?? null,
       reply_origem ?? null,
     ])
+
+    // Sugestão foi editada antes de enviar — sinal de aprendizado mais direto que existe.
+    // Roda em background, não atrasa a resposta.
+    if (status_sugestao === 'editada' && sugestao_ia && tipoEnvio === 'text') {
+      buildHistoricoParaAprendizado(telefone)
+        .then((historico) => extractLearningFromEdicao(sugestao_ia, mensagem, historico))
+        .catch(() => {})
+    }
 
     return NextResponse.json({ success: true, message_id: data.messages?.[0]?.id })
   } catch (err) {

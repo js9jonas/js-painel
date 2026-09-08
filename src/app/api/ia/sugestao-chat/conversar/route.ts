@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { auth } from '@/auth'
+import { loadChatLearnings, extractLearningFromContexto } from '@/lib/chat-ia-learning'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ interface MensagemAgente {
   content: string
 }
 
-function buildSystem(clienteInfo: string, historico: string): string {
+function buildSystem(clienteInfo: string, historico: string, learnings: string): string {
   return `Você é um assistente de atendimento ao cliente para a JS Sistemas, um revendedor de IPTV no Brasil.
 Você está conversando com Jonas (o atendente) pra ajustar a sugestão de resposta que ele vai enviar ao cliente pelo WhatsApp — não é você quem fala com o cliente diretamente.
 
@@ -34,6 +35,7 @@ ${clienteInfo}
 
 Histórico da conversa com o cliente:
 ${historico || '(sem histórico ainda)'}
+${learnings}
 
 ## Seu papel
 - Jonas pode te dar contexto adicional (algo que você não sabia, uma decisão que ele tomou) ou pedir ajuste numa sugestão anterior sua.
@@ -73,7 +75,8 @@ Status assinatura: ${cliente.status ?? '—'}
 Vencimento: ${cliente.vencimento ?? '—'}
 ` : 'Cliente não identificado no sistema.'
 
-    const system = buildSystem(clienteInfo, historico ?? '')
+    const learnings = await loadChatLearnings()
+    const system = buildSystem(clienteInfo, historico ?? '', learnings)
 
     const res = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
@@ -84,19 +87,28 @@ Vencimento: ${cliente.vencimento ?? '—'}
 
     const raw = res.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text?.trim() ?? ''
 
+    let sugestao = ''
+    let comentario: string | null = null
     try {
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0])
-        return NextResponse.json({
-          sugestao: parsed.sugestao ?? '',
-          comentario: parsed.comentario ?? null,
-        })
+        sugestao = parsed.sugestao ?? ''
+        comentario = parsed.comentario ?? null
       }
     } catch {
       // fallthrough — devolve o texto cru como sugestão se o JSON não vier limpo
     }
-    return NextResponse.json({ sugestao: raw, comentario: null })
+    if (!sugestao) sugestao = raw
+
+    // A última instrução de Jonas nesta rodada é o sinal mais direto de aprendizado —
+    // extrai em background, não bloqueia a resposta.
+    const ultimaInstrucao = mensagens.findLast((m) => m.role === 'user')?.content
+    if (ultimaInstrucao && sugestao) {
+      extractLearningFromContexto(ultimaInstrucao, sugestao, historico ?? '').catch(() => {})
+    }
+
+    return NextResponse.json({ sugestao, comentario })
   } catch (err) {
     console.error('[IA] Erro ao conversar sobre sugestão:', err)
     return NextResponse.json({ error: 'Erro ao gerar sugestão' }, { status: 500 })

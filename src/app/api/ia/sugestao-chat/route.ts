@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { auth } from '@/auth'
+import { loadChatLearnings } from '@/lib/chat-ia-learning'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,8 @@ Status assinatura: ${cliente.status ?? '—'}
 Vencimento: ${cliente.vencimento ?? '—'}
 ` : 'Cliente não identificado no sistema.'
 
+    const learnings = await loadChatLearnings()
+
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
@@ -30,7 +33,8 @@ Vencimento: ${cliente.vencimento ?? '—'}
 Seu papel é sugerir respostas curtas, cordiais e objetivas para o atendente Jonas responder aos clientes no WhatsApp.
 Responda APENAS com o texto da sugestão — sem aspas, sem explicações, sem prefixos como "Sugestão:" ou "Resposta:".
 Use linguagem natural e informal, adequada ao WhatsApp brasileiro.
-Seja direto e conciso. Máximo de 3 frases.`,
+Seja direto e conciso. Máximo de 3 frases.
+${learnings}`,
       messages: [{
         role: 'user',
         content: `Informações do cliente:
