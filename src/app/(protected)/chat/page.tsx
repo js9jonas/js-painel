@@ -18,6 +18,7 @@ import RenovarAssinatura from '@/components/clientes/RenovarAssinatura'
 import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVencimentoPanel'
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
+import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
 
 interface Conversa {
   telefone: string
@@ -384,6 +385,11 @@ export default function ChatPage() {
   const [enviando, setEnviando] = useState(false)
   const [sugestao, setSugestao] = useState('')
   const [loadingSugestao, setLoadingSugestao] = useState(false)
+  const [agenteAtendimentoOpen, setAgenteAtendimentoOpen] = useState(false)
+  // Última sugestão gerada nesta sessão de composição (independe de sugestao ter sido limpa por ✕ ou envio)
+  // e se foi explicitamente descartada — juntos classificam o tri-state gravado em status_sugestao.
+  const sugestaoGeradaRef = useRef<string | null>(null)
+  const sugestaoDescartadaRef = useRef(false)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [hoveredMsg, setHoveredMsg] = useState<number | null>(null)
@@ -536,6 +542,9 @@ export default function ChatPage() {
     setSelectedIds(new Set())
     setReplyTo(null)
     setSugestao('')
+    setAgenteAtendimentoOpen(false)
+    sugestaoGeradaRef.current = null
+    sugestaoDescartadaRef.current = false
     setActiveMenu(null)
     setHoverMenuMsg(null)
     setHoveredMsg(null)
@@ -788,22 +797,44 @@ export default function ChatPage() {
         const data = await res.json()
         setSugestao(data.sugestao ?? '')
         setTexto(data.sugestao ?? '')
+        sugestaoGeradaRef.current = data.sugestao || null
+        sugestaoDescartadaRef.current = false
       }
     } finally {
       setLoadingSugestao(false)
     }
   }
 
-  async function enviar(usouSugestao = false) {
+  // Aplica uma sugestão vinda do painel do agente de atendimento (geração inicial ou ajuste)
+  function aplicarSugestaoDoAgente(texto: string) {
+    setSugestao(texto)
+    setTexto(texto)
+    sugestaoGeradaRef.current = texto
+    sugestaoDescartadaRef.current = false
+  }
+
+  async function enviar() {
     const msgFinal = lastUserInputRef.current.trim()
     if (!msgFinal || !selecionado || enviando) return
     setEnviando(true)
+
+    // Tri-state de aproveitamento da sugestão — só existe se alguma foi gerada nesta composição
+    const sugestaoOriginal = sugestaoGeradaRef.current
+    let statusSugestao: 'aceita_sem_edicao' | 'editada' | 'descartada' | null = null
+    if (sugestaoOriginal) {
+      statusSugestao = msgFinal === sugestaoOriginal
+        ? 'aceita_sem_edicao'
+        : sugestaoDescartadaRef.current ? 'descartada' : 'editada'
+    }
+
     const replyId      = replyTo?.wa_msg_id ?? null
     const replyConteudo = replyTo ? (replyTo.tipo === 'text' ? (replyTo.conteudo ?? null) : `[${replyTo.tipo}]`) : null
     const replyOrigem  = replyTo?.origem ?? null
     setTexto('')
     setSugestao('')
     setReplyTo(null)
+    sugestaoGeradaRef.current = null
+    sugestaoDescartadaRef.current = false
     if (inputRef.current) inputRef.current.innerHTML = ''
     lastUserInputRef.current = ''
     setInputVazio(true)
@@ -814,8 +845,9 @@ export default function ChatPage() {
         body: JSON.stringify({
           telefone: selecionado,
           mensagem: msgFinal,
-          sugestao_ia: usouSugestao ? sugestao : null,
-          foi_aceita: usouSugestao ? true : null,
+          sugestao_ia: sugestaoOriginal,
+          foi_aceita: statusSugestao === 'aceita_sem_edicao',
+          status_sugestao: statusSugestao,
           reply_msg_id: replyId,
           reply_conteudo: replyConteudo,
           reply_origem: replyOrigem,
@@ -1703,13 +1735,39 @@ export default function ChatPage() {
                   }}
                 >Usar</button>
                 <button
-                  onClick={() => setSugestao('')}
+                  onClick={() => setAgenteAtendimentoOpen(true)}
+                  title="Explicar o que ajustar nesta sugestão"
+                  style={{
+                    background: 'transparent', color: '#00a884', border: '1px solid #00a884',
+                    borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', flexShrink: 0
+                  }}
+                >💬 Ajustar</button>
+                <button
+                  onClick={() => { sugestaoDescartadaRef.current = true; setSugestao('') }}
                   style={{
                     background: 'transparent', color: '#667781', border: 'none',
                     fontSize: 16, cursor: 'pointer', padding: '0 4px'
                   }}
                 >✕</button>
               </div>
+            )}
+
+            {/* Painel do agente de atendimento — conversa pra gerar/ajustar a sugestão com contexto */}
+            {agenteAtendimentoOpen && !selectMode && (
+              <AgenteAtendimentoPanel
+                historico={mensagens.slice(-10).map(m =>
+                  `${m.origem === 'cliente' ? 'Cliente' : 'Jonas'}: ${m.conteudo ?? '[mídia]'}`
+                ).join('\n')}
+                cliente={cliente ? {
+                  nome: cliente.nome,
+                  plano: cliente.plano,
+                  status: cliente.status,
+                  vencimento: cliente.venc_contas
+                } : null}
+                sugestaoInicial={sugestao || null}
+                onAplicar={(texto) => { aplicarSugestaoDoAgente(texto); inputRef.current?.focus() }}
+                onClose={() => setAgenteAtendimentoOpen(false)}
+              />
             )}
 
             {/* Banner de resposta */}
@@ -1819,6 +1877,19 @@ export default function ChatPage() {
                 }}
               >
                 {loadingSugestao ? '...' : '✦ IA'}
+              </button>
+              <button
+                onClick={() => setAgenteAtendimentoOpen(true)}
+                disabled={mensagens.length === 0}
+                title="Conversar com o agente antes de gerar a sugestão"
+                style={{
+                  background: '#fff', border: '1px solid #d1d7db', color: '#54656f',
+                  borderRadius: 8, padding: '8px 10px', fontSize: 14,
+                  cursor: mensagens.length === 0 ? 'default' : 'pointer',
+                  flexShrink: 0, opacity: mensagens.length === 0 ? 0.5 : 1
+                }}
+              >
+                💬
               </button>
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <button
@@ -1951,7 +2022,7 @@ export default function ChatPage() {
                     }
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
-                      enviar(lastUserInputRef.current === sugestao)
+                      enviar()
                     }
                   }}
                   style={{
@@ -1985,7 +2056,7 @@ export default function ChatPage() {
               </button>
 
               <button
-                onClick={() => enviar(lastUserInputRef.current === sugestao)}
+                onClick={() => enviar()}
                 disabled={inputVazio || enviando || gravando}
                 style={{
                   background: !inputVazio && !gravando ? '#00a884' : '#adbac1',

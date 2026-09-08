@@ -1,6 +1,7 @@
 // src/app/api/ia/sugestao-chat/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { auth } from '@/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,11 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    }
+
     const { historico, cliente } = await req.json()
 
     const clienteInfo = cliente ? `

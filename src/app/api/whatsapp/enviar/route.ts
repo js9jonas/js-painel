@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-    const { telefone, mensagem, tipo, url, mp4_url, sugestao_ia, foi_aceita, reply_msg_id, reply_conteudo, reply_origem } = await req.json()
+    const { telefone, mensagem, tipo, url, mp4_url, sugestao_ia, foi_aceita, status_sugestao, reply_msg_id, reply_conteudo, reply_origem } = await req.json()
 
     const tipoEnvio = tipo ?? 'text'
 
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
     const conteudoSalvo = tipoEnvio === 'text' ? mensagem : url
     await pool.query(`
       INSERT INTO public.whatsapp_mensagens
-        (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, mensagem_final, source,
+        (wa_msg_id, telefone, tipo, conteudo, origem, sugestao_ia, foi_aceita, status_sugestao, mensagem_final, source,
          reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem, recebida_em)
-      VALUES ($1, $2, $3, $4, 'jonas', $5, $6, $7, $8, $9, $10, $11, NOW())
+      VALUES ($1, $2, $3, $4, 'jonas', $5, $6, $7, $8, $9, $10, $11, $12, NOW())
       ON CONFLICT (wa_msg_id) DO NOTHING
     `, [
       data.messages?.[0]?.id ?? `sent_${Date.now()}`,
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       conteudoSalvo,
       sugestao_ia ?? null,
       foi_aceita ?? null,
+      status_sugestao ?? null,
       tipoEnvio === 'text' ? mensagem : null,
       session?.user?.email ? `chat:${session.user.email}` : 'chat',
       reply_msg_id ?? null,

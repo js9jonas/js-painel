@@ -1,14 +1,23 @@
 ---
 name: project-chat-ia-aprendizado-historico
-description: "11/08/2026 — ideia (não iniciada): agente de sugestão de mensagem do /chat aprender com histórico real de conversas, não só com sugestões aceitas/editadas"
+description: "08/09/2026 — agente de atendimento do /chat: Fase 0 (fix instrumentação) e Fase 1 (caixa de conversa com o agente) implementadas; Fase 2 (aprendizado incremental) e mineração de histórico ainda pendentes"
 metadata:
   node_type: memory
   type: project
-  originSessionId: 8ee4daa4-21af-4846-8f81-a8e17f8ed224
-  modified: 2026-08-12T01:29:52.111Z
+  originSessionId: 01RW5BRa9bp84cx8kPsaZqy6
+  modified: 2026-09-08
 ---
 
-## Ideia (pedida por Jonas, ainda não iniciada — "momento mais apropriado")
+## Status (08/09/2026)
+
+Retomado e replanejado com Jonas — plano completo (4 pilares: caixa de conversa, captura de feedback, aprendizado incremental, escada de autonomia) apresentado e ele escolheu começar por **Fase 0 + 1**. Implementado nesta sessão:
+
+- **Fase 0 — fix de instrumentação** ✅: `whatsapp_mensagens.sugestao_ia` agora é sempre gravado quando uma sugestão foi gerada pra aquela resposta (antes só gravava se usada sem edição — o bug descrito abaixo). Nova coluna `status_sugestao` (`sql/010_whatsapp_mensagens_status_sugestao.sql`) com tri-state `aceita_sem_edicao` / `editada` / `descartada`, calculado em `chat/page.tsx::enviar()` via `sugestaoGeradaRef`/`sugestaoDescartadaRef`. `foi_aceita` (boolean) mantido como estava — ainda alimenta o badge "✦ IA" nas mensagens enviadas.
+- **Fase 1 — caixa de conversa com o agente** ✅: `src/components/chat/AgenteAtendimentoPanel.tsx` (painel novo, reaproveitando o padrão visual do resto do `/chat`) + `src/app/api/ia/sugestao-chat/conversar/route.ts` (Sonnet, mantém o histórico da conversa *com o agente* — diferente do histórico da conversa com o cliente). Dois pontos de entrada em `chat/page.tsx`: botão "💬" na barra de composição (abre o painel vazio, antes de gerar) e botão "💬 Ajustar" na bolha da sugestão já gerada (abre pré-carregado com ela). Cada resposta do agente no painel é uma sugestão pronta com botão "Usar".
+- Achado incidental corrigido: `api/ia/sugestao-chat/route.ts` não tinha checagem de `auth()` — endpoint aberto sem sessão. Adicionado ali e no endpoint novo.
+- **Pendente**: Fase 2 (tabela `lab.chat_ia_aprendizados` + extração em background a partir de edições/contexto do painel), Fase 3 (painel "Aprendizados" reaproveitando/generalizando a UI do `/agente`), Fase 4 (mineração de histórico, escopo abaixo) e Fase 5 (escada de autonomia, só desenho). Migration `010` ainda **não aplicada** em produção — rodar antes do próximo `commit e subir` que toque nisso.
+
+## Ideia original (11/08/2026, pré-replanejamento)
 
 Tornar o botão "Gerar mensagem com IA" do `/chat` (js-painel, [[project_chat_page]]) um agente com aprendizado constante, igual ao padrão já usado no `/agente` (`lab.agente_dados_aprendizados` + extração em background + discussão com o Sonnet) — ver `src/app/api/agent/chat/route.ts` e `src/app/api/agent/learnings/[id]/discuss/route.ts`.
 
