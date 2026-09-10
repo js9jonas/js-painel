@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { desmontarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 type Props = {
   idAppRegistro: number;
@@ -14,10 +15,6 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
 
   const [nome, setNome] = useState("");
   const [url, setUrl] = useState("");
-  const [host, setHost] = useState("");
-  const [port, setPort] = useState("");
-  const [usuario, setUsuario] = useState("");
-  const [senha, setSenha] = useState("");
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -26,7 +23,9 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
     setSalvando(true);
     setErro(null);
     try {
-      const corpo = isSmartOne ? { nome, host, port, usuario, senha } : { nome, url };
+      // SmartOne guarda host/porta/usuário/senha separados (exigência do endpoint
+      // dele) — desmontados aqui a partir do link m3u único da UI. Ver [[smartone-m3u]].
+      const corpo = isSmartOne ? { nome, ...desmontarLinkM3uSmartOne(url) } : { nome, url };
       const startRes = await fetch(`/api/aplicativos/${idAppRegistro}/playlists`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,35 +86,10 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
             <input value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} placeholder="Nome da playlist" />
           </div>
 
-          {isSmartOne ? (
-            <>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className={labelClass}>Servidor</label>
-                  <input value={host} onChange={(e) => setHost(e.target.value)} className={inputClass} placeholder="http://servidor.com" />
-                </div>
-                <div>
-                  <label className={labelClass}>Porta</label>
-                  <input value={port} onChange={(e) => setPort(e.target.value)} className={inputClass} placeholder="80" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Usuário</label>
-                  <input value={usuario} onChange={(e) => setUsuario(e.target.value)} className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Senha</label>
-                  <input value={senha} onChange={(e) => setSenha(e.target.value)} className={inputClass} />
-                </div>
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className={labelClass}>URL</label>
-              <input value={url} onChange={(e) => setUrl(e.target.value)} className={inputClass} placeholder="http://servidor.com/get.php?username=X&password=Y" />
-            </div>
-          )}
+          <div>
+            <label className={labelClass}>URL</label>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} className={inputClass} placeholder="http://servidor.com/get.php?username=X&password=Y" />
+          </div>
         </div>
 
         {erro && <p className="mx-6 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}

@@ -7,6 +7,7 @@ import { loginFunPlays, criarPlaylist as criarFunPlays, getPlaylistsDispositivo 
 import { loginLazerPlay, criarPlaylist as criarLazerPlay, getPlaylistsDispositivo as getLazerPlayPlaylists } from "@/lib/painel-adapters/lazerplay";
 import { loginCorePlayer, criarPlaylist as criarCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, criarPlaylist as criarSmartOne } from "@/lib/painel-adapters/smartone";
+import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 // Cria uma playlist nova num device existente. appacesso (FunPlays/LazerPlay/CorePlayer):
 // adiciona em aplicativo_playlists do MESMO id_app_registro. SmartOne: cria um SMARTKEY
@@ -108,7 +109,7 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
       // O novo smartkey fica como uma PLAYLIST do cadastro existente (não um aplicativo
       // novo) — mesmo critério visual do FunPlays/LazerPlay, ainda que no SmartOne cada
       // smartkey seja tecnicamente um device separado no painel.
-      const url = `${corpo.host}:${corpo.port}/?username=${encodeURIComponent(corpo.usuario ?? "")}&password=${encodeURIComponent(corpo.senha ?? "")}`;
+      const url = montarLinkM3uSmartOne(corpo.host ?? "", corpo.usuario ?? "", corpo.senha ?? "");
       await pool.query(
         `INSERT INTO public.aplicativo_playlists
            (id_app_registro, playlist_id_externo, nome, url, is_selected, expired_date, atualizado_em)

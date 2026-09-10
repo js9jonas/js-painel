@@ -8,6 +8,7 @@ import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
+import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 type Props = {
   idCliente: string;
@@ -91,6 +92,16 @@ function extrairUsernameUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+// SmartOne guarda host/porta/usuário/senha separados internamente, mas queremos que o
+// balão mostre sempre o mesmo formato de link m3u do FunPlays/LazerPlay/CorePlayer —
+// normaliza aqui pra cobrir também registros antigos sincronizados antes dessa mudança
+// (formato bruto "host:porta/?username=X&password=Y"). Ver [[smartone-m3u]].
+function urlExibicao(url: string, tipoPainel?: string | null): string {
+  if (tipoPainel !== "smartone") return url;
+  const { host, usuario, senha } = desmontarLinkM3uSmartOne(url);
+  return host ? montarLinkM3uSmartOne(host, usuario, senha) : url;
 }
 
 function PlaylistOptionsButton({ onEditar, onExcluir, excluindo }: { onEditar: () => void; onExcluir: () => void; excluindo: boolean }) {
@@ -220,9 +231,9 @@ function PlaylistBadge({
         {pl.url && (
           <div
             className="text-[10px] opacity-60 font-mono truncate max-w-[220px] select-all"
-            title={pl.url}
+            title={urlExibicao(pl.url, tipoPainel)}
           >
-            {pl.url}
+            {urlExibicao(pl.url, tipoPainel)}
           </div>
         )}
         {erroExclusao && (

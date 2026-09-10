@@ -7,6 +7,7 @@ import { loginFunPlays, editarPlaylist as editarFunPlays, excluirPlaylist as exc
 import { loginLazerPlay, editarPlaylist as editarLazerPlay, excluirPlaylist as excluirLazerPlay } from "@/lib/painel-adapters/lazerplay";
 import { loginCorePlayer, editarPlaylist as editarCorePlayer, excluirPlaylist as excluirCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, editarPlaylist as editarSmartOne, excluirPlaylist as excluirSmartOne } from "@/lib/painel-adapters/smartone";
+import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 // Editar/excluir uma playlist específica de um device de app (FunPlays/LazerPlay/
 // CorePlayer/SmartOne). Endpoints descobertos via monitoramento de rede em 16/06/2026
@@ -105,7 +106,7 @@ async function executar(idAppRegistro: number, idPlaylist: number, acao: Acao, c
           senha: corpo.senha ?? "",
           nota: corpo.nota,
         });
-        const url = `${corpo.host}:${corpo.port}/?username=${encodeURIComponent(corpo.usuario ?? "")}&password=${encodeURIComponent(corpo.senha ?? "")}`;
+        const url = montarLinkM3uSmartOne(corpo.host ?? "", corpo.usuario ?? "", corpo.senha ?? "");
         await pool.query(
           `UPDATE public.aplicativo_playlists SET nome = $1, url = $2, atualizado_em = NOW()
            WHERE id_app_registro = $3 AND playlist_id_externo = $4`,

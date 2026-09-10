@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { PlaylistRow } from "@/lib/aplicativos";
+import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 type Props = {
   idAppRegistro: number;
@@ -12,24 +13,19 @@ type Props = {
   onSaved: () => void;
 };
 
-// SmartOne armazena a URL já montada como "host:port/?username=X&password=Y" —
-// desmonta pra exibir os campos separados (formato exigido pelo POST de edição lá).
-function parseSmartOneUrl(url: string | null): { host: string; port: string; usuario: string; senha: string } {
-  const m = (url ?? "").match(/^(.*):(\d+)\/\?username=([^&]*)&password=(.*)$/);
-  if (!m) return { host: "", port: "", usuario: "", senha: "" };
-  return { host: m[1], port: m[2], usuario: decodeURIComponent(m[3]), senha: decodeURIComponent(m[4]) };
-}
-
 export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPainel, nomeCliente, onClose, onSaved }: Props) {
   const isSmartOne = tipoPainel === "smartone";
-  const smartOneCampos = isSmartOne ? parseSmartOneUrl(playlist.url) : null;
 
+  // SmartOne guarda host/porta/usuário/senha separados (exigência do endpoint dele),
+  // mas na UI isso vira um único campo "link m3u", igual FunPlays/LazerPlay/CorePlayer —
+  // normaliza aqui pra exibir sempre no mesmo formato, mesmo vindo de um registro
+  // antigo (sincronizado antes dessa mudança). Ver [[smartone-m3u]].
   const [nome, setNome] = useState(playlist.nome ?? "");
-  const [url, setUrl] = useState(playlist.url ?? "");
-  const [host, setHost] = useState(smartOneCampos?.host ?? "");
-  const [port, setPort] = useState(smartOneCampos?.port ?? "");
-  const [usuario, setUsuario] = useState(smartOneCampos?.usuario ?? "");
-  const [senha, setSenha] = useState(smartOneCampos?.senha ?? "");
+  const [url, setUrl] = useState(() => {
+    if (!isSmartOne) return playlist.url ?? "";
+    const { host, usuario, senha } = desmontarLinkM3uSmartOne(playlist.url ?? "");
+    return montarLinkM3uSmartOne(host, usuario, senha);
+  });
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -38,7 +34,7 @@ export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPaine
     setSalvando(true);
     setErro(null);
     try {
-      const corpo = isSmartOne ? { nome, host, port, usuario, senha, nota: nomeCliente } : { nome, url };
+      const corpo = isSmartOne ? { nome, ...desmontarLinkM3uSmartOne(url), nota: nomeCliente } : { nome, url };
       const startRes = await fetch(`/api/aplicativos/${idAppRegistro}/playlists/${playlist.playlist_id_externo}?acao=editar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,35 +91,10 @@ export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPaine
             <input value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} />
           </div>
 
-          {isSmartOne ? (
-            <>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className={labelClass}>Servidor</label>
-                  <input value={host} onChange={(e) => setHost(e.target.value)} className={inputClass} placeholder="http://servidor.com" />
-                </div>
-                <div>
-                  <label className={labelClass}>Porta</label>
-                  <input value={port} onChange={(e) => setPort(e.target.value)} className={inputClass} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Usuário</label>
-                  <input value={usuario} onChange={(e) => setUsuario(e.target.value)} className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Senha</label>
-                  <input value={senha} onChange={(e) => setSenha(e.target.value)} className={inputClass} />
-                </div>
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className={labelClass}>URL</label>
-              <input value={url} onChange={(e) => setUrl(e.target.value)} className={inputClass} placeholder="http://servidor.com/get.php?username=X&password=Y" />
-            </div>
-          )}
+          <div>
+            <label className={labelClass}>URL</label>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} className={inputClass} placeholder="http://servidor.com/get.php?username=X&password=Y" />
+          </div>
         </div>
 
         {erro && <p className="mx-6 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}

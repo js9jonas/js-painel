@@ -10,6 +10,7 @@ import type {
   SaveSession,
   SaveContaVencimento,
 } from "./types";
+import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 const BASE = "https://smartone-iptv.com";
 const TURNSTILE_SITEKEY = "0x4AAAAAAAP8nNwILjC5_ux6";
@@ -246,14 +247,15 @@ export async function getPlaylistsDispositivo(
   const html = await getHtml(`/plugin/smart_one/client_main/edit_playlist/${deviceId}/`, cookie);
 
   const host = html.match(/name="server_host"\s+value="([^"]*)"/)?.[1] ?? "";
-  const port = html.match(/name="server_port"\s+value="([^"]*)"/)?.[1] ?? "";
   const usuario = html.match(/name="server_username"\s+value="([^"]*)"/)?.[1] ?? "";
   const senha = html.match(/name="server_password"\s+value="([^"]*)"/)?.[1] ?? "";
   const nome = html.match(/name="server_name"\s+value="([^"]*)"/)?.[1] ?? "";
 
   if (!usuario) return [];
 
-  const url = `${host}:${port}/?username=${encodeURIComponent(usuario)}&password=${encodeURIComponent(senha)}`;
+  // Formato de exibição/edição alinhado ao FunPlays/LazerPlay/CorePlayer (link m3u
+  // único) — porta da página (`server_port`) ignorada de propósito, sempre 80.
+  const url = montarLinkM3uSmartOne(host, usuario, senha);
 
   return [
     {
