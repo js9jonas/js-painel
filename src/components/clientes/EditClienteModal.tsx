@@ -154,7 +154,7 @@ export default function EditClienteModal({
                   {editandoId === c.id_contato ? (
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={editTelefone} onChange={(e) => setEditTelefone(e.target.value)}
+                        <input value={editTelefone} onChange={(e) => setEditTelefone(e.target.value.replace(/\D/g, ''))}
                           className={inputClass} placeholder="Telefone" />
                         <input value={editNome} onChange={(e) => setEditNome(e.target.value)}
                           className={inputClass} placeholder="Nome (opcional)" />
@@ -201,7 +201,7 @@ export default function EditClienteModal({
               {adicionando && (
                 <div className="rounded-xl border border-zinc-300 bg-white p-3 space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value)}
+                    <input value={novoTelefone} onChange={(e) => setNovoTelefone(e.target.value.replace(/\D/g, ''))}
                       className={inputClass} placeholder="Telefone *" />
                     <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)}
                       className={inputClass} placeholder="Nome (opcional)" />

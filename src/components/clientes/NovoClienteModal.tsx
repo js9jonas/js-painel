@@ -121,7 +121,7 @@ export default function NovoClienteModal({ planos, pacotes, onClose, onSuccess, 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass}>Telefone</label>
-                    <input value={telefone} onChange={(e) => setTelefone(e.target.value)} className={inputClass} placeholder="Ex: 51999998888" />
+                    <input value={telefone} onChange={(e) => setTelefone(e.target.value.replace(/\D/g, ''))} className={inputClass} placeholder="Ex: 51999998888" />
                   </div>
                   <div>
                     <label className={labelClass}>Nome do contato</label>

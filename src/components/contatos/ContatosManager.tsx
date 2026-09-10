@@ -88,7 +88,7 @@ export default function ContatosManager({ idCliente, contatos, onSaved }: Props)
               <div className="flex gap-2">
                 <input
                   value={editValues.telefone}
-                  onChange={(e) => setEditValues((v) => ({ ...v, telefone: e.target.value }))}
+                  onChange={(e) => setEditValues((v) => ({ ...v, telefone: e.target.value.replace(/\D/g, '') }))}
                   className={`${inputClass} flex-1`}
                   placeholder="Telefone *"
                   autoFocus
@@ -165,7 +165,7 @@ export default function ContatosManager({ idCliente, contatos, onSaved }: Props)
           <div className="flex gap-2">
             <input
               value={newValues.telefone}
-              onChange={(e) => setNewValues((v) => ({ ...v, telefone: e.target.value }))}
+              onChange={(e) => setNewValues((v) => ({ ...v, telefone: e.target.value.replace(/\D/g, '') }))}
               className={`${inputClass} flex-1`}
               placeholder="Telefone *"
               autoFocus
