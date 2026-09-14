@@ -22,7 +22,9 @@ Em 25/08/2026, um commit de reorganização de memória (`455b90c1`, migração 
 2. ✅ Confirmado que o código (`src/lib/notificar-renovacao.ts`, `src/app/api/assinaturas/[id]/cortesia/route.ts`) já lia só de `process.env.TELEGRAM_BOT_TOKEN` — nenhum valor hardcoded no código-fonte, só nos docs.
 3. ✅ Jonas revogou e regerou o token via BotFather. Confirmado por `getMe`: token novo responde `ok:true` (mesmo bot `@jonascheibe_bot`); token antigo vazado responde `401 Unauthorized` — está morto, o vazamento no histórico do Git deixou de ter valor prático.
 4. ✅ `.env.local` atualizado com o token novo.
-5. 🔄 **Pendente**: atualizar a env var `TELEGRAM_BOT_TOKEN` no Easypanel (produção) com o token novo, e redeploy — sem isso, cortesia/notificação de ativação em produção ainda tentam usar o token antigo (morto) até o redeploy.
+5. ✅ Jonas atualizou a env var `TELEGRAM_BOT_TOKEN` no Easypanel (serviço `js-painel`, projeto `js`) com o token novo e disparou o redeploy (13/09/2026).
+
+**Status: resolvido**, pendente só a confirmação de rotina — testar em produção que uma notificação real (cortesia de indicação ou ativação) chega no Telegram depois que o deploy terminar, pra confirmar que o container já está rodando com o token novo (não assumir só pelo push/redeploy — ver `feedback_confirmar_deploy_antes_teste` na memória global).
 
 **Why importa:** a regra de memória "credencial nunca em texto puro" (ver `feedback_preferences.md` da memória global, seção de manutenção do `MEMORY.md`) existe justamente pra isso — memória de projeto vira arquivo versionado no repo, e um repo público expõe qualquer valor real que passar por ali, mesmo que a intenção fosse só documentar "qual é o bot"/"qual é o chat_id" pra referência futura.
 
