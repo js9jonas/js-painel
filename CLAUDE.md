@@ -79,7 +79,7 @@ WHATSAPP_VERIFY_TOKEN    # token de verificação do webhook
 WHATSAPP_APP_SECRET      # App Secret do app jswhats (ID 1060517628167041) — usado para verificar assinatura HMAC-SHA256 do webhook
 WHATSAPP_INTERNAL_KEY    # chave secreta para o endpoint POST /api/whatsapp/registrar (usado pelo n8n para salvar mensagens de automação no chat)
 TELEGRAM_BOT_TOKEN       # bot @jonascheibe_bot — usado para notificar Jonas de mensagens sem template Meta aprovado (ex: cortesia de indicação)
-TELEGRAM_CHAT_ID_JONAS   # chat_id pessoal do Jonas no Telegram (1110331118)
+TELEGRAM_CHAT_ID_JONAS   # chat_id pessoal do Jonas no Telegram — valor no .env.local/Easypanel
 ```
 
 ## Mensagens sem template Meta aprovado

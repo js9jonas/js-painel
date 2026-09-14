@@ -56,8 +56,8 @@ PDF: mesma cadeia com nós `Buscar base64 — Evolution (PDF)` / `Baixar mídia 
 - `nomeContato`: `contacts[0].profile.name` ou `messages[0].from`
 
 **Telegram — Ativação:** 1 mensagem com botões `copy_text`
-- Bot: @jonascheibe_bot (token: `5906280570:AAFxVppf-Ftlu2lz6_E4pdJM-lFULezh_e0`)
-- Chat ID pessoal Jonas: `1110331118`
+- Bot: @jonascheibe_bot (token: ver `TELEGRAM_BOT_TOKEN` no `.env.local`/Easypanel — nunca em texto puro aqui; rotacionado em 13/09/2026 após vazamento no GitHub, ver `incident_telegram_token_vazado_github.md`)
+- Chat ID pessoal Jonas: ver `TELEGRAM_CHAT_ID_JONAS` no `.env.local`/Easypanel
 - Formato: texto Markdown + inline_keyboard com `📋 Copiar MAC` e `🔑 Copiar Chave` (condicional)
 - **Meta Cloud API não permite enviar para si mesmo** → por isso Telegram em vez de WhatsApp
 
