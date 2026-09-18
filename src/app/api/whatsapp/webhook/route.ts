@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { pool } from '@/lib/db'
 import { maybeSyncLabels } from '@/lib/label-sync'
 import { responderFalarComSuporte } from '@/lib/auto-resposta-suporte'
+import { transcribeAudio } from '@/lib/transcribe'
 
 export const dynamic = 'force-dynamic'
 
@@ -133,15 +134,24 @@ export async function POST(req: NextRequest) {
 
             console.log(`[WhatsApp] Recebido de ${from}: ${tipo}`)
 
-            await pool.query(
+            const inserted = await pool.query(
               `INSERT INTO public.whatsapp_mensagens
                 (wa_msg_id, telefone, nome_contato, tipo, conteudo, media_mime, nome_arquivo, origem,
                  reply_to_wa_msg_id, reply_to_conteudo, reply_to_origem, recebida_em, phone_number_id)
                VALUES ($1, $2, $3, $4, $5, $6, $7, 'cliente', $8, $9, $10, $11, $12)
-               ON CONFLICT (wa_msg_id) DO NOTHING`,
+               ON CONFLICT (wa_msg_id) DO NOTHING
+               RETURNING id`,
               [msgId, from, nome, tipo, conteudo, media_mime, nome_arquivo,
                replyToId, replyToConteudo, replyToOrigem, timestamp, metadata?.phone_number_id]
             )
+
+            // Transcrição automática de áudio — fire-and-forget, alimenta o contexto do agente de sugestão
+            const novoId = inserted.rows[0]?.id as number | undefined
+            if (tipo === 'audio' && novoId) {
+              transcribeAudio(novoId).catch(err =>
+                console.error('[WhatsApp] transcribeAudio error:', err)
+              )
+            }
 
             // Auto-resposta a cliques nos botões do fluxo de vencimento — fire-and-forget
             if (tipo === 'interactive_reply' && ['Falar com suporte', 'Chave PIX', 'Automático mensal', 'Pagamento mensal', 'Planos estendidos'].includes(conteudo)) {

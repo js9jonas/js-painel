@@ -386,6 +386,7 @@ export default function ChatPage() {
   const [sugestao, setSugestao] = useState('')
   const [loadingSugestao, setLoadingSugestao] = useState(false)
   const [agenteAtendimentoOpen, setAgenteAtendimentoOpen] = useState(false)
+  const [historicoAgente, setHistoricoAgente] = useState('')
   // Última sugestão gerada nesta sessão de composição (independe de sugestao ter sido limpa por ✕ ou envio)
   // e se foi explicitamente descartada — juntos classificam o tri-state gravado em status_sugestao.
   const sugestaoGeradaRef = useRef<string | null>(null)
@@ -772,14 +773,51 @@ export default function ChatPage() {
     if (texto) moveCursorToEnd(div)
   }, [texto])
 
+  // Garante transcrição de áudios sem ela ainda (fallback — normalmente o webhook já transcreveu
+  // ao receber a mensagem; isso cobre mensagens antigas ou uma eventual corrida com o webhook).
+  // Retorna um mapa {msgId: transcricao} com o que foi obtido agora, e também atualiza o estado
+  // `mensagens` pra a bolha do chat já exibir a transcrição sem precisar clicar no botão manual.
+  async function garantirTranscricoes(msgs: Mensagem[]): Promise<Record<number, string>> {
+    const pendentes = msgs.filter(m => m.tipo === 'audio' && !m.transcricao)
+    if (pendentes.length === 0) return {}
+    const resultados: Record<number, string> = {}
+    await Promise.all(pendentes.map(async m => {
+      try {
+        const res = await fetch('/api/whatsapp/transcrever', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msgId: m.id }),
+        })
+        if (res.ok) {
+          const data = await res.json() as { transcricao?: string }
+          if (data.transcricao) resultados[m.id] = data.transcricao
+        }
+      } catch {
+        // silencioso — formatarLinhaHistorico cai no fallback de texto
+      }
+    }))
+    if (Object.keys(resultados).length > 0) {
+      setMensagens(prev => prev.map(m => resultados[m.id] ? { ...m, transcricao: resultados[m.id] } : m))
+    }
+    return resultados
+  }
+
+  // Monta a linha do histórico enviado ao agente — áudio usa a transcrição (nunca o ID de mídia)
+  function formatarLinhaHistorico(m: Mensagem, extras: Record<number, string>) {
+    const texto = m.tipo === 'audio'
+      ? (m.transcricao ?? extras[m.id] ?? '(áudio sem transcrição disponível)')
+      : (m.conteudo ?? '[mídia]')
+    return `${m.origem === 'cliente' ? 'Cliente' : 'Jonas'}: ${texto}`
+  }
+
   async function gerarSugestao() {
     if (!selecionado || mensagens.length === 0) return
     setLoadingSugestao(true)
     setSugestao('')
     try {
-      const historico = mensagens.slice(-10).map(m =>
-        `${m.origem === 'cliente' ? 'Cliente' : 'Jonas'}: ${m.conteudo ?? '[mídia]'}`
-      ).join('\n')
+      const ultimas = mensagens.slice(-10)
+      const extras = await garantirTranscricoes(ultimas)
+      const historico = ultimas.map(m => formatarLinhaHistorico(m, extras)).join('\n')
       const res = await fetch('/api/ia/sugestao-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -803,6 +841,16 @@ export default function ChatPage() {
     } finally {
       setLoadingSugestao(false)
     }
+  }
+
+  // Garante as transcrições antes de abrir o painel do agente de atendimento, pra ele já
+  // nascer com o histórico completo (mesmo fallback de garantirTranscricoes usado em gerarSugestao)
+  async function abrirAgenteAtendimento() {
+    if (mensagens.length === 0) return
+    const ultimas = mensagens.slice(-10)
+    const extras = await garantirTranscricoes(ultimas)
+    setHistoricoAgente(ultimas.map(m => formatarLinhaHistorico(m, extras)).join('\n'))
+    setAgenteAtendimentoOpen(true)
   }
 
   // Aplica uma sugestão vinda do painel do agente de atendimento (geração inicial ou ajuste)
@@ -1735,7 +1783,7 @@ export default function ChatPage() {
                   }}
                 >Usar</button>
                 <button
-                  onClick={() => setAgenteAtendimentoOpen(true)}
+                  onClick={abrirAgenteAtendimento}
                   title="Explicar o que ajustar nesta sugestão"
                   style={{
                     background: 'transparent', color: '#00a884', border: '1px solid #00a884',
@@ -1755,9 +1803,7 @@ export default function ChatPage() {
             {/* Painel do agente de atendimento — conversa pra gerar/ajustar a sugestão com contexto */}
             {agenteAtendimentoOpen && !selectMode && (
               <AgenteAtendimentoPanel
-                historico={mensagens.slice(-10).map(m =>
-                  `${m.origem === 'cliente' ? 'Cliente' : 'Jonas'}: ${m.conteudo ?? '[mídia]'}`
-                ).join('\n')}
+                historico={historicoAgente}
                 cliente={cliente ? {
                   nome: cliente.nome,
                   plano: cliente.plano,
@@ -1879,7 +1925,7 @@ export default function ChatPage() {
                 {loadingSugestao ? '...' : '✦ IA'}
               </button>
               <button
-                onClick={() => setAgenteAtendimentoOpen(true)}
+                onClick={abrirAgenteAtendimento}
                 disabled={mensagens.length === 0}
                 title="Conversar com o agente antes de gerar a sugestão"
                 style={{
