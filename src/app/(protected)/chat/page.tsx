@@ -19,7 +19,7 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
-import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X } from 'lucide-react'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package } from 'lucide-react'
 
 interface Conversa {
   telefone: string
@@ -433,6 +433,7 @@ export default function ChatPage() {
   const [templateConfirm, setTemplateConfirm] = useState<'amanha' | 'vencidos' | null>(null)
   const [enviandoTemplate, setEnviandoTemplate] = useState(false)
   const [infoAberto, setInfoAberto] = useState(false)
+  const [planosModalOpen, setPlanosModalOpen] = useState(false)
   const [gravando, setGravando] = useState(false)
   const [pausado, setPausado] = useState(false)
   const [tempoGravacao, setTempoGravacao] = useState(0)
@@ -995,6 +996,39 @@ export default function ChatPage() {
     return ['📱 Aplicativos cadastrados:', ...linhas].join('\n')
   }
 
+  // Manda junto o botão "Planos estendidos" (interativo, mesmo mecanismo dos templates de
+  // vencimento) — ao clicar, o webhook reconhece a origem via id_assinatura e responde com
+  // as opções de outros períodos (auto-resposta-suporte.ts, botaoClicado === 'Planos estendidos').
+  async function enviarInfoPlano(a: AssinaturaResumo) {
+    if (!selecionado || enviando || !a.id_assinatura) return
+    const identificacao = a.identificacao?.trim() || 'Principal'
+    const telas = a.pacote ?? (a.plano ?? 'Assinatura')
+    const texto = `📦 Seu plano: *${identificacao}*\n${telas}\n${formatValor(a.valor)}/mês`
+    setEnviando(true)
+    try {
+      await fetch('/api/whatsapp/enviar-planos-botao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado, texto, id_assinatura: a.id_assinatura }),
+      })
+      await carregarMensagens(selecionado)
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  // Com 1 assinatura só, envia direto — o modal de escolha só existe quando há mais de
+  // uma, pra não mandar informação do plano errado sem o atendente confirmar qual é.
+  function clicarPlanos() {
+    setInfoAberto(false)
+    if (assinaturas.length === 0) return
+    if (assinaturas.length === 1) {
+      enviarInfoPlano(assinaturas[0])
+      return
+    }
+    setPlanosModalOpen(true)
+  }
+
   function clicarDadosVencimento() {
     inserirNoComposer(montarTextoVencimento())
     setInfoAberto(false)
@@ -1521,6 +1555,20 @@ export default function ChatPage() {
                           display: 'flex', gap: 8, zIndex: 20,
                         }}
                       >
+                        <button
+                          type="button"
+                          onClick={clicarPlanos}
+                          title="Planos"
+                          style={{
+                            width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', flexShrink: 0,
+                            background: '#fff', color: '#374151',
+                            cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'transform 0.12s, box-shadow 0.12s',
+                          }}
+                        >
+                          <Package size={17} strokeWidth={2} />
+                        </button>
                         <button
                           type="button"
                           onClick={clicarDadosVencimento}
@@ -3090,6 +3138,53 @@ export default function ChatPage() {
             carregarAplicativosCliente(cliente.id_cliente)
           }}
         />
+      )}
+
+      {/* Modal — escolher qual assinatura enviar info do plano (só quando há mais de uma) */}
+      {planosModalOpen && (
+        <div
+          onClick={() => !enviando && setPlanosModalOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 380, maxHeight: '70vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9edef', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Package size={18} strokeWidth={2} color="#374151" />
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#111b21' }}>Qual assinatura?</span>
+            </div>
+            <div style={{ overflowY: 'auto', padding: '8px 12px' }}>
+              {assinaturas.map(a => (
+                <div key={a.id_assinatura} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  padding: '10px 8px', borderBottom: '1px solid #f0f2f5',
+                }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111b21' }}>
+                      {a.pacote ?? a.plano ?? 'Assinatura'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#667781' }}>
+                      {a.identificacao?.trim() || 'Principal'} — {formatValor(a.valor)}/mês
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={enviando}
+                    onClick={() => { enviarInfoPlano(a); setPlanosModalOpen(false) }}
+                    style={{
+                      background: '#00a884', border: 'none', color: '#fff', borderRadius: 8,
+                      padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >Enviar</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '10px 20px', borderTop: '1px solid #e9edef', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPlanosModalOpen(false)}
+                style={{ background: '#e9edef', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}
+              >Fechar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de confirmação — envio de template de vencimento */}

@@ -1,41 +1,12 @@
 import { pool } from '@/lib/db'
-import { enviarTextoWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
+import { enviarTextoWhatsapp, enviarBotoesWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
 
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID
 const PIX_CHAVE = '40827286000106'
 const TEMPLATES_GATILHO = ['lembrete_vencimento', 'lembrete_vencimento_v2', 'vencido_plano', 'vencido_plano_v2']
 
-async function enviarBotoes(
-  telefone: string,
-  texto: string,
-  botoes: { id: string; title: string }[]
-): Promise<string | null> {
-  const response = await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to: telefone,
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: { text: texto },
-        action: { buttons: botoes.map((b) => ({ type: 'reply', reply: b })) },
-      },
-    }),
-  })
-
-  const data = await response.json()
-  if (!response.ok) {
-    console.error('[AutoResposta] Erro ao enviar botões:', data)
-    return null
-  }
-  return data.messages?.[0]?.id ?? null
-}
+// Fonte reconhecida sem ser template Meta aprovado: botão "Planos estendidos" enviado
+// manualmente pelo atalho "Planos" do /chat (ver /api/whatsapp/enviar-planos-botao).
+const SOURCE_CHAT_PLANOS = 'chat-planos'
 
 async function buscarOrigemTemplate(
   replyToMsgId: string | null
@@ -43,12 +14,19 @@ async function buscarOrigemTemplate(
   if (!replyToMsgId) return { reconhecido: false, idAssinatura: null }
 
   const orig = await pool.query(
-    `SELECT conteudo FROM public.whatsapp_mensagens WHERE wa_msg_id = $1 AND tipo = 'template' LIMIT 1`,
-    [replyToMsgId]
+    `SELECT conteudo, tipo, source FROM public.whatsapp_mensagens
+     WHERE wa_msg_id = $1 AND (tipo = 'template' OR (tipo = 'interactive' AND source = $2))
+     LIMIT 1`,
+    [replyToMsgId, SOURCE_CHAT_PLANOS]
   )
   if (!orig.rows[0]) return { reconhecido: false, idAssinatura: null }
 
-  const parsed = JSON.parse(orig.rows[0].conteudo)
+  const row = orig.rows[0]
+  const parsed = JSON.parse(row.conteudo)
+
+  if (row.tipo === 'interactive') {
+    return { reconhecido: row.source === SOURCE_CHAT_PLANOS, idAssinatura: parsed?.id_assinatura ?? null }
+  }
   return {
     reconhecido: TEMPLATES_GATILHO.includes(parsed?.name),
     idAssinatura: parsed?.id_assinatura ?? null,
@@ -185,7 +163,7 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
       `🔄 Ativar a renovação automática mensal (sem precisar mandar comprovante todo mês)\n\n` +
       `Escolha uma opção abaixo:`
 
-    const msgId = await enviarBotoes(telefone, texto, [
+    const msgId = await enviarBotoesWhatsapp(telefone, texto, [
       { id: 'chave_pix', title: 'Chave PIX' },
       { id: 'automatico_mensal', title: 'Automático mensal' },
     ])
@@ -246,12 +224,13 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
     )
     if (opcoes.rows.length === 0) return
 
+    const NUMEROS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
     const linhas = opcoes.rows
-      .map((o) => `🔹 ${o.descricao}: R$ ${formatValor(Number(o.valor))}`)
+      .map((o, i) => `${NUMEROS[i] ?? '🔹'} ${o.descricao} — R$ ${formatValor(Number(o.valor))}`)
       .join('\n')
     const texto =
-      `Opções de plano disponíveis: 📅\n\n${linhas}\n\n` +
-      `Envie o comprovante com o valor escolhido pela chave PIX (CNPJ) abaixo:`
+      `🗓️ Opções de plano disponíveis:\n\n${linhas}\n\n` +
+      `🔑 Envie o comprovante do valor escolhido pela nossa chave PIX (CNPJ) abaixo:`
     const msgIdA = await enviarTextoWhatsapp(telefone, texto)
     await registrarEnvio(msgIdA, telefone, texto, cliqueMsgId)
 

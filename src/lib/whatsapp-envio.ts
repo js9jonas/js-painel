@@ -88,10 +88,46 @@ export async function enviarImagemWhatsapp(telefone: string, imagem: Buffer, cap
   return { waMsgId, mediaId: uploadData.id }
 }
 
+/**
+ * Mensagem interativa com botões de resposta rápida (até 3, título máx. 20 caracteres —
+ * limite da própria API da Meta). O clique volta pelo webhook como `interactive_reply` com
+ * `conteudo` = título do botão, e `context.id` apontando pro wa_msg_id desta mensagem.
+ */
+export async function enviarBotoesWhatsapp(
+  telefone: string,
+  texto: string,
+  botoes: { id: string; title: string }[]
+): Promise<string | null> {
+  const response = await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: telefone,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: texto },
+        action: { buttons: botoes.map((b) => ({ type: 'reply', reply: b })) },
+      },
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok) {
+    console.error('[WhatsappEnvio] Erro ao enviar botões:', data)
+    return null
+  }
+  return data.messages?.[0]?.id ?? null
+}
+
 interface RegistrarMensagemOpts {
   source: string
   replyToMsgId?: string
-  tipo?: 'text' | 'image'
+  tipo?: 'text' | 'image' | 'interactive'
 }
 
 export async function registrarMensagemWhatsapp(
