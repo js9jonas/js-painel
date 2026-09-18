@@ -33,7 +33,7 @@ export default function NovoClienteModal({ planos, pacotes, onClose, onSuccess, 
   const [nomeContato, setNomeContato] = useState(initialNomeContato);
 
   const [criarAssinatura, setCriarAssinatura] = useState(true);
-  const [idPacote, setIdPacote] = useState("");
+  const [idPacote, setIdPacote] = useState("51"); // 1 Tela
   const [idPlano, setIdPlano] = useState("1"); // Padrão · 1 tela · mensal · R$35
   const [vencContrato, setVencContrato] = useState(() => new Date().toISOString().slice(0, 10));
   const [vencContas, setVencContas] = useState("");

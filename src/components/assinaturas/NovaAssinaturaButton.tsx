@@ -22,8 +22,8 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
   const [error, setError]            = useState<string | null>(null);
   const router = useRouter();
 
-  const [idPacote, setIdPacote]           = useState("");
-  const [idPlano, setIdPlano]             = useState("");
+  const [idPacote, setIdPacote]           = useState("51"); // 1 Tela
+  const [idPlano, setIdPlano]             = useState("1");  // Padrão · 1 tela · mensal · R$35
 
   const pacoteSelecionado = pacotes.find(p => p.id_pacote === idPacote);
   const planosFiltrados = planos.filter(p =>
@@ -35,7 +35,7 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
     setIdPacote(novoId);
     setIdPlano("");
   }
-  const [vencContrato, setVencContrato]   = useState("");
+  const [vencContrato, setVencContrato]   = useState(() => new Date().toISOString().slice(0, 10));
   const [vencContas, setVencContas]       = useState("");
   const [status, setStatus]               = useState("ativo");
   const [identificacao, setIdentificacao] = useState("");
@@ -43,7 +43,7 @@ export default function NovaAssinaturaButton({ idCliente, planos, pacotes }: Pro
 
   function handleClose() {
     setOpen(false); setError(null);
-    setIdPacote(""); setIdPlano(""); setVencContrato(""); setVencContas("");
+    setIdPacote("51"); setIdPlano("1"); setVencContrato(new Date().toISOString().slice(0, 10)); setVencContas("");
     setStatus("ativo"); setIdentificacao(""); setObservacao("");
   }
 
