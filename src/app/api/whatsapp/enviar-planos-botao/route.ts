@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const msgId = await enviarBotoesWhatsapp(telefone, texto, [
+      { id: 'chave_pix', title: 'Chave PIX' },
       { id: 'planos_estendidos', title: 'Planos estendidos' },
     ])
 
