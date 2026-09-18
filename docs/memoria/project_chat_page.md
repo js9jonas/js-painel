@@ -204,3 +204,30 @@ Quando `!cliente` (telefone sem vínculo), exibe dois círculos lado a lado:
 - `pararEEnviarGravacao()` define `recorder.onstop`, chama `resume()` se pausado, depois `stop()`
 - `cancelarGravacao()` define `onstop` que apenas libera a stream, depois `stop()`
 - Após envio OK: chama `carregarMensagens(tel, true)` para recarregar com o novo áudio
+
+## Coluna de atalhos flutuantes + balão de informações (18/09/2026) — commit fa40605
+
+### Respostas Rápidas — campo `fixado`
+- Coluna `fixado BOOLEAN NOT NULL DEFAULT false` adicionada a `respostas_rapidas` (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` dentro do `ensureTable()`, não no seed)
+- Checkbox "📌 Fixar como atalho de círculo" no form de criar/editar (painel ⚙ → Respostas Rápidas)
+- `respostasFixadas = respostasRapidas.filter(r => r.fixado)` — derivado no render
+
+### Coluna invisível na área de mensagens
+Sibling flex `{display:flex}` antes do container scrollável de mensagens; coluna filha `width:52, flexDirection:'column', justifyContent:'flex-end'` empilha os círculos de baixo pra cima:
+1. `respostasFixadas.map(...)` — um círculo verde por resposta fixada, iniciais do título, `onClick` chama `aplicarRR(r.texto)` (mesmo fluxo do atalho `/palavra`). Se título/texto contém "pix", mostra a logo do Pix (`public/icons/pix.png`) em vez das iniciais.
+2. Balão `ℹ️` (`Info` do lucide-react, fundo gradiente azul) — sempre visível quando `cliente` carregado. `onMouseEnter`/`onMouseLeave` no wrapper controlam `infoAberto`.
+
+### Flyout do balão de informações
+Só quando `infoAberto`, `position:absolute, left:'100%', paddingLeft:8` (não `marginLeft` — ver quirk abaixo) com até 3 botões:
+- `ClipboardList` "Dados de vencimento" → `clicarDadosVencimento()` → `montarTextoVencimento()` lista status (ativo/atrasado/vencido) + venc_contrato de **todas** as `assinaturas` do contato (não só a principal) → insere no composer via `inserirNoComposer()`.
+- `Smartphone` "Aplicativos" → `clicarAplicativos()` → `montarTextoAplicativos()` lista `aplicativos` (filtra `!removido_em`) com `mac`/`chave` brutos lado a lado (sem rotular "MAC:" — ver quirk) + validade. Só insere texto, não dispara nada mais.
+- `CalendarClock`/`AlertTriangle` (condicional) → só renderiza se `tipoTemplateRelacionado()` retorna `'amanha'`/`'vencidos'` (compara `cliente.venc_contrato` com hoje/amanhã). `clicarTemplateRelacionado()` abre `templateConfirm` — modal de confirmação separado, nunca dispara como efeito colateral do clique em "Aplicativos" (decisão explícita do Jonas, revertida de uma primeira versão que acoplava os dois).
+
+### Envio de template manual — `/api/whatsapp/enviar-template`
+Endpoint já existia (`src/lib/whatsapp-template.ts` → `enviarTemplateWhatsapp`) mas nenhuma tela chamava. `enviarTemplateVencimento()` monta os 4 parâmetros (primeiro nome, `pacote` em minúsculo, identificação ou "Principal", data formatada) a partir do `cliente` já carregado e faz `POST` — mesmo mecanismo usado pelo disparo em massa (`notificacoes-vencimento/route.ts`), só que para 1 contato.
+
+### Quirks / armadilhas encontradas
+- **Gap de hover com `position:absolute`**: `marginLeft` no elemento absoluto cria uma faixa fora da área hoverable do wrapper pai — o mouse "sai" do DOM subtree ao atravessar, fechando o flyout antes de alcançar os botões. Fix: `paddingLeft` no próprio filho absoluto (o padding conta como parte da área do elemento).
+- **`aplicativos.mac` não é sempre MAC de verdade** — apps como Clouddy guardam o e-mail de login nesse campo. Nunca rotular como "MAC:" ao montar texto; mostrar o valor bruto, igual ao painel lateral já fazia.
+- Ícones de UI (não texto de mensagem) trocados de emoji pra `lucide-react` (`Info`, `ClipboardList`, `Smartphone`, `CalendarClock`, `AlertTriangle`, `Pin`) — mais nítido, já é dependência do projeto. Emoji continua obrigatório nos textos que viram mensagem WhatsApp de verdade (`montarTextoVencimento`/`montarTextoAplicativos`), porque o WhatsApp não renderiza SVG.
+- Balões de "Chave Pix" (`msg.tipo === 'template'` e `msg.tipo === 'pix'`) tinham um `₽` (símbolo de rublo) como avatar — trocado pela logo oficial do Pix (`public/icons/pix.png`, 1024×1024, fundo transparente).
