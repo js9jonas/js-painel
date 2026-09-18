@@ -4,6 +4,7 @@ export type TipoNotificacaoVencimento = 'vencidos' | 'amanha'
 
 export interface ItemNotificacaoVencimento {
   id_assinatura: string
+  id_cliente: number
   nome: string
   telefone: string | null
   telas: number
@@ -39,7 +40,7 @@ export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<
   const source = sourceDoTipo(tipo)
 
   const r = await pool.query(
-    `SELECT a.id_assinatura::text, c.nome, ct.telefone, p.telas, a.venc_contrato::text, a.status,
+    `SELECT a.id_assinatura::text, c.id_cliente, c.nome, ct.telefone, p.telas, a.venc_contrato::text, a.status,
        ultimo.tentou AS tentou_hoje, ultimo.status AS status_envio
      FROM public.assinaturas a
      JOIN public.clientes c ON c.id_cliente = a.id_cliente
@@ -64,6 +65,7 @@ export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<
     const falhouEnvio = tentouHoje && row.status_envio === 'failed'
     return {
       id_assinatura: row.id_assinatura,
+      id_cliente: row.id_cliente,
       nome: row.nome,
       telefone: row.telefone,
       telas: row.telas,

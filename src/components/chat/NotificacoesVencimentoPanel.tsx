@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 
 interface Item {
   id_assinatura: string
+  id_cliente: number
   nome: string
   telefone: string | null
   telas: number
@@ -60,7 +61,7 @@ function IndicadorEnvio({ jaEnviado, falhouEnvio, erro }: { jaEnviado: boolean; 
   )
 }
 
-function ListaNotificacao({ tipo }: { tipo: Tipo }) {
+function ListaNotificacao({ tipo, onAbrirConversa }: { tipo: Tipo; onAbrirConversa: (telefone: string) => void }) {
   const [itens, setItens] = useState<Item[]>([])
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(false)
@@ -193,7 +194,32 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: '#111b21', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {item.nome} <span style={{ color: '#667781', fontWeight: 400 }}>{item.telefone ?? '(sem telefone)'}</span>
+                <a
+                  href={`/clientes/${item.id_cliente}`}
+                  title="Abrir ficha completa"
+                  style={{ color: '#111b21', textDecoration: 'none' }}
+                  onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                  onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                >
+                  {item.nome}
+                </a>{' '}
+                {item.telefone ? (
+                  <button
+                    type="button"
+                    onClick={() => onAbrirConversa(item.telefone!)}
+                    title="Abrir conversa"
+                    style={{
+                      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      color: '#00a884', fontWeight: 400, fontSize: 13,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                    onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                  >
+                    {item.telefone}
+                  </button>
+                ) : (
+                  <span style={{ color: '#667781', fontWeight: 400 }}>(sem telefone)</span>
+                )}
               </div>
               <span style={{
                 display: 'inline-block', marginTop: 2, padding: '1px 6px', borderRadius: 4,
@@ -217,11 +243,11 @@ function ListaNotificacao({ tipo }: { tipo: Tipo }) {
   )
 }
 
-export default function NotificacoesVencimentoPanel() {
+export default function NotificacoesVencimentoPanel({ onAbrirConversa }: { onAbrirConversa: (telefone: string) => void }) {
   return (
     <div style={{ display: 'flex', gap: 16, marginTop: 24, width: '100%', maxWidth: 800, justifyContent: 'center' }}>
-      <ListaNotificacao tipo="vencidos" />
-      <ListaNotificacao tipo="amanha" />
+      <ListaNotificacao tipo="vencidos" onAbrirConversa={onAbrirConversa} />
+      <ListaNotificacao tipo="amanha" onAbrirConversa={onAbrirConversa} />
     </div>
   )
 }

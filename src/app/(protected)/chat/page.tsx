@@ -19,7 +19,7 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
-import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin } from 'lucide-react'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X } from 'lucide-react'
 
 interface Conversa {
   telefone: string
@@ -607,11 +607,41 @@ export default function ChatPage() {
     carregarRR()
   }
 
+  // Resposta rápida com uma linha só "---" entre os blocos vira mensagens sequenciais
+  // (enviadas direto, sem passar pelo campo de digitação) — ex: texto de apresentação + chave PIX
+  // como mensagens separadas, fáceis de copiar/encaminhar isoladamente.
+  function splitPartesRR(t: string): string[] {
+    return t.split(/\r?\n[ \t]*---[ \t]*\r?\n/).map(p => p.trim()).filter(Boolean)
+  }
+
+  async function enviarRRSequencial(partes: string[]) {
+    if (!selecionado || enviando) return
+    setEnviando(true)
+    try {
+      for (let i = 0; i < partes.length; i++) {
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 600))
+        await fetch('/api/whatsapp/enviar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telefone: selecionado, mensagem: partes[i] }),
+        })
+      }
+      await carregarMensagens(selecionado)
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   function aplicarRR(t: string) {
-    setTexto(t)
     setQrOpen(false)
     setQrFiltro('')
     setQrIdx(0)
+    const partes = splitPartesRR(t)
+    if (partes.length > 1) {
+      enviarRRSequencial(partes)
+      return
+    }
+    setTexto(t)
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
@@ -935,16 +965,21 @@ export default function ChatPage() {
       const venc = a.venc_contrato ? formatData(a.venc_contrato) : '—'
       return `${pacote} — ${statusLabel(a.status)} — *${identificacao}*\nVencimento: ${venc}`
     })
-    return `📋 Situação da(s) assinatura(s):\n\n${blocos.join('\n\n')}`
+    const titulo = assinaturas.length === 1 ? 'Situação da assinatura:' : 'Situação das assinaturas:'
+    return `📋 ${titulo}\n\n${blocos.join('\n\n')}`
   }
 
   // Verifica se a assinatura principal do cliente está vencendo amanhã ou já vencida —
   // mesma janela usada pelos templates lembrete_vencimento_v2/vencido_plano_v2.
+  // Mesma janela exata do disparo em massa (Notificar vencidos/vencem amanhã, ver
+  // src/lib/notificacoes-vencimento.ts): venceu ontem -> vencidos; vence amanhã -> amanha.
+  // "Vence hoje" não entra em nenhuma das duas — fica sem ícone, igual ao sistema oficial.
   function tipoTemplateRelacionado(): 'amanha' | 'vencidos' | null {
     if (!cliente?.venc_contrato) return null
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
     const venc = new Date(cliente.venc_contrato.split('T')[0] + 'T00:00:00')
-    if (venc.getTime() <= hoje.getTime()) return 'vencidos'
+    const ontem = new Date(hoje); ontem.setDate(ontem.getDate() - 1)
+    if (venc.getTime() === ontem.getTime()) return 'vencidos'
     const amanha = new Date(hoje); amanha.setDate(amanha.getDate() + 1)
     if (venc.getTime() === amanha.getTime()) return 'amanha'
     return null
@@ -1207,7 +1242,7 @@ export default function ChatPage() {
                     />
                   </div>
                   <textarea
-                    placeholder="texto da resposta"
+                    placeholder={'texto da resposta\n\nDica: separe em mensagens sequenciais com uma linha só "---" entre os blocos — envia direto, sem passar pelo campo de digitação'}
                     value={rrForm.texto}
                     onChange={e => setRrForm(f => ({ ...f, texto: e.target.value }))}
                     rows={2}
@@ -1283,6 +1318,19 @@ export default function ChatPage() {
                 color: '#111b21', fontSize: 14, width: '100%'
               }}
             />
+            {filtro && (
+              <button
+                type="button"
+                onClick={() => setFiltro('')}
+                title="Limpar busca"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  color: '#8696a0', flexShrink: 0, display: 'flex', alignItems: 'center',
+                }}
+              >
+                <X size={16} strokeWidth={2.25} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1390,7 +1438,7 @@ export default function ChatPage() {
             <div style={{ fontSize: 64, marginBottom: 16 }}>💬</div>
             <div style={{ fontSize: 20, fontWeight: 600, color: '#3b4a54' }}>JS Sistemas — Atendimento</div>
             <div style={{ fontSize: 14, marginTop: 8 }}>Selecione uma conversa para começar</div>
-            <NotificacoesVencimentoPanel />
+            <NotificacoesVencimentoPanel onAbrirConversa={setSelecionado} />
           </div>
         ) : (
           <>
