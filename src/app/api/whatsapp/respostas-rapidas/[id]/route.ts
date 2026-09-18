@@ -8,13 +8,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   const { id } = await params
-  const { atalho, titulo, texto, ordem, ativo } = await req.json()
+  const { atalho, titulo, texto, ordem, ativo, fixado } = await req.json()
   const { rows } = await pool.query(
     `UPDATE public.respostas_rapidas
-     SET atalho = $1, titulo = $2, texto = $3, ordem = $4, ativo = $5
-     WHERE id = $6
-     RETURNING id, atalho, titulo, texto, ordem, ativo`,
-    [atalho?.trim().toLowerCase(), titulo?.trim(), texto?.trim(), ordem ?? 0, ativo ?? true, id]
+     SET atalho = $1, titulo = $2, texto = $3, ordem = $4, ativo = $5, fixado = $6
+     WHERE id = $7
+     RETURNING id, atalho, titulo, texto, ordem, ativo, fixado`,
+    [atalho?.trim().toLowerCase(), titulo?.trim(), texto?.trim(), ordem ?? 0, ativo ?? true, fixado ?? false, id]
   )
   if (!rows[0]) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
   return NextResponse.json(rows[0])

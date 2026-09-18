@@ -19,6 +19,7 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin } from 'lucide-react'
 
 interface Conversa {
   telefone: string
@@ -308,6 +309,7 @@ interface RespostaRapida {
   texto: string
   ordem: number
   ativo: boolean
+  fixado: boolean
 }
 
 function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boolean }) {
@@ -426,7 +428,10 @@ export default function ChatPage() {
   const [configOpen, setConfigOpen] = useState(false)
   const [rrEditando, setRrEditando] = useState<RespostaRapida | null>(null)
   const [rrNovo, setRrNovo] = useState(false)
-  const [rrForm, setRrForm] = useState({ atalho: '', titulo: '', texto: '', ordem: 0 })
+  const [rrForm, setRrForm] = useState({ atalho: '', titulo: '', texto: '', ordem: 0, fixado: false })
+  const [templateConfirm, setTemplateConfirm] = useState<'amanha' | 'vencidos' | null>(null)
+  const [enviandoTemplate, setEnviandoTemplate] = useState(false)
+  const [infoAberto, setInfoAberto] = useState(false)
   const [gravando, setGravando] = useState(false)
   const [pausado, setPausado] = useState(false)
   const [tempoGravacao, setTempoGravacao] = useState(0)
@@ -592,7 +597,7 @@ export default function ChatPage() {
       })
       setRrNovo(false)
     }
-    setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0 })
+    setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0, fixado: false })
     carregarRR()
   }
 
@@ -908,6 +913,101 @@ export default function ChatPage() {
     }
   }
 
+  function statusLabel(s: string | null) {
+    const map: Record<string, string> = {
+      ativo: 'Ativo ✅', atrasado: 'Atrasado ⚠️', vencido: 'Vencido ❌',
+      inativo: 'Inativo', pendente: 'Pendente ⏳', cancelado: 'Cancelado', suspenso: 'Suspenso 🚫',
+    }
+    return map[s ?? ''] ?? (s ?? '—')
+  }
+
+  function inserirNoComposer(t: string) {
+    setTexto(t)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  function montarTextoVencimento(): string {
+    if (assinaturas.length === 0) return 'Nenhuma assinatura encontrada para este contato.'
+    const linhas = assinaturas.map(a => {
+      const pacote = a.pacote ?? (a.plano ?? 'Assinatura')
+      const venc = a.venc_contrato ? formatData(a.venc_contrato) : '—'
+      return `• ${pacote} — ${statusLabel(a.status)} — vencimento ${venc}`
+    })
+    return ['📋 Situação da(s) assinatura(s):', ...linhas].join('\n')
+  }
+
+  // Verifica se a assinatura principal do cliente está vencendo amanhã ou já vencida —
+  // mesma janela usada pelos templates lembrete_vencimento_v2/vencido_plano_v2.
+  function tipoTemplateRelacionado(): 'amanha' | 'vencidos' | null {
+    if (!cliente?.venc_contrato) return null
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const venc = new Date(cliente.venc_contrato.split('T')[0] + 'T00:00:00')
+    if (venc.getTime() <= hoje.getTime()) return 'vencidos'
+    const amanha = new Date(hoje); amanha.setDate(amanha.getDate() + 1)
+    if (venc.getTime() === amanha.getTime()) return 'amanha'
+    return null
+  }
+
+  function montarTextoAplicativos(): string {
+    const ativos = aplicativos.filter(a => !a.removido_em)
+    if (ativos.length === 0) return 'Nenhum aplicativo cadastrado para este contato.'
+    const linhas = ativos.map(a => {
+      const nome = a.nome_app ?? `App #${a.id_app_registro}`
+      // mac/chave não têm significado fixo por app (ex: Clouddy usa mac pra guardar o e-mail de
+      // login) — mostra os dois valores brutos, igual ao painel de Aplicativos à direita.
+      const credenciais = [a.mac, a.chave].filter(Boolean).join(' — ')
+      const vencida = a.validade ? new Date(a.validade) < new Date() : false
+      const validade = a.validade ? formatData(a.validade) : (a.venc_contrato ? formatData(a.venc_contrato) : null)
+      const partes = [credenciais || null, validade ? `${vencida ? '⚠️ ' : ''}válido até ${validade}` : null].filter(Boolean)
+      return `• ${nome}${partes.length ? ' — ' + partes.join(' — ') : ''}`
+    })
+    return ['📱 Aplicativos cadastrados:', ...linhas].join('\n')
+  }
+
+  function clicarDadosVencimento() {
+    inserirNoComposer(montarTextoVencimento())
+    setInfoAberto(false)
+  }
+
+  function clicarAplicativos() {
+    inserirNoComposer(montarTextoAplicativos())
+    setInfoAberto(false)
+  }
+
+  function clicarTemplateRelacionado() {
+    const tipo = tipoTemplateRelacionado()
+    if (!tipo) return
+    setTemplateConfirm(tipo)
+    setInfoAberto(false)
+  }
+
+  // Envia o template oficial da Meta (lembrete/vencido) com os dados da assinatura aberta —
+  // única forma de iniciar contato fora da janela de 24h do WhatsApp, ao contrário de texto livre.
+  async function enviarTemplateVencimento() {
+    if (!templateConfirm || !selecionado || !cliente) return
+    setEnviandoTemplate(true)
+    try {
+      const templateName = templateConfirm === 'amanha' ? 'lembrete_vencimento_v2' : 'vencido_plano_v2'
+      const primeiroNome = cliente.nome.trim().split(/\s+/)[0]
+      const telasTxt = (cliente.pacote ?? '').toLowerCase()
+      const identificacaoTxt = cliente.identificacao?.trim() || 'Principal'
+      const dataTxt = cliente.venc_contrato ? formatData(cliente.venc_contrato) : ''
+      await fetch('/api/whatsapp/enviar-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telefone: selecionado,
+          template_name: templateName,
+          parametros: [primeiroNome, telasTxt, identificacaoTxt, dataTxt],
+        }),
+      })
+      await carregarMensagens(selecionado)
+    } finally {
+      setEnviandoTemplate(false)
+      setTemplateConfirm(null)
+    }
+  }
+
   async function enviarSticker(url: string) {
     if (!selecionado || enviando) return
     setEnviando(true)
@@ -1016,6 +1116,7 @@ export default function ChatPage() {
 
   const conversaAtual = conversas.find(c => c.telefone === selecionado)
   const nomeExibido = conversaAtual?.nome_cliente ?? conversaAtual?.nome_contato ?? (selecionado ? formatTel(selecionado) : '')
+  const respostasFixadas = respostasRapidas.filter(r => r.fixado)
 
   return (
     <div style={{
@@ -1081,7 +1182,7 @@ export default function ChatPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontWeight: 700, fontSize: 13, color: '#111b21' }}>Respostas Rápidas</span>
                 <button
-                  onClick={() => { setRrNovo(true); setRrEditando(null); setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0 }) }}
+                  onClick={() => { setRrNovo(true); setRrEditando(null); setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0, fixado: false }) }}
                   style={{ background: '#e8fce4', border: '1px solid #00a884', color: '#00a884', borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
                 >+ Nova</button>
               </div>
@@ -1116,15 +1217,25 @@ export default function ChatPage() {
                     rows={2}
                     style={{ background: '#fff', border: '1px solid #d1d7db', borderRadius: 5, padding: '4px 8px', fontSize: 12, outline: 'none', resize: 'vertical' }}
                   />
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() => { setRrNovo(false); setRrEditando(null); setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0 }) }}
-                      style={{ background: '#e9edef', border: 'none', borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
-                    >Cancelar</button>
-                    <button
-                      onClick={salvarRR}
-                      style={{ background: '#00a884', border: 'none', color: '#fff', borderRadius: 5, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
-                    >Salvar</button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#3b4a54', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={rrForm.fixado}
+                        onChange={e => setRrForm(f => ({ ...f, fixado: e.target.checked }))}
+                      />
+                      <Pin size={13} strokeWidth={2.25} style={{ marginBottom: -1 }} /> Fixar como atalho de círculo no chat
+                    </label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => { setRrNovo(false); setRrEditando(null); setRrForm({ atalho: '', titulo: '', texto: '', ordem: 0, fixado: false }) }}
+                        style={{ background: '#e9edef', border: 'none', borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
+                      >Cancelar</button>
+                      <button
+                        onClick={salvarRR}
+                        style={{ background: '#00a884', border: 'none', color: '#fff', borderRadius: 5, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                      >Salvar</button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1137,12 +1248,15 @@ export default function ChatPage() {
                 <div key={r.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 0', borderBottom: '1px solid #f5f5f5' }}>
                   <span style={{ color: '#00a884', fontWeight: 700, fontSize: 11, background: '#e8fce4', borderRadius: 4, padding: '1px 5px', flexShrink: 0, marginTop: 2 }}>/{r.atalho}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 12, color: '#111b21' }}>{r.titulo}</div>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: '#111b21', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {r.fixado && <Pin size={11} strokeWidth={2.5} color="#00a884" />}
+                      {r.titulo}
+                    </div>
                     <div style={{ fontSize: 11, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.texto}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                     <button
-                      onClick={() => { setRrEditando(r); setRrNovo(false); setRrForm({ atalho: r.atalho, titulo: r.titulo, texto: r.texto, ordem: r.ordem }) }}
+                      onClick={() => { setRrEditando(r); setRrNovo(false); setRrForm({ atalho: r.atalho, titulo: r.titulo, texto: r.texto, ordem: r.ordem, fixado: r.fixado }) }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#667781', padding: '2px 4px', borderRadius: 4 }}
                     >✏️</button>
                     <button
@@ -1305,9 +1419,120 @@ export default function ChatPage() {
               </div>
             </div>
 
-            {/* Mensagens */}
+            {/* Mensagens + coluna de atalhos fixados */}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+              {/* Coluna invisível de atalhos — círculos empilhados de baixo pra cima */}
+              <div style={{
+                width: 52, flexShrink: 0, display: 'flex', flexDirection: 'column',
+                justifyContent: 'flex-end', alignItems: 'center', gap: 10, padding: '16px 0 16px 8px'
+              }}>
+                {respostasFixadas.map(r => {
+                  const ehPix = r.titulo.toLowerCase().includes('pix') || r.texto.toLowerCase().includes('chave pix')
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => aplicarRR(r.texto)}
+                      title={r.titulo}
+                      style={{
+                        width: 40, height: 40, borderRadius: '50%', border: ehPix ? '1px solid #e5e7eb' : 'none', flexShrink: 0,
+                        background: ehPix ? '#fff' : '#00a884', color: '#fff', fontSize: 13, fontWeight: 700,
+                        cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {ehPix
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src="/icons/pix.png" alt="Pix" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                        : r.titulo.trim().slice(0, 2).toUpperCase()}
+                    </button>
+                  )
+                })}
+
+                {/* Balão fixo de informações — hover abre atalhos de vencimento/aplicativos à direita */}
+                {cliente && (
+                  <div
+                    style={{ position: 'relative', flexShrink: 0 }}
+                    onMouseEnter={() => setInfoAberto(true)}
+                    onMouseLeave={() => setInfoAberto(false)}
+                  >
+                    <button
+                      type="button"
+                      title="Informações do cliente"
+                      style={{
+                        width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
+                        background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff',
+                        cursor: 'default', boxShadow: '0 3px 8px rgba(37,99,235,0.35)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Info size={19} strokeWidth={2.25} />
+                    </button>
+                    {infoAberto && (
+                      <div
+                        onMouseEnter={() => setInfoAberto(true)}
+                        onMouseLeave={() => setInfoAberto(false)}
+                        style={{
+                          position: 'absolute', left: '100%', bottom: 0, paddingLeft: 8,
+                          display: 'flex', gap: 8, zIndex: 20,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={clicarDadosVencimento}
+                          title="Dados de vencimento"
+                          style={{
+                            width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', flexShrink: 0,
+                            background: '#fff', color: '#374151',
+                            cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'transform 0.12s, box-shadow 0.12s',
+                          }}
+                        >
+                          <ClipboardList size={17} strokeWidth={2} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clicarAplicativos}
+                          title="Aplicativos"
+                          style={{
+                            width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', flexShrink: 0,
+                            background: '#fff', color: '#374151',
+                            cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'transform 0.12s, box-shadow 0.12s',
+                          }}
+                        >
+                          <Smartphone size={17} strokeWidth={2} />
+                        </button>
+                        {(() => {
+                          const tipo = tipoTemplateRelacionado()
+                          if (!tipo) return null
+                          return (
+                            <button
+                              type="button"
+                              onClick={clicarTemplateRelacionado}
+                              title={tipo === 'amanha' ? 'Enviar template: lembrete de vencimento' : 'Enviar template: aviso de vencido'}
+                              style={{
+                                width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', flexShrink: 0,
+                                background: '#fff', color: tipo === 'amanha' ? '#d97706' : '#dc2626',
+                                cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'transform 0.12s, box-shadow 0.12s',
+                              }}
+                            >
+                              {tipo === 'amanha' ? <CalendarClock size={17} strokeWidth={2} /> : <AlertTriangle size={17} strokeWidth={2} />}
+                            </button>
+                          )
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
             <div style={{
-              flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px',
+              flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px 16px 0',
               display: 'flex', flexDirection: 'column', gap: 4
             }}>
               {loadingMsgs && mensagens.length === 0 && (
@@ -1469,11 +1694,8 @@ export default function ChatPage() {
                           return (
                             <div style={{ minWidth: 220 }}>
                               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-                                <div style={{
-                                  width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                                  background: '#128c7e', display: 'flex', alignItems: 'center',
-                                  justifyContent: 'center', color: '#fff', fontSize: 18
-                                }}>₽</div>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src="/icons/pix.png" alt="Pix" style={{ width: 38, height: 38, flexShrink: 0, objectFit: 'contain' }} />
                                 <div>
                                   <div style={{ fontWeight: 600, fontSize: 13, color: '#111b21' }}>Js Sistemas - Jonas Eduardo Scheibe</div>
                                   <div style={{ fontSize: 12, color: '#667781' }}>CNPJ: 40.827.286/0001-06</div>
@@ -1501,11 +1723,8 @@ export default function ChatPage() {
                         {msg.tipo === 'pix' && (
                           <div style={{ minWidth: 220 }}>
                             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-                              <div style={{
-                                width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                                background: '#128c7e', display: 'flex', alignItems: 'center',
-                                justifyContent: 'center', color: '#fff', fontSize: 18
-                              }}>₽</div>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src="/icons/pix.png" alt="Pix" style={{ width: 38, height: 38, flexShrink: 0, objectFit: 'contain' }} />
                               <div>
                                 <div style={{ fontWeight: 600, fontSize: 13, color: '#111b21' }}>Js Sistemas - Jonas Eduardo Scheibe</div>
                                 <div style={{ fontSize: 12, color: '#667781' }}>CNPJ: 40.827.286/0001-06</div>
@@ -1765,6 +1984,7 @@ export default function ChatPage() {
                 )
               })}
               <div ref={bottomRef} />
+            </div>
             </div>
 
             {/* Sugestão de IA */}
@@ -2826,6 +3046,49 @@ export default function ChatPage() {
             carregarAplicativosCliente(cliente.id_cliente)
           }}
         />
+      )}
+
+      {/* Modal de confirmação — envio de template de vencimento */}
+      {templateConfirm && cliente && (
+        <div
+          onClick={() => !enviandoTemplate && setTemplateConfirm(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e9edef', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {templateConfirm === 'amanha'
+                ? <CalendarClock size={18} strokeWidth={2} color="#d97706" />
+                : <AlertTriangle size={18} strokeWidth={2} color="#dc2626" />}
+              <span style={{ fontWeight: 700, fontSize: 15, color: '#111b21' }}>
+                {templateConfirm === 'amanha' ? 'Enviar lembrete de vencimento' : 'Enviar aviso de vencido'}
+              </span>
+            </div>
+            <div style={{ padding: '16px 20px', fontSize: 13, color: '#3b4a54' }}>
+              <div>
+                Template oficial da Meta (<code>{templateConfirm === 'amanha' ? 'lembrete_vencimento_v2' : 'vencido_plano_v2'}</code>) —
+                funciona mesmo fora da janela de 24h de conversa.
+              </div>
+              <div style={{ marginTop: 10, background: '#f8f9fa', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div><b>Nome:</b> {cliente.nome.trim().split(/\s+/)[0]}</div>
+                <div><b>Pacote:</b> {(cliente.pacote ?? '—').toLowerCase()}</div>
+                <div><b>Identificação:</b> {cliente.identificacao?.trim() || 'Principal'}</div>
+                <div><b>Vencimento:</b> {cliente.venc_contrato ? formatData(cliente.venc_contrato) : '—'}</div>
+              </div>
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e9edef', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={() => setTemplateConfirm(null)}
+                disabled={enviandoTemplate}
+                style={{ background: '#e9edef', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}
+              >Cancelar</button>
+              <button
+                onClick={enviarTemplateVencimento}
+                disabled={enviandoTemplate}
+                style={{ background: '#00a884', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >{enviandoTemplate ? 'Enviando...' : 'Enviar'}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal encaminhar */}

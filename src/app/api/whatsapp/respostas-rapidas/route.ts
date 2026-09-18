@@ -16,6 +16,7 @@ async function ensureTable() {
       criado_em TIMESTAMPTZ DEFAULT NOW()
     )
   `)
+  await pool.query(`ALTER TABLE public.respostas_rapidas ADD COLUMN IF NOT EXISTS fixado BOOLEAN NOT NULL DEFAULT false`)
   const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM public.respostas_rapidas`)
   if (rows[0].n === 0) {
     await pool.query(`
@@ -35,7 +36,7 @@ export async function GET(_req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   await ensureTable()
   const { rows } = await pool.query(
-    `SELECT id, atalho, titulo, texto, ordem, ativo FROM public.respostas_rapidas ORDER BY ordem ASC, id ASC`
+    `SELECT id, atalho, titulo, texto, ordem, ativo, fixado FROM public.respostas_rapidas ORDER BY ordem ASC, id ASC`
   )
   return NextResponse.json(rows)
 }
@@ -44,14 +45,14 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   await ensureTable()
-  const { atalho, titulo, texto, ordem } = await req.json()
+  const { atalho, titulo, texto, ordem, fixado } = await req.json()
   if (!atalho?.trim() || !titulo?.trim() || !texto?.trim()) {
     return NextResponse.json({ error: 'atalho, titulo e texto obrigatórios' }, { status: 400 })
   }
   const { rows } = await pool.query(
-    `INSERT INTO public.respostas_rapidas (atalho, titulo, texto, ordem)
-     VALUES ($1, $2, $3, $4) RETURNING id, atalho, titulo, texto, ordem, ativo`,
-    [atalho.trim().toLowerCase(), titulo.trim(), texto.trim(), ordem ?? 0]
+    `INSERT INTO public.respostas_rapidas (atalho, titulo, texto, ordem, fixado)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id, atalho, titulo, texto, ordem, ativo, fixado`,
+    [atalho.trim().toLowerCase(), titulo.trim(), texto.trim(), ordem ?? 0, fixado ?? false]
   )
   return NextResponse.json(rows[0])
 }
