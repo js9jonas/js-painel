@@ -79,6 +79,7 @@ interface AssinaturaResumo {
   id_assinatura: number | null
   id_plano: number | null
   id_pacote: number | null
+  identificacao: string | null
   plano: string | null
   pacote: string | null
   status: string | null
@@ -928,12 +929,13 @@ export default function ChatPage() {
 
   function montarTextoVencimento(): string {
     if (assinaturas.length === 0) return 'Nenhuma assinatura encontrada para este contato.'
-    const linhas = assinaturas.map(a => {
+    const blocos = assinaturas.map(a => {
       const pacote = a.pacote ?? (a.plano ?? 'Assinatura')
+      const identificacao = a.identificacao?.trim() || 'Principal'
       const venc = a.venc_contrato ? formatData(a.venc_contrato) : '—'
-      return `• ${pacote} — ${statusLabel(a.status)} — vencimento ${venc}`
+      return `${pacote} — ${statusLabel(a.status)} — *${identificacao}*\nVencimento: ${venc}`
     })
-    return ['📋 Situação da(s) assinatura(s):', ...linhas].join('\n')
+    return `📋 Situação da(s) assinatura(s):\n\n${blocos.join('\n\n')}`
   }
 
   // Verifica se a assinatura principal do cliente está vencendo amanhã ou já vencida —
@@ -953,13 +955,7 @@ export default function ChatPage() {
     if (ativos.length === 0) return 'Nenhum aplicativo cadastrado para este contato.'
     const linhas = ativos.map(a => {
       const nome = a.nome_app ?? `App #${a.id_app_registro}`
-      // mac/chave não têm significado fixo por app (ex: Clouddy usa mac pra guardar o e-mail de
-      // login) — mostra os dois valores brutos, igual ao painel de Aplicativos à direita.
-      const credenciais = [a.mac, a.chave].filter(Boolean).join(' — ')
-      const vencida = a.validade ? new Date(a.validade) < new Date() : false
-      const validade = a.validade ? formatData(a.validade) : (a.venc_contrato ? formatData(a.venc_contrato) : null)
-      const partes = [credenciais || null, validade ? `${vencida ? '⚠️ ' : ''}válido até ${validade}` : null].filter(Boolean)
-      return `• ${nome}${partes.length ? ' — ' + partes.join(' — ') : ''}`
+      return a.mac ? `• ${nome} — ${a.mac}` : `• ${nome}`
     })
     return ['📱 Aplicativos cadastrados:', ...linhas].join('\n')
   }
