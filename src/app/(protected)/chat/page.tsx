@@ -19,7 +19,7 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
-import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package } from 'lucide-react'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard } from 'lucide-react'
 
 interface Conversa {
   telefone: string
@@ -434,6 +434,7 @@ export default function ChatPage() {
   const [enviandoTemplate, setEnviandoTemplate] = useState(false)
   const [infoAberto, setInfoAberto] = useState(false)
   const [planosModalOpen, setPlanosModalOpen] = useState(false)
+  const [pagamentoHoverAberto, setPagamentoHoverAberto] = useState(false)
   const [gravando, setGravando] = useState(false)
   const [pausado, setPausado] = useState(false)
   const [tempoGravacao, setTempoGravacao] = useState(0)
@@ -999,6 +1000,21 @@ export default function ChatPage() {
   // Manda junto o botão "Planos estendidos" (interativo, mesmo mecanismo dos templates de
   // vencimento) — ao clicar, o webhook reconhece a origem via id_assinatura e responde com
   // as opções de outros períodos (auto-resposta-suporte.ts, botaoClicado === 'Planos estendidos').
+  async function enviarFormasPagamento() {
+    if (!selecionado || enviando) return
+    setEnviando(true)
+    try {
+      await fetch('/api/whatsapp/enviar-pagamento-botao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: selecionado }),
+      })
+      await carregarMensagens(selecionado)
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   async function enviarInfoPlano(a: AssinaturaResumo) {
     if (!selecionado || enviando || !a.id_assinatura) return
     const identificacao = a.identificacao?.trim() || 'Principal'
@@ -1506,9 +1522,8 @@ export default function ChatPage() {
               }}>
                 {respostasFixadas.map(r => {
                   const ehPix = r.titulo.toLowerCase().includes('pix') || r.texto.toLowerCase().includes('chave pix')
-                  return (
+                  const botaoPix = (
                     <button
-                      key={r.id}
                       type="button"
                       onClick={() => aplicarRR(r.texto)}
                       title={r.titulo}
@@ -1524,6 +1539,43 @@ export default function ChatPage() {
                         ? <img src="/icons/pix.png" alt="Pix" style={{ width: 24, height: 24, objectFit: 'contain' }} />
                         : r.titulo.trim().slice(0, 2).toUpperCase()}
                     </button>
+                  )
+
+                  if (!ehPix) return <React.Fragment key={r.id}>{botaoPix}</React.Fragment>
+
+                  return (
+                    <div
+                      key={r.id}
+                      style={{ position: 'relative', flexShrink: 0 }}
+                      onMouseEnter={() => setPagamentoHoverAberto(true)}
+                      onMouseLeave={() => setPagamentoHoverAberto(false)}
+                    >
+                      {botaoPix}
+                      {pagamentoHoverAberto && (
+                        <div
+                          onMouseEnter={() => setPagamentoHoverAberto(true)}
+                          onMouseLeave={() => setPagamentoHoverAberto(false)}
+                          style={{
+                            position: 'absolute', left: '100%', bottom: 0, paddingLeft: 8,
+                            display: 'flex', zIndex: 20,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => { enviarFormasPagamento(); setPagamentoHoverAberto(false) }}
+                            title="Outras formas de pagamento"
+                            style={{
+                              width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', flexShrink: 0,
+                              background: '#fff', color: '#374151',
+                              cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            <CreditCard size={17} strokeWidth={2} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )
                 })}
 

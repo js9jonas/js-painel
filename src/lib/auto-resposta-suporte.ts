@@ -2,6 +2,28 @@ import { pool } from '@/lib/db'
 import { enviarTextoWhatsapp, enviarBotoesWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
 
 const PIX_CHAVE = '40827286000106'
+
+// Dados de contas bancárias pra quem prefere não usar PIX — botões "Sicredi"/"Lotérica"/"Banrisul"
+// enviados junto com a oferta de outras formas de pagamento (ver /api/whatsapp/enviar-pagamento-botao).
+// "Lotérica" deposita na conta Caixa (lotérica é correspondente bancário da Caixa).
+const CONTA_SICREDI =
+  `🟢 *CONTA SICREDI*\n` +
+  `AG: 0179\n` +
+  `CC: 19355-0\n\n` +
+  `*JONAS EDUARDO SCHEIBE*`
+
+const CONTA_CAIXA =
+  `🎰 *CONTA CAIXA*\n` +
+  `AG: 3689\n` +
+  `OP: 001\n` +
+  `CC: 00022669-0\n\n` +
+  `*JONAS EDUARDO SCHEIBE*`
+
+const CONTA_BANRISUL =
+  `🏛️ *CONTA BANRISUL*\n` +
+  `AG: 0191\n` +
+  `CC: 390103640-3\n\n` +
+  `*JONAS EDUARDO SCHEIBE*`
 const TEMPLATES_GATILHO = ['lembrete_vencimento', 'lembrete_vencimento_v2', 'vencido_plano', 'vencido_plano_v2']
 
 // Fonte reconhecida sem ser template Meta aprovado: botão "Planos estendidos" enviado
@@ -242,6 +264,24 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
   if (botaoClicado === 'Chave PIX') {
     const msgId = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
     await registrarEnvio(msgId, telefone, PIX_CHAVE, cliqueMsgId)
+    return
+  }
+
+  if (botaoClicado === 'Sicredi') {
+    const msgId = await enviarTextoWhatsapp(telefone, CONTA_SICREDI)
+    await registrarEnvio(msgId, telefone, CONTA_SICREDI, cliqueMsgId)
+    return
+  }
+
+  if (botaoClicado === 'Lotérica') {
+    const msgId = await enviarTextoWhatsapp(telefone, CONTA_CAIXA)
+    await registrarEnvio(msgId, telefone, CONTA_CAIXA, cliqueMsgId)
+    return
+  }
+
+  if (botaoClicado === 'Banrisul') {
+    const msgId = await enviarTextoWhatsapp(telefone, CONTA_BANRISUL)
+    await registrarEnvio(msgId, telefone, CONTA_BANRISUL, cliqueMsgId)
     return
   }
 
