@@ -231,3 +231,35 @@ Endpoint já existia (`src/lib/whatsapp-template.ts` → `enviarTemplateWhatsapp
 - **`aplicativos.mac` não é sempre MAC de verdade** — apps como Clouddy guardam o e-mail de login nesse campo. Nunca rotular como "MAC:" ao montar texto; mostrar o valor bruto, igual ao painel lateral já fazia.
 - Ícones de UI (não texto de mensagem) trocados de emoji pra `lucide-react` (`Info`, `ClipboardList`, `Smartphone`, `CalendarClock`, `AlertTriangle`, `Pin`) — mais nítido, já é dependência do projeto. Emoji continua obrigatório nos textos que viram mensagem WhatsApp de verdade (`montarTextoVencimento`/`montarTextoAplicativos`), porque o WhatsApp não renderiza SVG.
 - Balões de "Chave Pix" (`msg.tipo === 'template'` e `msg.tipo === 'pix'`) tinham um `₽` (símbolo de rublo) como avatar — trocado pela logo oficial do Pix (`public/icons/pix.png`, 1024×1024, fundo transparente).
+
+## Atalho "Planos" + botões enviados fora de template (19/09/2026) — commits até cdf6913
+
+### Envio sequencial em Respostas Rápidas
+`texto` com uma linha só `---` entre blocos vira mensagens de verdade separadas ao clicar no atalho — `splitPartesRR()` + `enviarRRSequencial()` (600ms de intervalo, via `/api/whatsapp/enviar` em loop), em vez de só inserir tudo com `\n` no composer. `aplicarRR()` decide entre os dois caminhos conforme o resultado do split.
+
+### Novo ícone "Planos" (📦) — primeira opção do flyout, antes de "Dados de vencimento"
+- 1 assinatura → `enviarInfoPlano()` manda direto: `📦 Seu plano: *identificação*\n[pacote]\n[valor]/mês`.
+- Mais de 1 → modal lista cada `assinaturas[]` com botão "Enviar" individual (`planosModalOpen`).
+- A mensagem sai com **botões anexados**: "Chave PIX" e "Planos estendidos", via `/api/whatsapp/enviar-planos-botao` (novo endpoint).
+
+### Padrão novo: botão de mensagem manual reconhecido pelo webhook de auto-resposta
+
+Antes, só templates Meta aprovados (nome em `TEMPLATES_GATILHO`, `src/lib/auto-resposta-suporte.ts`) tinham clique de botão reconhecido como "confiável" por `buscarOrigemTemplate()`. Pra um botão mandado por uma ação manual do `/chat` (não um template) também ser reconhecido:
+
+1. Endpoint dedicado grava em `whatsapp_mensagens` com `tipo='interactive'` e um `source` próprio (`'chat-planos'`), `conteudo = JSON.stringify({ body: { text }, id_assinatura })` — mesmo formato de conteúdo que os templates usam, pra reaproveitar o parse.
+2. `buscarOrigemTemplate()` foi generalizada: aceita `tipo='template'` (fluxo antigo) OU `tipo='interactive' AND source=<fonte esperada>` (fluxo novo). Cada fonte nova precisa ser adicionada manualmente nessa função.
+3. `webhook/route.ts` já despachava por **título do botão** (lista `['Falar com suporte', 'Chave PIX', ...]`), não por origem — só precisou incluir "Planos estendidos" nessa lista (já estava). Botões cujo handler não depende de `origem.reconhecido` (ex: "Chave PIX", que só devolve a chave incondicionalmente) não precisam de nenhuma dessas 3 etapas — só entrar na mensagem já basta.
+
+**Dedup:** `enviarBotoes()` que existia só dentro de `auto-resposta-suporte.ts` virou `enviarBotoesWhatsapp()` compartilhada em `src/lib/whatsapp-envio.ts` — os dois pontos de envio de botão (auto-resposta e o novo endpoint de planos) usam a mesma função agora.
+
+### Mensagem "Opções de plano disponíveis" (botão "Planos estendidos") reformatada
+Trocado `🔹` repetido por emoji numerado por linha (`1️⃣2️⃣3️⃣...`, array `NUMEROS` com fallback `🔹` pra além do 9º item) + `🗓️` no topo + `🔑` antes da chave PIX. Decisão de design: **não** adicionar destaque tipo "melhor oferta"/economia entre períodos — já registrado em `feedback_preferences.md` (memória global) que o tom do agente não deve comparar preços nem destacar economia sem o cliente perguntar.
+
+### Bug corrigido: "vence hoje" tratado como já vencido
+`tipoTemplateRelacionado()` (decide se mostra o ícone 📅/⚠️ no balão) usava `venc <= hoje`, tratando o dia do vencimento como já vencido. Corrigido pra bater exatamente com a janela do disparo em massa (`src/lib/notificacoes-vencimento.ts`: `CURRENT_DATE - 1` pra vencidos, `CURRENT_DATE + 1` pra amanhã) — "vence hoje" agora não mostra nenhum ícone, consistente com o sistema oficial. Achado ao investigar por que o cliente Luis Sedenir da Silva (3 assinaturas vinculadas, uma vencendo no dia) mostrava o aviso de vencido incorretamente.
+
+### Outras pequenas melhorias
+- Busca de conversa (`filtro`) ganhou botão "✕" (ícone `X` do lucide-react) que só aparece com texto digitado.
+- `NotificacoesVencimentoPanel` (listas "Notificar vencidos"/"vencem amanhã" na tela inicial): nome virou link pra `/clientes/{id}`, telefone virou botão que chama `onAbrirConversa` (prop nova, recebe `setSelecionado` do componente pai) — abre a conversa sem sair da página. Precisou adicionar `id_cliente` em `ItemNotificacaoVencimento` e na query de `listarPendentes()` (`src/lib/notificacoes-vencimento.ts`), que antes não trazia esse campo.
+- Texto de "Dados de vencimento": identificação em negrito (`*texto*`, padrão WhatsApp) após o status, quebra de linha pro vencimento, linha em branco entre assinaturas quando há mais de uma, cabeçalho no singular/plural conforme a quantidade.
+- Texto de "Aplicativos cadastrados" simplificado pra só nome + MAC (tirou chave/validade que tinha antes).
