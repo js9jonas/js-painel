@@ -19,7 +19,7 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
-import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard } from 'lucide-react'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard, Unplug } from 'lucide-react'
 
 interface Conversa {
   telefone: string
@@ -393,6 +393,9 @@ export default function ChatPage() {
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [cliente, setCliente] = useState<Cliente | null>(null)
+  // Última orientação "desligar tudo da tomada" enviada a este telefone (dias=null → nunca).
+  // Guarda o telefone junto pra nunca exibir o resultado de outra conversa enquanto carrega.
+  const [orientacaoReinicio, setOrientacaoReinicio] = useState<{ tel: string; dias: number | null } | null>(null)
   const [texto, setTexto] = useState('')
   const [inputVazio, setInputVazio] = useState(true)
   const [enviando, setEnviando] = useState(false)
@@ -537,6 +540,19 @@ export default function ChatPage() {
     document.addEventListener('visibilitychange', onVisible)
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [selecionado, carregarMensagens])
+
+  // Recarrega só quando a última mensagem real da conversa muda (envio pelo chat ou pelo celular),
+  // sem consulta extra a cada poll de 5s. Ignora bolhas otimistas (ainda sem id do servidor).
+  const ultimaMsgId = mensagens.filter(m => !m.pendente).at(-1)?.id ?? 0
+  useEffect(() => {
+    if (!selecionado) return
+    let cancelado = false
+    fetch(`/api/whatsapp/orientacao-reinicio?telefone=${selecionado}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelado && d) setOrientacaoReinicio({ tel: selecionado, dias: d.dias }) })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [selecionado, ultimaMsgId])
 
   // Esc fecha a conversa aberta, desde que nenhum modal esteja na frente
   useEffect(() => {
@@ -1573,14 +1589,31 @@ export default function ChatPage() {
               }}>
                 {respostasFixadas.map(r => {
                   const ehPix = r.titulo.toLowerCase().includes('pix') || r.texto.toLowerCase().includes('chave pix')
+                  // Atalho "Reinicia Geral": identificado pelo conteúdo (mesmo critério do endpoint
+                  // orientacao-reinicio), não pelo título — continua valendo se o atalho for renomeado.
+                  const textoLower = r.texto.toLowerCase()
+                  const ehReinicio = textoLower.includes('tomada') && textoLower.includes('2 minutos')
+                  const dadosReinicio = ehReinicio && orientacaoReinicio?.tel === selecionado ? orientacaoReinicio : null
+                  const diasReinicio = dadosReinicio?.dias ?? null
+                  // 0–3 dias vermelho (não reenviar), 4–21 amarelo, acima disso (ou nunca) verde.
+                  const corReinicio = !dadosReinicio ? '#00a884'
+                    : diasReinicio === null ? '#16a34a'
+                    : diasReinicio <= 3 ? '#dc2626'
+                    : diasReinicio <= 21 ? '#f59e0b'
+                    : '#16a34a'
+                  const tituloBotao = !ehReinicio || !dadosReinicio ? r.titulo
+                    : diasReinicio === null ? `${r.titulo} — nunca enviado para este contato`
+                    : diasReinicio === 0 ? `${r.titulo} — enviado hoje`
+                    : diasReinicio === 1 ? `${r.titulo} — enviado há 1 dia (ontem)`
+                    : `${r.titulo} — enviado há ${diasReinicio} dias`
                   const botaoPix = (
                     <button
                       type="button"
                       onClick={() => aplicarRR(r.texto)}
-                      title={r.titulo}
+                      title={tituloBotao}
                       style={{
                         width: 40, height: 40, borderRadius: '50%', border: ehPix ? '1px solid #e5e7eb' : 'none', flexShrink: 0,
-                        background: ehPix ? '#fff' : '#00a884', color: '#fff', fontSize: 13, fontWeight: 700,
+                        background: ehPix ? '#fff' : ehReinicio ? corReinicio : '#00a884', color: '#fff', fontSize: 13, fontWeight: 700,
                         cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
@@ -1588,7 +1621,9 @@ export default function ChatPage() {
                       {ehPix
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src="/icons/pix.png" alt="Pix" style={{ width: 24, height: 24, objectFit: 'contain' }} />
-                        : r.titulo.trim().slice(0, 2).toUpperCase()}
+                        : ehReinicio
+                          ? <Unplug size={19} strokeWidth={2.25} />
+                          : r.titulo.trim().slice(0, 2).toUpperCase()}
                     </button>
                   )
 
