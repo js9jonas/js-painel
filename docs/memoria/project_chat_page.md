@@ -263,3 +263,11 @@ Trocado `🔹` repetido por emoji numerado por linha (`1️⃣2️⃣3️⃣...`
 - `NotificacoesVencimentoPanel` (listas "Notificar vencidos"/"vencem amanhã" na tela inicial): nome virou link pra `/clientes/{id}`, telefone virou botão que chama `onAbrirConversa` (prop nova, recebe `setSelecionado` do componente pai) — abre a conversa sem sair da página. Precisou adicionar `id_cliente` em `ItemNotificacaoVencimento` e na query de `listarPendentes()` (`src/lib/notificacoes-vencimento.ts`), que antes não trazia esse campo.
 - Texto de "Dados de vencimento": identificação em negrito (`*texto*`, padrão WhatsApp) após o status, quebra de linha pro vencimento, linha em branco entre assinaturas quando há mais de uma, cabeçalho no singular/plural conforme a quantidade.
 - Texto de "Aplicativos cadastrados" simplificado pra só nome + MAC (tirou chave/validade que tinha antes).
+
+### Outras formas de pagamento (Sicredi/Lotérica/Banrisul) — commit dae424b
+
+Círculo fixado de "Chave PIX" ganhou um segundo botão (💳 `CreditCard` do lucide-react) que só aparece **no hover**, posicionado à direita dele — mesmo mecanismo de hover flyout do balão ℹ️ (`position:absolute, left:'100%', paddingLeft:8`, estado local `pagamentoHoverAberto`). Ao clicar, `enviarFormasPagamento()` chama `/api/whatsapp/enviar-pagamento-botao` (novo endpoint), que manda a mensagem "Caso prefira não usar o PIX..." com 3 botões interativos: Sicredi, Lotérica, Banrisul.
+
+Diferente do fluxo de "Planos estendidos", essas 3 respostas são **incondicionais** — não passam por `buscarOrigemTemplate()`/`id_assinatura` porque os dados da conta bancária são fixos, não dependem de qual cliente ou assinatura clicou. Só precisou: (1) 3 `if (botaoClicado === '...')` novos em `auto-resposta-suporte.ts` (mesmo padrão incondicional do handler "Chave PIX" já existente), cada um mandando uma constante de texto (`CONTA_SICREDI`/`CONTA_CAIXA`/`CONTA_BANRISUL`, com dados de agência/conta em nome de Jonas Eduardo Scheibe); (2) incluir os 3 títulos na lista de dispatch do `webhook/route.ts`.
+
+**Lotérica deposita na conta Caixa** — decisão de negócio confirmada com Jonas: lotérica é correspondente bancário da Caixa Econômica Federal no Brasil, então o botão "Lotérica" responde com os dados da `CONTA_CAIXA`, não uma conta própria de "lotérica".

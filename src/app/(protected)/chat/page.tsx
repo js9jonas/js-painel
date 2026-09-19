@@ -54,6 +54,7 @@ interface Mensagem {
   source: string | null
   recebida_em: string
   transcricao: string | null
+  pendente?: boolean
 }
 
 interface Cliente {
@@ -113,6 +114,15 @@ function formatData(iso: string) {
 function formatValor(v: number | null) {
   if (!v) return '—'
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+// Converte *negrito* (padrão WhatsApp) em <strong> pra exibição — mesma sintaxe que boldToHtml()
+// usa no campo de digitação, mas devolvendo nós React em vez de HTML.
+function renderComNegrito(texto: string): React.ReactNode[] {
+  const partes = texto.split(/\*(\S(?:[^*\n]*\S)?|\S)\*/g)
+  return partes.map((parte, i) =>
+    i % 2 === 1 ? <strong key={i}>{parte}</strong> : parte
+  )
 }
 
 function statusColor(s: string | null) {
@@ -502,7 +512,13 @@ export default function ChatPage() {
       const res = await fetch(`/api/whatsapp/mensagens?telefone=${tel}`, { signal: controller.signal })
       if (res.ok) {
         const data = await res.json()
-        setMensagens(data.mensagens)
+        // Preserva bolhas otimistas (envio ainda em voo) — sem isso, um poll concorrente que
+        // termina antes do POST de envio (Meta pode levar 1-3s) apagaria a bolha prematuramente,
+        // já que a lista do servidor ainda não inclui a mensagem recém-enviada.
+        setMensagens(prev => {
+          const pendentes = prev.filter(m => m.pendente)
+          return pendentes.length > 0 ? [...data.mensagens, ...pendentes] : data.mensagens
+        })
         setCliente(data.cliente)
         setAssinaturas(data.assinaturas ?? [])
       }
@@ -924,8 +940,37 @@ export default function ChatPage() {
     if (inputRef.current) inputRef.current.innerHTML = ''
     lastUserInputRef.current = ''
     setInputVazio(true)
+
+    // Bolha otimista — aparece na hora, antes da API real do WhatsApp responder (pode levar
+    // alguns segundos). Some sozinha quando carregarMensagens() troca a lista pela de verdade
+    // vinda do servidor; se o envio falhar, é removida e o texto volta pro campo pra tentar de novo.
+    const idTemp = -Date.now()
+    setMensagens(prev => [...prev, {
+      id: idTemp,
+      wa_msg_id: `temp_${idTemp}`,
+      telefone: selecionado,
+      nome_contato: null,
+      tipo: 'text',
+      conteudo: msgFinal,
+      media_mime: null,
+      nome_arquivo: null,
+      origem: 'jonas',
+      sugestao_ia: sugestaoOriginal,
+      foi_aceita: statusSugestao === 'aceita_sem_edicao',
+      mensagem_final: null,
+      reply_to_wa_msg_id: replyId,
+      reply_to_conteudo: replyConteudo,
+      reply_to_origem: replyOrigem,
+      reacao: null,
+      status: null,
+      source: null,
+      recebida_em: new Date().toISOString(),
+      transcricao: null,
+      pendente: true,
+    }])
+
     try {
-      await fetch('/api/whatsapp/enviar', {
+      const resp = await fetch('/api/whatsapp/enviar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -939,7 +984,13 @@ export default function ChatPage() {
           reply_origem: replyOrigem,
         })
       })
+      if (!resp.ok) throw new Error('Falha ao enviar')
       await carregarMensagens(selecionado)
+      setMensagens(prev => prev.filter(m => m.id !== idTemp))
+    } catch (err) {
+      console.error('[Chat] Erro ao enviar:', err)
+      setMensagens(prev => prev.filter(m => m.id !== idTemp))
+      setTexto(msgFinal)
     } finally {
       setEnviando(false)
       inputRef.current?.focus()
@@ -1757,7 +1808,9 @@ export default function ChatPage() {
                         padding: '8px 12px',
                         borderRadius: isCliente ? '0 8px 8px 8px' : '8px 0 8px 8px',
                         background: isCliente ? '#ffffff' : '#d9fdd3',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.13)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.13)',
+                        opacity: msg.pendente ? 0.6 : 1,
+                        transition: 'opacity 0.2s',
                       }}>
                         {/* Quote de resposta */}
                         {msg.reply_to_wa_msg_id && (
@@ -1906,10 +1959,26 @@ export default function ChatPage() {
                         {msg.tipo === 'interactive' && (() => {
                           let iv: any = {}
                           try { iv = JSON.parse(msg.conteudo ?? '{}') } catch {}
-                          const label = iv.body?.text ?? iv.header?.text ?? '[Mensagem interativa]'
+                          const texto = iv.body?.text ?? iv.header?.text ?? '[Mensagem interativa]'
+                          const botoes: { id: string; title: string }[] = iv.buttons ?? []
                           return (
-                            <div style={{ fontSize: 14, fontStyle: 'italic', color: '#667781' }}>
-                              🔘 {label}
+                            <div style={{ minWidth: 220 }}>
+                              <div style={{ color: '#111b21', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                                {renderComNegrito(texto)}
+                              </div>
+                              {botoes.length > 0 && (
+                                <div style={{ marginTop: 8, borderTop: '1px solid rgba(0,0,0,0.13)' }}>
+                                  {botoes.map(b => (
+                                    <div key={b.id} style={{
+                                      padding: '9px 0', textAlign: 'center', color: '#00a884',
+                                      fontWeight: 600, fontSize: 14,
+                                      borderBottom: '1px solid rgba(0,0,0,0.13)',
+                                    }}>
+                                      {b.title}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )
                         })()}
@@ -2080,7 +2149,7 @@ export default function ChatPage() {
                           </span>
                           {!isCliente && (
                             <span style={{ color: msg.status === 'read' ? '#53bdeb' : '#667781', fontSize: 13 }}>
-                              {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
+                              {msg.pendente ? '🕓' : msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
                             </span>
                           )}
                         </div>

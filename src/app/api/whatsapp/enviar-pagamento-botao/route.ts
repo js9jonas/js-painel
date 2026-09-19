@@ -19,11 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'telefone obrigatório' }, { status: 400 })
     }
 
-    const msgId = await enviarBotoesWhatsapp(telefone, TEXTO, [
+    const botoes = [
       { id: 'sicredi', title: 'Sicredi' },
       { id: 'loterica', title: 'Lotérica' },
       { id: 'banrisul', title: 'Banrisul' },
-    ])
+    ]
+    const msgId = await enviarBotoesWhatsapp(telefone, TEXTO, botoes)
 
     if (!msgId) {
       return NextResponse.json({ error: 'Erro ao enviar mensagem' }, { status: 500 })
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
         (wa_msg_id, telefone, tipo, conteudo, origem, source, recebida_em)
        VALUES ($1, $2, 'interactive', $3, 'jonas', 'chat-pagamento', NOW())
        ON CONFLICT (wa_msg_id) DO NOTHING`,
-      [msgId, telefone, JSON.stringify({ body: { text: TEXTO } })]
+      [msgId, telefone, JSON.stringify({ body: { text: TEXTO }, buttons: botoes })]
     )
 
     return NextResponse.json({ success: true, message_id: msgId })
