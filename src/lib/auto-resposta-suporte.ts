@@ -262,8 +262,12 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
   }
 
   if (botaoClicado === 'Chave PIX') {
-    const msgId = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
-    await registrarEnvio(msgId, telefone, PIX_CHAVE, cliqueMsgId)
+    const texto = 'Segue abaixo nossa chave PIX (CNPJ):'
+    const msgIdA = await enviarTextoWhatsapp(telefone, texto)
+    await registrarEnvio(msgIdA, telefone, texto, cliqueMsgId)
+
+    const msgIdB = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
+    await registrarEnvio(msgIdB, telefone, PIX_CHAVE, cliqueMsgId)
     return
   }
 
