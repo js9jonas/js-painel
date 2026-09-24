@@ -38,14 +38,16 @@ export default function ContasGroupClient({ contas, idCliente, vencContas, empty
       vencContas={vencContas}
       emptyAction={emptyAction}
       small={small}
+      contaLeading={(c) => (
+        <ContaAcoesMenu
+          conta={c}
+          idCliente={idCliente}
+          appsVinculados={appsVinculados?.get(c.id_conta) ?? []}
+          paineisList={paineisList}
+        />
+      )}
       contaAction={(c) => (
         <>
-          <ContaAcoesMenu
-            conta={c}
-            idCliente={idCliente}
-            appsVinculados={appsVinculados?.get(c.id_conta) ?? []}
-            paineisList={paineisList}
-          />
           <VerificarContaButton
             idConta={c.id_conta}
             usuario={c.usuario}

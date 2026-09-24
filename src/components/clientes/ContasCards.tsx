@@ -19,6 +19,8 @@ type Props = {
   contas: ContaPainelVinculada[];
   /** Botão extra ao final de cada balão (ex.: DesvincularContaButton) */
   contaAction?: (conta: ContaPainelVinculada) => React.ReactNode;
+  /** Elemento no início de cada balão (ex.: ContaAcoesMenu) */
+  contaLeading?: (conta: ContaPainelVinculada) => React.ReactNode;
   /** Conteúdo extra no balão "sem vínculo" */
   emptyAction?: React.ReactNode;
   /** Mostra data de vencimento no balão "sem vínculo" */
@@ -27,7 +29,7 @@ type Props = {
   small?: boolean;
 };
 
-export default function ContasCards({ contas, contaAction, emptyAction, vencContas, small }: Props) {
+export default function ContasCards({ contas, contaAction, contaLeading, emptyAction, vencContas, small }: Props) {
   const card = small
     ? "flex items-center gap-1.5 rounded bg-zinc-50 border border-zinc-200 px-2 py-1 text-xs"
     : "flex items-center gap-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-1.5 text-xs"
@@ -39,6 +41,7 @@ export default function ContasCards({ contas, contaAction, emptyAction, vencCont
       {contas.length > 0
         ? contas.map((c) => (
             <div key={c.id_conta} className={card}>
+              {contaLeading?.(c)}
               <span className="font-medium text-zinc-500">{c.nome_painel}</span>
               <span className="text-zinc-300">·</span>
               <span className="font-mono font-semibold text-zinc-800 select-all">{c.usuario}</span>
