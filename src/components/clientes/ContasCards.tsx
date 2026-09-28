@@ -42,7 +42,19 @@ export default function ContasCards({ contas, contaAction, contaLeading, emptyAc
         ? contas.map((c) => (
             <div key={c.id_conta} className={card}>
               {contaLeading?.(c)}
-              <span className="font-medium text-zinc-500">{c.nome_painel}</span>
+              {c.rotulo_complemento ? (
+                <span className="flex flex-col leading-tight">
+                  <span className="font-medium text-zinc-500">{c.nome_painel}</span>
+                  <span
+                    className={`${small ? "max-w-[8rem] text-[10px]" : "max-w-[10rem] text-[11px]"} truncate text-zinc-400`}
+                    title={c.rotulo ?? undefined}
+                  >
+                    {c.rotulo_complemento}
+                  </span>
+                </span>
+              ) : (
+                <span className="font-medium text-zinc-500">{c.nome_painel}</span>
+              )}
               <span className="text-zinc-300">·</span>
               <span className="font-mono font-semibold text-zinc-800 select-all">{c.usuario}</span>
               {c.senha && (

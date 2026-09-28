@@ -29,7 +29,7 @@ type Props = {
 
 export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paineisList, onContaChanged }: Props) {
   const [editarAberto, setEditarAberto] = useState(false);
-  const [copiado, setCopiado] = useState(false);
+  const [copiado, setCopiado] = useState<"ok" | "erro" | null>(null);
   const [resultado, setResultado] = useState<ResultadoEnvioDados | null>(null);
   const [copiadoModelo, setCopiadoModelo] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -55,9 +55,12 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
       nomePainel: conta.nome_painel,
       hostStream: conta.host_stream,
     });
-    navigator.clipboard.writeText(link);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 1500);
+    // O menu fecha ao clicar; a confirmação aparece no próprio ícone do menu (✓/✗ por 1,5 s)
+    navigator.clipboard.writeText(link).then(
+      () => setCopiado("ok"),
+      () => setCopiado("erro"),
+    );
+    setTimeout(() => setCopiado(null), 1500);
   }
 
   function enviar(formato: FormatoEnvio) {
@@ -103,11 +106,13 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="rounded p-0.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors leading-none"
-            title="Ações da conta"
+            className={`rounded p-0.5 hover:bg-zinc-100 transition-colors leading-none ${
+              copiado === "ok" ? "text-emerald-600 font-bold" : copiado === "erro" ? "text-red-600 font-bold" : "text-zinc-400 hover:text-zinc-700"
+            }`}
+            title={copiado === "ok" ? "M3U copiado!" : copiado === "erro" ? "Não foi possível copiar o M3U" : "Ações da conta"}
             type="button"
           >
-            👤
+            {copiado === "ok" ? "✓" : copiado === "erro" ? "✗" : "👤"}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
@@ -117,8 +122,8 @@ export default function ContaAcoesMenu({ conta, idCliente, appsVinculados, paine
 
           {podeM3u && (
             <>
-              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); copiarM3u(); }}>
-                🔗 {copiado ? "Copiado!" : "Copiar M3U"}
+              <DropdownMenuItem onSelect={copiarM3u}>
+                🔗 Copiar M3U
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => enviar("xciptv")}>
                 📲 Enviar Dados de XCIPTV

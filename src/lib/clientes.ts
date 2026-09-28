@@ -1,5 +1,6 @@
 // src/lib/clientes.ts
 import { pool } from "@/lib/db";
+import { complementoRotulo } from "@/lib/rotulo-complemento";
 
 export type ClienteStatusTela =
   | "sem_assinatura"
@@ -70,6 +71,8 @@ export type ContaPainelVinculada = {
   usuario: string;
   senha: string | null;
   rotulo: string | null;
+  /** Parte do rótulo que difere do nome do cliente (sub-linha do balão) — ver lib/rotulo-complemento */
+  rotulo_complemento: string | null;
   status_conta: string;
   nome_painel: string;
   tipo_painel: string;
@@ -79,22 +82,25 @@ export type ContaPainelVinculada = {
 };
 
 export async function getContasPainelByClienteId(id: string): Promise<ContaPainelVinculada[]> {
-  const { rows } = await pool.query<ContaPainelVinculada>(
+  const { rows } = await pool.query<Omit<ContaPainelVinculada, 'rotulo_complemento'> & { nome_cliente: string | null }>(
     `SELECT c.id_conta::text, c.id_assinatura::text, c.id_painel_servidor,
             c.usuario, c.senha,
             c.rotulo, c.status_conta, ps.nome AS nome_painel, ps.tipo AS tipo_painel,
             c.vencimento_real_painel::text AS vencimento_real_painel,
-            ps.host_stream, ps.url_acesso_web
+            ps.host_stream, ps.url_acesso_web, cl.nome AS nome_cliente
      FROM public.contas c
      JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
-     WHERE c.id_assinatura IN (
-       SELECT id_assinatura FROM public.assinaturas WHERE id_cliente = $1::bigint
-     )
+     JOIN public.assinaturas a ON a.id_assinatura = c.id_assinatura
+     JOIN public.clientes cl ON cl.id_cliente = a.id_cliente
+     WHERE a.id_cliente = $1::bigint
        AND c.removido_em IS NULL
      ORDER BY ps.nome, c.usuario`,
     [id]
   );
-  return rows;
+  return rows.map(({ nome_cliente, ...conta }) => ({
+    ...conta,
+    rotulo_complemento: complementoRotulo(conta.rotulo, nome_cliente),
+  }));
 }
 
 export type PagamentoRow = {
