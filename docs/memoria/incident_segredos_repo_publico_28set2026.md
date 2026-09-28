@@ -1,6 +1,6 @@
 ---
 name: incident_segredos_repo_publico_28set2026
-description: 28/09/2026 — INTERNAL_API_TOKEN, login da CENTRAL e dealer token UNITV em texto puro no repo público; varredura do histórico inteiro e plano de rotação
+description: ✅ encerrado — 28/09/2026 — INTERNAL_API_TOKEN, login da CENTRAL e dealer token UNITV em texto puro no repo público; varredura do histórico inteiro e plano de rotação
 metadata:
   type: project
 ---
@@ -37,7 +37,6 @@ metadata:
 
 **⚪ Repo continua público** — decisão do Jonas 28/09: os segredos ativos foram trocados e há hook + lições registradas.
 
-**Pendente (rotação — tirar do código NÃO basta, o histórico é público):**
-1. Revogar a API key temporária do n8n (foi colada no chat).
+**✅ Incidente encerrado 28/09 ~18h25:** deploy do proxy restrito confirmado em produção — token + `/api/m3u-resumo` e `/api/m3u-listas` → 200, `/api/interno/central-token` → 405, token + `/api/clientes` → 307, sem token → 307; refresh da CENTRAL → "Token salvo". API key temporária do n8n revogada pelo Jonas (confirmado: 401).
 
 **Por que o cron do refresh continua:** o token da CENTRAL que ele grava em `servidores.session_cookie` (id 2) é usado por **todas** as operações do adapter — saldo (`getCreditos`) e sync (`listarContas`) funcionam com ele; só a renovação (escrita) falha por `sessao_nao_renderizada`. Sem o cron, o adapter cai no login via CapSolver (pago por captcha).
