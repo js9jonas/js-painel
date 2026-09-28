@@ -25,11 +25,15 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
-  // Libera rotas internas da API com token secreto (ex: n8n, cron)
+  // Libera rotas internas da API com token secreto (ex: n8n, cron) — SÓ as listadas.
+  // Antes valia pra qualquer /api/*: um vazamento do token (aconteceu, ver
+  // docs/memoria/incident_segredos_repo_publico_28set2026.md) abria a API inteira.
+  // Rota nova chamada por n8n/cron com esse header precisa entrar aqui.
   const internalToken = req.headers.get('x-internal-token')
   if (
-    pathname.startsWith('/api/') &&
-    internalToken === process.env.INTERNAL_API_TOKEN
+    internalToken &&
+    internalToken === process.env.INTERNAL_API_TOKEN &&
+    rotaAceitaTokenInterno(pathname)
   ) {
     return NextResponse.next()
   }
@@ -49,6 +53,15 @@ export default auth((req) => {
 
   return NextResponse.next()
 })
+
+// Consumidores (28/09/2026): cron local central_refresh_token.js → /api/interno/central-token;
+// n8n "Automações JS" (credencial `js-painel — token interno`) → m3u-listas (GET),
+// m3u-testes (POST), m3u-resumo (POST)
+const ROTAS_TOKEN_INTERNO = new Set(['/api/m3u-listas', '/api/m3u-testes', '/api/m3u-resumo'])
+
+function rotaAceitaTokenInterno(pathname: string): boolean {
+  return pathname.startsWith('/api/interno/') || ROTAS_TOKEN_INTERNO.has(pathname)
+}
 
 export const config = {
   matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],

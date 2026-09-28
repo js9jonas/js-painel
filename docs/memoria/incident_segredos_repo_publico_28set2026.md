@@ -33,9 +33,11 @@ metadata:
 
 **⚪ UNITV — risco aceito por Jonas 28/09:** painel migrou `starhome.vip` → `panel-web.revenda.watch`; o token vazado é da época antiga e hoje o `dealer_token` é gerado a cada login (adapter re-loga via CapSolver), então provavelmente já não vale (não testado contra a API). Login no painel exige código por SMS em dispositivo novo. Senha não trocada.
 
+**✅ Bypass do `proxy.ts` restrito 28/09:** token interno só libera `/api/interno/*` + `/api/m3u-listas`, `/api/m3u-testes`, `/api/m3u-resumo` (exato) — levantamento de todos os nós n8n que chamam o js-painel (qualquer auth) confirmou que são os únicos consumidores. Testado local (dev): rotas listadas passam (405/500-sem-banco), `/api/clientes` e subrotas `/api/m3u-listas/1/canais` com token → 307, token errado/ausente → 307.
+
+**⚪ Repo continua público** — decisão do Jonas 28/09: os segredos ativos foram trocados e há hook + lições registradas.
+
 **Pendente (rotação — tirar do código NÃO basta, o histórico é público):**
-1. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
-2. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
-3. Revogar a API key temporária do n8n (foi colada no chat).
+1. Revogar a API key temporária do n8n (foi colada no chat).
 
 **Por que o cron do refresh continua:** o token da CENTRAL que ele grava em `servidores.session_cookie` (id 2) é usado por **todas** as operações do adapter — saldo (`getCreditos`) e sync (`listarContas`) funcionam com ele; só a renovação (escrita) falha por `sessao_nao_renderizada`. Sem o cron, o adapter cai no login via CapSolver (pago por captcha).
