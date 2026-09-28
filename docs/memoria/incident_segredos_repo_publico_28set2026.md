@@ -31,10 +31,11 @@ metadata:
 
 **✅ Senha da CENTRAL trocada 28/09 ~18h:** Jonas trocou no painel.fun e no cadastro do servidor no js-painel; `.env.local` atualizado via área de transferência (sem passar pelo chat). Testado: refresh fez login completo com a senha nova → "Token salvo".
 
+**⚪ UNITV — risco aceito por Jonas 28/09:** painel migrou `starhome.vip` → `panel-web.revenda.watch`; o token vazado é da época antiga e hoje o `dealer_token` é gerado a cada login (adapter re-loga via CapSolver), então provavelmente já não vale (não testado contra a API). Login no painel exige código por SMS em dispositivo novo. Senha não trocada.
+
 **Pendente (rotação — tirar do código NÃO basta, o histórico é público):**
-1. Trocar dealer token UNITV se o painel permitir.
-2. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
-3. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
-4. Revogar a API key temporária do n8n (foi colada no chat).
+1. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
+2. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
+3. Revogar a API key temporária do n8n (foi colada no chat).
 
 **Por que o cron do refresh continua:** o token da CENTRAL que ele grava em `servidores.session_cookie` (id 2) é usado por **todas** as operações do adapter — saldo (`getCreditos`) e sync (`listarContas`) funcionam com ele; só a renovação (escrita) falha por `sessao_nao_renderizada`. Sem o cron, o adapter cai no login via CapSolver (pago por captcha).
