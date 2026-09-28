@@ -87,7 +87,7 @@ Quando não há template aprovado pela Meta para um tipo de mensagem (ex: agrade
 
 ## Rotas chamadas por n8n/cron (`src/proxy.ts`)
 
-O header `x-internal-token` (= `INTERNAL_API_TOKEN`) só libera o login nas rotas de `ROTAS_TOKEN_INTERNO` (vazia desde a remoção dos testes M3U) + prefixo `/api/interno/` (restrito em 28/09/2026 — antes valia pra toda `/api/*` e o token vazou neste repo público). **Rota nova chamada por serviço externo com esse header precisa entrar nessa lista**, senão recebe 307 pro login. No n8n, usar a credencial `js-painel — token interno` (httpHeaderAuth), nunca o valor literal no nó. Commits passam pelo hook `.githooks/pre-commit` (scanner de segredos) — ativar em clone novo com `git config core.hooksPath .githooks`.
+O header `x-internal-token` (= `INTERNAL_API_TOKEN`) só libera o login nas rotas de `ROTAS_TOKEN_INTERNO` (vazia desde a remoção dos testes M3U) + prefixo `/api/interno/` (restrito em 28/09/2026 — antes valia pra toda `/api/*` e o token vazou neste repo público). **Rota nova chamada por serviço externo com esse header precisa entrar nessa lista**, senão recebe 307 pro login. No n8n, criar/usar uma credencial httpHeaderAuth com o token, nunca o valor literal no nó (a antiga `js-painel — token interno` foi apagada em 28/09 junto com os testes M3U). Commits passam pelo hook `.githooks/pre-commit` (scanner de segredos) — ativar em clone novo com `git config core.hooksPath .githooks`.
 
 ## Memória do projeto
 
