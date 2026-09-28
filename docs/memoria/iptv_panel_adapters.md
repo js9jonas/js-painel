@@ -103,7 +103,7 @@ painel_tipo, painel_url, painel_usuario, painel_senha, session_cookie, session_e
 - **Frontend:** `https://panel-web.starhome.vip/` (ResellerSystem / UniTV)
 - **Solução Cloudflare:** Python `curl_cffi` com `impersonate='chrome120'` — bypassa TLS fingerprinting
 - **Criptografia AES-128-CBC:** Key=`93403d3aa2ec48b4` (UTF8), IV=`7cf0127d190cb909` (UTF8), output hex maiúsculo
-- **Token permanente:** `f1089b6267eed53cf086e6fbca376a6e` — dealer token, não expira
+- **Token permanente:** valor no cadastro do servidor UNITV no banco (`public.servidores`), nunca no repo — dealer token, não expira (o valor antigo vazou neste repo público — troca pendente desde 28/09/2026, ver incident_segredos_repo_publico_28set2026.md)
 - **cf_clearance:** expira ~1 ano (até abr/2027) — extraído via `page.context().cookies()` no Playwright
 - **Sessão salva no banco:** JSON `{token, cfClearance}` em `servidores.session_cookie`, `id_servidor = 5`
 - **Renovar sessão:** `POST /api/servidores/5/refresh-session { token, cfClearance }` quando cf_clearance expirar (~abr/2027)

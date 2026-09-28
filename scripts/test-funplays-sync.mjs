@@ -6,7 +6,7 @@ import { URL } from 'url';
 
 const { Pool } = pg;
 const pool = new Pool({
-  connectionString: 'postgresql://postgres:87fec72605778bc4dd1a@168.231.98.162:5432/js'
+  connectionString: process.env.DATABASE_URL
 });
 
 const ID_PAINEL = 100;       // painel_servidores.id do FunPlays

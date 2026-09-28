@@ -17,11 +17,37 @@ const { chromium } = require("/home/jonas/.npm/_npx/e41f203b7505f1fb/node_module
 // desde 11/07/2026, só aceita conexão via túnel SSH, que não fica sempre aberto no
 // desktop. Reaproveita o bypass genérico de rota interna do proxy.ts (x-internal-token).
 const APP_URL = process.env.CENTRAL_APP_URL || "https://painel.jssistemas.online";
-const INTERNAL_API_TOKEN =
-  process.env.INTERNAL_API_TOKEN || "656f9f41f061edfb189b3f8a2c497493b6cca421f0a58cc9";
 
-const USUARIO = "Jonas3468";
-const SENHA = "683468";
+// Segredos vêm do .env.local (fora do git) — nunca com valor padrão no código, o repo é
+// público (token interno e senha da CENTRAL já vazaram por aqui, ver
+// docs/memoria/incident_segredos_repo_publico_28set2026.md). Node 18 não tem loadEnvFile.
+carregarEnvLocal(require("path").join(__dirname, "../../.env.local"));
+const INTERNAL_API_TOKEN = exigirEnv("INTERNAL_API_TOKEN");
+const USUARIO = exigirEnv("CENTRAL_USUARIO");
+const SENHA = exigirEnv("CENTRAL_SENHA");
+
+function carregarEnvLocal(arquivo) {
+  let texto;
+  try {
+    texto = require("fs").readFileSync(arquivo, "utf8");
+  } catch {
+    return;
+  }
+  for (const linha of texto.split(/\r?\n/)) {
+    const m = linha.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
+  }
+}
+
+function exigirEnv(nome) {
+  const valor = process.env[nome];
+  if (!valor) {
+    console.error(`[${new Date().toISOString()}] ${nome} não definida no .env.local — abortando.`);
+    process.exit(1);
+  }
+  return valor;
+}
+
 const URL_PAINEL = "https://painel.fun/";
 const PROFILE_DIR = "/home/jonas/.config/playwright-profile";
 

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Bloqueia commit com segredo aparente (o repo é PÚBLICO — ver
+# docs/memoria/incident_segredos_repo_publico_28set2026.md). Ativar num clone novo com:
+#   git config core.hooksPath .githooks
+# Falso positivo revisado: marcar a linha com o comentário `segredo-ok`.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+mapfile -d '' ARQS < <(git diff --cached --name-only -z --diff-filter=ACMR \
+  | grep -zvE '\.(png|jpe?g|gif|ico|webp|svg|woff2?|ttf|mp3|mp4|ogg|pdf)$|package-lock\.json$|tsbuildinfo$' || true)
+[[ ${#ARQS[@]} -eq 0 ]] && exit 0
+if ! python3 scripts/scan-segredos.py "${ARQS[@]}" >&2; then
+  echo "BLOQUEADO: possível segredo acima (só arquivo:linha:tipo). Mover o valor pro .env.local/Easypanel, ou marcar a linha com 'segredo-ok' se for falso positivo." >&2
+  exit 1
+fi

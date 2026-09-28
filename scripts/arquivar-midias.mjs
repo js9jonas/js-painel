@@ -21,7 +21,8 @@ const { Pool } = pkg;
 
 // ─── Config ────────────────────────────────────────────────────────────────
 
-const DB_URL   = process.env.DATABASE_URL || 'postgresql://postgres:87fec72605778bc4dd1a@168.231.98.162:5432/js';
+const DB_URL   = process.env.DATABASE_URL;
+if (!DB_URL) throw new Error('DATABASE_URL não definida');
 const WA_TOKEN = process.env.WHATSAPP_TOKEN;
 if (!WA_TOKEN) throw new Error('WHATSAPP_TOKEN não definida');
 
