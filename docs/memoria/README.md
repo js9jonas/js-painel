@@ -2,6 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
+- [project_m3u_testes_player_removidos](project_m3u_testes_player_removidos.md) — 28/09/2026 — testes de listas M3U, tela "📡 Servidores" e "▶ Player" REMOVIDOS a pedido do Jonas; como era, tabelas mantidas no banco, commit `861934d` pra restaurar; fechou proxy aberto (SSRF) em stream-proxy/proxy-test
 - [incident_bind_mounts_perdidos_30jul_28set2026](incident_bind_mounts_perdidos_30jul_28set2026.md) — 28/09/2026 ✅ — bind mount manual das mídias do WhatsApp sumiu num deploy do Easypanel em ~30/07; mídias até 28/09 gravadas só no container e apagadas a cada deploy (milhares perdidas, recuperação descartada); corrigido na aba Armazenamento
 - [incident_segredos_repo_publico_28set2026](incident_segredos_repo_publico_28set2026.md) — 28/09/2026 ✅ — INTERNAL_API_TOKEN (liberava todo `/api/*`) e login da CENTRAL em texto puro no repo público; trocados, removidos do código, proxy restrito a rotas listadas, hook de segredos; UNITV risco aceito
 - [incident_telegram_token_vazado_github](incident_telegram_token_vazado_github.md) — 13-14/09/2026 — token real do bot `@jonascheibe_bot` e chat_id pessoal ficaram em texto puro em `docs/memoria/project_n8n_comprovante.md` (repo público), detectado pelo GitGuardian em 25/08; token rotacionado via BotFather e valores removidos dos docs; **14/09**: node do n8n ("WhatsApp JS API Oficial" → `Telegram — Ativação`) tinha o token antigo hardcoded na URL e ficou de fora do fix — corrigido e testado

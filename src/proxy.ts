@@ -15,8 +15,6 @@ export default auth((req) => {
   }
 
   if (
-    pathname.startsWith('/api/stream-proxy') ||
-    pathname.startsWith('/api/proxy-test') ||
     pathname.startsWith('/api/whatsapp/webhook') ||
     pathname.startsWith('/api/whatsapp/registrar') ||
     pathname.startsWith('/api/typebot/') ||
@@ -54,10 +52,10 @@ export default auth((req) => {
   return NextResponse.next()
 })
 
-// Consumidores (28/09/2026): cron local central_refresh_token.js → /api/interno/central-token;
-// n8n "Automações JS" (credencial `js-painel — token interno`) → m3u-listas (GET),
-// m3u-testes (POST), m3u-resumo (POST)
-const ROTAS_TOKEN_INTERNO = new Set(['/api/m3u-listas', '/api/m3u-testes', '/api/m3u-resumo'])
+// Consumidores (28/09/2026): cron local central_refresh_token.js → /api/interno/central-token.
+// (As rotas m3u-* do n8n saíram junto com os testes M3U — ver
+// docs/memoria/project_m3u_testes_player_removidos.md.)
+const ROTAS_TOKEN_INTERNO = new Set<string>([])
 
 function rotaAceitaTokenInterno(pathname: string): boolean {
   return pathname.startsWith('/api/interno/') || ROTAS_TOKEN_INTERNO.has(pathname)
