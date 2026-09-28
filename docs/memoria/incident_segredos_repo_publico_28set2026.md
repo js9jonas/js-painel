@@ -27,11 +27,13 @@ metadata:
 - **VPS:** varredura (rodada pelo Jonas, classificador bloqueou pra mim) — token só no env do serviço `js_painel`, nenhum cron/script.
 - **Hook de segredos:** `.githooks/pre-commit` + `scripts/scan-segredos.py`, ativado com `git config core.hooksPath .githooks` (precisa rodar em cada clone novo). Testado bloqueando o token real.
 
+**✅ `INTERNAL_API_TOKEN` rotacionado 28/09 ~17h30:** novo valor (64 hex, `openssl rand`) no Easypanel (deploy pelo Jonas), `.env.local` e credencial n8n `js-painel — token interno` (PATCH via API). Testado em produção (`GET /api/m3u-resumo`): novo → 200, antigo → 307 (redireciona pro login = bypass negado). Refresh da CENTRAL com o novo → "Token salvo". Arquivo temporário destruído com `shred`.
+
 **Pendente (rotação — tirar do código NÃO basta, o histórico é público):**
-1. Novo `INTERNAL_API_TOKEN`: Easypanel (Jonas, aba Ambiente + deploy) + `.env.local` + todo consumidor. Consumidores (levantamento completo): env do `js_painel` no Easypanel, `.env.local` (cron do refresh da CENTRAL), credencial n8n `js-painel — token interno`.
-2. Trocar senha da CENTRAL (painel + cadastro do servidor no js-painel + `.env.local`).
-3. Trocar dealer token UNITV se o painel permitir.
-4. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
-5. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
+1. Trocar senha da CENTRAL (painel + cadastro do servidor no js-painel + `.env.local`).
+2. Trocar dealer token UNITV se o painel permitir.
+3. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
+4. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
+5. Revogar a API key temporária do n8n (foi colada no chat).
 
 **Por que o cron do refresh continua:** o token da CENTRAL que ele grava em `servidores.session_cookie` (id 2) é usado por **todas** as operações do adapter — saldo (`getCreditos`) e sync (`listarContas`) funcionam com ele; só a renovação (escrita) falha por `sessao_nao_renderizada`. Sem o cron, o adapter cai no login via CapSolver (pago por captcha).
