@@ -29,11 +29,12 @@ metadata:
 
 **✅ `INTERNAL_API_TOKEN` rotacionado 28/09 ~17h30:** novo valor (64 hex, `openssl rand`) no Easypanel (deploy pelo Jonas), `.env.local` e credencial n8n `js-painel — token interno` (PATCH via API). Testado em produção (`GET /api/m3u-resumo`): novo → 200, antigo → 307 (redireciona pro login = bypass negado). Refresh da CENTRAL com o novo → "Token salvo". Arquivo temporário destruído com `shred`.
 
+**✅ Senha da CENTRAL trocada 28/09 ~18h:** Jonas trocou no painel.fun e no cadastro do servidor no js-painel; `.env.local` atualizado via área de transferência (sem passar pelo chat). Testado: refresh fez login completo com a senha nova → "Token salvo".
+
 **Pendente (rotação — tirar do código NÃO basta, o histórico é público):**
-1. Trocar senha da CENTRAL (painel + cadastro do servidor no js-painel + `.env.local`).
-2. Trocar dealer token UNITV se o painel permitir.
-3. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
-4. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
-5. Revogar a API key temporária do n8n (foi colada no chat).
+1. Trocar dealer token UNITV se o painel permitir.
+2. Avaliar repo privado — confirmar antes que o Easypanel tem acesso autenticado ao GitHub, senão o deploy quebra.
+3. Considerar restringir o bypass do `proxy.ts` a `/api/interno/*` em vez de `/api/*` inteiro (reduz o raio de um vazamento futuro).
+4. Revogar a API key temporária do n8n (foi colada no chat).
 
 **Por que o cron do refresh continua:** o token da CENTRAL que ele grava em `servidores.session_cookie` (id 2) é usado por **todas** as operações do adapter — saldo (`getCreditos`) e sync (`listarContas`) funcionam com ele; só a renovação (escrita) falha por `sessao_nao_renderizada`. Sem o cron, o adapter cai no login via CapSolver (pago por captcha).
