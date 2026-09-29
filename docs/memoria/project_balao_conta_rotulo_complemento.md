@@ -11,3 +11,5 @@ metadata:
 - Dados reais (1.530 contas ativas): 499 com sub-linha (392 prefixo, 84 diferença, 23 outra pessoa); 17 casos de teste ok; 18 ms pra todas.
 
 **Menu de ações da conta (`ContaAcoesMenu`):** "Copiar M3U" agora fecha o menu; a confirmação vai pro ícone 👤 do balão (✓ verde / ✗ vermelho por 1,5 s). Antes o menu ficava aberto pra mostrar "Copiado!" e mostrava isso mesmo se o `clipboard.writeText` falhasse.
+
+**Modal de editar conta (`EditarContaModal`, 28/09/2026):** campo **Usuário** antes de **Senha** (antes vinha invertido) — só a ordem na tela; o envio ao salvar não mudou.
