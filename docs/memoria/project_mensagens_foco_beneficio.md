@@ -6,7 +6,7 @@ metadata:
 ---
 
 Pedido do Jonas em 29/09/2026 (commit b92ef82), a partir do insight de vendas "não vender, oferecer benefício" (Levitt/FAB/SPIN). Textos alterados:
-- `src/lib/notificar-renovacao.ts`: renovação e boas-vindas com primeiro nome, "Pagamento confirmado", "N telas liberadas até DD/MM" (concordância 1/N, genérico sem telas) e suporte concreto ("Travou, sumiu canal ou precisa trocar de aparelho? Me chama aqui que eu resolvo").
+- `src/lib/notificar-renovacao.ts`: renovação e boas-vindas com primeiro nome, "Pagamento confirmado", "N telas liberadas até DD/MM" (concordância 1/N, genérico sem telas) e suporte ("Qualquer coisa que precisar, é só me chamar aqui que eu resolvo" — trocado no mesmo dia porque listar problemas como "travou, sumiu canal" sugeria que eles iam acontecer).
 - `/chat`, botão Planos (`enviarInfoPlano`): plano + benefício + próximo passo (tocar em Chave PIX e mandar o comprovante). O botão "Planos estendidos" foi **mantido** por decisão do Jonas (só mostra opções se o cliente tocar).
 - `auto-resposta-suporte.ts`, resposta da Chave PIX: pede o comprovante. Vale também pros lembretes de vencimento.
 

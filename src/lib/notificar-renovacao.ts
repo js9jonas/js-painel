@@ -48,7 +48,7 @@ function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean, ide
     `✅ *Tudo certo${pNome ? `, ${pNome}` : ''}!*\n\n` +
     `Pagamento confirmado. ${fraseTelas(telas, dataTxt, false).replace(/\.$/, '')}${cadaUm}. 📺\n` +
     linhaIdentificacao +
-    `\nTravou, sumiu canal ou precisa trocar de aparelho? Me chama aqui que eu resolvo 📲\n\n` +
+    `\nQualquer coisa que precisar, é só me chamar aqui que eu resolvo 📲\n\n` +
     `Obrigado por seguir com a gente! 🙏`
   )
 }
