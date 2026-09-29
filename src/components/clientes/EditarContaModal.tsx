@@ -150,6 +150,24 @@ export default function EditarContaModal({ conta, appsVinculados, onClose, onSav
 
           <div>
             <label className="block text-xs font-medium mb-1 flex items-center gap-1.5">
+              <span className={c.usuario ? "text-zinc-700" : "text-zinc-400"}>Usuário</span>
+              {!c.usuario && (
+                <span className="text-xs font-normal text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+                  não editável neste painel
+                </span>
+              )}
+            </label>
+            <input
+              type="text"
+              value={usuario}
+              onChange={e => setUsuario(e.target.value)}
+              disabled={!c.usuario}
+              className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1 flex items-center gap-1.5">
               <span className={c.senha ? "text-zinc-700" : "text-zinc-400"}>Senha</span>
               {!c.senha && (
                 <span className="text-xs font-normal text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
@@ -163,24 +181,6 @@ export default function EditarContaModal({ conta, appsVinculados, onClose, onSav
               onChange={e => setSenha(e.target.value)}
               disabled={!c.senha}
               placeholder={c.senha ? (conta.senha ?? "nova senha") : "—"}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium mb-1 flex items-center gap-1.5">
-              <span className={c.usuario ? "text-zinc-700" : "text-zinc-400"}>Usuário</span>
-              {!c.usuario && (
-                <span className="text-xs font-normal text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
-                  não editável neste painel
-                </span>
-              )}
-            </label>
-            <input
-              type="text"
-              value={usuario}
-              onChange={e => setUsuario(e.target.value)}
-              disabled={!c.usuario}
               className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
             />
           </div>
