@@ -14,11 +14,11 @@ export type AplicativoData = {
   validade: string | null;
   status: string;
   observacao: string | null;
-  id_assinatura: string | null;
-  id_conta: string | null;
-  id_dispositivo: string | null;
 };
 
+// id_assinatura / id_conta / id_dispositivo de `aplicativos` não são mais gravados aqui (28/09/2026):
+// as colunas estão 100% vazias (os 2 id_conta manuais foram limpos a pedido do Jonas). O vínculo real app↔conta fica em
+// aplicativo_playlists.id_conta (preenchido pelo sync dos painéis).
 export async function createAplicativo(id_cliente: string, data: AplicativoData) {
   if (data.mac?.trim() && data.id_app) {
     const dono = await buscarDonoDoMac(data.mac, parseInt(data.id_app));
@@ -27,9 +27,8 @@ export async function createAplicativo(id_cliente: string, data: AplicativoData)
 
   await pool.query(
     `INSERT INTO public.aplicativos
-   (id_cliente, id_app, mac, chave, validade, status, observacao,
-    id_assinatura, id_conta, id_dispositivo, data_cadastro, atualizado_em)
- VALUES ($1::int, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, NOW(), NOW())`,
+   (id_cliente, id_app, mac, chave, validade, status, observacao, data_cadastro, atualizado_em)
+ VALUES ($1::int, $2, $3, $4, $5::date, $6, $7, NOW(), NOW())`,
     [
       id_cliente,
       data.id_app ? parseInt(data.id_app) : null,
@@ -38,9 +37,6 @@ export async function createAplicativo(id_cliente: string, data: AplicativoData)
       data.validade || null,
       data.status.trim() || "ativo",
       data.observacao?.trim() || null,
-      data.id_assinatura ? parseInt(data.id_assinatura) : null,
-      data.id_conta ? parseInt(data.id_conta) : null,
-      data.id_dispositivo ? parseInt(data.id_dispositivo) : null,
     ]
   );
 
@@ -86,11 +82,8 @@ export async function updateAplicativo(
          validade       = $5::date,
          status         = $6,
          observacao     = $7,
-         id_assinatura  = $8,
-         id_conta       = $9,
-         id_dispositivo = $10,
          atualizado_em  = NOW()
-       WHERE id_app_registro = $11`,
+       WHERE id_app_registro = $8`,
       [
         data.id_cliente ? parseInt(data.id_cliente) : null,
         data.id_app ? parseInt(data.id_app) : null,
@@ -99,9 +92,6 @@ export async function updateAplicativo(
         data.validade || null,
         data.status.trim() || "ativo",
         data.observacao?.trim() || null,
-        data.id_assinatura ? parseInt(data.id_assinatura) : null,
-        data.id_conta ? parseInt(data.id_conta) : null,
-        data.id_dispositivo ? parseInt(data.id_dispositivo) : null,
         id_app_registro,
       ]
     );

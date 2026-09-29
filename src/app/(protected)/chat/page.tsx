@@ -6,6 +6,7 @@ import ContasCards from '@/components/clientes/ContasCards'
 import ContaAcoesMenu from '@/components/clientes/ContaAcoesMenu'
 import type { ContaPainelVinculada } from '@/lib/clientes'
 import type { AplicativoRow, AppRow } from '@/lib/aplicativos'
+import { appsPorConta } from '@/lib/apps-vinculados'
 import AplicativoModal from '@/components/aplicativos/AplicativoModal'
 import type { PagamentoFullRow } from '@/lib/pagamentos'
 import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
@@ -2895,9 +2896,7 @@ export default function ChatPage() {
                     <ContaAcoesMenu
                       conta={c}
                       idCliente={String(cliente.id_cliente)}
-                      appsVinculados={aplicativos
-                        .filter(a => String(a.id_conta) === c.id_conta)
-                        .map(a => ({ id_app_registro: a.id_app_registro, nome_app: a.nome_app }))}
+                      appsVinculados={appsPorConta(aplicativos).get(c.id_conta) ?? []}
                       onContaChanged={() => carregarContasCliente(cliente.id_cliente)}
                     />
                   )}

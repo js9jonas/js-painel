@@ -30,9 +30,6 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
   const [validade, setValidade] = useState(toDateInput(aplicativo?.validade ?? null));
   const [status, setStatus] = useState(aplicativo?.status ?? "ativa");
   const [observacao, setObservacao] = useState(aplicativo?.observacao ?? "");
-  const [idAssinatura, setIdAssinatura] = useState(String(aplicativo?.id_assinatura ?? ""));
-  const [idConta, setIdConta] = useState(String(aplicativo?.id_conta ?? ""));
-  const [idDispositivo, setIdDispositivo] = useState(String(aplicativo?.id_dispositivo ?? ""));
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +50,6 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
       validade: validade || null,
       status,
       observacao: observacao || null,
-      id_assinatura: idAssinatura || null,
-      id_conta: idConta || null,
-      id_dispositivo: idDispositivo || null,
     };
 
     startTransition(async () => {
@@ -178,45 +172,6 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, 
                 className={inputClass}
                 placeholder="Chave de ativação..."
               />
-            </div>
-          </div>
-
-          {/* IDs de referência */}
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
-              Vínculos (opcional)
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className={labelClass}>ID Assinatura</label>
-                <input
-                  type="number"
-                  value={idAssinatura}
-                  onChange={(e) => setIdAssinatura(e.target.value)}
-                  className={inputClass}
-                  placeholder="—"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>ID Conta</label>
-                <input
-                  type="number"
-                  value={idConta}
-                  onChange={(e) => setIdConta(e.target.value)}
-                  className={inputClass}
-                  placeholder="—"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>ID Dispositivo</label>
-                <input
-                  type="number"
-                  value={idDispositivo}
-                  onChange={(e) => setIdDispositivo(e.target.value)}
-                  className={inputClass}
-                  placeholder="—"
-                />
-              </div>
             </div>
           </div>
 

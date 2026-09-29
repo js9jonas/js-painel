@@ -1,5 +1,6 @@
 ﻿export const dynamic = "force-dynamic";
 
+import { appsPorConta as appsPorContaPorPlaylist } from "@/lib/apps-vinculados";
 import Link from "next/link";
 import { getAssinaturasByClienteId, getClienteById, getPagamentosByClienteId, getContasPainelByClienteId, type ContaPainelVinculada } from "@/lib/clientes";
 import { getAuditLogByClienteId } from "@/lib/audit";
@@ -72,13 +73,8 @@ export default async function ClienteDetalhePage({ params }: Props) {
   }
 
   // Mapa id_conta → apps vinculados (para alerta no modal de edição)
-  const appsPorConta: Record<string, { id_app_registro: number; nome_app: string | null }[]> = {};
-  for (const app of aplicativos) {
-    if (app.id_conta != null) {
-      const key = String(app.id_conta);
-      (appsPorConta[key] ??= []).push({ id_app_registro: app.id_app_registro, nome_app: app.nome_app });
-    }
-  }
+  // (via playlists — ver lib/apps-vinculados; Record porque Map não serializa pro client component)
+  const appsPorConta = Object.fromEntries(appsPorContaPorPlaylist(aplicativos));
 
   // Toda assinatura ativa/atrasada/vencida/pendente ganha card expandido — sem escolher só uma "destaque"
   const emDestaque = [...assinaturas]
