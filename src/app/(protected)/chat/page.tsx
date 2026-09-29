@@ -82,6 +82,7 @@ interface AssinaturaResumo {
   id_plano: number | null
   id_pacote: number | null
   identificacao: string | null
+  assinatura_observacao: string | null
   plano: string | null
   pacote: string | null
   status: string | null
@@ -2834,6 +2835,7 @@ export default function ChatPage() {
                       planoTipo={planoAtual?.tipo ?? null}
                       planoTelas={planoAtual?.telas ?? null}
                       status={cliente.status ?? null}
+                      observacaoAtual={cliente.assinatura_observacao ?? null}
                       contasVinculadas={contas.filter(c => c.id_assinatura === String(cliente.id_assinatura))}
                       planos={planos.map(p => ({
                         id_plano: p.id_plano,
@@ -3010,6 +3012,7 @@ export default function ChatPage() {
                                     planoTipo={planoA?.tipo ?? null}
                                     planoTelas={planoA?.telas ?? null}
                                     status={a.status ?? null}
+                                    observacaoAtual={a.assinatura_observacao ?? null}
                                     contasVinculadas={contasA}
                                     planos={planos.map(p => ({
                                       id_plano: p.id_plano,

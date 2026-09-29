@@ -132,6 +132,7 @@ export default function RenovarAssinatura({
     planoTipo,
     planoTelas,
     status,
+    observacaoAtual,
     contasVinculadas,
     onSuccess,
 }: {
@@ -147,6 +148,7 @@ export default function RenovarAssinatura({
     planoTipo?: string | null;
     planoTelas?: number | null;
     status?: string | null;
+    observacaoAtual?: string | null;
     contasVinculadas?: ContaVinculada[];
     onSuccess?: () => void;
 }) {
@@ -187,6 +189,8 @@ export default function RenovarAssinatura({
     );
     const [vencContratoEditado, setVencContratoEditado] = useState(false);
     const [resultadosContas, setResultadosContas] = useState<ResultadoConta[]>([]);
+    const [observacao, setObservacao] = useState(observacaoAtual ?? "");
+    const podeEditarObs = observacaoAtual !== undefined;
 
     function handlePeriodoChange(p: Periodo) {
         setPeriodo(p);
@@ -207,6 +211,7 @@ export default function RenovarAssinatura({
         setVencContratoEditado(false);
         setVencContas(contasVencida ? addMeses(undefined, 1) : (vencContasAtual?.split("T")[0] ?? ""));
         setStatusFinal("ativo");
+        setObservacao(observacaoAtual ?? "");
         setResultadosContas([]);
         setOpen(true);
     }
@@ -298,6 +303,9 @@ export default function RenovarAssinatura({
                 pagamento: (registrarPagamento && statusFinal === "ativo")
                     ? { idCliente, nomeCliente, pacoteNome, forma, valor }
                     : null,
+                // Só no "Salvar como pendente" e quando a observação atual foi carregada
+                // (sem ela, mandar o campo apagaria o que já existe); ausente = não muda
+                ...(podeEditarObs && registrarPagamento && statusFinal === "pendente" ? { observacao } : {}),
             }),
         });
 
@@ -478,6 +486,19 @@ export default function RenovarAssinatura({
                                                 />
                                             </div>
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Observação da assinatura — editável ao salvar como pendente */}
+                                {podeEditarObs && !isPendente && statusFinal === "pendente" && (
+                                    <div className="space-y-1.5">
+                                        <label className={labelClass}>Observação da assinatura</label>
+                                        <textarea
+                                            className="min-h-[72px] w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all"
+                                            value={observacao}
+                                            onChange={(e) => setObservacao(e.target.value)}
+                                            placeholder="Ex.: vai pagar dia 10"
+                                        />
                                     </div>
                                 )}
 

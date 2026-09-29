@@ -34,6 +34,10 @@ export async function PUT(
     const vencContasManual = typeof body?.vencContasManual === "string" && body.vencContasManual.trim()
       ? body.vencContasManual.trim() : null;
     const soPagamento = body?.soPagamento === true;
+    // Observação só é gravada quando o campo vem no body (hoje: "Salvar como pendente").
+    // Texto vazio limpa a observação.
+    const atualizarObservacao = typeof body?.observacao === "string";
+    const observacao: string | null = atualizarObservacao ? body.observacao : null;
 
     // statusFinal: "ativo" | "pendente" | null (null = manter status atual)
     const statusFinal: "ativo" | "pendente" | null = body?.statusFinal ?? null;
@@ -173,12 +177,16 @@ export async function PUT(
       WHEN $4::text IS NOT NULL THEN $4::text
       ELSE status
     END,
+    observacao = CASE
+      WHEN $6::boolean THEN NULLIF(btrim($7::text), '')
+      ELSE observacao
+    END,
     atualizado_em = NOW()
   WHERE id_assinatura = $1::bigint
   RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, id_cliente::text;
 `;
 
-      const result = await client.query(sql, [idAssinatura, dataManual, meses, statusFinal, vencContasManual]);
+      const result = await client.query(sql, [idAssinatura, dataManual, meses, statusFinal, vencContasManual, atualizarObservacao, observacao]);
 
       if (result.rowCount === 0) {
         await client.query("ROLLBACK");

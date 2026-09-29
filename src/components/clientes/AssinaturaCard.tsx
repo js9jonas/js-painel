@@ -203,6 +203,7 @@ export default function AssinaturaCard({
             planoTipo={a.plano_tipo ?? null}
             planoTelas={a.pacote_telas ?? null}
             status={a.status ?? null}
+            observacaoAtual={a.observacao ?? null}
             contasVinculadas={contas}
             planos={planosRenovar}
           />
