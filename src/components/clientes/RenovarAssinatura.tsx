@@ -43,6 +43,20 @@ function calcVencContrato(
     return addMeses(vencAtual ?? undefined, MESES[periodo]);
 }
 
+// Pendente: o mês em aberto já foi somado ao vencimento quando a assinatura virou pendente,
+// então um pagamento de N meses só acrescenta N-1 (trimestral +2, semestral +5, anual +11).
+function calcVencContratoPendente(vencAtual: string | null | undefined, periodo: Periodo): string {
+    if (!vencAtual) return ""; // sem vencimento: não inventa data, operador preenche se quiser
+    return addMeses(vencAtual.split("T")[0], MESES[periodo] - 1);
+}
+
+const OPCOES_PERIODO: { value: Periodo; label: string }[] = [
+    { value: "mensal", label: "Mensal (1 mes)" },
+    { value: "trimestral", label: "Trimestral (3 meses)" },
+    { value: "semestral", label: "Semestral (6 meses)" },
+    { value: "anual", label: "Anual (12 meses)" },
+];
+
 function vencContasVencida(vencContasAtual: string | null | undefined): boolean {
     if (!vencContasAtual) return false;
     const hoje = new Date();
@@ -152,6 +166,13 @@ export default function RenovarAssinatura({
         }
     }
 
+    // Pendente: só oferece os períodos que o plano (tipo + telas) realmente tem cadastrados.
+    // Sem dados do plano, mostra todos (mesmo comportamento da renovação normal).
+    const opcoesPendente = OPCOES_PERIODO.filter((o) =>
+        o.value === "mensal" || !planos || !planoTipo ||
+        planos.some((pl) => pl.tipo === planoTipo && pl.telas === (planoTelas ?? pl.telas) && pl.meses === MESES[o.value])
+    );
+
     const [open, setOpen] = useState(false);
     const [periodo, setPeriodo] = useState<Periodo>("mensal");
     const [statusFinal, setStatusFinal] = useState<StatusFinal>("ativo");
@@ -171,14 +192,18 @@ export default function RenovarAssinatura({
         setPeriodo(p);
         setValor(valorDoPeriodo(p));
         if (!vencContratoEditado) {
-            setVencContrato(calcVencContrato(contasVencida ? null : vencAtual, p));
+            setVencContrato(isPendente
+                ? calcVencContratoPendente(vencAtual, p)
+                : calcVencContrato(contasVencida ? null : vencAtual, p));
         }
     }
 
     function handleOpen() {
         setPeriodo("mensal");
         setValor(valorDoPeriodo("mensal"));
-        setVencContrato(calcVencContrato(contasVencida ? null : vencAtual, "mensal"));
+        setVencContrato(isPendente
+            ? calcVencContratoPendente(vencAtual, "mensal")
+            : calcVencContrato(contasVencida ? null : vencAtual, "mensal"));
         setVencContratoEditado(false);
         setVencContas(contasVencida ? addMeses(undefined, 1) : (vencContasAtual?.split("T")[0] ?? ""));
         setStatusFinal("ativo");
@@ -205,59 +230,18 @@ export default function RenovarAssinatura({
                 soPagamento: true,
                 registrarPagamento: true,
                 statusFinal: "ativo",
+                periodo,
+                // Datas iguais às atuais = nada muda (caso mensal padrão)
+                dataManual: vencContrato && vencContrato !== vencAtual?.split("T")[0] ? vencContrato : null,
+                vencContasManual: vencContas && vencContas !== vencContasAtual?.split("T")[0] ? vencContas : null,
                 pagamento: { idCliente, nomeCliente, pacoteNome, forma, valor },
             }),
         });
 
-        const text = await resp.text();
-        let j: any = {};
-        let jsonOk = false;
-        try { j = JSON.parse(text); jsonOk = true; } catch { }
-        setLoading(false);
-
-        if (!resp.ok || j?.ok === false) {
-            alert(formatarErroSalvar(endpoint, resp.status, jsonOk, j, text));
-            return;
-        }
-
-        if (j?.whatsapp?.enviado === false) {
-            if (j.whatsapp.viaTelegram) {
-                alert(`Assinatura renovada. Cliente sem conversa ativa — mensagem enviada como link no seu Telegram, para envio manual.`);
-            } else {
-                alert(`Assinatura renovada. Mensagem de confirmação não enviada: ${j.whatsapp.motivo}`);
-            }
-        }
-
-        setOpen(false);
-        router.refresh();
-        onSuccess?.();
+        await concluir(resp, endpoint);
     }
 
-    async function executar(registrarPagamento: boolean) {
-        if (!idAssinatura) { alert("ID da assinatura inválido."); return; }
-        if (registrarPagamento && statusFinal === "ativo" && !valor.trim()) {
-            alert("Informe o valor do pagamento.");
-            return;
-        }
-
-        setLoading(true);
-
-        const endpoint = `PUT /api/assinaturas/${idAssinatura}/renovar`;
-        const resp = await fetch(`/api/assinaturas/${idAssinatura}/renovar`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                periodo,
-                dataManual: vencContrato,
-                vencContasManual: vencContas || null,
-                statusFinal: registrarPagamento ? statusFinal : null,
-                registrarPagamento: registrarPagamento && statusFinal === "ativo",
-                pagamento: (registrarPagamento && statusFinal === "ativo")
-                    ? { idCliente, nomeCliente, pacoteNome, forma, valor }
-                    : null,
-            }),
-        });
-
+    async function concluir(resp: Response, endpoint: string) {
         const text = await resp.text();
         let j: any = {};
         let jsonOk = false;
@@ -292,6 +276,34 @@ export default function RenovarAssinatura({
         setResultadosContas(resultados);
     }
 
+    async function executar(registrarPagamento: boolean) {
+        if (!idAssinatura) { alert("ID da assinatura inválido."); return; }
+        if (registrarPagamento && statusFinal === "ativo" && !valor.trim()) {
+            alert("Informe o valor do pagamento.");
+            return;
+        }
+
+        setLoading(true);
+
+        const endpoint = `PUT /api/assinaturas/${idAssinatura}/renovar`;
+        const resp = await fetch(`/api/assinaturas/${idAssinatura}/renovar`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                periodo,
+                dataManual: vencContrato,
+                vencContasManual: vencContas || null,
+                statusFinal: registrarPagamento ? statusFinal : null,
+                registrarPagamento: registrarPagamento && statusFinal === "ativo",
+                pagamento: (registrarPagamento && statusFinal === "ativo")
+                    ? { idCliente, nomeCliente, pacoteNome, forma, valor }
+                    : null,
+            }),
+        });
+
+        await concluir(resp, endpoint);
+    }
+
     const inputClass = "h-9 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
     const labelClass = "text-xs font-semibold text-zinc-700";
 
@@ -317,7 +329,7 @@ export default function RenovarAssinatura({
                             </p>
                             {isPendente && (
                                 <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                                    Assinatura pendente — o pagamento ativará a assinatura sem alterar as datas.
+                                    Assinatura pendente — o mês em aberto já está no vencimento atual. Mensal só ativa; trimestral soma +2 meses, semestral +5, anual +11.
                                 </div>
                             )}
                         </div>
@@ -350,9 +362,8 @@ export default function RenovarAssinatura({
                         ) : (
                             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 sm:px-6">
 
-                                {/* Modo normal: mostra período e datas */}
-                                {!isPendente && (
-                                    <>
+                                {/* Período e datas (normal e pendente) */}
+                                <>
                                         {/* Alerta de urgência em venc_contas */}
                                         {contasVencida && (
                                             <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-start gap-3">
@@ -376,12 +387,7 @@ export default function RenovarAssinatura({
                                                 className={inputClass}
                                                 value={periodo}
                                                 onChange={(v) => handlePeriodoChange(v as Periodo)}
-                                                options={[
-                                                    { value: "mensal", label: "Mensal (1 mes)" },
-                                                    { value: "trimestral", label: "Trimestral (3 meses)" },
-                                                    { value: "semestral", label: "Semestral (6 meses)" },
-                                                    { value: "anual", label: "Anual (12 meses)" },
-                                                ]}
+                                                options={isPendente ? opcoesPendente : OPCOES_PERIODO}
                                             />
                                         </div>
 
@@ -417,8 +423,8 @@ export default function RenovarAssinatura({
                                             </div>
                                         </div>
 
-                                        {/* Seleção de status */}
-                                        <div className="space-y-1.5">
+                                        {/* Seleção de status (pendente sempre vira ativo ao confirmar) */}
+                                        {!isPendente && <div className="space-y-1.5">
                                             <label className={labelClass}>Marcar status como</label>
                                             <div className="flex gap-2">
                                                 <button
@@ -443,40 +449,13 @@ export default function RenovarAssinatura({
                                                     ⏳ Pendente
                                                 </button>
                                             </div>
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* Datas somente leitura para pendente */}
-                                {isPendente && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className={labelClass}>Venc. contrato atual</label>
-                                            <input
-                                                type="date"
-                                                className={`${inputClass} bg-zinc-50 text-zinc-400 cursor-not-allowed`}
-                                                value={vencAtual?.split("T")[0] ?? ""}
-                                                readOnly
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className={labelClass}>Venc. contas atual</label>
-                                            <input
-                                                type="date"
-                                                className={`${inputClass} bg-zinc-50 text-zinc-400 cursor-not-allowed`}
-                                                value={vencContasAtual?.split("T")[0] ?? ""}
-                                                readOnly
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                        </div>}
+                                </>
 
                                 {/* Pagamento — visível somente se status = ativo */}
                                 {(isPendente || statusFinal === "ativo") && (
-                                    <div className={isPendente ? "" : "border-t pt-4"}>
-                                        {!isPendente && (
-                                            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Dados do pagamento</p>
-                                        )}
+                                    <div className="border-t pt-4">
+                                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Dados do pagamento</p>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="space-y-1.5">
                                                 <label className={labelClass}>Forma</label>

@@ -40,29 +40,51 @@ export async function PUT(
 
     const client = await pool.connect();
 
-    // Modo soPagamento (assinatura já pendente — só registra pagamento e ativa)
+    // Modo soPagamento (assinatura já pendente — registra pagamento e ativa).
+    // O mês em aberto já foi contado quando a assinatura virou pendente, então num pagamento
+    // de N meses o front manda dataManual = venc_contrato atual + (N-1) meses. Sem dataManual
+    // (mensal) as datas ficam como estão.
     if (soPagamento) {
       try {
         await client.query("BEGIN");
 
         // Captura venc_contrato antes de ativar para calcular tipo_pagamento.
-        // Como a assinatura estava pendente, venc_contrato já foi avançado um ciclo
-        // na renovação anterior. Subtraímos o período para obter o vencimento original.
+        // Como a assinatura estava pendente, venc_contrato já foi avançado um ciclo (1 mês)
+        // na renovação anterior. Subtraímos esse mês para obter o vencimento original —
+        // fixo em 1, independente do período pago agora.
         const { rows: vcRows } = await client.query(
-          `SELECT (CURRENT_DATE - (venc_contrato - make_interval(months => $2::int))::date)::int AS dias_rel, venc_contrato
+          `SELECT (CURRENT_DATE - (venc_contrato - make_interval(months => 1))::date)::int AS dias_rel,
+                  venc_contas::text AS venc_contas_anterior
            FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
-          [idAssinatura, meses]
+          [idAssinatura]
         );
+        if (vcRows.length === 0) {
+          await client.query("ROLLBACK");
+          return NextResponse.json({ ok: false, error: `Assinatura ${idAssinatura} não encontrada` }, { status: 404 });
+        }
         const diasRelSoPag: number | null = vcRows[0]?.dias_rel ?? null;
+        const vencContasAnteriorSoPag: string | null = vcRows[0]?.venc_contas_anterior ?? null;
         const tipoPagSoPag =
           diasRelSoPag == null ? "novo"
           : diasRelSoPag > 0   ? "atrasado"
           : "adiantado";
 
-        await client.query(
-          `UPDATE public.assinaturas SET status = 'ativo', atualizado_em = NOW() WHERE id_assinatura = $1::bigint`,
-          [idAssinatura]
+        const { rows: atualizada } = await client.query(
+          `UPDATE public.assinaturas
+           SET status = 'ativo',
+               venc_contrato = COALESCE($2::date, venc_contrato),
+               venc_contas   = COALESCE($3::date, venc_contas),
+               atualizado_em = NOW()
+           WHERE id_assinatura = $1::bigint
+           RETURNING venc_contas::text AS venc_contas`,
+          [idAssinatura, dataManual, vencContasManual]
         );
+        const vencContasNovaSoPag: string | null = atualizada[0]?.venc_contas ?? null;
+
+        // Só abate crédito se o venc. contas realmente mudou (a função ainda ignora avanços < 15 dias)
+        if (vencContasManual && vencContasNovaSoPag !== vencContasAnteriorSoPag) {
+          await abaterCreditoRenovacao(client, idAssinatura, vencContasAnteriorSoPag, vencContasNovaSoPag);
+        }
 
         let ehNovoSoPag = false;
         if (registrarPagamento && pgto) {
