@@ -92,6 +92,29 @@ function formatarErroSalvar(endpoint: string, status: number, jsonOk: boolean, j
     ].join("\n");
 }
 
+/**
+ * Contas vinculadas lidas do banco na hora da renovação. A lista recebida por props pode estar
+ * desatualizada (ex.: no /chat ela só carrega quando o cliente é identificado — conta vinculada
+ * depois disso não aparecia e a renovação no painel era pulada sem aviso, caso real 29/09/2026).
+ * Se a busca falhar, volta pra lista das props (comportamento anterior).
+ */
+async function buscarContasAtuais(
+    idCliente: string | undefined,
+    idAssinatura: string,
+    fallback: ContaVinculada[],
+): Promise<ContaVinculada[]> {
+    if (!idCliente) return fallback;
+    try {
+        const res = await fetch(`/api/clientes/${idCliente}/contas`, { cache: "no-store" });
+        if (!res.ok) return fallback;
+        const todas: (ContaVinculada & { id_assinatura: string | null })[] = await res.json();
+        if (!Array.isArray(todas)) return fallback;
+        return todas.filter((c) => String(c.id_assinatura) === String(idAssinatura));
+    } catch {
+        return fallback;
+    }
+}
+
 async function renovarContasViaAPI(contas: ContaVinculada[]): Promise<ResultadoConta[]> {
     return Promise.all(
         contas.map(async (c) => {
@@ -266,7 +289,8 @@ export default function RenovarAssinatura({
             }
         }
 
-        const expiradas = contasExpiradas(contasVinculadas ?? []);
+        const contasAtuais = await buscarContasAtuais(idCliente, idAssinatura, contasVinculadas ?? []);
+        const expiradas = contasExpiradas(contasAtuais);
 
         if (expiradas.length === 0) {
             setLoading(false);

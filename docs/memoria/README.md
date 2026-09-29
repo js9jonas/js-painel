@@ -60,6 +60,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [project_player_iptv](project_player_iptv.md) — Página /player do js-painel: arquitetura, bugs corrigidos em mai/2026 e limitações conhecidas
 - [project_proxy_nova_vps](project_proxy_nova_vps.md) — Lembrete para testar necessidade do proxy Webshare após migração para novo servidor VPS
 - [project_renovacao_comprovante](project_renovacao_comprovante.md) — Fluxo de renovação de assinatura disparado por comprovante enviado pelo cliente via WhatsApp
+- [incident_renovar_contas_lista_desatualizada_chat](incident_renovar_contas_lista_desatualizada_chat.md) — 29/09/2026 — renovar pelo /chat pulava a conta no painel com lista de contas desatualizada; modal agora busca as contas no banco na hora
 - [project_renovar_pendente_periodo](project_renovar_pendente_periodo.md) — 29/09/2026 — Renovar pendente aceita trimestral/semestral/anual somando N-1 meses (mês em aberto já contado)
 - [project_mensagens_foco_beneficio](project_mensagens_foco_beneficio.md) — 29/09/2026 — renovação, boas-vindas, botão Planos e Chave PIX reescritos com foco em benefício; tom "eu resolvo"
 - [project_template_lembrete_vencimento](project_template_lembrete_vencimento.md) — Template Meta \"lembrete_vencimento\" para avisar clientes que vencem amanhã — parâmetros e status de implementação
