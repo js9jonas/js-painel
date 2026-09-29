@@ -12,3 +12,5 @@ Pedido do Jonas em 29/09/2026, testado por ele e em produção (commit 68c4ae6):
 **Why:** cliente pendente que paga vários meses de uma vez ficava sem como lançar o período estendido — só dava pra registrar o pagamento mensal.
 
 **How to apply:** rota `PUT /api/assinaturas/[id]/renovar` no modo `soPagamento` aceita `dataManual`/`vencContasManual` e abate crédito se o `venc_contas` mudar. O `tipo_pagamento` é calculado sempre voltando **1 mês fixo** do vencimento — não usar o período pago nesse cálculo. A pendente também renova no painel as contas vencidas, igual à renovação normal (antes não fazia isso).
+
+**Observação ao salvar como pendente (29/09/2026, commit 6fd8224):** no modal Renovar, ao escolher "Pendente" aparece o campo Observação da assinatura pré-preenchido; só é gravado no "Salvar como pendente" (texto vazio limpa). O campo fica oculto se o chamador não passar `observacaoAtual` — mandar vazio apagaria a observação existente. No `/chat` a observação da assinatura vem como `assinatura_observacao` (endpoint `/api/whatsapp/mensagens`).
