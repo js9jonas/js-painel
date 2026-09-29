@@ -17,26 +17,39 @@ interface NotificarRenovacaoResultado {
   viaTelegram?: boolean
 }
 
-function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean, identificacao: string | null): string {
-  const linhaIdentificacao = identificacao ? `🏷️ Identificação: ${identificacao}\n` : ''
+/** Primeiro nome com só a inicial maiúscula ("JOÃO DA SILVA" → "João"); vazio se não houver nome utilizável. */
+function primeiroNome(nome: string | null | undefined): string {
+  const primeiro = (nome ?? '').trim().split(/\s+/)[0]?.replace(/[^\p{L}'-]/gu, '') ?? ''
+  if (!primeiro) return ''
+  return primeiro.charAt(0).toLocaleUpperCase('pt-BR') + primeiro.slice(1).toLocaleLowerCase('pt-BR')
+}
+
+/** Frase das telas liberadas, com concordância; sem número de telas cai no genérico "Sua assinatura". */
+function fraseTelas(telas: number | null, dataTxt: string, ativa: boolean): string {
+  if (!telas) return `Sua assinatura ${ativa ? 'está ativa' : 'segue liberada'} até *${dataTxt}*.`
+  if (telas === 1) return `Sua *1 tela* ${ativa ? 'está liberada' : 'segue liberada'} até *${dataTxt}*.`
+  return `Suas *${telas} telas* ${ativa ? 'estão liberadas' : 'seguem liberadas'} até *${dataTxt}*.`
+}
+
+function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean, identificacao: string | null, nome: string | null): string {
+  const pNome = primeiroNome(nome)
+  const linhaIdentificacao = identificacao ? `🏷️ ${identificacao}\n` : ''
   if (ehNovo) {
     return (
-      `🎉 *BEM-VINDO(A)!* 🎉\n\n` +
-      `📺 Telas: ${telas ?? '-'}\n` +
+      `🎉 *Seja bem-vindo(a)${pNome ? `, ${pNome}` : ''}!*\n\n` +
+      `${fraseTelas(telas, dataTxt, true)} 📺\n` +
       linhaIdentificacao +
-      `📅 Vencimento: ${dataTxt}\n\n` +
-      `Qualquer dúvida é só chamar por aqui 📲\n\n` +
-      `😊 Muito obrigado pela confiança, esperamos que aproveite bem!`
+      `\nSe tiver qualquer dificuldade pra instalar ou entrar, me chama aqui que eu te ajudo passo a passo 📲\n\n` +
+      `Obrigado pela confiança, bom proveito! 😊`
     )
   }
+  const cadaUm = telas && telas > 1 ? ', então é só aproveitar, cada um na sua TV' : ', então é só aproveitar'
   return (
-    `🔰 *ASSINATURA RENOVADA* ♻️\n\n` +
-    `📺 Telas: ${telas ?? '-'}\n` +
+    `✅ *Tudo certo${pNome ? `, ${pNome}` : ''}!*\n\n` +
+    `Pagamento confirmado. ${fraseTelas(telas, dataTxt, false).replace(/\.$/, '')}${cadaUm}. 📺\n` +
     linhaIdentificacao +
-    `📅 Novo vencimento: ${dataTxt}\n\n` +
-    `Se precisar de algo é só chamar 📲\n\n` +
-    `🙏 Muito obrigado pela confiança e por continuar com a gente!\n` +
-    `Aproveite bem sua assinatura! 😊`
+    `\nTravou, sumiu canal ou precisa trocar de aparelho? Me chama aqui que eu resolvo 📲\n\n` +
+    `Obrigado por seguir com a gente! 🙏`
   )
 }
 
@@ -51,7 +64,7 @@ export async function notificarRenovacao(
   if (!cliente.rows[0]) return { enviado: false, motivo: 'Cliente não encontrado' }
 
   const dataTxt = novoVencimento ? formatarData(novoVencimento) : '-'
-  const texto = montarTexto(telas, dataTxt, ehNovo, identificacao)
+  const texto = montarTexto(telas, dataTxt, ehNovo, identificacao, cliente.rows[0].nome)
 
   const telefoneAtivo = await pool.query(
     `SELECT ct.telefone

@@ -1086,9 +1086,21 @@ export default function ChatPage() {
 
   async function enviarInfoPlano(a: AssinaturaResumo) {
     if (!selecionado || enviando || !a.id_assinatura) return
-    const identificacao = a.identificacao?.trim() || 'Principal'
-    const telas = a.pacote ?? (a.plano ?? 'Assinatura')
-    const texto = `📦 Seu plano: *${identificacao}*\n${telas}\n${formatValor(a.valor)}/mês`
+    // Foco no benefício (o que o cliente ganha), não em ficha técnica do plano
+    const identificacao = a.identificacao?.trim()
+    const nTelas = pacotes.find(p => p.id_pacote === String(a.id_pacote))?.telas ?? null
+    const pNome = (cliente?.nome ?? '').trim().split(/\s+/)[0]?.replace(/[^\p{L}'-]/gu, '') ?? ''
+    const saudacao = pNome
+      ? `Oi, ${pNome.charAt(0).toLocaleUpperCase('pt-BR')}${pNome.slice(1).toLocaleLowerCase('pt-BR')}! 👋\n\n`
+      : ''
+    const telasTxt = nTelas == null
+      ? (a.pacote ?? a.plano ?? 'sua assinatura')
+      : nTelas === 1 ? '1 tela' : `${nTelas} telas`
+    const beneficio = nTelas && nTelas > 1 ? ', cada um assistindo na sua TV' : ' pra assistir sem interrupção'
+    const texto =
+      saudacao +
+      `📦 Seu plano${identificacao ? ` *${identificacao}*` : ''}: *${telasTxt}*${a.valor ? ` por *${formatValor(a.valor)}/mês*` : ''}${beneficio}.\n\n` +
+      `Pra renovar, é só tocar em *Chave PIX* aqui embaixo e me mandar o comprovante. Assim que eu confirmar, te aviso por aqui ✅`
     setEnviando(true)
     try {
       await fetch('/api/whatsapp/enviar-planos-botao', {

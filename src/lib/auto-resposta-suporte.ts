@@ -262,7 +262,7 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
   }
 
   if (botaoClicado === 'Chave PIX') {
-    const texto = 'Segue abaixo nossa chave PIX (CNPJ):'
+    const texto = 'Segue abaixo nossa chave PIX (CNPJ). Me manda o comprovante por aqui que eu confirmo e já te aviso ✅'
     const msgIdA = await enviarTextoWhatsapp(telefone, texto)
     await registrarEnvio(msgIdA, telefone, texto, cliqueMsgId)
 
