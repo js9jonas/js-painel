@@ -60,6 +60,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [project_player_iptv](project_player_iptv.md) — Página /player do js-painel: arquitetura, bugs corrigidos em mai/2026 e limitações conhecidas
 - [project_proxy_nova_vps](project_proxy_nova_vps.md) — Lembrete para testar necessidade do proxy Webshare após migração para novo servidor VPS
 - [project_renovacao_comprovante](project_renovacao_comprovante.md) — Fluxo de renovação de assinatura disparado por comprovante enviado pelo cliente via WhatsApp
+- [project_renovar_pendente_periodo](project_renovar_pendente_periodo.md) — 29/09/2026 — Renovar pendente aceita trimestral/semestral/anual somando N-1 meses (mês em aberto já contado)
 - [project_template_lembrete_vencimento](project_template_lembrete_vencimento.md) — Template Meta \"lembrete_vencimento\" para avisar clientes que vencem amanhã — parâmetros e status de implementação
 - [project_uniplay_bloqueio_ip](project_uniplay_bloqueio_ip.md) — Bloqueio de IP na API gesapioffice.com contornado com proxy residencial Webshare; 23/07 achado variante — IP do próprio pool rotativo cai no
 - [project_venc_contas_design](project_venc_contas_design.md) — Decisão de design sobre como datas de vencimento do painel devem alimentar o controle de renovações
