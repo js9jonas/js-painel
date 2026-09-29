@@ -10,6 +10,8 @@ type Props = {
   idCliente: string;
   aplicativo?: AplicativoRow | null;
   apps: AppRow[];
+  /** Valores iniciais pra cadastro novo (ex.: lidos de uma imagem no /chat); ignorado na edição */
+  inicial?: { id_app?: string; mac?: string; chave?: string; validade?: string };
   onClose: () => void;
   onSaved: () => void;
 };
@@ -21,13 +23,14 @@ function toDateInput(v: string | null): string {
   return v.split("T")[0];
 }
 
-export default function AplicativoModal({ idCliente, aplicativo, apps, onClose, onSaved }: Props) {
+export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, onClose, onSaved }: Props) {
   const isEdit = !!aplicativo;
 
-  const [idApp, setIdApp] = useState(String(aplicativo?.id_app ?? ""));
-  const [mac, setMac] = useState(aplicativo?.mac ?? "");
-  const [chave, setChave] = useState(aplicativo?.chave ?? "");
-  const [validade, setValidade] = useState(toDateInput(aplicativo?.validade ?? null));
+  const base = aplicativo ? null : inicial;
+  const [idApp, setIdApp] = useState(String(aplicativo?.id_app ?? base?.id_app ?? ""));
+  const [mac, setMac] = useState(aplicativo?.mac ?? base?.mac ?? "");
+  const [chave, setChave] = useState(aplicativo?.chave ?? base?.chave ?? "");
+  const [validade, setValidade] = useState(toDateInput(aplicativo?.validade ?? base?.validade ?? null));
   const [status, setStatus] = useState(aplicativo?.status ?? "ativa");
   const [observacao, setObservacao] = useState(aplicativo?.observacao ?? "");
 

@@ -20,7 +20,8 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
-import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard, Unplug } from 'lucide-react'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard, Unplug, ScanText, Copy, Check } from 'lucide-react'
+import type { LeituraImagem } from '@/lib/ler-imagem-app'
 
 interface Conversa {
   telefone: string
@@ -457,6 +458,12 @@ export default function ChatPage() {
   const [erroAudio, setErroAudio] = useState<string | null>(null)
   const [transcrevendo, setTranscrevendo] = useState(false)
   const [mediaErros, setMediaErros] = useState<Set<number>>(new Set())
+  // Leitura de MAC/chave em imagem, sob demanda — temporária: some ao trocar de conversa
+  const [leiturasImg, setLeiturasImg] = useState<Record<number,
+    { status: 'lendo' } | { status: 'ok'; dados: LeituraImagem } | { status: 'erro'; erro: string }>>({})
+  const [copiadoLeitura, setCopiadoLeitura] = useState<string | null>(null)
+  // Cadastro de app aberto a partir de uma leitura de imagem (modal já preenchido)
+  const [appDaLeitura, setAppDaLeitura] = useState<{ msgId: number; dados: LeituraImagem } | null>(null)
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false)
   const speechRecRef = useRef<{ stop(): void } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -1021,6 +1028,34 @@ export default function ChatPage() {
       inativo: 'Inativo', pendente: 'Pendente ⏳', cancelado: 'Cancelado', suspenso: 'Suspenso 🚫',
     }
     return map[s ?? ''] ?? (s ?? '—')
+  }
+
+  useEffect(() => { setLeiturasImg({}) }, [selecionado])
+
+  async function lerImagem(msgId: number) {
+    if (leiturasImg[msgId]?.status === 'lendo') return
+    setLeiturasImg(prev => ({ ...prev, [msgId]: { status: 'lendo' } }))
+    try {
+      const res = await fetch('/api/whatsapp/ler-imagem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msgId }),
+      })
+      const j = await res.json().catch(() => null)
+      setLeiturasImg(prev => ({
+        ...prev,
+        [msgId]: res.ok && j ? { status: 'ok', dados: j as LeituraImagem } : { status: 'erro', erro: j?.error ?? `Falha (HTTP ${res.status})` },
+      }))
+    } catch {
+      setLeiturasImg(prev => ({ ...prev, [msgId]: { status: 'erro', erro: 'Erro de rede, tente de novo' } }))
+    }
+  }
+
+  function copiarLeitura(chave: string, valor: string) {
+    navigator.clipboard.writeText(valor).then(() => {
+      setCopiadoLeitura(chave)
+      setTimeout(() => setCopiadoLeitura(c => (c === chave ? null : c)), 1500)
+    }).catch(() => {})
   }
 
   function inserirNoComposer(t: string) {
@@ -2203,6 +2238,115 @@ export default function ChatPage() {
                           )}
                         </div>
                       </div>
+                      {/* Leitura de MAC/chave — ícone acima do botão de ações, cartão ao lado do balão */}
+                      {isCliente && msg.tipo === 'image' && msg.conteudo && !mediaErros.has(msg.id) && !selectMode && (() => {
+                        const leitura = leiturasImg[msg.id]
+                        const linhaCopia = (rotulo: string, valor: string, chave: string, alerta?: string) => (
+                          <div key={chave} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: '#667781', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4 }}>{rotulo}</div>
+                              <div style={{ fontFamily: 'monospace', fontSize: 13, color: '#111b21', wordBreak: 'break-all' }}>{valor}</div>
+                              {alerta && <div style={{ color: '#b45309', fontSize: 10 }}>{alerta}</div>}
+                            </div>
+                            <button
+                              onClick={() => copiarLeitura(chave, valor)}
+                              title="Copiar"
+                              style={{ background: 'none', border: '1px solid #d1d7db', borderRadius: 6, width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: copiadoLeitura === chave ? '#00a884' : '#54656f', flexShrink: 0 }}
+                            >{copiadoLeitura === chave ? <Check size={14} /> : <Copy size={14} />}</button>
+                          </div>
+                        )
+                        return (
+                          <>
+                            <button
+                              onClick={() => lerImagem(msg.id)}
+                              disabled={leitura?.status === 'lendo'}
+                              title="Ler MAC e chave da imagem"
+                              style={{
+                                position: 'absolute', left: 'calc(100% + 4px)', bottom: 32,
+                                background: 'rgba(255,255,255,0.85)', border: '1px solid #d1d7db',
+                                borderRadius: '50%', width: 26, height: 26, cursor: leitura?.status === 'lendo' ? 'wait' : 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: leitura?.status === 'ok' ? '#00a884' : '#54656f', boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                              }}
+                            ><ScanText size={14} className={leitura?.status === 'lendo' ? 'animate-pulse' : undefined} /></button>
+                            {leitura && leitura.status !== 'lendo' && (
+                              <div style={{
+                                position: 'absolute', left: 'calc(100% + 36px)', bottom: 0, width: 250, zIndex: 5,
+                                background: '#fff', border: '1px solid #d1d7db', borderRadius: 8,
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '8px 10px', fontSize: 12,
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                  <span style={{ fontWeight: 600, color: '#111b21' }}>
+                                    {leitura.status === 'ok' ? (leitura.dados.app ?? 'Leitura da imagem') : 'Não foi possível ler'}
+                                  </span>
+                                  <button
+                                    onClick={() => setLeiturasImg(prev => { const n = { ...prev }; delete n[msg.id]; return n })}
+                                    title="Fechar"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#667781', padding: 0, display: 'flex' }}
+                                  ><X size={14} /></button>
+                                </div>
+                                {leitura.status === 'erro' && <div style={{ color: '#b91c1c', marginTop: 4 }}>{leitura.erro}</div>}
+                                {leitura.status === 'ok' && (() => {
+                                  const d = leitura.dados
+                                  const nada = !d.mac && !d.chave && d.outros.length === 0
+                                  return (
+                                    <>
+                                      {d.mac && linhaCopia(d.mac.includes('@') ? 'E-mail (login)' : 'MAC', d.mac, `${msg.id}-mac`, d.mac_suspeito ? 'Formato incomum, confira na imagem' : undefined)}
+                                      {d.chave && linhaCopia(d.mac?.includes('@') ? 'Senha' : 'Chave', d.chave, `${msg.id}-chave`)}
+                                      {d.validade && linhaCopia('Validade', formatData(d.validade), `${msg.id}-val`)}
+                                      {d.outros.map((o, i) => linhaCopia(o.rotulo, o.valor, `${msg.id}-o${i}`))}
+                                      {nada && <div style={{ color: '#667781', marginTop: 4 }}>Nenhum MAC ou chave encontrado.</div>}
+                                      {d.observacao && <div style={{ color: '#667781', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>{d.observacao}</div>}
+                                      {/* Cadastros existentes com esse MAC/e-mail */}
+                                      {d.cadastros.length > 0 && (
+                                        <div style={{ borderTop: '1px solid #e9edef', marginTop: 8, paddingTop: 6 }}>
+                                          <div style={{ color: '#667781', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4 }}>Já cadastrado</div>
+                                          {d.cadastros.map(c => {
+                                            const outro = !c.do_contato
+                                            return (
+                                              <div key={c.id_app_registro} style={{
+                                                marginTop: 4, padding: '4px 6px', borderRadius: 6,
+                                                background: outro ? '#fef2f2' : '#f0fdf4', border: `1px solid ${outro ? '#fecaca' : '#bbf7d0'}`,
+                                              }}>
+                                                <div style={{ fontWeight: 600, color: '#111b21' }}>
+                                                  {c.nome_app ?? `App #${c.id_app}`}
+                                                  <span style={{ fontWeight: 400, color: '#667781' }}>
+                                                    {' · '}{c.status ?? '—'}{c.validade ? ` · até ${formatData(c.validade)}` : ''}
+                                                  </span>
+                                                </div>
+                                                {c.id_cliente == null
+                                                  ? <div style={{ color: '#b91c1c', fontSize: 11 }}>⚠️ Registro sem cliente vinculado (#{c.id_app_registro})</div>
+                                                  : outro
+                                                    ? <div style={{ color: '#b91c1c', fontSize: 11 }}>
+                                                        ⚠️ Pertence a outro cliente:{' '}
+                                                        <a href={`/clientes/${c.id_cliente}`} target="_blank" rel="noopener noreferrer" style={{ color: '#b91c1c', fontWeight: 600 }}>{c.nome_cliente ?? `#${c.id_cliente}`}</a>
+                                                      </div>
+                                                    : <div style={{ color: '#15803d', fontSize: 11 }}>✓ Deste cliente</div>}
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
+                                      {/* MAC novo nesse app, com dados suficientes → cadastrar direto */}
+                                      {d.pode_cadastrar && (
+                                        cliente
+                                          ? <button
+                                              onClick={() => setAppDaLeitura({ msgId: msg.id, dados: d })}
+                                              style={{
+                                                marginTop: 8, width: '100%', height: 30, borderRadius: 6, border: 'none',
+                                                background: '#00a884', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                              }}
+                                            >+ Cadastrar aplicativo</button>
+                                          : <div style={{ color: '#667781', fontSize: 11, marginTop: 6 }}>Vincule o contato a um cliente pra cadastrar este app.</div>
+                                      )}
+                                    </>
+                                  )
+                                })()}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                       {/* Badge de reação */}
                       {msg.reacao && (
                         <div style={{
@@ -3293,6 +3437,42 @@ export default function ChatPage() {
           pacotes={pacotes}
           onClose={() => { setEditAssinaturaOpen(false); setEditAssinaturaAlvo(null) }}
           onSaved={() => { setEditAssinaturaOpen(false); setEditAssinaturaAlvo(null); carregarMensagens(selecionado!) }}
+        />
+      )}
+
+      {/* Modal cadastrar aplicativo a partir da leitura de uma imagem */}
+      {appDaLeitura && cliente && (
+        <AplicativoModal
+          idCliente={String(cliente.id_cliente)}
+          apps={apps}
+          inicial={{
+            id_app: appDaLeitura.dados.id_app != null ? String(appDaLeitura.dados.id_app) : undefined,
+            mac: appDaLeitura.dados.mac ?? undefined,
+            chave: appDaLeitura.dados.chave ?? undefined,
+            validade: appDaLeitura.dados.validade ?? undefined,
+          }}
+          onClose={() => setAppDaLeitura(null)}
+          onSaved={() => {
+            const { msgId, dados } = appDaLeitura
+            setAppDaLeitura(null)
+            carregarAplicativosCliente(cliente.id_cliente)
+            // Atualiza o cartão sem nova leitura: agora o MAC já consta como deste cliente
+            setLeiturasImg(prev => ({
+              ...prev,
+              [msgId]: {
+                status: 'ok',
+                dados: {
+                  ...dados,
+                  pode_cadastrar: false,
+                  cadastros: [{
+                    id_app_registro: 0, id_app: dados.id_app, nome_app: dados.app,
+                    id_cliente: cliente.id_cliente, nome_cliente: cliente.nome,
+                    status: 'ativa', validade: dados.validade, do_contato: true,
+                  }, ...dados.cadastros],
+                },
+              },
+            }))
+          }}
         />
       )}
 

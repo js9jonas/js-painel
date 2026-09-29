@@ -1,11 +1,7 @@
 import { pool } from '@/lib/db'
-import { createDriveAuth } from '@/lib/google-drive'
-import fs from 'fs/promises'
-import path from 'path'
+import { downloadFromMeta, downloadFromLocal, downloadFromDrive } from '@/lib/midia-whatsapp'
 
-const WA_TOKEN     = process.env.WHATSAPP_TOKEN!
 const GROQ_API_KEY = process.env.GROQ_API_KEY
-const MIDIA_ROOT    = process.env.WHATSAPP_MIDIA_ROOT || '/app/whatsapp-midias'
 
 export async function transcribeAudio(
   msgId: number
@@ -76,34 +72,4 @@ export async function transcribeAudio(
   )
 
   return { ok: true, transcricao }
-}
-
-async function downloadFromMeta(mediaId: string): Promise<Buffer> {
-  const metaRes = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, {
-    headers: { Authorization: `Bearer ${WA_TOKEN}` },
-  })
-  if (!metaRes.ok) throw new Error(`Meta ${metaRes.status}`)
-  const { url } = await metaRes.json() as { url?: string }
-  if (!url) throw new Error('URL não retornada pela Meta')
-
-  const audioRes = await fetch(url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } })
-  if (!audioRes.ok) throw new Error(`Download ${audioRes.status}`)
-  return Buffer.from(await audioRes.arrayBuffer())
-}
-
-async function downloadFromLocal(localPath: string): Promise<Buffer> {
-  return fs.readFile(path.join(MIDIA_ROOT, localPath))
-}
-
-async function downloadFromDrive(driveId: string): Promise<Buffer> {
-  const driveAuth = createDriveAuth()
-  if (!driveAuth) throw new Error('Credenciais Drive não configuradas')
-  const token = await driveAuth.getAccessToken()
-  if (!token) throw new Error('Token Drive inválido')
-
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error(`Drive ${res.status}`)
-  return Buffer.from(await res.arrayBuffer())
 }
