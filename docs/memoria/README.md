@@ -2,6 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
+- [incident_renovacao_acidental_aba_velha_30set2026](incident_renovacao_acidental_aba_velha_30set2026.md) — 30/09/2026 ✅ — cliente 2888 renovado por toque acidental em aba aberta havia 40 min; renovação/exclusão de pagamento passam a entrar no audit_log com usuário+IP, e o modal pede 2º clique quando a tela está desatualizada
 - [project_vinculos_aplicativo_removidos](project_vinculos_aplicativo_removidos.md) — 28/09/2026 — área "Vínculos" removida dos formulários de aplicativo (colunas 100% vazias); aviso "Apps vinculados a esta conta" agora lê das playlists (~610 contas, antes 2)
 - [project_balao_conta_rotulo_complemento](project_balao_conta_rotulo_complemento.md) — 28/09/2026 — balão de conta mostra a parte do rótulo que difere do nome do cliente (sub-linha) + "Copiar M3U" fecha o menu
 - [project_m3u_testes_player_removidos](project_m3u_testes_player_removidos.md) — 28/09/2026 — testes de listas M3U, tela "📡 Servidores" e "▶ Player" REMOVIDOS a pedido do Jonas; como era, tabelas mantidas no banco, commit `861934d` pra restaurar; fechou proxy aberto (SSRF) em stream-proxy/proxy-test

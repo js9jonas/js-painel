@@ -1,19 +1,48 @@
 // src/app/api/pagamentos/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { registrarAudit, origemRequisicao } from "@/lib/audit";
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await ctx.params;
-    const { rowCount } = await pool.query(
-      `DELETE FROM public.pagamentos WHERE id = $1::bigint`,
-      [id]
-    );
-    if (!rowCount) {
-      return NextResponse.json({ ok: false, error: "Pagamento não encontrado" }, { status: 404 });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query(
+        `DELETE FROM public.pagamentos WHERE id = $1::bigint
+         RETURNING id::text, id_cliente::text, id_assinatura::text, data_pgto::text,
+                   valor::text, forma, tipo_pagamento`,
+        [id]
+      );
+      if (rows.length === 0) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ ok: false, error: "Pagamento não encontrado" }, { status: 404 });
+      }
+      const pg = rows[0];
+      await registrarAudit(client, {
+        tipo: "exclusao_pagamento",
+        id_cliente: pg.id_cliente,
+        id_assinatura: pg.id_assinatura,
+        descricao: `Pagamento #${pg.id} excluído (R$ ${pg.valor}, ${pg.forma ?? "—"})`,
+        dados_antes: {
+          id_pagamento: pg.id,
+          data_pgto: pg.data_pgto,
+          valor: pg.valor,
+          forma: pg.forma,
+          tipo_pagamento: pg.tipo_pagamento,
+        },
+        dados_depois: origemRequisicao(req),
+      });
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
     return NextResponse.json({ ok: true });
   } catch (err: any) {

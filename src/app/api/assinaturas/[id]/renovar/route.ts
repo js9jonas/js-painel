@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { abaterCreditoRenovacao } from "@/lib/saldoServidor";
 import { notificarRenovacao } from "@/lib/notificar-renovacao";
+import { registrarAudit, origemRequisicao } from "@/lib/audit";
 
 type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 
@@ -42,6 +43,10 @@ export async function PUT(
     // statusFinal: "ativo" | "pendente" | null (null = manter status atual)
     const statusFinal: "ativo" | "pendente" | null = body?.statusFinal ?? null;
 
+    // Rastro pra auditoria: tela de onde veio (/chat, /clientes/[id]) + IP/navegador.
+    const telaOrigem = typeof body?.telaOrigem === "string" ? body.telaOrigem.slice(0, 120) : null;
+    const origem = { tela: telaOrigem, ...origemRequisicao(req) };
+
     const client = await pool.connect();
 
     // Modo soPagamento (assinatura já pendente — registra pagamento e ativa).
@@ -58,7 +63,10 @@ export async function PUT(
         // fixo em 1, independente do período pago agora.
         const { rows: vcRows } = await client.query(
           `SELECT (CURRENT_DATE - (venc_contrato - make_interval(months => 1))::date)::int AS dias_rel,
-                  venc_contas::text AS venc_contas_anterior
+                  venc_contas::text AS venc_contas_anterior,
+                  venc_contrato::text AS venc_contrato_anterior,
+                  status AS status_anterior,
+                  id_cliente::text AS id_cliente
            FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
           [idAssinatura]
         );
@@ -80,7 +88,7 @@ export async function PUT(
                venc_contas   = COALESCE($3::date, venc_contas),
                atualizado_em = NOW()
            WHERE id_assinatura = $1::bigint
-           RETURNING venc_contas::text AS venc_contas`,
+           RETURNING venc_contas::text AS venc_contas, venc_contrato::text AS venc_contrato`,
           [idAssinatura, dataManual, vencContasManual]
         );
         const vencContasNovaSoPag: string | null = atualizada[0]?.venc_contas ?? null;
@@ -91,6 +99,7 @@ export async function PUT(
         }
 
         let ehNovoSoPag = false;
+        let idPagamentoSoPag: string | null = null;
         if (registrarPagamento && pgto) {
           const idCliente = pgto.idCliente;
 
@@ -106,17 +115,42 @@ export async function PUT(
             ? `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`
             : "novo";
 
-          await client.query(
+          const { rows: pgRows } = await client.query(
             `INSERT INTO public.pagamentos
              (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
               tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura)
              VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                     $7, $8, NOW(), $9::bigint)`,
+                     $7, $8, NOW(), $9::bigint)
+             RETURNING id::text`,
             [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
              pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
              tipoPagSoPag, diasRelSoPag, idAssinatura]
           );
+          idPagamentoSoPag = pgRows[0]?.id ?? null;
         }
+
+        await registrarAudit(client, {
+          tipo: "renovacao",
+          id_cliente: vcRows[0].id_cliente,
+          id_assinatura: idAssinatura,
+          descricao: idPagamentoSoPag
+            ? `Pagamento confirmado (pendente → ativo), ${periodo}, pagamento #${idPagamentoSoPag}`
+            : `Pendente → ativo, ${periodo}, sem pagamento`,
+          dados_antes: {
+            status: vcRows[0].status_anterior,
+            venc_contrato: vcRows[0].venc_contrato_anterior,
+            venc_contas: vencContasAnteriorSoPag,
+          },
+          dados_depois: {
+            status: "ativo",
+            venc_contrato: atualizada[0]?.venc_contrato ?? null,
+            venc_contas: vencContasNovaSoPag,
+            id_pagamento: idPagamentoSoPag,
+            valor: idPagamentoSoPag ? pgto?.valor ?? null : null,
+            forma: idPagamentoSoPag ? pgto?.forma ?? "INTER" : null,
+            ...origem,
+          },
+        });
 
         await client.query("COMMIT");
 
@@ -148,7 +182,8 @@ export async function PUT(
         `SELECT
            venc_contas::text    AS venc_contas_anterior,
            venc_contrato::text  AS venc_contrato_anterior,
-           (CURRENT_DATE - venc_contrato)::int AS dias_rel_vencimento
+           (CURRENT_DATE - venc_contrato)::int AS dias_rel_vencimento,
+           status               AS status_anterior
          FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
         [idAssinatura]
       );
@@ -198,6 +233,7 @@ export async function PUT(
 
       // Registra pagamento somente se status = ativo
       let ehNovo = false;
+      let idPagamento: string | null = null;
       if (registrarPagamento && pgto && statusFinal !== "pendente") {
         const idCliente = pgto.idCliente ?? assinatura.id_cliente;
 
@@ -213,17 +249,44 @@ export async function PUT(
           ? `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`
           : "novo";
 
-        await client.query(
+        const { rows: pgRows } = await client.query(
           `INSERT INTO public.pagamentos
            (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
             tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura)
            VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                   $7, $8, NOW(), $9::bigint)`,
+                   $7, $8, NOW(), $9::bigint)
+           RETURNING id::text`,
           [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
            pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
            tipoPagamento, diasRelVencimento, idAssinatura]
         );
+        idPagamento = pgRows[0]?.id ?? null;
       }
+
+      await registrarAudit(client, {
+        tipo: "renovacao",
+        id_cliente: assinatura.id_cliente,
+        id_assinatura: idAssinatura,
+        descricao: idPagamento
+          ? `Renovação ${periodo} com pagamento #${idPagamento}`
+          : assinatura.status === "pendente"
+            ? `Renovação ${periodo} como pendente (sem pagamento)`
+            : `Datas alteradas (${periodo}), sem pagamento`,
+        dados_antes: {
+          status: antes[0]?.status_anterior ?? null,
+          venc_contrato: antes[0]?.venc_contrato_anterior ?? null,
+          venc_contas: vencContasAnterior,
+        },
+        dados_depois: {
+          status: assinatura.status,
+          venc_contrato: assinatura.venc_contrato,
+          venc_contas: vencContasNova,
+          id_pagamento: idPagamento,
+          valor: idPagamento ? pgto?.valor ?? null : null,
+          forma: idPagamento ? pgto?.forma ?? "INTER" : null,
+          ...origem,
+        },
+      });
 
       // Abate crédito em ambos os casos (ativo e pendente) — datas foram atualizadas
       await abaterCreditoRenovacao(client, idAssinatura, vencContasAnterior, vencContasNova);

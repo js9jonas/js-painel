@@ -3001,6 +3001,7 @@ export default function ChatPage() {
                         valor: p.valor ?? '0',
                       }))}
                       onSuccess={() => selecionado && carregarMensagens(selecionado, true)}
+                      onRecarregarDados={() => selecionado && carregarMensagens(selecionado, true)}
                     />
                   )
                 })()}

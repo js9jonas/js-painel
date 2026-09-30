@@ -11,6 +11,9 @@ const TIPO_CONFIG: Record<string, { label: string; classes: string }> = {
   alteracao_app:   { label: "Alteração de app",    classes: "bg-amber-50 text-amber-700" },
   vinculo_conta:   { label: "Conta vinculada",     classes: "bg-emerald-50 text-emerald-700" },
   desvinculo_conta:{ label: "Conta desvinculada",  classes: "bg-orange-50 text-orange-700" },
+  criacao_teste_conta:{ label: "Teste criado",      classes: "bg-sky-50 text-sky-700" },
+  renovacao:       { label: "Renovação",           classes: "bg-emerald-50 text-emerald-700" },
+  exclusao_pagamento:{ label: "Pagamento excluído", classes: "bg-red-50 text-red-700" },
 };
 
 function formatarDataHora(iso: string): string {
@@ -82,6 +85,9 @@ function LinhaAudit({ entry }: { entry: AuditLogRow }) {
           {entry.descricao ?? "—"}
           {entry.id_assinatura && (
             <span className="ml-1 text-zinc-400">· ass. {entry.id_assinatura}</span>
+          )}
+          {entry.usuario && (
+            <span className="ml-1 text-zinc-400">· por {entry.usuario}</span>
           )}
         </td>
         <td className="px-3 py-2 text-zinc-400 text-right">
