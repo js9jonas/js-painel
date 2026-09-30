@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { pool } from '@/lib/db'
+import { lerImagemPorReacao, EMOJI_LER_IMAGEM } from '@/lib/leitura-por-reacao'
 import { maybeSyncLabels } from '@/lib/label-sync'
 import { responderFalarComSuporte } from '@/lib/auto-resposta-suporte'
 import { transcribeAudio } from '@/lib/transcribe'
@@ -208,10 +209,20 @@ export async function POST(req: NextRequest) {
               // Reação enviada pelo Jonas via celular — atualiza a mensagem alvo
               const { message_id, emoji } = msg.reaction ?? {}
               if (message_id) {
-                await pool.query(
-                  `UPDATE public.whatsapp_mensagens SET reacao = $1 WHERE wa_msg_id = $2`,
+                const { rows: antes } = await pool.query(
+                  `UPDATE public.whatsapp_mensagens m SET reacao = $1
+                   FROM (SELECT reacao FROM public.whatsapp_mensagens WHERE wa_msg_id = $2) old
+                   WHERE m.wa_msg_id = $2
+                   RETURNING old.reacao AS anterior`,
                   [emoji || null, message_id]
                 )
+                // 🔄 numa imagem de cliente = pedido de leitura de MAC/chave (resultado no Telegram).
+                // Só dispara se a reação anterior não era 🔄 — reenvio do mesmo evento pela Meta não repete.
+                if (emoji === EMOJI_LER_IMAGEM && antes[0] && antes[0].anterior !== EMOJI_LER_IMAGEM) {
+                  lerImagemPorReacao(message_id).catch(err =>
+                    console.error('[WhatsApp] leitura por reação error:', err)
+                  )
+                }
               }
               continue
             } else if (msg.type === 'unsupported') {
