@@ -16,4 +16,4 @@ Pedido do Jonas em 29/09/2026. Cada imagem enviada pelo cliente no `/chat` tem u
 
 **Why:** o n8n processava toda imagem recebida e mandava pro Telegram; a ideia é ler só quando o Jonas pede, no contexto da conversa.
 
-**How to apply:** 📋 pendente desligar o processamento de imagem do n8n (workflow do webhook do WhatsApp) depois de validado em produção. Pedir um token temporário da API do n8n e mostrar os nós antes de desativar. Custo estimado de US$0,01–0,02 por leitura (só roda no clique). O `msgId` chega como string do /chat (bigint) — a rota converte.
+**How to apply:** ✅ 29/09 o nó "Telegram — Ativação" do workflow n8n "WhatsApp JS API Oficial" (`81byRJISvt0l7X6X`) foi **desativado** (não apagado). A análise de imagem do n8n ("Analisar com Claude") **continua ligada** porque o ramo de comprovante de Pix depende dela; só o envio da ativação pro Telegram parou. Pra voltar, é só reativar o nó. Custo estimado de US$0,01–0,02 por leitura (só roda no clique). O `msgId` chega como string do /chat (bigint) — a rota converte.
