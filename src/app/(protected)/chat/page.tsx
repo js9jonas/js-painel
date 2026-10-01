@@ -456,6 +456,7 @@ export default function ChatPage() {
   const [tempoGravacao, setTempoGravacao] = useState(0)
   const [enviandoAudio, setEnviandoAudio] = useState(false)
   const [erroAudio, setErroAudio] = useState<string | null>(null)
+  const [erroRR, setErroRR] = useState<{ telefone: string; restantes: string[]; texto: string } | null>(null)
   const [transcrevendo, setTranscrevendo] = useState(false)
   const [mediaErros, setMediaErros] = useState<Set<number>>(new Set())
   // Leitura de MAC/chave em imagem, sob demanda — temporária: some ao trocar de conversa
@@ -657,21 +658,40 @@ export default function ChatPage() {
     return t.split(/\r?\n[ \t]*---[ \t]*\r?\n/).map(p => p.trim()).filter(Boolean)
   }
 
-  async function enviarRRSequencial(partes: string[]) {
-    if (!selecionado || enviando) return
+  // Para na 1ª falha: seguir mandando as próximas entregaria a sequência ao cliente com um
+  // pedaço faltando, sem ninguém perceber. O telefone vai junto no erro pra que "Reenviar"
+  // mande pro mesmo cliente mesmo que outra conversa tenha sido aberta nesse meio-tempo.
+  async function enviarRRSequencial(partes: string[], telefone: string | null = selecionado) {
+    if (!telefone || enviando) return
     setEnviando(true)
+    setErroRR(null)
+    let i = 0
     try {
-      for (let i = 0; i < partes.length; i++) {
-        if (i > 0) await new Promise(resolve => setTimeout(resolve, 600))
-        await fetch('/api/whatsapp/enviar', {
+      for (; i < partes.length; i++) {
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 1500))
+        const resp = await fetch('/api/whatsapp/enviar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telefone: selecionado, mensagem: partes[i] }),
+          body: JSON.stringify({ telefone, mensagem: partes[i] }),
         })
+        if (!resp.ok) {
+          const { error } = await resp.json().catch(() => ({ error: null }))
+          throw new Error(error ?? `erro ${resp.status}`)
+        }
       }
-      await carregarMensagens(selecionado)
+    } catch (err) {
+      console.error('[Chat] Erro na resposta rápida sequencial:', err)
+      // fetch() rejeita com TypeError quando a conexão cai — mensagem do navegador vem em inglês
+      const motivo = err instanceof TypeError || !(err instanceof Error) ? 'falha de conexão' : err.message
+      setErroRR({
+        telefone,
+        restantes: partes.slice(i),
+        texto: `Mensagem ${i + 1} de ${partes.length} não foi enviada (${motivo})` +
+          (i + 1 < partes.length ? ' — as seguintes também não.' : '.'),
+      })
     } finally {
       setEnviando(false)
+      await carregarMensagens(telefone).catch(() => {})
     }
   }
 
@@ -681,6 +701,11 @@ export default function ChatPage() {
     setQrIdx(0)
     const partes = splitPartesRR(t)
     if (partes.length > 1) {
+      // Limpa o "/atalho" digitado — senão fica no campo e um Enter distraído manda ele pro cliente
+      setTexto('')
+      if (inputRef.current) inputRef.current.innerHTML = ''
+      lastUserInputRef.current = ''
+      setInputVazio(true)
       enviarRRSequencial(partes)
       return
     }
@@ -2799,6 +2824,23 @@ export default function ChatPage() {
                 >
                   {enviandoAudio ? '...' : '🎙️'}
                 </button>
+              )}
+              {erroRR && erroRR.telefone === selecionado && (
+                <div style={{
+                  position: 'absolute', bottom: '100%', right: 0,
+                  background: '#fee2e2', border: '1px solid #fecaca',
+                  color: '#991b1b', fontSize: 12, borderRadius: 6,
+                  padding: '6px 10px', marginBottom: erroAudio ? 36 : 4, whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 8
+                }}>
+                  {erroRR.texto}
+                  <button onClick={() => enviarRRSequencial(erroRR.restantes, erroRR.telefone)} disabled={enviando}
+                    style={{ background: '#991b1b', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#fff', fontSize: 12, padding: '2px 8px' }}>
+                    Reenviar
+                  </button>
+                  <button onClick={() => setErroRR(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+                </div>
               )}
               {erroAudio && (
                 <div style={{
