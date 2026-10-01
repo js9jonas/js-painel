@@ -31,6 +31,58 @@ function fraseTelas(telas: number | null, dataTxt: string, ativa: boolean): stri
   return `Suas *${telas} telas* ${ativa ? 'estão liberadas' : 'seguem liberadas'} até *${dataTxt}*.`
 }
 
+/**
+ * Sem conversa minha com o cliente nesse intervalo, a renovação vai precedida de uma
+ * saudação — senão a 1ª mensagem "humana" que ele recebe depois do lembrete automático
+ * + Chave PIX automática é a confirmação seca. Pedido do Jonas em 01/10/2026.
+ */
+const HORAS_SEM_CONVERSA_PARA_SAUDACAO = 6
+const PAUSA_ENTRE_SAUDACAO_E_RENOVACAO_MS = 2_000
+
+/** "bom dia" / "boa tarde" / "boa noite" pelo horário de Brasília (o container roda em UTC). */
+function periodoDoDia(): string {
+  const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hourCycle: 'h23' }))
+  if (hora >= 5 && hora < 12) return 'bom dia'
+  if (hora >= 12 && hora < 18) return 'boa tarde'
+  return 'boa noite'
+}
+
+function montarSaudacao(nome: string | null): string {
+  const pNome = primeiroNome(nome)
+  return `Oi${pNome ? `, ${pNome}` : ''}, ${periodoDoDia()}! 😊\nRecebi seu comprovante, muito obrigado!`
+}
+
+/**
+ * Conta só o que eu digitei: pelo celular (eco do app, source 'phone') ou pelo /chat
+ * ('chat' / 'chat:<email>'). Fica de fora tudo que sai sozinho — resposta automática da
+ * Chave PIX, lembretes de vencimento, notificações de renovação, n8n — e os botões do
+ * /chat ('chat-planos', 'chat-pagamento'), que são mensagens prontas (decisão do Jonas).
+ * Usa o índice (telefone, recebida_em DESC).
+ */
+async function conversouRecentemente(telefone: string): Promise<boolean> {
+  // Acessório: erro aqui não pode derrubar a renovação — na dúvida, sem saudação.
+  try {
+    return await consultarConversaRecente(telefone)
+  } catch (err) {
+    console.error('[NotificarRenovacao] Falha ao checar conversa recente, seguindo sem saudação:', err)
+    return true
+  }
+}
+
+async function consultarConversaRecente(telefone: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT 1
+     FROM public.whatsapp_mensagens
+     WHERE telefone = $1
+       AND origem = 'jonas'
+       AND (source = 'phone' OR source = 'chat' OR source LIKE 'chat:%')
+       AND recebida_em >= NOW() - make_interval(hours => $2::int)
+     LIMIT 1`,
+    [telefone, HORAS_SEM_CONVERSA_PARA_SAUDACAO]
+  )
+  return rows.length > 0
+}
+
 function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean, identificacao: string | null, nome: string | null): string {
   const pNome = primeiroNome(nome)
   const linhaIdentificacao = identificacao ? `🏷️ ${identificacao}\n` : ''
@@ -63,8 +115,13 @@ export async function notificarRenovacao(
   const cliente = await pool.query(`SELECT nome FROM public.clientes WHERE id_cliente = $1::bigint`, [idCliente])
   if (!cliente.rows[0]) return { enviado: false, motivo: 'Cliente não encontrado' }
 
+  const nome: string | null = cliente.rows[0].nome
   const dataTxt = novoVencimento ? formatarData(novoVencimento) : '-'
-  const texto = montarTexto(telas, dataTxt, ehNovo, identificacao, cliente.rows[0].nome)
+  const texto = montarTexto(telas, dataTxt, ehNovo, identificacao, nome)
+  // Depois da saudação o nome já foi dito — a renovação sai sem ele pra não repetir.
+  // Boas-vindas não ganha saudação: ela já é uma.
+  const saudacao = ehNovo ? null : montarSaudacao(nome)
+  const textoAposSaudacao = montarTexto(telas, dataTxt, ehNovo, identificacao, null)
 
   const telefoneAtivo = await pool.query(
     `SELECT ct.telefone
@@ -78,17 +135,38 @@ export async function notificarRenovacao(
   )
 
   const haviaJanelaAberta = !!telefoneAtivo.rows[0]
+  let saudacaoEnviada = false
   if (telefoneAtivo.rows[0]) {
     const telefone = telefoneAtivo.rows[0].telefone
-    const msgId = await enviarTextoWhatsapp(telefone, texto)
-    await registrarMensagemWhatsapp(msgId, telefone, texto, { source: ehNovo ? 'notificacao-boas-vindas' : 'notificacao-renovacao' })
+    let textoFinal = texto
+    if (saudacao && !(await conversouRecentemente(telefone))) {
+      // Saudação é acessória: se falhar, a renovação sai mesmo assim, com o nome.
+      const saudacaoId = await enviarTextoWhatsapp(telefone, saudacao)
+      await registrarMensagemWhatsapp(saudacaoId, telefone, saudacao, { source: 'notificacao-renovacao-saudacao' })
+      if (saudacaoId) {
+        saudacaoEnviada = true
+        textoFinal = textoAposSaudacao
+        await new Promise((r) => setTimeout(r, PAUSA_ENTRE_SAUDACAO_E_RENOVACAO_MS))
+      }
+    }
+    const msgId = await enviarTextoWhatsapp(telefone, textoFinal)
+    await registrarMensagemWhatsapp(msgId, telefone, textoFinal, { source: ehNovo ? 'notificacao-boas-vindas' : 'notificacao-renovacao' })
     if (msgId) return { enviado: true, telefone }
     // Falha no envio direto mesmo com janela aberta (já passou pelo retry de erro
     // transitório em enviarTextoWhatsapp) — segue pro fallback Telegram como rede
     // de segurança, mas avisando que o motivo foi outro, não falta de conversa.
   }
 
-  return notificarRenovacaoTelegram({ idCliente, nomeCliente: cliente.rows[0].nome, texto, ehNovo, haviaJanelaAberta })
+  return notificarRenovacaoTelegram({
+    idCliente,
+    nomeCliente: nome,
+    texto,
+    // Se a saudação já chegou pelo envio direto, o link leva só a renovação (sem nome).
+    textoAposSaudacao: saudacao ? textoAposSaudacao : null,
+    saudacao: saudacaoEnviada ? null : saudacao,
+    ehNovo,
+    haviaJanelaAberta,
+  })
 }
 
 /**
@@ -100,12 +178,20 @@ async function notificarRenovacaoTelegram({
   idCliente,
   nomeCliente,
   texto,
+  textoAposSaudacao,
+  saudacao,
   ehNovo,
   haviaJanelaAberta,
 }: {
   idCliente: string
   nomeCliente: string | null
   texto: string
+  /** Renovação sem o nome, pra ir depois da saudação; preenchido sozinho (sem `saudacao`)
+   * quando a saudação já foi entregue pelo envio direto. */
+  textoAposSaudacao: string | null
+  /** Saudação a acrescentar no início do link se eu não conversei com o cliente nesse
+   * telefone nas últimas horas; null quando não se aplica ou já foi entregue. */
+  saudacao: string | null
   ehNovo: boolean
   /** true quando a janela de 24h estava aberta mas o envio direto falhou por outro
    * motivo (ex: instabilidade transitória da Meta) — diferencia do caso "sem
@@ -144,9 +230,17 @@ async function notificarRenovacaoTelegram({
     return { enviado: false, motivo: 'Cliente sem telefone cadastrado' }
   }
 
+  // O link wa.me só leva um texto: saudação e renovação vão juntas, separadas por linha em branco.
+  let textoLink = texto
+  if (saudacao && textoAposSaudacao && !(await conversouRecentemente(telefoneRaw))) {
+    textoLink = `${saudacao}\n\n${textoAposSaudacao}`
+  } else if (!saudacao && textoAposSaudacao) {
+    textoLink = textoAposSaudacao
+  }
+
   const digits = telefoneRaw.replace(/\D/g, '')
   const numero = digits.startsWith('55') ? digits : `55${digits}`
-  const linkWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(texto).replace(/!/g, '%21')}`
+  const linkWhatsapp = `https://wa.me/${numero}?text=${encodeURIComponent(textoLink).replace(/!/g, '%21')}`
 
   // Título e motivo dependem da causa real: falta de janela de 24h é diferente de
   // "tinha janela, mas o envio direto falhou" (ex: instabilidade transitória da

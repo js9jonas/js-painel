@@ -73,3 +73,11 @@ Jonas reportou que várias renovações sem janela de 24h aberta não geravam o 
 **Fix (commit `4714649`):** a busca de telefone pro link do Telegram passou a ser em `public.contatos` diretamente (`LEFT JOIN LATERAL` só pra *preferir* o telefone com conversa mais recente, sem exigir que exista) — só falha de verdade se o cliente não tiver telefone cadastrado nenhum. Faz sentido porque o wa.me link não precisa de histórico prévio pra funcionar (só a janela de 24h do envio direto via API oficial exige isso, que é uma regra real da Meta, não bug). Mensagens de erro também ficaram mais específicas.
 
 **Validado:** simulei a nova query pros 8 clientes reais que falharam — todos os 8 agora retornam telefone.
+
+## ✅ Saudação antes da renovação quando não houve conversa (01/10/2026)
+
+Pedido do Jonas: se ele não conversou com o cliente nas últimas **6 h** (`HORAS_SEM_CONVERSA_PARA_SAUDACAO`), antes da renovação sai "Oi, {Nome}, {bom dia|boa tarde|boa noite}! 😊 / Recebi seu comprovante, muito obrigado!", pausa de 2 s, e a renovação vai sem o nome ("✅ *Tudo certo!*") pra não repetir.
+- "Conversa minha" = `origem='jonas'` com `source` `phone` (eco do celular), `chat` ou `chat:%` (/chat). **Botões do /chat (`chat-planos`, `chat-pagamento`) não contam** (decisão do Jonas), nem automáticas (auto-resposta, lembretes, notificações, n8n).
+- Boas-vindas (cliente novo) não ganha saudação.
+- Saudação é acessória: se falhar, a renovação sai normal, com o nome. Registrada com source `notificacao-renovacao-saudacao`.
+- Fallback Telegram: o link wa.me leva saudação + renovação num texto só (se a saudação já tinha saído pelo envio direto, leva só a renovação).
