@@ -53,11 +53,28 @@ interface Mensagem {
   reply_to_origem: string | null
   reacao: string | null
   status: string | null
+  status_error?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] | null
   source: string | null
   recebida_em: string
   transcricao: string | null
   pendente?: boolean
 }
+
+// Motivo legível pra mensagem recusada pela Meta (status 'failed' + status_error do webhook).
+// Códigos vistos em produção: 131047 (fora da janela de 24h) e 131026 (não entregável).
+function motivoFalhaEnvio(msg: Mensagem): string {
+  const erro = Array.isArray(msg.status_error) ? msg.status_error[0] : null
+  if (erro?.code === 131047) {
+    return 'Não entregue: fora da janela de 24h. O cliente não manda mensagem há mais de 24h — o WhatsApp só aceita template até ele responder.'
+  }
+  if (erro?.code === 131026) {
+    return 'Não entregue: o WhatsApp não conseguiu entregar (número sem WhatsApp, app desatualizado ou o cliente bloqueou o número).'
+  }
+  const detalhe = erro?.error_data?.details ?? erro?.message ?? erro?.title
+  return `Não entregue: o WhatsApp recusou a mensagem${erro?.code ? ` (erro ${erro.code})` : ''}${detalhe ? ` — ${detalhe}` : ''}.`
+}
+
+const JANELA_24H_MS = 24 * 60 * 60 * 1000
 
 interface Cliente {
   id_cliente: number
@@ -1115,6 +1132,17 @@ export default function ChatPage() {
     if (venc.getTime() === amanha.getTime()) return 'amanha'
     return null
   }
+
+  // Janela de 24h do WhatsApp: só conta mensagem do próprio cliente (a nossa não reabre).
+  // As 200 últimas mensagens carregadas bastam — sem nenhuma do cliente nelas, está fora.
+  const ultimaMsgClienteEm = (() => {
+    for (let i = mensagens.length - 1; i >= 0; i--) {
+      if (mensagens[i].origem === 'cliente') return mensagens[i].recebida_em
+    }
+    return null
+  })()
+  const foraDaJanela24h = !!selecionado && !loadingMsgs &&
+    (!ultimaMsgClienteEm || Date.now() - new Date(ultimaMsgClienteEm).getTime() > JANELA_24H_MS)
 
   function montarTextoAplicativos(): string {
     // Inativos não entram na lista mandada pro cliente (pedido do Jonas, 03/10/2026)
@@ -2260,11 +2288,19 @@ export default function ChatPage() {
                               hour: '2-digit', minute: '2-digit'
                             })}
                           </span>
-                          {!isCliente && (
+                          {!isCliente && (msg.status === 'failed' ? (
+                            // Antes mostrava ✓ igual a enviada — recusa da Meta passava despercebida
+                            <span
+                              title={motivoFalhaEnvio(msg)}
+                              style={{ color: '#dc2626', fontSize: 11, fontWeight: 600, cursor: 'help', whiteSpace: 'nowrap' }}
+                            >
+                              ⚠ Não entregue
+                            </span>
+                          ) : (
                             <span style={{ color: msg.status === 'read' ? '#53bdeb' : '#667781', fontSize: 13 }}>
                               {msg.pendente ? '🕓' : msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
                             </span>
-                          )}
+                          ))}
                         </div>
                       </div>
                       {/* Leitura de MAC/chave — ícone acima do botão de ações, cartão ao lado do balão */}
@@ -2486,6 +2522,26 @@ export default function ChatPage() {
                   </div>
                 </div>
                 <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#667781', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              </div>
+            )}
+
+            {/* Aviso de janela de 24h — texto livre, lista, mídia etc. são recusados pela Meta (erro 131047) */}
+            {!selectMode && foraDaJanela24h && (
+              <div style={{
+                background: '#fef3c7', borderTop: '1px solid #fcd34d', color: '#92400e',
+                padding: '8px 16px', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <AlertTriangle size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
+                <span>
+                  <b>Fora da janela de 24h</b>
+                  {ultimaMsgClienteEm
+                    ? ` — o cliente não manda mensagem desde ${new Date(ultimaMsgClienteEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.`
+                    : ' — o cliente ainda não mandou mensagem nesta conversa.'}
+                  {' '}Mensagem comum não chega até ele responder
+                  {tipoTemplateRelacionado()
+                    ? ' — o botão de template ao lado do nome dele funciona agora.'
+                    : ' — peça por outro meio (ligação, etc.) pra ele mandar qualquer mensagem.'}
+                </span>
               </div>
             )}
 
