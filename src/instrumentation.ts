@@ -15,4 +15,7 @@ export async function register() {
 
   const { iniciarKeepaliveSaldo } = await import("@/lib/saldo-keepalive");
   iniciarKeepaliveSaldo();
+
+  const { iniciarMonitorSaldoCaptcha } = await import("@/lib/aviso-saldo-captcha");
+  iniciarMonitorSaldoCaptcha();
 }

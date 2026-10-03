@@ -1,5 +1,6 @@
 // Base compartilhada para painéis na plataforma appacesso.com
 // FunPlays e LazerPlay usam a mesma API, apenas com URLs e chaves diferentes.
+import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 import type {
   ContaPainel,
   PainelAdapter,
@@ -53,6 +54,7 @@ async function resolverRecaptcha(cfg: AppAcessoConfig): Promise<string> {
   }).then((r) => r.json()) as any;
 
   if (criacao.errorId) {
+    if (ehErroSaldoZerado(criacao)) void avisarSaldoZerado("capsolver");
     throw new Error(`CapSolver createTask: ${criacao.errorDescription ?? criacao.errorCode}`);
   }
 

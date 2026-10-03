@@ -1,4 +1,5 @@
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 
 // Painel N (pnw7.cc) — PHP session + reCAPTCHA v2
 // Auto-login: CapSolver ReCaptchaV2TaskProxyLess → POST validar-login.php → PHPSESSID no Set-Cookie
@@ -40,6 +41,7 @@ async function resolverRecaptcha(websiteURL: string): Promise<string> {
     }),
   }).then(r => r.json()) as any;
 
+  if (ehErroSaldoZerado(created)) void avisarSaldoZerado("capsolver");
   if (created.errorId) throw new Error(`CapSolver erro: ${created.errorDescription}`);
 
   for (let i = 0; i < 30; i++) {

@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 import { Impit } from "impit";
 import { impitFetch } from "./proxy-retry";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 
 // UNITV (ResellerSystem) — https://panel-web.revenda.watch/
 // Auth: dealer_token retornado no login. Re-login automático via CapSolver (ImageToTextTask) quando returnCode=300.
@@ -91,6 +92,7 @@ async function resolverCaptcha(imageB64: string): Promise<string> {
     }),
   }).then(r => r.json()) as any;
 
+  if (ehErroSaldoZerado(created)) void avisarSaldoZerado("capsolver");
   if (created.errorId) throw new Error(`CapSolver erro: ${created.errorDescription}`);
 
   // ImageToTextTask é resolvido de forma síncrona — resultado já vem no createTask

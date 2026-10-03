@@ -11,6 +11,7 @@ import type {
   SaveContaVencimento,
 } from "./types";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
+import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 
 const BASE = "https://smartone-iptv.com";
 const TURNSTILE_SITEKEY = "0x4AAAAAAAP8nNwILjC5_ux6";
@@ -47,6 +48,7 @@ async function resolverTurnstile(websiteUrl: string, siteKey: string): Promise<s
   }).then((r) => r.json())) as any;
 
   if (criacao.errorId) {
+    if (ehErroSaldoZerado(criacao)) void avisarSaldoZerado("capsolver");
     throw new Error(`CapSolver createTask: ${criacao.errorDescription ?? criacao.errorCode}`);
   }
   const { taskId } = criacao;

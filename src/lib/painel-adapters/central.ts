@@ -1,5 +1,6 @@
 import { Impit } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 
 // API base: https://api.controle.fit/api
 // Auth: JWT Bearer, expira em 1h
@@ -16,7 +17,7 @@ async function resolverTurnstile(): Promise<string> {
   const apiKey = process.env.CAPSOLVER_API_KEY;
   if (!apiKey) throw new Error("CAPSOLVER_API_KEY não definida no Easypanel.");
 
-  const { taskId, errorId, errorDescription } = await fetch("https://api.capsolver.com/createTask", {
+  const { taskId, errorId, errorCode, errorDescription } = await fetch("https://api.capsolver.com/createTask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -25,6 +26,7 @@ async function resolverTurnstile(): Promise<string> {
     }),
   }).then(r => r.json()) as any;
 
+  if (ehErroSaldoZerado({ errorCode })) void avisarSaldoZerado("capsolver");
   if (errorId) throw new Error(`CapSolver erro ao criar tarefa: ${errorDescription}`);
 
   for (let i = 0; i < 20; i++) {
@@ -46,7 +48,7 @@ async function resolverReCaptchaEnterprise(): Promise<string | null> {
   const apiKey = process.env.CAPSOLVER_API_KEY;
   if (!apiKey) return null;
 
-  const { taskId, errorId } = await fetch("https://api.capsolver.com/createTask", {
+  const { taskId, errorId, errorCode } = await fetch("https://api.capsolver.com/createTask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -55,6 +57,7 @@ async function resolverReCaptchaEnterprise(): Promise<string | null> {
     }),
   }).then(r => r.json()) as any;
 
+  if (ehErroSaldoZerado({ errorCode })) void avisarSaldoZerado("capsolver");
   if (errorId) return null;
 
   for (let i = 0; i < 30; i++) {

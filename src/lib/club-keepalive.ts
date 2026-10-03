@@ -1,6 +1,5 @@
 import { pool } from "@/lib/db";
 import { dispararLoginClub } from "@/lib/painel-adapters/club";
-import { verificarSaldo2captcha } from "@/lib/aviso-saldo-2captcha";
 import type { ServidorCredenciais, SaveSession } from "@/lib/painel-adapters/types";
 
 // Renovação preventiva da sessão CLUB (pdcapi.io). A sessão real dura ~1h ou menos (não os
@@ -19,9 +18,6 @@ const MARGEM_MS = 20 * 60 * 1000; // renova preventivamente quando faltar menos 
 type PainelClubRow = ServidorCredenciais & { id: number };
 
 async function tick() {
-  // Saldo do 2captcha (login do CLUB) — avisa no Telegram se estiver baixo ou zerado
-  await verificarSaldo2captcha().catch(() => {});
-
   let rows: PainelClubRow[];
   try {
     ({ rows } = await pool.query<PainelClubRow>(
