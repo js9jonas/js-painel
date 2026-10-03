@@ -82,3 +82,10 @@ Para FunPlays/LazerPlay (reCAPTCHA) e painel.fun (Turnstile): usar 2captcha via 
 - Credenciais e endpoints já mapeados no Tampermonkey: `/home/jonas/Documentos/iptv-keepalive.user.js`
 - Adapters existentes no js-painel: [[iptv_panel_adapters]]
 - Vínculo assinaturas × painéis: [[project_vinculo_assinaturas_paineis]]
+
+## 03/10/2026 — contadores do card corrigidos + balão explicativo (commit `7e14b8d`)
+
+- **Ao vivo** (`/api/paineis/servidores/[id]/status` respondeu `conectado: true`): Total, Ativas e Vencidas vêm do painel; embaixo do Total aparece "js-painel: N" quando o banco tem outro número (conta de teste / criada direto no painel). Bloqueadas não entram na contagem, só são citadas no balão.
+- **Sem ao vivo** (ou `conectado: false`): tudo do banco — Total = contas não removidas; Ativas/Vencidas pelo `vencimento_real_painel` (≥ / < `CURRENT_DATE`). Conta sem vencimento não entra em nenhuma das duas.
+- Antes, o modo banco usava `status_sinc` ('confirmado'/'pendente'), que **só é gravado na criação da conta** (vinculação manual = confirmado, sincronização = pendente) e nunca mais atualizado — não diz nada sobre estar em dia. Não usar `status_sinc` pra isso.
+- Teste local seguro contra o banco de produção: `DESATIVAR_JOBS=1 npx next dev -p 3010` (desliga keepalive CLUB/saldo/monitor de captcha) + interceptar `/status` no Playwright pra não consultar painéis reais.
