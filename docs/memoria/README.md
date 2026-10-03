@@ -43,6 +43,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [project_criar_teste_conta](project_criar_teste_conta.md) — Feature 'Criar teste' no modal + Conta (clientes/[id]) — usa gerarTeste() dos adapters (nunca chamado antes), com correções específicas por 
 - [project_drive_service_account_fix](project_drive_service_account_fix.md) — Causa raiz do invalid_grant no Google Drive do js-painel; leitura fixada com conta de serviço; mídia nova migrada pra armazenamento local na
 - [project_editar_conta_modal](project_editar_conta_modal.md) — Modal de edição de conta em clientes/[id] — implementado 18/06/2026 — campos desabilitados por tipo de painel
+- [project_funplay_listas_invisiveis](project_funplay_listas_invisiveis.md) — FunPlay esconde a lista em uso (27 de 937 apps com lista); plano de 04/10/2026: URL fictícia + migração em massa do site, só clientes com 1 conta
 - [project_funplay_licencas_livres](project_funplay_licencas_livres.md) — Relatório periódico de licenças FunPlay livres e inativos — metodologia, critérios e como reproduzir
 - [project_teste_listas_relatorio_26ago](project_teste_listas_relatorio_26ago.md) — Teste de conexão + catálogo dos 8 servidores em `m3u_listas` (26/08/2026) via página `/teste-listas`, comparado com fornecedor xc.s-dns.org em avaliação
 - [project_iphone_dados_acesso](project_iphone_dados_acesso.md) — Opção 'Enviar dados para iPhone' no balão de conta — gera screenshot do Smarters Player Lite já preenchida com usuário/senha/URL reais e env
