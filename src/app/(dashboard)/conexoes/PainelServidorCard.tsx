@@ -27,6 +27,7 @@ const TIPO_BADGE: Record<string, string> = {
 type StatusAoVivo = {
   conectado: boolean;
   creditos: number | null;
+  total: number;
   ativas: number;
   vencidas: number;
   bloqueadas: number;
@@ -87,6 +88,10 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
       setCarregandoStatus(false);
     }
   }
+
+  // Só conta como "ao vivo" se o painel respondeu — resposta com conectado:false (sessão caída,
+  // erro) cai pros números do banco.
+  const vivo = aoVivo?.conectado ? aoVivo : null;
 
   const sessionExpirada =
     painel.session_expiry && new Date(painel.session_expiry) < new Date();
@@ -206,20 +211,47 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
         </div>
       </div>
 
-      {/* Contadores — banco + ao vivo se disponível */}
+      {/* Contadores — ao vivo (consulta ao painel) quando conectado; senão, do banco do js-painel
+          pelo vencimento gravado. Passar o mouse em cada número explica de onde ele vem. */}
       <div className="grid grid-cols-3 gap-2 text-center">
-        <Stat label="Total" value={painel.total_contas} />
         <Stat
-          label="Ativas"
-          value={aoVivo?.ativas ?? painel.contas_confirmadas}
-          cor="text-emerald-700"
-          aoVivo={aoVivo !== null}
+          label="Total"
+          alinhar="esquerda"
+          value={vivo ? vivo.total : painel.total_contas}
+          aoVivo={!!vivo}
+          nota={vivo && vivo.total !== painel.total_contas ? `js-painel: ${painel.total_contas}` : undefined}
+          dica={
+            vivo
+              ? `Contas que existem no painel agora (ao vivo). No js-painel há ${painel.total_contas} contas ligadas a este painel` +
+                (vivo.total !== painel.total_contas
+                  ? " — a diferença costuma ser conta de teste ou conta criada direto no painel sem cadastro no js-painel."
+                  : ", o mesmo número.")
+              : "Contas cadastradas no js-painel ligadas a este painel (sem contar as removidas). Sem consulta ao vivo no momento."
+          }
         />
         <Stat
-          label={aoVivo ? "Vencidas" : "Pendentes"}
-          value={aoVivo?.vencidas ?? painel.contas_pendentes}
-          cor={(aoVivo?.vencidas ?? painel.contas_pendentes) > 0 ? "text-amber-600" : undefined}
-          aoVivo={aoVivo !== null}
+          label="Ativas"
+          value={vivo ? vivo.ativas : painel.contas_em_dia}
+          cor="text-emerald-700"
+          aoVivo={!!vivo}
+          dica={
+            vivo
+              ? "Ao vivo: contas que o painel informa como liberadas e com vencimento no futuro."
+              : "Do banco: contas do js-painel com vencimento de hoje em diante (última data sincronizada do painel)."
+          }
+        />
+        <Stat
+          label="Vencidas"
+          alinhar="direita"
+          value={vivo ? vivo.vencidas : painel.contas_vencidas}
+          cor={(vivo ? vivo.vencidas : painel.contas_vencidas) > 0 ? "text-amber-600" : undefined}
+          aoVivo={!!vivo}
+          dica={
+            vivo
+              ? "Ao vivo: contas que o painel informa como vencidas." +
+                (vivo.bloqueadas > 0 ? ` Há também ${vivo.bloqueadas} bloqueada(s), fora desta contagem.` : "")
+              : "Do banco: contas do js-painel com vencimento antes de hoje (última data sincronizada do painel)."
+          }
         />
       </div>
 
@@ -314,18 +346,37 @@ function Stat({
   value,
   cor,
   aoVivo,
+  nota,
+  dica,
+  alinhar = "centro",
 }: {
   label: string;
   value: number;
   cor?: string;
   aoVivo?: boolean;
+  nota?: string;
+  dica?: string;
+  alinhar?: "esquerda" | "centro" | "direita";
 }) {
+  // Balão alinhado pra dentro do card nas colunas das pontas, senão vaza pra fora da tela no celular
+  const posicao =
+    alinhar === "esquerda" ? "left-0" : alinhar === "direita" ? "right-0" : "left-1/2 -translate-x-1/2";
   return (
-    <div className="rounded-lg bg-zinc-50 py-2 px-1 relative">
+    <div className="group rounded-lg bg-zinc-50 py-2 px-1 relative cursor-help">
       <p className={`text-lg font-bold ${cor ?? "text-zinc-800"}`}>{value}</p>
       <p className="text-xs text-zinc-400">{label}</p>
+      {nota && <p className="text-[10px] text-zinc-400 leading-tight">{nota}</p>}
       {aoVivo && (
-        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400" title="Dado ao vivo" />
+        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+      )}
+      {dica && (
+        <div
+          role="tooltip"
+          className={`pointer-events-none absolute bottom-full ${posicao} z-20 mb-2 w-56 rounded-md bg-zinc-800 px-3 py-2 text-left text-xs leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100`}
+        >
+          <span className="mb-0.5 block font-semibold">{aoVivo ? "● Ao vivo" : "Banco do js-painel"}</span>
+          {dica}
+        </div>
       )}
     </div>
   );

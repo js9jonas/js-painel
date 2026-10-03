@@ -3,6 +3,10 @@
 // vez pelo Next.js na inicialização do processo.
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Teste local contra o banco de produção: DESATIVAR_JOBS=1 npm run dev — sem isso o dev server
+  // também renovaria sessões CLUB (gasta captcha, pode derrubar a sessão de produção) e rodaria
+  // os demais jobs em paralelo com a VPS.
+  if (process.env.DESATIVAR_JOBS === "1") return;
 
   // Guarda em globalThis pra não duplicar o setInterval em recarregamentos do dev server
   // (hot reload não reexecuta módulos top-level do jeito que reexecutaria um redeploy real).

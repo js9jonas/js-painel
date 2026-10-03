@@ -15,8 +15,11 @@ export type PainelServidorRow = {
   session_expiry: Date | null;
   tem_api_token: boolean;
   total_contas: number;
-  contas_pendentes: number;
-  contas_confirmadas: number;
+  // Por vencimento gravado no banco (vencimento_real_painel) — usado no card de /conexoes
+  // quando o status ao vivo do painel não está disponível. Substituiu status_sinc
+  // ('confirmado'/'pendente'), que só era gravado na criação e nunca dizia se a conta estava em dia.
+  contas_em_dia: number;
+  contas_vencidas: number;
   id_servidor: number | null;
 };
 
@@ -54,8 +57,8 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       ps.session_expiry,
       (ps.api_token IS NOT NULL)      AS tem_api_token,
       COUNT(c.id_conta)::int          AS total_contas,
-      COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'pendente')::int   AS contas_pendentes,
-      COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'confirmado')::int AS contas_confirmadas,
+      COUNT(c.id_conta) FILTER (WHERE c.vencimento_real_painel >= CURRENT_DATE)::int AS contas_em_dia,
+      COUNT(c.id_conta) FILTER (WHERE c.vencimento_real_painel <  CURRENT_DATE)::int AS contas_vencidas,
       ps.id_servidor
     FROM public.painel_servidores ps
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
@@ -153,8 +156,8 @@ export async function getPainelServidorById(id: number): Promise<PainelServidorR
       ps.session_expiry,
       (ps.api_token IS NOT NULL)      AS tem_api_token,
       COUNT(c.id_conta)::int          AS total_contas,
-      COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'pendente')::int   AS contas_pendentes,
-      COUNT(c.id_conta) FILTER (WHERE c.status_sinc = 'confirmado')::int AS contas_confirmadas
+      COUNT(c.id_conta) FILTER (WHERE c.vencimento_real_painel >= CURRENT_DATE)::int AS contas_em_dia,
+      COUNT(c.id_conta) FILTER (WHERE c.vencimento_real_painel <  CURRENT_DATE)::int AS contas_vencidas
     FROM public.painel_servidores ps
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
     WHERE ps.id = $1
