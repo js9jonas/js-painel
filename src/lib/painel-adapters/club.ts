@@ -1,6 +1,7 @@
 import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ResultadoCriacao, DetalhesConta, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
+import { avisarSaldoZerado2captcha, ehErroSaldoZerado } from "@/lib/aviso-saldo-2captcha";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN
 // ⚠️ Duração real da sessão observada em produção: ~1h ou menos (não os "~7 dias" nominais que
@@ -73,6 +74,11 @@ async function resolverHCaptcha(): Promise<string> {
     }).then(r => r.json()) as any;
 
     if (criacao.errorId) {
+      // Sem saldo não adianta repetir as 10 tentativas — avisa no Telegram e para na hora
+      if (ehErroSaldoZerado(criacao)) {
+        await avisarSaldoZerado2captcha();
+        throw new Error("CLUB: saldo do 2captcha zerado — recarregue para o login do CLUB voltar a funcionar.");
+      }
       ultimoErro = `createTask: ${criacao.errorDescription ?? criacao.errorCode ?? criacao.errorId}`;
       continue;
     }
