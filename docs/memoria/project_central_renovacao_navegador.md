@@ -1,11 +1,23 @@
 ---
 name: project-central-renovacao-navegador
-description: "Automação de renovação do CENTRAL via navegador real (Playwright+Chrome+Xvfb) na VPS — ABANDONADA e revertida em 27/08/2026 após 0/4 sucessos reais em produção contra o Turnstile interativo; CENTRAL voltou a não ter renovação automática confiável"
+description: "Automação de renovação do CENTRAL via navegador real (Playwright+Chrome+Xvfb) na VPS — ABANDONADA e revertida em 27/08/2026 após 0/4 sucessos reais em produção contra o Turnstile interativo; CENTRAL voltou a não ter renovação automática confiável; 03/10/2026: captcha (2captcha/CapSolver) descartado como solução, próximo passo é testar worker no desktop com IP residencial"
 metadata:
   node_type: memory
   type: project
   modified: 2026-08-27T13:30:00.000Z
 ---
+
+## 🔎 03/10/2026 — conclusão: captcha não resolve; próximo passo é "renovador em casa" (IP residencial)
+
+**Necessidade real (Jonas, 03/10):** renovar na hora, quando o cliente chama ao vivo, **de qualquer aparelho** (celular do Jonas, notebook da Alana) pelo js-painel. Por isso Claude in Chrome (Opção B abaixo) **não atende**: exige sessão do Claude Code + Chrome aberto no desktop, abre aba visível e o js-painel não consegue acioná-la sozinho — serve só pra lote sob demanda.
+
+**Trocar CapSolver por 2captcha não ajuda** (Jonas perguntou se o 2captcha, mais caro, teria esse diferencial). CENTRAL nunca foi testada com 2captcha (só o CLUB usa), mas o bloqueio não é captcha: o login já passa com CapSolver; o que falha é `/renew` com `403 sessao_nao_renderizada` (prova de JS executado num navegador real, tipo Cloudflare Bot Management). Serviço de captcha só devolve token de captcha. O 2captcha é mais caro por usar humanos no hCaptcha (mais lento), não por vencer proteção que o CapSolver não vence.
+
+**Pista principal:** o `central_refresh_token.js` (Playwright + Chrome real no **desktop do Jonas**, IP residencial) passava no Turnstile com "Sucesso!"; a mesma abordagem na **VPS** (IP de datacenter Hostinger) deu 0/4 no checkbox interativo. Reforça a hipótese de reputação de IP.
+
+**Arquitetura candidata (não implementada):** botão Renovar no js-painel → fila no banco (o job+polling já existiu na tentativa revertida) → worker no desktop (Chrome real, IP de casa) pega o pedido, renova pela UI da CENTRAL em ~30-60 s e devolve o resultado. Contra: só funciona com o desktop ligado (senão fica na fila ou renova manual); a tela `/lock` nunca foi testada com IP residencial.
+
+**Próximo passo combinado (sem data):** testar no desktop a automação revertida (está no histórico do git) numa conta CENTRAL que precise de renovação de verdade — incluindo o caso da sessão parada até cair no `/lock`. Passando várias vezes → construir a fila; travando no checkbox mesmo em casa → hipótese do IP cai. **Paliativo barato:** botão "Abrir na CENTRAL" no js-painel pra renovar manualmente (verificar se o painel deles aceita abrir já buscando o cliente). Jonas encerrou o dia aqui sem pedir implementação.
 
 ## ⛔ Resultado final: abandonado e revertido (27/08/2026)
 
