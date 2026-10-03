@@ -84,3 +84,16 @@ Jonas percebeu o risco real: o fluxo de renovação (tanto o clique manual "Reno
 Mecanismo `migrar_para_id` validado como funcionando de ponta a ponta (banco + os dois painéis reais), incluindo o fix do `id_servidor`.
 
 **Generalização:** esse mecanismo (`migrar_para_id`) é reutilizável pra qualquer futura troca de fornecedor de painel, não só CLUB — basta setar a coluna no painel a ser descontinuado.
+
+## ⛔ 03/10/2026 — CLUB antigo desativado (commit `2afa383`)
+
+Jonas decidiu trabalhar só com o CLUB novo. Estado do antigo na hora: 18 contas, **todas vencidas** (última 29/08/2026), todas de assinaturas inativas/canceladas — conferido direto no painel (1 request `listas/minhas`) e batendo com o banco.
+
+Mudanças no banco (transação única; valores anteriores entre parênteses, pra reverter):
+- `painel_servidores.ativo = false` no id 1 (era `true`) — `migrar_para_id = 105` mantido.
+- `servidores.ativo = false` no id 1 "Club" (era `true`) — some do saldo por servidor/alertas.
+- `contas.id_servidor = 14` na conta 333 `adrimauer` (era `1`): estava no painel 105 mas com servidor antigo (sobra pré-fix `5f5c0af` de 05/08) — era o "1 ativo no CLUB antigo" do dashboard. Única conta com `painel_servidores.id_servidor ≠ contas.id_servidor` no banco.
+
+Código: `club-keepalive` só renova painéis `ativo = true` (economiza ~12-15 captchas/dia do 2captcha) e `getPainelServidores()` esconde painel inativo de `/conexoes`. Nenhuma conta foi excluída no painel externo nem no banco.
+
+**Se um desses 18 clientes voltar:** a migração automática (renovar com `migrar_para_id`) vai abortar porque o painel antigo fica sem sessão — criar conta nova no CLUB novo. O usuário antigo continua "ocupado" no painel antigo; se quiser o mesmo nome, excluir lá manualmente antes.
