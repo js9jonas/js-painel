@@ -1117,11 +1117,15 @@ export default function ChatPage() {
   }
 
   function montarTextoAplicativos(): string {
-    const ativos = aplicativos.filter(a => !a.removido_em)
+    // Inativos não entram na lista mandada pro cliente (pedido do Jonas, 03/10/2026)
+    const ativos = aplicativos.filter(a => !a.removido_em && a.status !== 'inativa')
     if (ativos.length === 0) return 'Nenhum aplicativo cadastrado para este contato.'
     const linhas = ativos.map(a => {
       const nome = a.nome_app ?? `App #${a.id_app_registro}`
-      return a.mac ? `• ${nome} — ${a.mac}` : `• ${nome}`
+      const linha = a.mac ? `• ${nome} — ${a.mac}` : `• ${nome}`
+      // Observação (ex.: "Tela Principal sogro") numa sub-linha recuada, pra identificar o aparelho
+      const obs = a.observacao?.trim()
+      return obs ? `${linha}\n   ↳ _${obs}_` : linha
     })
     return ['📱 Aplicativos cadastrados:', ...linhas].join('\n')
   }
