@@ -195,3 +195,7 @@ Jonas pediu a lista "prontos pra transferir" de novo (FunPlay), e a partir dela 
 **How to apply:** não precisa mais rodar essa limpeza manualmente — já acontece a cada sync. Só relevante lembrar disso se um relatório de "licenças livres" antigo vier com `validade` preenchida em devices `removido_em IS NOT NULL` — indica dado de antes de 31/08/2026, desatualizado.
 
 Ver também: [[reference-funplay-licencas-sem-contrato]], [[reference-funplays-api]], [[reference-funplays-licenca-transferencia]]
+
+## Resultados em 2026-10-02 — "lista de aplicativos fun play que posso transferir licença"
+
+Critério "prontos" (status='ativa' + validade≥hoje + cliente com assinatura registrada e nenhuma ativa): **112 devices / 106 clientes**. Separado em 3 grupos na página: **76 prontas** (≥30 dias de licença e contrato vencido há mais de 7 dias), **28 aguardar** (contrato venceu há ≤7 dias, pode renovar; a queda do FunPlay de 28/09 pode ter atrasado renovações), **8 não transferíveis** (<30 dias, regra da FunPlay). Republicado no mesmo artifact de 26/08 (link novo após republicar: https://claude.ai/artifact/Wi7DKxvb6dLMdWXcPpAHcg). `.env.local` do js-painel não tem `dotenv` instalado: ler `DATABASE_URL` direto do arquivo e trocar host/porta para localhost:5433.
