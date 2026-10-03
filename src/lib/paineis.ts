@@ -59,7 +59,10 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
       ps.id_servidor
     FROM public.painel_servidores ps
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
+    -- Painel inativo (ex.: CLUB antigo, desativado 03/10/2026) some de /conexoes e para de ter
+    -- sessão renovada pelo club-keepalive. Reativar: painel_servidores.ativo = true no banco.
     WHERE ps.tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone')
+      AND ps.ativo = true
     GROUP BY ps.id
     ORDER BY ps.nome
   `);

@@ -23,7 +23,7 @@ async function tick() {
     ({ rows } = await pool.query<PainelClubRow>(
       `SELECT id, tipo AS painel_tipo, url_painel AS painel_url, usuario AS painel_usuario,
               senha AS painel_senha, session_cookie, session_expiry, api_token, api_secret
-       FROM public.painel_servidores WHERE tipo = 'club'`
+       FROM public.painel_servidores WHERE tipo = 'club' AND ativo = true`
     ));
   } catch (err) {
     console.error("[club-keepalive] falha ao consultar painéis CLUB:", err instanceof Error ? err.message : err);
