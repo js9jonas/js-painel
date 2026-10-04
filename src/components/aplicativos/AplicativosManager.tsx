@@ -306,6 +306,12 @@ function PlaylistsRow({
   );
 }
 
+// Filtro por MAC: ignora maiúsculas e separadores (":" "-" "." espaço), então "a4307a"
+// encontra "a4:30:7a:d1:e2:4e" e "A4-30-7A" também.
+function normalizarMac(v: string): string {
+  return v.toLowerCase().replace(/[^0-9a-z]/g, "");
+}
+
 export default function AplicativosManager({ idCliente, nomeCliente, aplicativos, apps }: Props) {
   const [modalApp, setModalApp] = useState<AplicativoRow | null | "novo">(null);
   const [appPgto, setAppPgto] = useState<AplicativoRow | null>(null);
@@ -316,7 +322,13 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
   const [atualizadoAoVivo, setAtualizadoAoVivo] = useState<Set<number>>(new Set());
   const [editandoPlaylist, setEditandoPlaylist] = useState<{ idAppRegistro: number; pl: PlaylistRow; tipoPainel: string | null } | null>(null);
   const [criandoPlaylist, setCriandoPlaylist] = useState<{ idAppRegistro: number; tipoPainel: string | null } | null>(null);
+  const [filtroMac, setFiltroMac] = useState("");
   const router = useRouter();
+
+  const filtroNormalizado = normalizarMac(filtroMac);
+  const aplicativosVisiveis = filtroNormalizado
+    ? aplicativos.filter((a) => a.mac && normalizarMac(a.mac).includes(filtroNormalizado))
+    : aplicativos;
 
   async function recarregarPlaylistsAoVivo(idAppRegistro: number) {
     try {
@@ -376,26 +388,64 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
 
   return (
     <div className="rounded-2xl border bg-white overflow-hidden">
-      <div className="px-4 py-3 border-b bg-zinc-50 flex items-center justify-between">
+      <div className="px-4 py-3 border-b bg-zinc-50 flex flex-wrap items-center justify-between gap-2">
         <div>
           <span className="text-sm font-medium text-zinc-700">📱 Aplicativos</span>
           <span className="ml-2 text-xs text-zinc-400">
+            {filtroNormalizado && `${aplicativosVisiveis.length} de `}
             {aplicativos.length} registro{aplicativos.length !== 1 ? "s" : ""}
             {removidosCount > 0 && ` (${removidosCount} removido${removidosCount !== 1 ? "s" : ""})`}
           </span>
         </div>
-        <button
+        <div className="flex items-center gap-2 ml-auto">
+          {aplicativos.length > 0 && (
+            <div className="relative">
+              <input
+                type="text"
+                value={filtroMac}
+                onChange={(e) => setFiltroMac(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && filtroMac) {
+                    e.preventDefault();
+                    setFiltroMac("");
+                  }
+                }}
+                placeholder="Filtrar por MAC"
+                aria-label="Filtrar aplicativos por MAC"
+                spellCheck={false}
+                autoComplete="off"
+                className="h-8 w-44 rounded-xl border border-zinc-300 bg-white pl-3 pr-7 font-mono text-xs placeholder:font-sans placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none"
+              />
+              {filtroMac && (
+                <button
+                  type="button"
+                  onClick={() => setFiltroMac("")}
+                  title="Limpar filtro (Esc)"
+                  aria-label="Limpar filtro"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
+          <button
           type="button"
           onClick={() => setModalApp("novo")}
           className="h-8 rounded-xl bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-800 transition-all"
         >
           + Adicionar
-        </button>
+          </button>
+        </div>
       </div>
 
       {aplicativos.length === 0 ? (
         <div className="px-4 py-10 text-center text-zinc-400 text-sm">
           Nenhum aplicativo vinculado
+        </div>
+      ) : aplicativosVisiveis.length === 0 ? (
+        <div className="px-4 py-10 text-center text-zinc-400 text-sm">
+          Nenhum MAC contém “{filtroMac.trim()}”
         </div>
       ) : (
         <div className="overflow-auto">
@@ -413,7 +463,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {aplicativos.map((a) => {
+              {aplicativosVisiveis.map((a) => {
                 const playlists = playlistsAoVivo[a.id_app_registro] ?? a.playlists;
                 const hasPlaylists = playlists?.length > 0;
                 const isExpanded = expandedIds.has(a.id_app_registro);
