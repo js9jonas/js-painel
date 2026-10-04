@@ -20,7 +20,7 @@ import NotificacoesVencimentoPanel from '@/components/chat/NotificacoesVenciment
 import StickerPicker from '@/components/chat/StickerPicker'
 import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
-import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard, Unplug, ScanText, Copy, Check } from 'lucide-react'
+import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard, Unplug, ScanText, Copy, Check, RotateCw, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import type { LeituraImagem } from '@/lib/ler-imagem-app'
 
 interface Conversa {
@@ -411,6 +411,18 @@ export default function ChatPage() {
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [filtro, setFiltro] = useState('')
   const [selecionado, setSelecionado] = useState<string | null>(null)
+  // Coluna direita (assinaturas, aplicativos etc.) recolhível — preferência lembrada neste navegador
+  const [painelDireitoRecolhido, setPainelDireitoRecolhido] = useState(false)
+  useEffect(() => {
+    try { setPainelDireitoRecolhido(localStorage.getItem('chat:painelDireitoRecolhido') === '1') } catch {}
+  }, [])
+  function alternarPainelDireito() {
+    setPainelDireitoRecolhido(v => {
+      const novo = !v
+      try { localStorage.setItem('chat:painelDireitoRecolhido', novo ? '1' : '0') } catch {}
+      return novo
+    })
+  }
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [cliente, setCliente] = useState<Cliente | null>(null)
   // Última orientação "desligar tudo da tomada" enviada a este telefone (dias=null → nunca).
@@ -476,7 +488,8 @@ export default function ChatPage() {
   const [erroRR, setErroRR] = useState<{ telefone: string; restantes: string[]; texto: string } | null>(null)
   const [transcrevendo, setTranscrevendo] = useState(false)
   const [mediaErros, setMediaErros] = useState<Set<number>>(new Set())
-  // Leitura de MAC/chave em imagem, sob demanda — temporária: some ao trocar de conversa
+  // Leitura de MAC/chave em imagem, sob demanda — salva no banco (whatsapp_leituras_imagem):
+  // reabrir a conversa traz os cartões de volta, sempre abertos. O ✕ só esconde nesta tela.
   const [leiturasImg, setLeiturasImg] = useState<Record<number,
     { status: 'lendo' } | { status: 'ok'; dados: LeituraImagem } | { status: 'erro'; erro: string }>>({})
   const [copiadoLeitura, setCopiadoLeitura] = useState<string | null>(null)
@@ -1072,16 +1085,33 @@ export default function ChatPage() {
     return map[s ?? ''] ?? (s ?? '—')
   }
 
-  useEffect(() => { setLeiturasImg({}) }, [selecionado])
+  // Ao abrir a conversa, traz as leituras já feitas (1 consulta, fora do polling de 5 s)
+  useEffect(() => {
+    setLeiturasImg({})
+    if (!selecionado) return
+    const tel = selecionado
+    let cancelado = false
+    fetch(`/api/whatsapp/ler-imagem?telefone=${encodeURIComponent(tel)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((j: { leituras?: Record<string, LeituraImagem> } | null) => {
+        if (cancelado || !j?.leituras) return
+        const salvas: Record<number, { status: 'ok'; dados: LeituraImagem }> = {}
+        for (const [id, dados] of Object.entries(j.leituras)) salvas[Number(id)] = { status: 'ok', dados }
+        // Não sobrescreve leitura iniciada nesta tela enquanto a consulta estava em voo
+        setLeiturasImg(prev => ({ ...salvas, ...prev }))
+      })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [selecionado])
 
-  async function lerImagem(msgId: number) {
+  async function lerImagem(msgId: number, forcar = false) {
     if (leiturasImg[msgId]?.status === 'lendo') return
     setLeiturasImg(prev => ({ ...prev, [msgId]: { status: 'lendo' } }))
     try {
       const res = await fetch('/api/whatsapp/ler-imagem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msgId }),
+        body: JSON.stringify({ msgId, forcar }),
       })
       const j = await res.json().catch(() => null)
       setLeiturasImg(prev => ({
@@ -2344,11 +2374,18 @@ export default function ChatPage() {
                                   <span style={{ fontWeight: 600, color: '#111b21' }}>
                                     {leitura.status === 'ok' ? (leitura.dados.app ?? 'Leitura da imagem') : 'Não foi possível ler'}
                                   </span>
-                                  <button
-                                    onClick={() => setLeiturasImg(prev => { const n = { ...prev }; delete n[msg.id]; return n })}
-                                    title="Fechar"
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#667781', padding: 0, display: 'flex' }}
-                                  ><X size={14} /></button>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <button
+                                      onClick={() => lerImagem(msg.id, true)}
+                                      title="Ler de novo (nova consulta à IA)"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#667781', padding: 0, display: 'flex' }}
+                                    ><RotateCw size={13} /></button>
+                                    <button
+                                      onClick={() => setLeiturasImg(prev => { const n = { ...prev }; delete n[msg.id]; return n })}
+                                      title="Esconder (a leitura continua salva e volta ao reabrir a conversa)"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#667781', padding: 0, display: 'flex' }}
+                                    ><X size={14} /></button>
+                                  </span>
                                 </div>
                                 {leitura.status === 'erro' && <div style={{ color: '#b91c1c', marginTop: 4 }}>{leitura.erro}</div>}
                                 {leitura.status === 'ok' && (() => {
@@ -2921,8 +2958,26 @@ export default function ChatPage() {
         )}
       </div>
 
+      {/* ── Painel direito recolhido: só a faixa com o botão de abrir ── */}
+      {selecionado && painelDireitoRecolhido && (
+        <div style={{
+          width: 40, minWidth: 40, background: '#f0f2f5', borderLeft: '1px solid #d1d7db',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10,
+        }}>
+          <button
+            onClick={alternarPainelDireito}
+            title="Mostrar informações do cliente (assinaturas, aplicativos…)"
+            aria-label="Mostrar informações do cliente"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', color: '#54656f',
+              padding: 6, borderRadius: 6, display: 'flex',
+            }}
+          ><PanelRightOpen size={18} /></button>
+        </div>
+      )}
+
       {/* ── Painel direito: info do cliente ── */}
-      {selecionado && (
+      {selecionado && !painelDireitoRecolhido && (
         <div style={{
           width: 390, minWidth: 340, background: '#ffffff',
           borderLeft: '1px solid #d1d7db', display: 'flex', flexDirection: 'column',
@@ -2934,6 +2989,20 @@ export default function ChatPage() {
             background: '#f0f2f5', padding: '24px 20px', textAlign: 'center',
             borderBottom: '1px solid #e9edef', position: 'relative'
           }}>
+            <button
+              onClick={alternarPainelDireito}
+              title="Recolher esta coluna"
+              aria-label="Recolher informações do cliente"
+              style={{
+                position: 'absolute', top: 10, left: 10,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#adbac1', padding: 4, borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'color 0.15s'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#54656f')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#adbac1')}
+            ><PanelRightClose size={16} /></button>
             <button
               onClick={() => selecionado && carregarMensagens(selecionado, true)}
               title="Atualizar dados"

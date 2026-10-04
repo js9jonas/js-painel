@@ -118,17 +118,77 @@ async function baixarImagem(msgId: number): Promise<{ buffer: Buffer; tipo: Tipo
 
 type ResultadoLeitura = { ok: true; leitura: LeituraImagem } | { ok: false; error: string }
 
-export async function lerImagemApp(msgId: number): Promise<ResultadoLeitura> {
+// Leitura salva em public.whatsapp_leituras_imagem (sql/013): reabrir a conversa mostra o cartão
+// de novo sem pagar outra chamada à IA. Só o extraído fica salvo — o cruzamento com o cadastro
+// (vincularCadastros) é refeito a cada exibição pra não ficar desatualizado.
+// `forcar` ignora a leitura salva e lê de novo (botão "Ler de novo" no cartão).
+export async function lerImagemApp(msgId: number, opcoes: { forcar?: boolean } = {}): Promise<ResultadoLeitura> {
+  const catalogo = await carregarCatalogo()
+  if (!opcoes.forcar) {
+    const { rows } = await pool.query<{ dados: LeituraImagem }>(
+      `SELECT dados FROM public.whatsapp_leituras_imagem WHERE id_mensagem = $1`,
+      [msgId]
+    )
+    if (rows[0]) return { ok: true, leitura: await vincularCadastros(rows[0].dados, msgId, catalogo) }
+  }
+
   let imagem: { buffer: Buffer; tipo: TipoImagem }
   try {
     imagem = await baixarImagem(msgId)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
-  const catalogo = await carregarCatalogo()
   const extraido = await extrairDadosImagem(imagem.buffer, imagem.tipo, catalogo)
   if (!extraido.ok) return extraido
+  try {
+    await salvarLeitura(msgId, extraido.leitura)
+  } catch (e) {
+    // Falha ao salvar não esconde a leitura que acabou de ser feita
+    console.error(`[ler-imagem] falha ao salvar leitura msgId=${msgId}:`, e instanceof Error ? e.message : e)
+  }
   return { ok: true, leitura: await vincularCadastros(extraido.leitura, msgId, catalogo) }
+}
+
+async function salvarLeitura(msgId: number, leitura: LeituraImagem): Promise<void> {
+  // Campos do cruzamento ficam de fora — mudam conforme o cadastro e são recalculados na exibição
+  const extraido = {
+    app: leitura.app,
+    id_app: leitura.id_app,
+    mac: leitura.mac,
+    mac_suspeito: leitura.mac_suspeito,
+    chave: leitura.chave,
+    validade: leitura.validade,
+    outros: leitura.outros,
+    observacao: leitura.observacao,
+    cadastros: [],
+    id_cliente_conversa: null,
+    pode_cadastrar: false,
+  } satisfies LeituraImagem
+  await pool.query(
+    `INSERT INTO public.whatsapp_leituras_imagem (id_mensagem, dados, modelo, lido_em)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (id_mensagem) DO UPDATE SET dados = EXCLUDED.dados, modelo = EXCLUDED.modelo, lido_em = NOW()`,
+    [msgId, JSON.stringify(extraido), MODELO]
+  )
+}
+
+// Leituras já feitas nas imagens de uma conversa, com o cruzamento atualizado — carregado ao abrir
+// a conversa no /chat (uma vez, fora do polling de 5 s).
+export async function leiturasDaConversa(telefone: string): Promise<Record<string, LeituraImagem>> {
+  const { rows } = await pool.query<{ id: string; dados: LeituraImagem }>(
+    `SELECT m.id::text AS id, l.dados
+     FROM public.whatsapp_leituras_imagem l
+     JOIN public.whatsapp_mensagens m ON m.id = l.id_mensagem
+     WHERE m.telefone = $1`,
+    [telefone]
+  )
+  if (rows.length === 0) return {}
+  const catalogo = await carregarCatalogo()
+  const resultado: Record<string, LeituraImagem> = {}
+  for (const r of rows) {
+    resultado[r.id] = await vincularCadastros(r.dados, Number(r.id), catalogo)
+  }
+  return resultado
 }
 
 type AppCatalogo = { id_app: number; nome_app: string }
