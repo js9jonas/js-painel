@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import type { ServidorCredenciais } from "@/lib/painel-adapters/types";
 import { loginFunPlays, getDispositivos as getFunPlaysDevices, getPlaylistsDispositivo as getFunPlaysPlaylists, editarComentario as editarComentarioFunPlays } from "@/lib/painel-adapters/funplays";
-import { loginLazerPlay, getDispositivos as getLazerPlayDevices, getPlaylistsDispositivo as getLazerPlayPlaylists } from "@/lib/painel-adapters/lazerplay";
+import { loginLazerPlay, getDispositivos as getLazerPlayDevices, getPlaylistsDispositivo as getLazerPlayPlaylists, editarComentario as editarComentarioLazerPlay } from "@/lib/painel-adapters/lazerplay";
 import { loginCorePlayer, getDispositivos as getCorePlayerDevices, getPlaylistsDispositivo as getCorePlayerPlaylists } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, getDispositivos as getSmartOneDevices, getPlaylistsDispositivo as getSmartOnePlaylists } from "@/lib/painel-adapters/smartone";
 import { jwtValido as jwtValidoAppAcesso, type AppAcessoPlaylist } from "@/lib/painel-adapters/appacesso";
@@ -327,10 +327,13 @@ async function executarSync(idPainel: number, jobId: string) {
           stats.playlists_removidas += rowCount ?? 0;
         }
 
-        // FunPlay: aparelho sem comentário ("N/A" — ex.: recém-migrado pro painel novo) e com cliente
-        // vinculado recebe o nome do cliente no painel, pra facilitar a busca lá (pedido do Jonas 08/10).
-        // Acessório: falha aqui não conta como erro do aparelho.
-        if (painel.tipo === "funplays" && semComentario(dev)) {
+        // FunPlay/LazerPlay: aparelho sem comentário ("N/A" — ex.: recém-migrado pro painel novo) e com
+        // cliente vinculado recebe o nome do cliente no painel, pra facilitar a busca lá (pedido do Jonas
+        // 08/10; endpoint confirmado nos dois). Acessório: falha aqui não conta como erro do aparelho.
+        const editarComentario =
+          painel.tipo === "funplays" ? editarComentarioFunPlays :
+          painel.tipo === "lazerplay" ? editarComentarioLazerPlay : null;
+        if (editarComentario && semComentario(dev)) {
           const { rows: cli } = await pool.query<{ nome: string | null }>(
             `SELECT cl.nome FROM public.aplicativos ap JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
              WHERE ap.id_app_registro = $1`,
@@ -339,7 +342,7 @@ async function executarSync(idPainel: number, jobId: string) {
           const nome = cli[0]?.nome?.trim();
           if (nome) {
             try {
-              await editarComentarioFunPlays(jwt, dev.id, nome.slice(0, 100));
+              await editarComentario(jwt, dev.id, nome.slice(0, 100));
               stats.comentarios_preenchidos++;
             } catch (e: unknown) {
               console.error(`[sync-aplicativos] comentário não gravado (${dev.mac}):`, e instanceof Error ? e.message : e);

@@ -5,6 +5,7 @@ import {
   getDispositivos as getDispositivosBase,
   getPlaylistsDispositivo as getPlaylistsBase,
   ativarDispositivo as ativarBase,
+  editarComentario as editarComentarioBase,
   criarPlaylist as criarPlaylistBase,
   editarPlaylist as editarPlaylistBase,
   excluirPlaylist as excluirPlaylistBase,
@@ -43,6 +44,9 @@ export const editarPlaylist = (token: string, params: { id: number; deviceId: nu
 
 export const excluirPlaylist = (token: string, params: { id: number; deviceId: number }) =>
   excluirPlaylistBase(CONFIG, token, params);
+
+export const editarComentario = (token: string, deviceId: number, comentario: string) =>
+  editarComentarioBase(CONFIG, token, deviceId, comentario);
 
 export function criarLazerPlayAdapter(
   creds: ServidorCredenciais,

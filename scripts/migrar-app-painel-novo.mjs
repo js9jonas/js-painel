@@ -1,10 +1,10 @@
-// Migração ÚNICA dos aparelhos FunPlay do painel antigo (id 100) pro novo (id 106) — 08/10/2026.
-// Ver docs/memoria/project_funplay_dois_paineis.md.
+// Migração ÚNICA dos aparelhos de um app do painel antigo pro novo — 08/10/2026.
+// FunPlay: painel 100 → 106 · LazerPlay: 101 → 107. Ver docs/memoria/project_funplay_dois_paineis.md.
 //
 // Uso (daqui do PC, com o túnel do banco aberto):
-//   node --env-file=.env.local scripts/migrar-funplay-painel-novo.mjs listar        # só mostra, não mexe em nada
-//   node --env-file=.env.local scripts/migrar-funplay-painel-novo.mjs testar 2      # migra 2 (com cliente e playlist) e confere tudo
-//   node --env-file=.env.local scripts/migrar-funplay-painel-novo.mjs tudo          # migra o resto, devagar
+//   node --env-file=.env.local scripts/migrar-app-painel-novo.mjs funplay listar      # só mostra, não mexe em nada
+//   node --env-file=.env.local scripts/migrar-app-painel-novo.mjs lazerplay testar 2  # migra 2 e confere tudo
+//   node --env-file=.env.local scripts/migrar-app-painel-novo.mjs lazerplay tudo      # migra o resto, devagar
 //
 // Por aparelho COM VALIDADE no antigo: validate_mac + add_existing_device { mac, key } no NOVO
 // (chave real lida AO VIVO do antigo) → comentário = nome do cliente (ou o comentário do antigo).
@@ -12,14 +12,19 @@
 // sozinho — o que já migrou fica migrado, que é o objetivo). Depois: sync no /conexoes.
 import pg from 'pg';
 
-const API = 'https://api.funplays.app';
-const SITE = 'https://reseller.funplays.app';
-const RECAPTCHA = '6LcS2BYsAAAAALlg6fQnrKJLBTheTQbiyy6hUbnz';
-const ID_ANTIGO = 100;
-const ID_NOVO = 106;
+const APPS = {
+  funplay: { api: 'https://api.funplays.app', site: 'https://reseller.funplays.app', recaptcha: '6LcS2BYsAAAAALlg6fQnrKJLBTheTQbiyy6hUbnz', antigo: 100, novo: 106, idApp: 3 },
+  lazerplay: { api: 'https://api.appacesso.com', site: 'https://reseller.lazerplay.io', recaptcha: '6LfjXhYsAAAAAHQ6pH2nBmSwmlK-e5xMcdbXAb5z', antigo: 101, novo: 107, idApp: 2 },
+};
+const [nomeApp, modo = 'listar', qtdArg] = process.argv.slice(2);
+const APP = APPS[nomeApp];
+if (!APP) {
+  console.error('App: funplay | lazerplay');
+  process.exit(1);
+}
+const { api: API, site: SITE, recaptcha: RECAPTCHA, antigo: ID_ANTIGO, novo: ID_NOVO, idApp: ID_APP } = APP;
 const PAUSA_MS = 1500; // entre aparelhos: sem pressa, pra não acionar limite do FunPlay
 
-const [modo = 'listar', qtdArg] = process.argv.slice(2);
 if (!['listar', 'testar', 'tudo'].includes(modo)) {
   console.error('Modo: listar | testar [N] | tudo');
   process.exit(1);
@@ -89,8 +94,8 @@ try {
   const { rows: banco } = await db.query(
     `SELECT UPPER(ap.mac) mac, cl.nome, (SELECT count(*)::int FROM public.aplicativo_playlists pl WHERE pl.id_app_registro = ap.id_app_registro) playlists
      FROM public.aplicativos ap LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
-     WHERE ap.id_app = 3 AND ap.removido_em IS NULL AND UPPER(ap.mac) = ANY($1)`,
-    [comValidade.map((d) => d.mac.toUpperCase())],
+     WHERE ap.id_app = $2 AND ap.removido_em IS NULL AND UPPER(ap.mac) = ANY($1)`,
+    [comValidade.map((d) => d.mac.toUpperCase()), ID_APP],
   );
   const info = new Map(banco.map((b) => [b.mac, b]));
   const itens = comValidade
@@ -140,7 +145,7 @@ try {
     }
     await espera(PAUSA_MS);
   }
-  console.log(`\nFim: ${ok} migrado(s). Agora rode o sync de um card FunPlay no /conexoes.`);
+  console.log(`\nFim: ${ok} migrado(s). Agora rode o sync de um card ${nomeApp === 'funplay' ? 'FunPlay' : 'LazerPlay'} no /conexoes.`);
 } catch (e) {
   console.error(`\nPAROU: ${e.message}`);
   process.exitCode = 1;
