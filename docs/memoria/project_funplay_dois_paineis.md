@@ -42,9 +42,9 @@ removido = não está em nenhum. Se um painel falhar no login/lista, nada é gra
 ## Próximos passos (atualizado 09/10)
 - ✅ 09/10 ~00h05: deploy + sync dos dois: FunPlay 952 no 106, LazerPlay 363 no 107, 0 nos antigos, nenhum removido,
   todas as chaves reais. ✅ Painéis 100 e 101 desativados (`ativo = false`, sessão limpa) — somem de /conexoes.
-- 📋 Anomalia: aplicativo 971 (cliente William Hauschildt, id 1075) tipo "Fun Play" preso ao painel 101, duplicado
-  do mesmo MAC F8:B7:83:DD:3A:1B que está certo como LazerPlay no 107 mas SEM cliente. Proposto ao Jonas: vincular
-  o LazerPlay ao cliente 1075 e remover (removido_em) o 971 — aguardando ok.
+- ✅ 09/10: anomalia resolvida com ok do Jonas — app 5351 (LazerPlay, painel 107, MAC F8:B7:83:DD:3A:1B) vinculado ao
+  cliente William Hauschildt (1075); duplicado 971 (tipo Fun Play preso ao painel 101) com `removido_em`. Os dois
+  registrados no `audit_log` (usuario "claude (a pedido do Jonas, 09/10/2026)").
 - 📋 Trocar senha dos painéis novos 106 e 107 (apareceram na conversa) e atualizar no banco.
 
 ### Histórico dos passos
