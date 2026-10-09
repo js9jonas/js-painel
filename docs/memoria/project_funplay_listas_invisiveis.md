@@ -28,7 +28,7 @@ Pontos a confirmar antes de rodar em massa:
 - Confirmar no aparelho do Evair se a lista aparece duplicada no app.
 - Rodar primeiro um relatório (dry-run) de quem entra/sai, depois um lote pequeno, com pausa entre chamadas.
 
-## Playlist ativa (09/10/2026, commit ba4038c)
+## Playlist ativa (09/10/2026, commits ba4038c + 5e64444) — ✅ em produção, Jonas confirmou funcionando
 - Endpoint capturado no LazerPlay com o Jonas operando (Playwright): `PUT /reseller/playlist/set_selected { id }` → "Success";
   mesmo bundle (`main.b0256ef8.js`) no FunPlay e no CorePlayer. Só o id da playlist, sem deviceId.
 - js-painel: menu ▾ da playlist → "★ Marcar como ativa" + selo ATIVA (`?acao=selecionar` na rota de playlists); a rota
