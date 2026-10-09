@@ -733,6 +733,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
           tipoPainel={criandoPlaylist.tipoPainel}
           onClose={() => setCriandoPlaylist(null)}
           onSaved={() => {
+            recarregarPlaylistsAoVivo(criandoPlaylist.idAppRegistro);
             router.refresh();
             setCriandoPlaylist(null);
           }}

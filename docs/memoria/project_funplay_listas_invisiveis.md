@@ -36,3 +36,7 @@ Pontos a confirmar antes de rodar em massa:
 - Observado: playlist recém-criada pelo revendedor nasce `is_selected:false` mesmo sendo a única, e vem com
   `added_by_web:false`. Pra marcar como ativa num aparelho com lista invisível, Jonas teve que cadastrar a lista de novo
   primeiro (as invisíveis não aparecem pra escolher). Não se sabe se o set_selected desmarca as invisíveis.
+- 09/10 (2º commit): ao **criar** playlist no appacesso, se ela for a única visível no aparelho, já manda o set_selected e
+  confere relendo; se não confirmar, o modal fica aberto com aviso âmbar ("criada, mas não deu pra marcar como ativa") —
+  pedido do Jonas, que aprovou avisar em vez de falhar calado. Corrigido junto: depois de criar, a lista ao vivo da tela
+  não era recarregada (a playlist nova só aparecia após recarregar a página).

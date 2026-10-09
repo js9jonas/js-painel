@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import { jwtValido } from "@/lib/painel-adapters/appacesso";
-import { loginFunPlays, criarPlaylist as criarFunPlays, getPlaylistsDispositivo as getFunPlaysPlaylists } from "@/lib/painel-adapters/funplays";
-import { loginLazerPlay, criarPlaylist as criarLazerPlay, getPlaylistsDispositivo as getLazerPlayPlaylists } from "@/lib/painel-adapters/lazerplay";
-import { loginCorePlayer, criarPlaylist as criarCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists } from "@/lib/painel-adapters/coreplayer";
+import { loginFunPlays, criarPlaylist as criarFunPlays, getPlaylistsDispositivo as getFunPlaysPlaylists, selecionarPlaylist as selecionarFunPlays } from "@/lib/painel-adapters/funplays";
+import { loginLazerPlay, criarPlaylist as criarLazerPlay, getPlaylistsDispositivo as getLazerPlayPlaylists, selecionarPlaylist as selecionarLazerPlay } from "@/lib/painel-adapters/lazerplay";
+import { loginCorePlayer, criarPlaylist as criarCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists, selecionarPlaylist as selecionarCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, criarPlaylist as criarSmartOne } from "@/lib/painel-adapters/smartone";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
@@ -13,8 +13,12 @@ import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 // adiciona em aplicativo_playlists do MESMO id_app_registro. SmartOne: cria um SMARTKEY
 // novo (1 smartkey = 1 device lá) — gera uma linha NOVA em public.aplicativos, com o
 // nome do cliente em "note" pra identificação no site do SmartOne.
+//
+// 09/10/2026: no appacesso a playlist nasce `is_selected:false` mesmo sendo a única do
+// aparelho — se for a única visível no painel, já marca como ativa (set_selected).
 
-type JobState = { done: false } | { done: true; ok: true } | { done: true; ok: false; erro: string };
+// `aviso`: criou, mas algo secundário falhou (ex.: não marcou como ativa) — a tela mostra sem tratar como erro.
+type JobState = { done: false } | { done: true; ok: true; aviso?: string } | { done: true; ok: false; erro: string };
 const jobs = new Map<string, JobState>();
 
 type CorpoCriacao = {
@@ -53,6 +57,7 @@ async function obterSessao(tipo: string, idPainel: number, usuario: string, senh
 }
 
 async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId: string) {
+  let aviso: string | undefined;
   try {
     const { rows } = await pool.query<{
       mac: string | null;
@@ -124,8 +129,24 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
 
       await criarFn(token, { deviceId, name: corpo.nome ?? "", url: corpo.url ?? "" });
 
-      const playlists = await getPlaylistsFn(token, deviceId);
-      const nova = playlists.find((p) => p.url === corpo.url) ?? playlists[playlists.length - 1];
+      let playlists = await getPlaylistsFn(token, deviceId);
+      let nova = playlists.find((p) => p.url === corpo.url) ?? playlists[playlists.length - 1];
+
+      if (nova && playlists.length === 1 && !nova.is_selected) {
+        const selecionarFn = tipo === "lazerplay" ? selecionarLazerPlay : tipo === "coreplayer" ? selecionarCorePlayer : selecionarFunPlays;
+        const idNova = nova.id;
+        try {
+          await selecionarFn(token, idNova);
+          playlists = await getPlaylistsFn(token, deviceId);
+          nova = playlists.find((p) => p.id === idNova) ?? nova;
+        } catch {
+          // segue: a playlist já foi criada; só avisa abaixo
+        }
+        if (!nova.is_selected) {
+          aviso = "Playlist criada, mas não deu pra marcar como ativa. Use \"Marcar como ativa\" no menu da playlist.";
+        }
+      }
+
       if (nova) {
         await pool.query(
           `INSERT INTO public.aplicativo_playlists
@@ -137,7 +158,7 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
       }
     }
 
-    jobs.set(jobId, { done: true, ok: true });
+    jobs.set(jobId, { done: true, ok: true, ...(aviso ? { aviso } : {}) });
   } catch (e: unknown) {
     jobs.set(jobId, { done: true, ok: false, erro: e instanceof Error ? e.message : "Erro ao criar playlist." });
   }

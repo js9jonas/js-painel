@@ -18,6 +18,7 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   async function salvar() {
     setSalvando(true);
@@ -45,7 +46,11 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
         const poll = await fetch(`/api/aplicativos/${idAppRegistro}/playlists?jobId=${jobId}`);
         const job = await poll.json();
         if (job.done) {
-          if (job.ok) {
+          if (job.ok && job.aviso) {
+            // Criou, mas não marcou como ativa: deixa o aviso aberto; "Fechar" atualiza a lista.
+            setAviso(job.aviso);
+            setSalvando(false);
+          } else if (job.ok) {
             onSaved();
             onClose();
           } else {
@@ -69,7 +74,7 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={salvando ? undefined : onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={salvando ? undefined : aviso ? onSaved : onClose} />
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh]">
         <div className="px-6 pt-6 pb-4 border-b border-zinc-100">
           <h2 className="text-lg font-bold text-zinc-900">Adicionar Playlist</h2>
@@ -93,24 +98,25 @@ export default function AdicionarPlaylistModal({ idAppRegistro, tipoPainel, onCl
         </div>
 
         {erro && <p className="mx-6 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
+        {aviso && <p className="mx-6 text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{aviso}</p>}
 
         <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={aviso ? onSaved : onClose}
             disabled={salvando}
             className="h-10 rounded-xl border border-zinc-300 px-5 text-sm font-medium hover:bg-zinc-50 transition-all disabled:opacity-50"
           >
-            Cancelar
+            {aviso ? "Fechar" : "Cancelar"}
           </button>
-          <button
+          {!aviso && <button
             type="button"
             onClick={salvar}
             disabled={salvando || !nome}
             className="h-10 rounded-xl bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {salvando ? "Criando..." : "Adicionar"}
-          </button>
+          </button>}
         </div>
       </div>
     </div>
