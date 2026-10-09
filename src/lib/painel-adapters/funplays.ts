@@ -8,6 +8,8 @@ import {
   criarPlaylist as criarPlaylistBase,
   editarPlaylist as editarPlaylistBase,
   excluirPlaylist as excluirPlaylistBase,
+  editarComentario as editarComentarioBase,
+  adicionarExistente as adicionarExistenteBase,
   type AppAcessoConfig,
   type AppAcessoDevice,
   type AppAcessoPlaylist,
@@ -44,6 +46,12 @@ export const editarPlaylist = (token: string, params: { id: number; deviceId: nu
 
 export const excluirPlaylist = (token: string, params: { id: number; deviceId: number }) =>
   excluirPlaylistBase(CONFIG, token, params);
+
+export const editarComentario = (token: string, deviceId: number, comentario: string) =>
+  editarComentarioBase(CONFIG, token, deviceId, comentario);
+
+export const adicionarExistente = (token: string, mac: string, chave: string) =>
+  adicionarExistenteBase(CONFIG, token, mac, chave);
 
 export function criarFunPlaysAdapter(
   creds: ServidorCredenciais,

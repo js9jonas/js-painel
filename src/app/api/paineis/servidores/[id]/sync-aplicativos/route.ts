@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import type { ServidorCredenciais } from "@/lib/painel-adapters/types";
-import { loginFunPlays, getDispositivos as getFunPlaysDevices, getPlaylistsDispositivo as getFunPlaysPlaylists } from "@/lib/painel-adapters/funplays";
+import { loginFunPlays, getDispositivos as getFunPlaysDevices, getPlaylistsDispositivo as getFunPlaysPlaylists, editarComentario as editarComentarioFunPlays } from "@/lib/painel-adapters/funplays";
 import { loginLazerPlay, getDispositivos as getLazerPlayDevices, getPlaylistsDispositivo as getLazerPlayPlaylists } from "@/lib/painel-adapters/lazerplay";
 import { loginCorePlayer, getDispositivos as getCorePlayerDevices, getPlaylistsDispositivo as getCorePlayerPlaylists } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, getDispositivos as getSmartOneDevices, getPlaylistsDispositivo as getSmartOnePlaylists } from "@/lib/painel-adapters/smartone";
@@ -29,6 +29,8 @@ type Stats = {
   chaves_mudaram: number;
   /** SmartOne (sem chave): número interno que estava em `chave` foi limpo. */
   chaves_limpas: number;
+  /** FunPlay: comentário "N/A" preenchido com o nome do cliente. */
+  comentarios_preenchidos: number;
 };
 type JobState =
   | { done: false }
@@ -68,7 +70,16 @@ async function mapConcorrente<T>(items: T[], limite: number, fn: (item: T) => Pr
 }
 
 type PainelSync = ServidorCredenciais & { tipo: string; id: number; nome: string };
-type DeviceComum = { id: number; mac: string; model?: string | null; activation_expired: string | null; key?: string | number | null };
+type DeviceComum = {
+  id: number; mac: string; model?: string | null; activation_expired: string | null; key?: string | number | null;
+  device_note?: { comment: string | null } | null;
+};
+
+/** Comentário vazio pro FunPlay (o site mostra "N/A") — aparelho recém-migrado chega assim. */
+function semComentario(dev: DeviceComum): boolean {
+  const c = dev.device_note?.comment?.trim() ?? "";
+  return c === "" || c.toUpperCase() === "N/A";
+}
 
 /** Login (reaproveita sessão válida) + lista de aparelhos de UM painel. */
 async function listarPainel(p: PainelSync): Promise<{ jwt: string; devices: DeviceComum[] }> {
@@ -175,7 +186,7 @@ async function executarSync(idPainel: number, jobId: string) {
 
     const stats: Stats = {
       inseridos: 0, atualizados: 0, playlists_sincronizadas: 0, playlists_removidas: 0, removidos: 0, erros: 0,
-      chaves_restauradas: 0, chaves_mudaram: 0, chaves_limpas: 0,
+      chaves_restauradas: 0, chaves_mudaram: 0, chaves_limpas: 0, comentarios_preenchidos: 0,
     };
 
     await mapConcorrente(itens, CONCORRENCIA, async ({ painel, jwt, dev }) => {
@@ -316,6 +327,26 @@ async function executarSync(idPainel: number, jobId: string) {
           stats.playlists_removidas += rowCount ?? 0;
         }
 
+        // FunPlay: aparelho sem comentário ("N/A" — ex.: recém-migrado pro painel novo) e com cliente
+        // vinculado recebe o nome do cliente no painel, pra facilitar a busca lá (pedido do Jonas 08/10).
+        // Acessório: falha aqui não conta como erro do aparelho.
+        if (painel.tipo === "funplays" && semComentario(dev)) {
+          const { rows: cli } = await pool.query<{ nome: string | null }>(
+            `SELECT cl.nome FROM public.aplicativos ap JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
+             WHERE ap.id_app_registro = $1`,
+            [idAppRegistro]
+          );
+          const nome = cli[0]?.nome?.trim();
+          if (nome) {
+            try {
+              await editarComentarioFunPlays(jwt, dev.id, nome.slice(0, 100));
+              stats.comentarios_preenchidos++;
+            } catch (e: unknown) {
+              console.error(`[sync-aplicativos] comentário não gravado (${dev.mac}):`, e instanceof Error ? e.message : e);
+            }
+          }
+        }
+
         // CorePlayer/SmartOne: complementa o vínculo de cliente via MAC já vinculado em outro app/painel
         if ((painel.tipo === "coreplayer" || painel.tipo === "smartone") && !existentes[0]?.id_cliente) {
           const { rows: vinculoRows } = await pool.query<{ id_cliente: number }>(
@@ -385,6 +416,7 @@ async function executarSync(idPainel: number, jobId: string) {
       porPainel,
       emDoisPaineis > 0 ? `${emDoisPaineis} aparelho(s) apareceram em dois painéis — ficou o de validade maior.` : null,
       stats.chaves_mudaram > 0 ? `${stats.chaves_mudaram} chave(s) mudaram no painel (a anterior ficou guardada).` : null,
+      stats.comentarios_preenchidos > 0 ? `${stats.comentarios_preenchidos} comentário(s) "N/A" preenchidos com o nome do cliente no painel.` : null,
       !syncConfiavel ? "Sync com retorno insuficiente — remoções ignoradas por segurança." : null,
       stats.erros > 0 ? `${stats.erros} device(s) falharam individualmente e foram pulados — ver logs do servidor.` : null,
     ].filter(Boolean);

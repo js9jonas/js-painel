@@ -184,6 +184,31 @@ export async function getDispositivos(
   return all;
 }
 
+/**
+ * Comentário do aparelho no painel (nome do cliente, pra busca). Formato capturado no painel
+ * FunPlay em 08/10/2026: PUT /reseller/device/comment { comment, id } — `id` = número interno
+ * do aparelho (o mesmo de /reseller/devices), não o id da nota.
+ */
+export async function editarComentario(cfg: AppAcessoConfig, token: string, deviceId: number, comentario: string): Promise<void> {
+  await apiFetch(cfg, token, `/reseller/device/comment`, {
+    method: "PUT",
+    body: JSON.stringify({ comment: comentario, id: deviceId }),
+  });
+}
+
+/**
+ * "Add existing device": traz pra ESTE painel um aparelho de outro painel (MAC + chave real).
+ * Capturado no FunPlay em 08/10/2026: POST /reseller/add_existing_device { mac, key } → "Success".
+ * Segundo o Jonas: o aparelho sai do painel antigo, a validade vem junto, não gasta crédito e o
+ * comentário chega vazio ("N/A").
+ */
+export async function adicionarExistente(cfg: AppAcessoConfig, token: string, mac: string, chave: string): Promise<void> {
+  await apiFetch(cfg, token, `/reseller/add_existing_device`, {
+    method: "POST",
+    body: JSON.stringify({ mac, key: chave }),
+  });
+}
+
 export async function getPlaylistsDispositivo(
   cfg: AppAcessoConfig,
   token: string,
