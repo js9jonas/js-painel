@@ -33,9 +33,17 @@ removido = não está em nenhum. Se um painel falhar no login/lista, nada é gra
 - `testar 2` (Cleber Splendor, Samara Davila): validade/comentário ok, saíram do antigo, **playlists do antigo não
   aparecem no novo** (1→0, 2→0). Jonas: é o mesmo problema de listas ocultas que já havia no painel antigo
   (desconfia do master) — seguir sem recriar. Cópia das playlists em `lab.bkp_funplay_playlists_20261008` (41/39).
-- `tudo` rodado em 08/10 ~23h30 (ver resultado abaixo).
+- **Resultado (08–09/10/2026, madrugada): migração COMPLETA, 0 falhas.** FunPlay 100→106: 922 com validade + 2 teste +
+  22 vencidos (Jonas decidiu migrar TODOS, inclusive vencidos, "como se nunca tivesse sido necessário migração").
+  LazerPlay 101→107 (painel novo cadastrado 08/10, mesmo processo): 197 + 2 teste + 165 vencidos. Nenhum vencido
+  estava em período grátis (todos aceitaram add existing). Script: `scripts/migrar-app-painel-novo.mjs
+  funplay|lazerplay listar|testar N|tudo|vencidos`; cópia das playlists LazerPlay em `lab.bkp_lazerplay_playlists_20261008`.
 
-## Próximos passos
+## Próximos passos (atualizado 09/10)
+- Jonas: deploy + sync FunPlay e LazerPlay → conferir painéis antigos com 0 → `ativo = false` nos ids 100 e 101
+  (card some de /conexoes desde a2ced71). Depois: trocar senha dos painéis novos 106 e 107 (apareceram na conversa).
+
+### Histórico dos passos
 - Jonas: deploy + sincronizar (qualquer card FunPlay; LazerPlay/CorePlayer/SmartOne também, pra recuperar chaves).
 - ✅ Sync preenche comentário "N/A" com o nome do cliente (e143eb3, deploy pendente).
 - Fase 2: capturar o endpoint do "add existing device" (Jonas adiciona 1 aparelho com a rede monitorada) → script único:
