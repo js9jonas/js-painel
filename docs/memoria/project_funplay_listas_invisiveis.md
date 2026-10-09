@@ -27,3 +27,12 @@ Pontos a confirmar antes de rodar em massa:
 - **O que a migração em massa troca:** só o domínio ou a URL inteira? Cada lista tem usuário/senha próprios (`http://<domínio>/get.php?username=…&password=…&type=m3u_plus&output=ts`). Se troca só o domínio, a URL fictícia deve levar o usuário/senha reais da conta com um domínio fictício por servidor (ex.: um por Central/FAST/Uniplay). Se troca a URL inteira, não serve pra várias contas.
 - Confirmar no aparelho do Evair se a lista aparece duplicada no app.
 - Rodar primeiro um relatório (dry-run) de quem entra/sai, depois um lote pequeno, com pausa entre chamadas.
+
+## Playlist ativa (09/10/2026, commit ba4038c)
+- Endpoint capturado no LazerPlay com o Jonas operando (Playwright): `PUT /reseller/playlist/set_selected { id }` → "Success";
+  mesmo bundle (`main.b0256ef8.js`) no FunPlay e no CorePlayer. Só o id da playlist, sem deviceId.
+- js-painel: menu ▾ da playlist → "★ Marcar como ativa" + selo ATIVA (`?acao=selecionar` na rota de playlists); a rota
+  relê as playlists no painel e só grava `is_selected` se a escolhida voltou como ativa. SmartOne não tem.
+- Observado: playlist recém-criada pelo revendedor nasce `is_selected:false` mesmo sendo a única, e vem com
+  `added_by_web:false`. Pra marcar como ativa num aparelho com lista invisível, Jonas teve que cadastrar a lista de novo
+  primeiro (as invisíveis não aparecem pra escolher). Não se sabe se o set_selected desmarca as invisíveis.
