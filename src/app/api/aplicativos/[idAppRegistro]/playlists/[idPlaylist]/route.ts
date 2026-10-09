@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import { jwtValido } from "@/lib/painel-adapters/appacesso";
-import { loginFunPlays, editarPlaylist as editarFunPlays, excluirPlaylist as excluirFunPlays } from "@/lib/painel-adapters/funplays";
-import { loginLazerPlay, editarPlaylist as editarLazerPlay, excluirPlaylist as excluirLazerPlay } from "@/lib/painel-adapters/lazerplay";
-import { loginCorePlayer, editarPlaylist as editarCorePlayer, excluirPlaylist as excluirCorePlayer } from "@/lib/painel-adapters/coreplayer";
+import { loginFunPlays, editarPlaylist as editarFunPlays, excluirPlaylist as excluirFunPlays, selecionarPlaylist as selecionarFunPlays, getPlaylistsDispositivo as getPlaylistsFunPlays } from "@/lib/painel-adapters/funplays";
+import { loginLazerPlay, editarPlaylist as editarLazerPlay, excluirPlaylist as excluirLazerPlay, selecionarPlaylist as selecionarLazerPlay, getPlaylistsDispositivo as getPlaylistsLazerPlay } from "@/lib/painel-adapters/lazerplay";
+import { loginCorePlayer, editarPlaylist as editarCorePlayer, excluirPlaylist as excluirCorePlayer, selecionarPlaylist as selecionarCorePlayer, getPlaylistsDispositivo as getPlaylistsCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, editarPlaylist as editarSmartOne, excluirPlaylist as excluirSmartOne } from "@/lib/painel-adapters/smartone";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
@@ -18,11 +18,14 @@ import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 // Roda em background (mesmo padrão job+polling do sync-aplicativos/verificar conta)
 // porque o relogin pode ser lento em painéis com captcha (FunPlays/LazerPlay reCAPTCHA,
 // SmartOne Turnstile) — uma chamada síncrona arriscaria timeout de proxy.
+//
+// "selecionar" (09/10/2026): marca a playlist como a ativa no app — PUT
+// /reseller/playlist/set_selected { id }, igual nos 3 sites appacesso. SmartOne não tem.
 
 type JobState = { done: false } | { done: true; ok: true } | { done: true; ok: false; erro: string };
 const jobs = new Map<string, JobState>();
 
-type Acao = "editar" | "excluir";
+type Acao = "editar" | "excluir" | "selecionar";
 type CorpoEdicao = {
   nome?: string;
   url?: string;
@@ -84,7 +87,30 @@ async function executar(idAppRegistro: number, idPlaylist: number, acao: Acao, c
     const { tipo, usuario, senha } = painelRows[0];
     const token = await obterSessao(tipo, idPainel!, usuario, senha);
 
-    if (acao === "excluir") {
+    if (acao === "selecionar") {
+      if (tipo === "smartone") {
+        jobs.set(jobId, { done: true, ok: false, erro: "O SmartOne não tem playlist ativa pra escolher." });
+        return;
+      }
+      const selecionarFn = tipo === "lazerplay" ? selecionarLazerPlay : tipo === "coreplayer" ? selecionarCorePlayer : selecionarFunPlays;
+      const getPlaylistsFn = tipo === "lazerplay" ? getPlaylistsLazerPlay : tipo === "coreplayer" ? getPlaylistsCorePlayer : getPlaylistsFunPlays;
+      await selecionarFn(token, idPlaylist);
+
+      // Confere no painel antes de gravar: só vale se a escolhida voltou como ativa.
+      const playlists = await getPlaylistsFn(token, deviceId);
+      const alvo = playlists.find((p) => p.id === idPlaylist);
+      if (!alvo?.is_selected) {
+        jobs.set(jobId, { done: true, ok: false, erro: "O painel não confirmou a troca. Tente de novo." });
+        return;
+      }
+      const ativas = playlists.filter((p) => p.is_selected).map((p) => p.id);
+      await pool.query(
+        `UPDATE public.aplicativo_playlists
+            SET is_selected = (playlist_id_externo = ANY($2::bigint[])), atualizado_em = NOW()
+          WHERE id_app_registro = $1`,
+        [idAppRegistro, ativas]
+      );
+    } else if (acao === "excluir") {
       if (tipo === "smartone") {
         await excluirSmartOne(token, idPlaylist);
       } else {
@@ -146,8 +172,8 @@ export async function POST(
   if (isNaN(idApp) || isNaN(idPl)) return NextResponse.json({ erro: "ID inválido." }, { status: 400 });
 
   const acao = new URL(req.url).searchParams.get("acao") as Acao | null;
-  if (acao !== "editar" && acao !== "excluir") {
-    return NextResponse.json({ erro: "Ação inválida. Use ?acao=editar ou ?acao=excluir." }, { status: 400 });
+  if (acao !== "editar" && acao !== "excluir" && acao !== "selecionar") {
+    return NextResponse.json({ erro: "Ação inválida. Use ?acao=editar, ?acao=excluir ou ?acao=selecionar." }, { status: 400 });
   }
 
   const corpo: CorpoEdicao = acao === "editar" ? await req.json().catch(() => ({})) : {};

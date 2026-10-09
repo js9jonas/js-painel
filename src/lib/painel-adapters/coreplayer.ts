@@ -5,6 +5,7 @@ import {
   criarPlaylist as criarPlaylistBase,
   editarPlaylist as editarPlaylistBase,
   excluirPlaylist as excluirPlaylistBase,
+  selecionarPlaylist as selecionarPlaylistBase,
   criarAppAcessoAdapter,
   type AppAcessoConfig,
 } from "./appacesso";
@@ -35,6 +36,9 @@ export const editarPlaylist = (token: string, params: { id: number; deviceId: nu
 
 export const excluirPlaylist = (token: string, params: { id: number; deviceId: number }) =>
   excluirPlaylistBase(CONFIG, token, params);
+
+export const selecionarPlaylist = (token: string, id: number) =>
+  selecionarPlaylistBase(CONFIG, token, id);
 
 export function criarCorePlayerAdapter(
   creds: ServidorCredenciais,

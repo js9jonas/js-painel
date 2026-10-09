@@ -262,6 +262,18 @@ export async function excluirPlaylist(
   });
 }
 
+/**
+ * Marca a playlist como a ativa (a que o app abre) no aparelho. Mesmo código nos sites
+ * FunPlay/LazerPlay/CorePlayer (main.b0256ef8.js, conferido 09/10/2026): botão "Set Selected"
+ * → PUT /reseller/playlist/set_selected { id } — `id` da playlist, sem deviceId.
+ */
+export async function selecionarPlaylist(cfg: AppAcessoConfig, token: string, id: number): Promise<void> {
+  await apiFetch(cfg, token, "/reseller/playlist/set_selected", {
+    method: "PUT",
+    body: JSON.stringify({ id }),
+  });
+}
+
 export async function ativarDispositivo(
   cfg: AppAcessoConfig,
   token: string,

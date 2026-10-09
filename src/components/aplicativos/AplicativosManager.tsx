@@ -104,7 +104,7 @@ function urlExibicao(url: string, tipoPainel?: string | null): string {
   return host ? montarLinkM3uSmartOne(host, usuario, senha) : url;
 }
 
-function PlaylistOptionsButton({ onEditar, onExcluir, excluindo }: { onEditar: () => void; onExcluir: () => void; excluindo: boolean }) {
+function PlaylistOptionsButton({ onEditar, onExcluir, onSelecionar, excluindo }: { onEditar: () => void; onExcluir: () => void; onSelecionar?: () => void; excluindo: boolean }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -128,7 +128,16 @@ function PlaylistOptionsButton({ onEditar, onExcluir, excluindo }: { onEditar: (
         {excluindo ? <span className="animate-spin">⟳</span> : "▾"}
       </button>
       {aberto && (
-        <div className="absolute right-0 top-full mt-1 w-28 rounded-lg border border-zinc-200 bg-white shadow-lg py-1 z-50 text-left">
+        <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-zinc-200 bg-white shadow-lg py-1 z-50 text-left">
+          {onSelecionar && (
+            <button
+              type="button"
+              onClick={() => { setAberto(false); onSelecionar(); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50"
+            >
+              ★ Marcar como ativa
+            </button>
+          )}
           <button
             type="button"
             onClick={() => { setAberto(false); onEditar(); }}
@@ -156,6 +165,7 @@ function PlaylistBadge({
   vencContrato,
   onEditar,
   onExcluido,
+  onSelecionada,
 }: {
   pl: PlaylistRow;
   idAppRegistro: number;
@@ -163,9 +173,45 @@ function PlaylistBadge({
   vencContrato: string | null;
   onEditar: () => void;
   onExcluido: () => void;
+  onSelecionada: () => void;
 }) {
   const [excluindo, setExcluindo] = useState(false);
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
+
+  // Playlist ativa = a que o app abre no aparelho. Só FunPlay/LazerPlay/CorePlayer têm isso.
+  const podeSelecionar = tipoPainel !== "smartone" && !pl.is_selected;
+
+  async function selecionar() {
+    setExcluindo(true);
+    setErroExclusao(null);
+    try {
+      const startRes = await fetch(`/api/aplicativos/${idAppRegistro}/playlists/${pl.playlist_id_externo}?acao=selecionar`, { method: "POST" });
+      const { jobId } = await startRes.json();
+      if (!jobId) {
+        setErroExclusao("Não deu pra trocar a playlist ativa. Tente de novo.");
+        setExcluindo(false);
+        return;
+      }
+      const inicio = Date.now();
+      const MAX_ESPERA = 5 * 60 * 1000;
+      while (Date.now() - inicio < MAX_ESPERA) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const poll = await fetch(`/api/aplicativos/${idAppRegistro}/playlists/${pl.playlist_id_externo}?jobId=${jobId}`);
+        const job = await poll.json();
+        if (job.done) {
+          if (job.ok) onSelecionada();
+          else setErroExclusao(job.erro ?? "Não deu pra trocar a playlist ativa.");
+          setExcluindo(false);
+          return;
+        }
+      }
+      setErroExclusao("Demorou demais pra trocar a playlist ativa. Confira de novo daqui a pouco.");
+      setExcluindo(false);
+    } catch {
+      setErroExclusao("Sem internet ou o sistema está atualizando. Tente de novo.");
+      setExcluindo(false);
+    }
+  }
 
   async function excluir() {
     if (!confirm(`Excluir a playlist "${pl.nome || `#${pl.playlist_id_externo}`}"? Isso é feito direto na API do painel e não pode ser desfeito.`)) return;
@@ -219,7 +265,14 @@ function PlaylistBadge({
     <div className={`flex items-start gap-1.5 rounded-lg px-2 py-1.5 text-xs ${classes}`}>
       <span className="mt-0.5 shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">
-        <div className="font-medium truncate">{pl.nome || `Playlist #${pl.playlist_id_externo}`}</div>
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="font-medium truncate">{pl.nome || `Playlist #${pl.playlist_id_externo}`}</span>
+          {pl.is_selected && tipoPainel !== "smartone" && (
+            <span className="shrink-0 rounded bg-emerald-600 px-1 text-[9px] font-semibold uppercase text-white" title="Playlist que o app abre no aparelho">
+              Ativa
+            </span>
+          )}
+        </div>
         {usuario && (
           <div className="text-[10px] opacity-75 font-mono select-all">{usuario}</div>
         )}
@@ -241,7 +294,7 @@ function PlaylistBadge({
         )}
       </div>
       {pl.playlist_id_externo != null && (
-        <PlaylistOptionsButton onEditar={onEditar} onExcluir={excluir} excluindo={excluindo} />
+        <PlaylistOptionsButton onEditar={onEditar} onExcluir={excluir} onSelecionar={podeSelecionar ? selecionar : undefined} excluindo={excluindo} />
       )}
     </div>
   );
@@ -254,6 +307,7 @@ function PlaylistsRow({
   vencContrato,
   onEditarPlaylist,
   onPlaylistExcluida,
+  onPlaylistSelecionada,
 }: {
   playlists: PlaylistRow[];
   idAppRegistro: number;
@@ -261,6 +315,7 @@ function PlaylistsRow({
   vencContrato: string | null;
   onEditarPlaylist: (pl: PlaylistRow) => void;
   onPlaylistExcluida: (pl: PlaylistRow) => void;
+  onPlaylistSelecionada: () => void;
 }) {
   if (!playlists.length) return null;
 
@@ -298,6 +353,7 @@ function PlaylistsRow({
               vencContrato={vencContrato}
               onEditar={() => onEditarPlaylist(pl)}
               onExcluido={() => onPlaylistExcluida(pl)}
+              onSelecionada={onPlaylistSelecionada}
             />
           ))}
         </div>
@@ -619,6 +675,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                         vencContrato={a.venc_contrato}
                         onEditarPlaylist={(pl) => setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
                         onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
+                        onPlaylistSelecionada={() => { recarregarPlaylistsAoVivo(a.id_app_registro); router.refresh(); }}
                       />
                     )}
                   </Fragment>

@@ -9,6 +9,7 @@ import {
   criarPlaylist as criarPlaylistBase,
   editarPlaylist as editarPlaylistBase,
   excluirPlaylist as excluirPlaylistBase,
+  selecionarPlaylist as selecionarPlaylistBase,
   type AppAcessoConfig,
   type AppAcessoDevice,
   type AppAcessoPlaylist,
@@ -44,6 +45,9 @@ export const editarPlaylist = (token: string, params: { id: number; deviceId: nu
 
 export const excluirPlaylist = (token: string, params: { id: number; deviceId: number }) =>
   excluirPlaylistBase(CONFIG, token, params);
+
+export const selecionarPlaylist = (token: string, id: number) =>
+  selecionarPlaylistBase(CONFIG, token, id);
 
 export const editarComentario = (token: string, deviceId: number, comentario: string) =>
   editarComentarioBase(CONFIG, token, deviceId, comentario);
