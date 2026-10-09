@@ -40,8 +40,12 @@ removido = não está em nenhum. Se um painel falhar no login/lista, nada é gra
   funplay|lazerplay listar|testar N|tudo|vencidos`; cópia das playlists LazerPlay em `lab.bkp_lazerplay_playlists_20261008`.
 
 ## Próximos passos (atualizado 09/10)
-- Jonas: deploy + sync FunPlay e LazerPlay → conferir painéis antigos com 0 → `ativo = false` nos ids 100 e 101
-  (card some de /conexoes desde a2ced71). Depois: trocar senha dos painéis novos 106 e 107 (apareceram na conversa).
+- ✅ 09/10 ~00h05: deploy + sync dos dois: FunPlay 952 no 106, LazerPlay 363 no 107, 0 nos antigos, nenhum removido,
+  todas as chaves reais. ✅ Painéis 100 e 101 desativados (`ativo = false`, sessão limpa) — somem de /conexoes.
+- 📋 Anomalia: aplicativo 971 (cliente William Hauschildt, id 1075) tipo "Fun Play" preso ao painel 101, duplicado
+  do mesmo MAC F8:B7:83:DD:3A:1B que está certo como LazerPlay no 107 mas SEM cliente. Proposto ao Jonas: vincular
+  o LazerPlay ao cliente 1075 e remover (removido_em) o 971 — aguardando ok.
+- 📋 Trocar senha dos painéis novos 106 e 107 (apareceram na conversa) e atualizar no banco.
 
 ### Histórico dos passos
 - Jonas: deploy + sincronizar (qualquer card FunPlay; LazerPlay/CorePlayer/SmartOne também, pra recuperar chaves).
