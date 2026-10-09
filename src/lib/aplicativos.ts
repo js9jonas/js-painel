@@ -38,6 +38,8 @@ export type AplicativoRow = {
   venc_contrato: string | null;
   id_conta: number | null;
   id_dispositivo: number | null;
+  /** Número interno do aparelho no painel (só pro sistema — não exibir). */
+  id_dispositivo_painel: string | null;
   id_painel_servidor: number | null;
   tipo_painel: string | null;
   data_cadastro: string | null;
@@ -103,6 +105,7 @@ export async function getAplicativosByClienteId(
        to_char(ass.venc_contrato, 'YYYY-MM-DD') AS venc_contrato,
        ap.id_conta,
        ap.id_dispositivo,
+       ap.id_dispositivo_painel::text AS id_dispositivo_painel,
        ap.id_painel_servidor,
        ps.tipo AS tipo_painel,
        ap.data_cadastro::text,

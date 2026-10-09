@@ -19,10 +19,13 @@ export interface AppAcessoConfig {
 }
 
 export interface AppAcessoDevice {
+  /** Número interno do aparelho no painel (usado nas chamadas da API) — NÃO é a chave da TV. */
   id: number;
   mac: string;
   model: string;
   activation_expired: string | null;
+  /** Chave real do aparelho ("Device Key" na TV; pedida pelo "add existing device"). */
+  key?: string | number | null;
   device_note?: { comment: string | null };
 }
 

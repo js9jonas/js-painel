@@ -61,16 +61,17 @@ async function obterSessao(tipo: string, idPainel: number, usuario: string, senh
 
 async function executar(idAppRegistro: number, idPlaylist: number, acao: Acao, corpo: CorpoEdicao, jobId: string) {
   try {
-    const { rows } = await pool.query<{ mac: string | null; chave: string | null; id_painel_servidor: number | null }>(
-      `SELECT mac, chave, id_painel_servidor FROM public.aplicativos WHERE id_app_registro = $1`,
+    const { rows } = await pool.query<{ mac: string | null; id_dispositivo_painel: string | null; id_painel_servidor: number | null }>(
+      `SELECT mac, id_dispositivo_painel::text AS id_dispositivo_painel, id_painel_servidor FROM public.aplicativos WHERE id_app_registro = $1`,
       [idAppRegistro]
     );
-    if (!rows.length || !rows[0].id_painel_servidor || !rows[0].chave) {
+    if (!rows.length || !rows[0].id_painel_servidor || !rows[0].id_dispositivo_painel) {
       jobs.set(jobId, { done: true, ok: false, erro: "Aplicativo sem painel/device vinculado." });
       return;
     }
-    const { mac, chave, id_painel_servidor: idPainel } = rows[0];
-    const deviceId = parseInt(chave!, 10);
+    const { mac, id_dispositivo_painel, id_painel_servidor: idPainel } = rows[0];
+    // Número interno do aparelho no painel (sql/014) — a `chave` é a chave real da TV.
+    const deviceId = parseInt(id_dispositivo_painel!, 10);
 
     const { rows: painelRows } = await pool.query<{ tipo: string; usuario: string; senha: string }>(
       `SELECT tipo, usuario, senha FROM public.painel_servidores WHERE id = $1`,

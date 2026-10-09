@@ -87,9 +87,11 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         if (job.ok) {
           const removidosTxto = job.stats.removidos > 0 ? ` · ${job.stats.removidos} devices removidos` : "";
           const playlistsRemovidasTxto = job.stats.playlists_removidas > 0 ? ` · ${job.stats.playlists_removidas} playlists removidas` : "";
+          // Chave real do aparelho (sql/014): recuperada do painel / mudou no painel.
+          const chavesTxto = (job.stats.chaves_restauradas ?? 0) > 0 ? ` · ${job.stats.chaves_restauradas} chaves recuperadas` : "";
           const avisoTxto = job.aviso ? ` ⚠️ ${job.aviso}` : "";
           setMensagem(
-            `✅ ${job.total_devices} devices · ${job.stats.playlists_sincronizadas} playlists · ${job.stats.inseridos} novos · ${job.stats.atualizados} atualizados${removidosTxto}${playlistsRemovidasTxto}${avisoTxto}`
+            `✅ ${job.total_devices} devices · ${job.stats.playlists_sincronizadas} playlists · ${job.stats.inseridos} novos · ${job.stats.atualizados} atualizados${removidosTxto}${playlistsRemovidasTxto}${chavesTxto}${avisoTxto}`
           );
           router.refresh();
         } else {

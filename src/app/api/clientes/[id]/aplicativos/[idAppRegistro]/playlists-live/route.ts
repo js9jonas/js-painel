@@ -56,13 +56,13 @@ export async function GET(
   if (isNaN(idApp)) return NextResponse.json({ ok: false, motivo: "id_invalido" });
 
   const { rows } = await pool.query<{
-    chave: string | null;
+    id_dispositivo_painel: string | null;
     id_painel_servidor: number | null;
     tipo: string | null;
     session_cookie: string | null;
     session_expiry: Date | null;
   }>(
-    `SELECT ap.chave, ap.id_painel_servidor, ps.tipo, ps.session_cookie, ps.session_expiry
+    `SELECT ap.id_dispositivo_painel::text AS id_dispositivo_painel, ap.id_painel_servidor, ps.tipo, ps.session_cookie, ps.session_expiry
      FROM public.aplicativos ap
      LEFT JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor
      WHERE ap.id_app_registro = $1 AND ap.id_cliente = $2::int`,
@@ -72,7 +72,7 @@ export async function GET(
   if (!rows.length) return NextResponse.json({ ok: false, motivo: "nao_encontrado" });
   const row = rows[0];
 
-  if (!row.id_painel_servidor || !row.chave || !row.tipo) {
+  if (!row.id_painel_servidor || !row.id_dispositivo_painel || !row.tipo) {
     return NextResponse.json({ ok: false, motivo: "sem_device" });
   }
 
@@ -83,7 +83,8 @@ export async function GET(
     return NextResponse.json({ ok: false, motivo: "sem_sessao" });
   }
 
-  const deviceId = parseInt(row.chave, 10);
+  // Número interno do aparelho no painel (sql/014) — a `chave` é a chave real da TV.
+  const deviceId = parseInt(row.id_dispositivo_painel, 10);
   if (isNaN(deviceId)) return NextResponse.json({ ok: false, motivo: "device_invalido" });
 
   let playlists: AppAcessoPlaylist[];

@@ -349,7 +349,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
   useEffect(() => {
     // Apps já removidos remotamente não existem mais do lado do painel — buscar playlist
     // ao vivo pra eles só geraria erro/timeout sem necessidade.
-    const candidatos = aplicativos.filter((a) => a.id_painel_servidor && a.chave && !a.removido_em);
+    const candidatos = aplicativos.filter((a) => a.id_painel_servidor && a.id_dispositivo_painel && !a.removido_em);
     candidatos.forEach((a) => recarregarPlaylistsAoVivo(a.id_app_registro));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idCliente]);
@@ -559,7 +559,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           ) : (
                             <span className="text-zinc-300 text-xs">—</span>
                           )}
-                          {a.id_painel_servidor && a.chave && !removido && (
+                          {a.id_painel_servidor && a.id_dispositivo_painel && !removido && (
                             <button
                               type="button"
                               onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: a.tipo_painel })}
