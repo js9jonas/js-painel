@@ -124,7 +124,10 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
     FROM public.painel_servidores ps
     LEFT JOIN public.aplicativos ap ON ap.id_painel_servidor = ps.id
     LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
+    -- Painel de app desativado (ex.: FunPlay/LazerPlay antigos depois da migração de 08/10/2026) some de
+    -- /conexoes e o sync em família para de lê-lo; os aplicativos dele ficam no cadastro dos clientes.
     WHERE ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone')
+      AND ps.ativo = true
     GROUP BY ps.id
     ORDER BY ps.nome
   `);
