@@ -15,7 +15,7 @@ import {
   type AppAcessoPlaylist,
 } from "./appacesso";
 
-const CONFIG: AppAcessoConfig = {
+export const CONFIG: AppAcessoConfig = {
   apiBase: "https://api.appacesso.com",
   websiteUrl: "https://reseller.lazerplay.io",
   recaptchaKey: "6LfjXhYsAAAAAHQ6pH2nBmSwmlK-e5xMcdbXAb5z",

@@ -40,3 +40,15 @@ Pontos a confirmar antes de rodar em massa:
   confere relendo; se não confirmar, o modal fica aberto com aviso âmbar ("criada, mas não deu pra marcar como ativa") —
   pedido do Jonas, que aprovou avisar em vez de falhar calado. Corrigido junto: depois de criar, a lista ao vivo da tela
   não era recarregada (a playlist nova só aparecia após recarregar a página).
+
+## Levantamento FAST (11/10/2026)
+- Banco tinha só 10 listas Fun Play (Central 6 `pfun.store`, Uniplay 3 `chdef.site`, FAST 1 `bandeiraf.vip`) — eram 27 em 03/10; queda não investigada (talvez migração 100→106).
+- `aplicativos.id_conta` está vazio em todos os Fun Play; ligação app→conta só dá pelo cliente (app → cliente → assinatura → conta).
+- Clientes sem ambiguidade (1 assinatura viva, 1 única conta não removida = FAST, Fun Play ativo sem lista): **212** com 1 aparelho + 17 com 2+ aparelhos na mesma conta. Relatório: https://claude.ai/artifact/2zkScd22Ew8XXSgGdDpWLc
+- **11/10/2026 cadastro em massa** (pedido do Jonas, domínio `ligaf.me`, nome "<PrimeiroNome> TV", marcada como ativa, gravada em `aplicativo_playlists`): ✅ **209 de 209 concluídos** + 36 aparelhos dos 17 clientes com 2-3 Fun Play na mesma conta FAST (todas marcadas como ativa, gravadas no banco) — 245 no total. A URL real foi **aceita** (sem o "já existe" de 03/10). Limites encontrados: FunPlay devolve "Too many requests" com ~1 chamada/1,2 s (com 4 s + nova tentativa passou); a `CAPSOLVER_API_KEY` do `.env.local` local está inválida ("clientKey is invalid"), então não dá pra renovar a sessão do painel 106 daqui — depende da sessão renovada pelo js-painel em produção. Script temporário apagado ao final. Cliente com `bandeiraf.vip`: Miguel Angelo (#255).
+
+## Estratégia do Jonas — domínio separado para as ocultas (11/10/2026)
+- Jonas usou a **migração de URL em massa** do painel FunPlay para mandar todas as listas (visíveis e ocultas) para `bandeiraf.vip`. As ocultas só aparecem na guia Listas do app no aparelho e não dá pra apagá-las remotamente.
+- A partir daí, lista avulsa nova usa **outro domínio** (`ligaf.me`), que nunca bate com a oculta: o FunPlay não recusa como "já existe" e o cliente não precisa apagar nada à mão.
+- A migração em massa também serve pra trocar o domínio de todas as listas quando uma URL dá problema. Conferido ao vivo: as listas `ligaf.me` criadas no lote de 11/10 **não** foram afetadas pela migração.
+- 📋 Próximo (sem data): Jonas vai operar a migração em massa com Playwright aberto pra capturar o endpoint e trazer a função pro js-painel.

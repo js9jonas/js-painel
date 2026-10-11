@@ -35,6 +35,8 @@ export type AlertaAppRow = {
     venc_contrato_cliente: string | null;
     pacote_contrato: string | null;  // coluna Pacote
     total_apps: number;              // sublinha do Pacote
+    /** Cadastrado no painel sem ativação (add existing, sem crédito): aparece como se vencesse hoje. */
+    sem_validade: boolean;
 };
 
 export async function getAlertasContas(dias = 5): Promise<AlertaContaRow[]> {
@@ -109,7 +111,8 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        c.id_cliente::text,
        c.nome,
        ap.id_app_registro::text,
-       ap.validade::text,
+       COALESCE(ap.validade, (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)::text AS validade,
+       (ap.validade IS NULL) AS sem_validade,
        ap.mac,
        ap.observacao,
        app.nome_app,
@@ -119,6 +122,7 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
      FROM public.aplicativos ap
      JOIN public.clientes c ON c.id_cliente = ap.id_cliente
      JOIN public.apps app ON app.id_app = ap.id_app
+     LEFT JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor
      -- venc_contrato_cliente + pacote_contrato: última assinatura do cliente
      LEFT JOIN LATERAL (
        SELECT
@@ -138,9 +142,12 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
          AND lower(btrim(ap2.status)) = 'ativa'
      ) cnt ON true
      WHERE lower(btrim(ap.status)) = 'ativa'
-       AND ap.validade IS NOT NULL
-       AND ap.validade::date <= CURRENT_DATE + ($1::int || ' days')::interval
-     ORDER BY ap.validade ASC`,
+       AND (
+         (ap.validade IS NOT NULL AND ap.validade::date <= CURRENT_DATE + ($1::int || ' days')::interval)
+         -- Fun Play / Lazer Play / Core Player cadastrados sem ativação (add existing): precisam ser ativados
+         OR (ap.validade IS NULL AND ap.removido_em IS NULL AND ps.tipo IN ('funplays', 'lazerplay', 'coreplayer'))
+       )
+     ORDER BY COALESCE(ap.validade, (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) ASC`,
         [dias]
     );
     return rows;

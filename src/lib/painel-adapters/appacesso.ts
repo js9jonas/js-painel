@@ -209,6 +209,36 @@ export async function adicionarExistente(cfg: AppAcessoConfig, token: string, ma
   });
 }
 
+export interface AppAcessoValidacaoMac {
+  /** Número interno do aparelho (o mesmo de /reseller/devices). */
+  id: number;
+  mac: string;
+  payed: boolean;
+  /** "device_key" = add existing com a chave da TV; "otp" = pede código mostrado na TV. */
+  auth_type: string;
+  model?: string | null;
+}
+
+/**
+ * Confere o MAC no sistema do app (qualquer revendedor). Formato conferido no FunPlay em 11/10/2026:
+ * GET /reseller/validate_mac?mac= → { payed, free_trial, mac, auth_type, id, model, notes }.
+ * Erro da API = MAC não existe (o app nunca foi aberto nesse aparelho).
+ */
+export async function validarMac(cfg: AppAcessoConfig, token: string, mac: string): Promise<AppAcessoValidacaoMac> {
+  return apiFetch(cfg, token, `/reseller/validate_mac?mac=${encodeURIComponent(mac)}`);
+}
+
+/**
+ * Aparelho DESTE revendedor pelo MAC (null se não está no painel). Mesma busca do site
+ * (main.b0256ef8.js): GET /reseller/devices?search={"mac":...}.
+ */
+export async function buscarDispositivoPorMac(cfg: AppAcessoConfig, token: string, mac: string): Promise<AppAcessoDevice | null> {
+  const q = new URLSearchParams({ limit: "10", pagination: "1", page: "1", search: JSON.stringify({ mac }) });
+  const data = await apiFetch(cfg, token, `/reseller/devices?${q}`);
+  const rows = (data?.rows ?? []) as AppAcessoDevice[];
+  return rows.find((d) => d.mac.toUpperCase() === mac.toUpperCase()) ?? null;
+}
+
 export async function getPlaylistsDispositivo(
   cfg: AppAcessoConfig,
   token: string,
@@ -274,15 +304,20 @@ export async function selecionarPlaylist(cfg: AppAcessoConfig, token: string, id
   });
 }
 
+/**
+ * Ativa (gasta crédito). POST /reseller/activate { mac, package_id, comment? } — o `comment` opcional
+ * grava o nome do cliente no aparelho na mesma chamada (conferido no site em 11/10/2026).
+ */
 export async function ativarDispositivo(
   cfg: AppAcessoConfig,
   token: string,
   mac: string,
-  packageId = 1
+  packageId = 1,
+  comentario?: string
 ): Promise<string> {
   await apiFetch(cfg, token, "/reseller/activate", {
     method: "POST",
-    body: JSON.stringify({ mac, package_id: packageId }),
+    body: JSON.stringify({ mac, package_id: packageId, ...(comentario ? { comment: comentario } : {}) }),
   });
   const devices = await apiFetch(cfg, token, `/reseller/devices?limit=10&page=1&sort=["id","DESC"]`);
   const dev = (devices.rows as AppAcessoDevice[]).find((d) => d.mac === mac);

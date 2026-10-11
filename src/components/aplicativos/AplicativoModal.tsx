@@ -1,10 +1,13 @@
 // src/components/aplicativos/AplicativoModal.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createAplicativo, updateAplicativo, type AplicativoData } from "@/app/actions/aplicativos";
 import { Select } from "@/components/ui/select";
 import type { AplicativoRow, AppRow } from "@/lib/aplicativos";
+import { appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+
+type ContaOpcao = { id_conta: string; usuario: string; rotulo: string | null; nome_painel: string; status_conta: string; host_stream: string | null };
 
 type Props = {
   idCliente: string;
@@ -39,7 +42,88 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
 
   const appSelecionado = apps.find((a) => a.id_app === idApp) ?? null;
 
+  // Fun Play / Lazer Play / Core Player: cadastro direto no painel (add existing + lista, sem gastar
+  // crédito). A ativação fica pra quando o cliente assinar — /alertas mostra "Precisa ativar".
+  const podePainel = !isEdit && appTemCadastroPeloPainel(idApp);
+  const [peloPainel, setPeloPainel] = useState(true);
+  const usarPainel = podePainel && peloPainel;
+  const [contas, setContas] = useState<ContaOpcao[] | null>(null);
+  const [idConta, setIdConta] = useState("");
+  const [etapa, setEtapa] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    if (!usarPainel || contas !== null) return;
+    fetch(`/api/clientes/${idCliente}/contas`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((lista: ContaOpcao[]) => {
+        const comLista = Array.isArray(lista) ? lista.filter((c) => !!c.host_stream) : [];
+        setContas(comLista);
+        if (comLista.length === 1) setIdConta(comLista[0].id_conta);
+      })
+      .catch(() => setContas([]));
+  }, [usarPainel, contas, idCliente]);
+
+  async function cadastrarNoPainel() {
+    setError(null);
+    setAviso(null);
+    if (!mac.trim() || !chave.trim()) {
+      setError("Informe o MAC e a chave (Device Key) que aparecem na TV.");
+      return;
+    }
+    setEnviando(true);
+    setEtapa("Iniciando…");
+    try {
+      const res = await fetch("/api/aplicativos/cadastrar-painel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_cliente: idCliente, id_app: idApp, mac, chave, id_conta: idConta || null, observacao: observacao || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.jobId) throw new Error(data.erro ?? "Não deu pra iniciar o cadastro.");
+      for (let i = 0; i < 90; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const job = await fetch(`/api/aplicativos/cadastrar-painel?jobId=${encodeURIComponent(data.jobId)}`)
+          .then((r) => r.json())
+          .catch(() => null);
+        if (!job) continue;
+        if (!job.done) {
+          if (job.etapa) setEtapa(job.etapa);
+          continue;
+        }
+        if (!job.ok) throw new Error(job.erro ?? "Não deu pra cadastrar no painel.");
+        if (job.aviso) {
+          // Mostra o aviso antes de fechar; a tela atualiza ao fechar (fecharModal → onSaved).
+          setEtapa(null);
+          setAviso(job.aviso);
+          return;
+        }
+        onSaved();
+        onClose();
+        return;
+      }
+      throw new Error("O painel demorou para responder. Confira o aparelho no painel antes de tentar de novo.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Sem internet ou o sistema está atualizando. Tente de novo.");
+      setEtapa(null);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  // Depois de um cadastro com aviso, fechar também atualiza a tela do cliente.
+  function fecharModal() {
+    if (enviando) return;
+    if (aviso) onSaved();
+    onClose();
+  }
+
   function handleSave() {
+    if (usarPainel) {
+      void cadastrarNoPainel();
+      return;
+    }
     setError(null);
     if (!idApp) {
       setError("Selecione o aplicativo antes de salvar.");
@@ -78,7 +162,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={fecharModal} />
       <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh]">
 
         {/* Header */}
@@ -126,7 +210,49 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
             )}
           </div>
 
+          {podePainel && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 space-y-3">
+              <label className="flex items-start gap-2 text-sm text-violet-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={peloPainel}
+                  onChange={(e) => setPeloPainel(e.target.checked)}
+                  disabled={enviando}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-semibold">Cadastrar no painel do app</span>
+                  <span className="block text-xs text-violet-700">
+                    Adiciona o aparelho ao painel com o MAC e a chave, sem gastar crédito. A ativação fica para quando o cliente assinar: o aparelho aparece em Alertas como &quot;Precisa ativar&quot;.
+                  </span>
+                </span>
+              </label>
+              {peloPainel && (
+                <div>
+                  <label className={labelClass}>Lista no aparelho</label>
+                  {contas === null ? (
+                    <p className="text-xs text-zinc-500">Carregando contas do cliente…</p>
+                  ) : (
+                    <Select
+                      value={idConta}
+                      onChange={setIdConta}
+                      className={selectClass}
+                      options={[
+                        { value: "", label: contas.length ? "— Não criar lista —" : "Cliente sem conta com lista" },
+                        ...contas.map((c) => ({
+                          value: c.id_conta,
+                          label: `${c.nome_painel} — ${c.rotulo?.trim() || c.usuario}${c.status_conta !== "ok" ? ` (${c.status_conta})` : ""}`,
+                        })),
+                      ]}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Status e Validade */}
+          {!usarPainel && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Status</label>
@@ -150,6 +276,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
               />
             </div>
           </div>
+          )}
 
           {/* MAC e Chave */}
           <div className="grid grid-cols-2 gap-3">
@@ -195,25 +322,33 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
         {error && (
           <p className="mx-6 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
         )}
+        {etapa && (
+          <p className="mx-6 text-sm text-violet-700 bg-violet-50 rounded-lg px-3 py-2">{etapa}</p>
+        )}
+        {aviso && (
+          <p className="mx-6 text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2">Cadastrado. {aviso}</p>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-3">
           <button
             type="button"
-            onClick={onClose}
-            disabled={isPending}
+            onClick={fecharModal}
+            disabled={isPending || enviando}
             className="h-10 rounded-xl border border-zinc-300 px-5 text-sm font-medium hover:bg-zinc-50 transition-all disabled:opacity-50"
           >
-            Cancelar
+            {aviso ? "Fechar" : "Cancelar"}
           </button>
+          {!aviso && (
           <button
             type="button"
             onClick={handleSave}
-            disabled={isPending}
+            disabled={isPending || enviando}
             className="h-10 rounded-xl bg-zinc-900 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {isPending ? "Salvando..." : isEdit ? "Salvar alterações" : "Adicionar"}
+            {enviando ? "Cadastrando no painel..." : isPending ? "Salvando..." : isEdit ? "Salvar alterações" : usarPainel ? "Cadastrar no painel" : "Adicionar"}
           </button>
+          )}
         </div>
       </div>
     </div>

@@ -16,7 +16,7 @@ import {
   type AppAcessoPlaylist,
 } from "./appacesso";
 
-const CONFIG: AppAcessoConfig = {
+export const CONFIG: AppAcessoConfig = {
   apiBase: "https://api.funplays.app",
   websiteUrl: "https://reseller.funplays.app",
   recaptchaKey: "6LcS2BYsAAAAALlg6fQnrKJLBTheTQbiyy6hUbnz",

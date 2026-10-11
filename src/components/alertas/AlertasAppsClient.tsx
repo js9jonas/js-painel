@@ -6,6 +6,7 @@ import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
 import { Select } from "@/components/ui/select";
+import AtivarPainelButton from "./AtivarPainelButton";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
 
@@ -67,6 +68,8 @@ export default function AlertasAppsClient({
 
   const filtrados = apps.filter((r) => {
     if (filtro === "com_contrato") {
+      // Cadastro novo sem ativação (geralmente teste, ainda sem assinatura): sempre à vista.
+      if (r.sem_validade) return true;
       if (!r.venc_contrato_cliente) return false;
       return new Date(r.venc_contrato_cliente + "T00:00:00") > ontem;
     }
@@ -130,7 +133,7 @@ export default function AlertasAppsClient({
         <div className="px-5 py-4 border-b bg-blue-50 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-blue-900">📱 Aplicativos expirando</p>
-            <p className="text-xs text-blue-700 mt-0.5">Validade ≤ 7 dias • Status ativa</p>
+            <p className="text-xs text-blue-700 mt-0.5">Validade ≤ 7 dias • Status ativa • Sem ativação no painel</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-2xl font-bold text-blue-900">{filtrados.length}</span>
@@ -238,17 +241,30 @@ export default function AlertasAppsClient({
                               : <span className="text-zinc-400 italic">Sem assinatura</span>}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
-                              {labelDias(dias)}
-                            </span>
+                            {r.sem_validade ? (
+                              <span
+                                className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-100 text-violet-700"
+                                title="Cadastrado no painel sem ativação. A validade que aparece na TV é provisória."
+                              >
+                                Precisa ativar
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
+                                {labelDias(dias)}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => abrirModal(r)}
-                              className="h-7 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
-                            >
-                              +1 ano
-                            </button>
+                            {r.sem_validade ? (
+                              <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                            ) : (
+                              <button
+                                onClick={() => abrirModal(r)}
+                                className="h-7 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
+                              >
+                                +1 ano
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );

@@ -11,7 +11,7 @@ import {
 } from "./appacesso";
 import type { ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 
-const CONFIG: AppAcessoConfig = {
+export const CONFIG: AppAcessoConfig = {
   apiBase: "https://api.coreplayer.io",
   websiteUrl: "https://reseller.coreplayer.io",
   recaptchaKey: "",    // CorePlayer não exige captcha
