@@ -1,8 +1,9 @@
 // src/proxy.ts  ← Next.js 16 renomeou middleware.ts para proxy.ts
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
+import { registrarChaveIdempotencia } from "@/lib/idempotencia"
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { pathname } = req.nextUrl
 
   // Rotas públicas
@@ -47,6 +48,24 @@ export default auth((req) => {
   // Já logado tentando acessar login → redireciona para dashboard
   if (isLoggedIn && isLoginPage) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+
+  // Requisição repetida pelo navegador (mesma Idempotency-Key, posta por src/components/IdempotenciaFetch.tsx)
+  // não chega na rota: sem isso o servidor executa de novo mesmo com o navegador já tendo desistido (499).
+  if (isLoggedIn && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    const resultado = await registrarChaveIdempotencia(
+      req.headers.get('idempotency-key'),
+      req.auth?.user?.email ?? null,
+      req.method,
+      pathname
+    )
+    if (resultado === 'repetida') {
+      console.warn(`[idempotencia] requisição repetida recusada: ${req.method} ${pathname}`)
+      return NextResponse.json(
+        { error: 'Essa ação já foi feita. O navegador tentou enviar de novo e foi bloqueado.' },
+        { status: 409 }
+      )
+    }
   }
 
   return NextResponse.next()
