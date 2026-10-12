@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
 
@@ -21,18 +21,6 @@ type ResultadoConta = {
     mensagem: string;
     novoVencimento?: string | null;
 };
-
-/**
- * Trava contra tela desatualizada (incidente 30/09/2026, cliente 2888): uma aba com a página
- * do cliente aberta havia 40 min, retomada no celular, renovou por um toque acidental.
- * Se a aba ficou em segundo plano (celular bloqueado, outra aba/app) por MIN_SEGUNDO_PLANO_MS
- * ou mais, ou o modal está aberto há MAX_MODAL_ABERTO_MS ou mais, o 1º clique em salvar NÃO
- * grava: recarrega os dados, mostra um aviso com o nome do cliente e exige um 2º clique,
- * liberado só depois de TRAVA_POS_AVISO_MS (evita que um toque duplo passe direto).
- */
-const MIN_SEGUNDO_PLANO_MS = 5 * 60_000;
-const MAX_MODAL_ABERTO_MS = 15 * 60_000;
-const TRAVA_POS_AVISO_MS = 1_500;
 
 const FORMAS_PGTO = ["INTER", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
 const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
@@ -170,7 +158,6 @@ export default function RenovarAssinatura({
     observacaoAtual,
     contasVinculadas,
     onSuccess,
-    onRecarregarDados,
 }: {
     idAssinatura: string;
     vencAtual?: string | null;
@@ -187,9 +174,6 @@ export default function RenovarAssinatura({
     observacaoAtual?: string | null;
     contasVinculadas?: ContaVinculada[];
     onSuccess?: () => void;
-    /** Recarrega os dados do cliente no componente pai quando a tela estava desatualizada
-     *  (ex.: /chat, cujos dados não vêm do router.refresh()). */
-    onRecarregarDados?: () => void;
 }) {
     const router = useRouter();
     const isPendente = (status ?? "").toLowerCase().trim() === "pendente";
@@ -231,66 +215,6 @@ export default function RenovarAssinatura({
     const [observacao, setObservacao] = useState(observacaoAtual ?? "");
     const podeEditarObs = observacaoAtual !== undefined;
 
-    // Trava contra tela desatualizada — ver MIN_SEGUNDO_PLANO_MS
-    const ocultoDesdeRef = useRef<number | null>(null);
-    const minutosSegundoPlanoRef = useRef<number | null>(null);
-    const abertoEmRef = useRef<number>(0);
-    const [avisoDesatualizada, setAvisoDesatualizada] = useState<string | null>(null);
-    const [travadoAte, setTravadoAte] = useState(0);
-    const travado = travadoAte > 0;
-
-    useEffect(() => {
-        if (document.hidden) ocultoDesdeRef.current = Date.now();
-        function onVisibilidade() {
-            if (document.hidden) {
-                ocultoDesdeRef.current ??= Date.now();
-                return;
-            }
-            const desde = ocultoDesdeRef.current;
-            ocultoDesdeRef.current = null;
-            if (desde != null && Date.now() - desde >= MIN_SEGUNDO_PLANO_MS) {
-                // Guarda o maior período; só zera quando o aviso for mostrado
-                const min = Math.round((Date.now() - desde) / 60_000);
-                minutosSegundoPlanoRef.current = Math.max(minutosSegundoPlanoRef.current ?? 0, min);
-            }
-        }
-        document.addEventListener("visibilitychange", onVisibilidade);
-        return () => document.removeEventListener("visibilitychange", onVisibilidade);
-    }, []);
-
-    useEffect(() => {
-        if (!travadoAte) return;
-        const t = setTimeout(() => setTravadoAte(0), Math.max(0, travadoAte - Date.now()));
-        return () => clearTimeout(t);
-    }, [travadoAte]);
-
-    // Depois do aviso os dados são recarregados: recalcula os campos com os valores novos
-    useEffect(() => {
-        if (open && avisoDesatualizada) resetarCampos();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [vencAtual, vencContasAtual, status]);
-
-    /** true = bloqueou o salvamento (tela desatualizada); o próximo clique grava. */
-    function bloquearSeDesatualizada(): boolean {
-        const minSegundoPlano = minutosSegundoPlanoRef.current;
-        const minModal = Math.round((Date.now() - abertoEmRef.current) / 60_000);
-        const modalVelho = Date.now() - abertoEmRef.current >= MAX_MODAL_ABERTO_MS;
-        if (minSegundoPlano == null && !modalVelho) return false;
-
-        const motivo = minSegundoPlano != null
-            ? `Esta tela ficou ${minSegundoPlano} min em segundo plano`
-            : `Esta janela está aberta há ${minModal} min`;
-        setAvisoDesatualizada(
-            `${motivo}. Os dados foram recarregados — confira se é mesmo ${nomeCliente ? `o cliente ${nomeCliente}` : "o cliente certo"} e as datas antes de salvar de novo.`
-        );
-        minutosSegundoPlanoRef.current = null;
-        abertoEmRef.current = Date.now();
-        setTravadoAte(Date.now() + TRAVA_POS_AVISO_MS);
-        router.refresh();
-        onRecarregarDados?.();
-        return true;
-    }
-
     function handlePeriodoChange(p: Periodo) {
         setPeriodo(p);
         setValor(valorDoPeriodo(p));
@@ -316,8 +240,6 @@ export default function RenovarAssinatura({
 
     function handleOpen() {
         resetarCampos();
-        setAvisoDesatualizada(null);
-        abertoEmRef.current = Date.now();
         setOpen(true);
     }
 
@@ -330,7 +252,6 @@ export default function RenovarAssinatura({
 
     async function executarPendente() {
         if (!valor.trim()) { alert("Informe o valor do pagamento."); return; }
-        if (bloquearSeDesatualizada()) return;
         setLoading(true);
 
         const endpoint = `PUT /api/assinaturas/${idAssinatura}/renovar`;
@@ -395,8 +316,6 @@ export default function RenovarAssinatura({
             alert("Informe o valor do pagamento.");
             return;
         }
-        if (bloquearSeDesatualizada()) return;
-
         setLoading(true);
 
         const endpoint = `PUT /api/assinaturas/${idAssinatura}/renovar`;
@@ -448,11 +367,6 @@ export default function RenovarAssinatura({
                                 Assinatura #{idAssinatura}
                                 {vencAtual ? ` • vencimento atual: ${vencAtual.split("T")[0].split("-").reverse().join("/")}` : ""}
                             </p>
-                            {avisoDesatualizada && resultadosContas.length === 0 && (
-                                <div className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                                    ⚠️ {avisoDesatualizada}
-                                </div>
-                            )}
                             {isPendente && (
                                 <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
                                     Assinatura pendente — o mês em aberto já está no vencimento atual. Mensal só ativa; trimestral soma +2 meses, semestral +5, anual +11.
@@ -641,7 +555,7 @@ export default function RenovarAssinatura({
                                         className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
                                         Cancelar
                                     </button>
-                                    <button type="button" onClick={executarPendente} disabled={loading || travado}
+                                    <button type="button" onClick={executarPendente} disabled={loading}
                                         className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
                                         {loading ? "Salvando..." : "Confirmar pagamento"}
                                     </button>
@@ -652,11 +566,11 @@ export default function RenovarAssinatura({
                                         className="h-9 rounded-xl border px-4 text-sm hover:bg-zinc-50 disabled:opacity-50">
                                         Cancelar
                                     </button>
-                                    <button type="button" onClick={() => executar(false)} disabled={loading || travado}
+                                    <button type="button" onClick={() => executar(false)} disabled={loading}
                                         className="h-9 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50">
                                         {loading ? "..." : "Alterar"}
                                     </button>
-                                    <button type="button" onClick={() => executar(true)} disabled={loading || travado}
+                                    <button type="button" onClick={() => executar(true)} disabled={loading}
                                         className={`h-9 rounded-xl px-4 text-sm text-white font-medium disabled:opacity-50 transition-colors ${statusFinal === "pendente"
                                                 ? "bg-amber-500 hover:bg-amber-600"
                                                 : "bg-emerald-600 hover:bg-emerald-700"
