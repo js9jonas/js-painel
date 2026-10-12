@@ -2,7 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
-- [incident_template_duplicado_post_reenviado_12out2026](incident_template_duplicado_post_reenviado_12out2026.md) — 12/10/2026 ✅ — disparo de templates saía 2x (POST reenviado pelo navegador ao retomar a aba; servidor seguia mesmo com 499); regra: mesmo template, mesmo número, 1x por dia + trava de lote
+- [incident_template_duplicado_post_reenviado_12out2026](incident_template_duplicado_post_reenviado_12out2026.md) — 12/10/2026 ✅ em produção — disparo de templates saía 2x (POST reenviado pelo navegador ao retomar a aba; servidor seguia mesmo com 499); regra: mesmo template, mesmo número, 1x por dia + trava de lote
 - [incident_renovacao_acidental_aba_velha_30set2026](incident_renovacao_acidental_aba_velha_30set2026.md) — 30/09/2026 ✅ — cliente 2888 renovado por toque acidental em aba aberta havia 40 min; renovação/exclusão de pagamento passam a entrar no audit_log com usuário+IP, (a trava de 2º clique por tela parada foi removida em 12/10 a pedido do Jonas)
 - [project_vinculos_aplicativo_removidos](project_vinculos_aplicativo_removidos.md) — 28/09/2026 — área "Vínculos" removida dos formulários de aplicativo (colunas 100% vazias); aviso "Apps vinculados a esta conta" agora lê das playlists (~610 contas, antes 2)
 - [project_balao_conta_rotulo_complemento](project_balao_conta_rotulo_complemento.md) — 28/09/2026 — balão de conta mostra a parte do rótulo que difere do nome do cliente (sub-linha) + "Copiar M3U" fecha o menu
