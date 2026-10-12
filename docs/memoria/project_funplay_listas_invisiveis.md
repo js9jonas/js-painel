@@ -52,3 +52,19 @@ Pontos a confirmar antes de rodar em massa:
 - A partir daí, lista avulsa nova usa **outro domínio** (`ligaf.me`), que nunca bate com a oculta: o FunPlay não recusa como "já existe" e o cliente não precisa apagar nada à mão.
 - A migração em massa também serve pra trocar o domínio de todas as listas quando uma URL dá problema. Conferido ao vivo: as listas `ligaf.me` criadas no lote de 11/10 **não** foram afetadas pela migração.
 - 📋 Próximo (sem data): Jonas vai operar a migração em massa com Playwright aberto pra capturar o endpoint e trazer a função pro js-painel.
+
+## Ideia do Jonas (11/10/2026): lista nova recusada por "já existe" (lista oculta no mesmo host)
+
+Quando cadastrar uma lista e o painel do app recusar porque já existe uma igual (oculta) no aparelho, limpar via
+migração do servidor daquele host (Servidores em /conexoes, ou `PUT /reseller/server/migrate`):
+
+1. Migrar o servidor para o host da lista, **sem** "levar as listas" — só para o servidor apontar para esse host.
+2. Migrar para um host **secundário com** "levar as listas" — tudo que está naquele host, inclusive a oculta, sai dele.
+3. **Antes do passo 4**, voltar por API (`PUT /reseller/playlist`) as listas visíveis que o js-painel conhece para o
+   host principal. O passo 2 leva também as listas boas, e sem isso elas ficariam no secundário. Foi o que se fez com a Central em 11/10:
+   9 listas devolvidas.
+4. Migrar de volta para o host principal **sem** levar as listas — as ocultas ficam no secundário e o cadastro da
+   lista nova passa.
+
+Ainda não usado neste formato (ideia registrada). Mesmo procedimento já aplicado em lote no FAST (bandeiraf.vip) e na
+Central (bandeira5.info).
