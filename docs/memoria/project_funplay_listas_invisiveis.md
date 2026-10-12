@@ -89,3 +89,12 @@ migração do servidor daquele host (Servidores em /conexoes, ou `PUT /reseller/
 
 Ainda não usado neste formato (ideia registrada). Mesmo procedimento já aplicado em lote no FAST (bandeiraf.vip) e na
 Central (bandeira5.info).
+
+## 🔑 Achado do Jonas (12/10/2026): o site do CLIENTE mostra e apaga as listas ocultas
+
+Capturado com Playwright no site do cliente do Lazer Play (`lazerplay.io/#/playlists`, API `api.lazerplay.io`); o Fun Play deve ter o mesmo (`api.funplays.app/api/...`, mesma plataforma) — **conferir**.
+- `GET /api/validate_mac?mac=` → `{payed, free_trial, auth_type:"device_key", id, model...}`
+- `POST /api/login_by_mac {mac, key}` → token de aparelho (JWT `type:"web_device"`). `key` = **chave do dispositivo** (a mesma de `aplicativos.chave`). Sem captcha no corpo (`GET /api/captcha` voltou vazio).
+- `GET /api/device` (Bearer do aparelho) → aparelho com **todas** as playlists, inclusive as ocultas do painel de revenda. As que o revendedor criou vêm com `reseller_id` = nosso id (8448); as ocultas vêm com `reseller_id: null`.
+- `DELETE /api/palylist_from_web {id}` (sic, "palylist") → `"Deleted"`. Jonas apagou assim uma lista oculta para liberar o cadastro pelo painel.
+- Consequência: dá para ver e apagar as ocultas de qualquer aparelho cuja chave temos, sem precisar do cliente nem da migração de servidor. ⚠️ A resposta traz usuário/senha das listas: não registrar em log nem em memória.
