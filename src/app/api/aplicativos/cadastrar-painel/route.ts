@@ -189,7 +189,9 @@ async function executar(corpo: Required<Pick<Corpo, "mac" | "chave">> & { idClie
         let lista = atuais.find((p) => p.url === url) ?? null;
         let ativa = !!lista?.is_selected;
         if (!lista) {
-          ({ lista, ativa } = await criarListaAtiva(painel.cfg, token, dev.id, nomeListaCliente(nomeCliente), url));
+          const criada = await criarListaAtiva(painel.cfg, token, dev.id, nomeListaCliente(nomeCliente), url, { mac: dev.mac, chave: chaveReal });
+          ({ lista, ativa } = criada);
+          if (criada.ocultasApagadas) avisos.push(`Havia ${criada.ocultasApagadas === 1 ? "uma lista oculta igual" : `${criada.ocultasApagadas} listas ocultas iguais`} no aparelho; foi apagada para a nova entrar.`);
         }
         if (!lista) throw new Error("a lista não apareceu no aparelho depois de criada");
         await pool.query(

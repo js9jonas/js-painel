@@ -17,6 +17,7 @@ export const CONFIG: AppAcessoConfig = {
   recaptchaKey: "",    // CorePlayer não exige captcha
   requireOrigin: true, // API bloqueia chamadas sem header Origin
   nomeApp: "CorePlayer",
+  apiCliente: "https://api.coreplayer.io", // site do cliente (listas do aparelho, inclusive ocultas)
 };
 
 export const loginCorePlayer = (email: string, senha: string) =>

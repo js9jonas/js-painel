@@ -32,6 +32,8 @@ export type AlertaAppRow = {
     mac: string | null;
     observacao: string | null;       // sublinha do MAC
     nome_app: string;
+    /** Aparelho ligado a um painel nosso (Fun Play / Lazer Play / Core Player): pode renovar pelo painel. */
+    no_painel_app: boolean;
     venc_contrato_cliente: string | null;
     pacote_contrato: string | null;  // coluna Pacote
     total_apps: number;              // sublinha do Pacote
@@ -116,6 +118,7 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ap.mac,
        ap.observacao,
        app.nome_app,
+       (ps.tipo IN ('funplays', 'lazerplay', 'coreplayer')) IS TRUE AS no_painel_app,
        ult.venc_contrato_cliente,
        -- mais de uma assinatura viva: "2 (1 Tela - 1 Tela)"; senão o pacote da última assinatura
        CASE WHEN vivas.n > 1 THEN vivas.n || ' (' || vivas.pacotes || ')' ELSE ult.pacote_contrato END AS pacote_contrato,

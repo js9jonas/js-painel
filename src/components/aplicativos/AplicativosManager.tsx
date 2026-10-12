@@ -7,6 +7,8 @@ import AplicativoModal from "./AplicativoModal";
 import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
+import ListasAparelhoModal from "./ListasAparelhoModal";
+import { appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
 import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
@@ -378,6 +380,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
   const [atualizadoAoVivo, setAtualizadoAoVivo] = useState<Set<number>>(new Set());
   const [editandoPlaylist, setEditandoPlaylist] = useState<{ idAppRegistro: number; pl: PlaylistRow; tipoPainel: string | null } | null>(null);
   const [criandoPlaylist, setCriandoPlaylist] = useState<{ idAppRegistro: number; tipoPainel: string | null } | null>(null);
+  const [vendoAparelho, setVendoAparelho] = useState<AplicativoRow | null>(null);
   const [filtroMac, setFiltroMac] = useState("");
   const router = useRouter();
 
@@ -629,6 +632,16 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                               +
                             </button>
                           )}
+                          {appTemCadastroPeloPainel(a.id_app) && a.mac && a.chave && !removido && (
+                            <button
+                              type="button"
+                              onClick={() => setVendoAparelho(a)}
+                              title="Ver todas as listas no aparelho (inclusive as ocultas)"
+                              className="text-zinc-400 hover:text-amber-600 transition-colors text-xs"
+                            >
+                              👁
+                            </button>
+                          )}
                         </div>
                       </td>
 
@@ -727,6 +740,18 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
           onSaved={() => {
             recarregarPlaylistsAoVivo(editandoPlaylist.idAppRegistro);
             setEditandoPlaylist(null);
+          }}
+        />
+      )}
+
+      {vendoAparelho && (
+        <ListasAparelhoModal
+          idAppRegistro={vendoAparelho.id_app_registro}
+          mac={vendoAparelho.mac}
+          onClose={() => setVendoAparelho(null)}
+          onAlterado={() => {
+            recarregarPlaylistsAoVivo(vendoAparelho.id_app_registro);
+            router.refresh();
           }}
         />
       )}

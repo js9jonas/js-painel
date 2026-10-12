@@ -257,6 +257,8 @@ export default function AlertasAppsClient({
                           <td className="px-4 py-3">
                             {r.sem_validade ? (
                               <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                            ) : r.no_painel_app ? (
+                              <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar />
                             ) : (
                               <button
                                 onClick={() => abrirModal(r)}

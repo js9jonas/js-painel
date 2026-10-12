@@ -20,6 +20,7 @@ export const CONFIG: AppAcessoConfig = {
   websiteUrl: "https://reseller.lazerplay.io",
   recaptchaKey: "6LfjXhYsAAAAAHQ6pH2nBmSwmlK-e5xMcdbXAb5z",
   nomeApp: "LazerPlay",
+  apiCliente: "https://api.lazerplay.io", // site do cliente (listas do aparelho, inclusive ocultas)
 };
 
 export type LazerPlayDevice = AppAcessoDevice;

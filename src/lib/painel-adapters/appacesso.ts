@@ -16,6 +16,8 @@ export interface AppAcessoConfig {
   recaptchaKey: string; // vazio = sem captcha (ex: CorePlayer)
   nomeApp: string;
   requireOrigin?: boolean; // true = envia Origin/Referer (ex: CorePlayer bloqueia sem isso)
+  /** API do site do CLIENTE (o dono do aparelho entra com MAC + chave). Ver "Site do cliente" abaixo. */
+  apiCliente?: string;
 }
 
 export interface AppAcessoDevice {
@@ -237,6 +239,53 @@ export async function buscarDispositivoPorMac(cfg: AppAcessoConfig, token: strin
   const data = await apiFetch(cfg, token, `/reseller/devices?${q}`);
   const rows = (data?.rows ?? []) as AppAcessoDevice[];
   return rows.find((d) => d.mac.toUpperCase() === mac.toUpperCase()) ?? null;
+}
+
+// ---------- Site do cliente: listas do aparelho, inclusive as ocultas ----------
+// Achado do Jonas em 12/10/2026 (capturado no lazerplay.io, conferido no Fun Play): o site do cliente
+// entra com MAC + chave do aparelho (sem captcha) e mostra TODAS as listas do aparelho — também as que o
+// painel de revenda esconde — e deixa apagá-las. A resposta traz usuário/senha das listas: não logar.
+
+export interface AppAcessoListaAparelho {
+  id: number;
+  name: string;
+  url: string;
+  is_selected: boolean;
+  reseller_id: number | null;
+  createdAt?: string;
+}
+
+async function clienteFetch(cfg: AppAcessoConfig, path: string, tokenAparelho: string | null, options: RequestInit = {}): Promise<any> {
+  if (!cfg.apiCliente) throw new Error(`${cfg.nomeApp}: site do cliente não configurado.`);
+  const res = await fetch(`${cfg.apiCliente}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", authorization: `Bearer ${tokenAparelho ?? "null"}` },
+  });
+  const data = (await res.json().catch(() => null)) as any;
+  if (!data || data.error) throw new Error(`${cfg.nomeApp} (site do cliente): ${data?.message ?? `HTTP ${res.status}`}`);
+  return data.message;
+}
+
+/** Entra no site do cliente como o aparelho. A chave é a "Device Key" da TV (`aplicativos.chave`). */
+export async function entrarComoAparelho(cfg: AppAcessoConfig, mac: string, chave: string): Promise<string> {
+  // o MAC precisa ir como o app registrou (maiúsculas/minúsculas): o validate_mac devolve a forma certa
+  const v = await clienteFetch(cfg, `/api/validate_mac?mac=${encodeURIComponent(mac)}`, null).catch(() => null);
+  const token = await clienteFetch(cfg, "/api/login_by_mac", null, {
+    method: "POST",
+    body: JSON.stringify({ mac: v?.mac ?? mac, key: String(chave).trim() }),
+  });
+  if (typeof token !== "string" || !token) throw new Error(`${cfg.nomeApp}: o site do cliente não aceitou MAC + chave.`);
+  return token;
+}
+
+export async function listasNoAparelho(cfg: AppAcessoConfig, tokenAparelho: string): Promise<AppAcessoListaAparelho[]> {
+  const d = await clienteFetch(cfg, "/api/device", tokenAparelho);
+  return Array.isArray(d?.playlists) ? (d.playlists as AppAcessoListaAparelho[]) : [];
+}
+
+/** DELETE /api/palylist_from_web { id } — assim mesmo, "palylist". */
+export async function apagarListaNoAparelho(cfg: AppAcessoConfig, tokenAparelho: string, id: number): Promise<void> {
+  await clienteFetch(cfg, "/api/palylist_from_web", tokenAparelho, { method: "DELETE", body: JSON.stringify({ id }) });
 }
 
 // ---------- Servidores (host das listas) e migração em massa ----------

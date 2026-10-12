@@ -3,13 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Ativa no painel do app (Fun Play / Lazer Play / Core Player) um aparelho cadastrado sem ativação.
+// Ativa no painel do app (Fun Play / Lazer Play / Core Player) um aparelho cadastrado sem ativação,
+// ou renova (mesma ativação de 1 ano) um que está vencendo — `renovar` só muda os textos.
 // GASTA 1 CRÉDITO: 1º clique recarrega a tela e pede confirmação com o nome do cliente; 2º clique ativa.
 // O servidor ainda recusa gastar de novo se o painel já mostrar o aparelho ativado.
 
 type Estado = "parado" | "confirmar" | "ativando" | "ok" | "erro";
 
-export default function AtivarPainelButton({ idAppRegistro, nomeCliente }: { idAppRegistro: string; nomeCliente: string }) {
+export default function AtivarPainelButton({
+  idAppRegistro,
+  nomeCliente,
+  renovar = false,
+}: {
+  idAppRegistro: string;
+  nomeCliente: string;
+  renovar?: boolean;
+}) {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>("parado");
   const [mensagem, setMensagem] = useState<string | null>(null);
@@ -29,8 +38,8 @@ export default function AtivarPainelButton({ idAppRegistro, nomeCliente }: { idA
         setEstado("ok");
         setMensagem(
           job.jaAtivado
-            ? `Já estava ativado${data ? ` até ${data}` : ""}. Nenhum crédito gasto.`
-            : `Ativado${data ? ` até ${data}` : ""}.`
+            ? `Já estava ${renovar ? "renovado" : "ativado"}${data ? ` até ${data}` : ""}. Nenhum crédito gasto.`
+            : `${renovar ? "Renovado" : "Ativado"}${data ? ` até ${data}` : ""}.`
         );
         router.refresh();
       } else {
@@ -58,7 +67,7 @@ export default function AtivarPainelButton({ idAppRegistro, nomeCliente }: { idA
     try {
       const res = await fetch(`/api/aplicativos/${idAppRegistro}/ativar-painel`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.jobId) throw new Error(data.erro ?? "Não deu pra iniciar a ativação.");
+      if (!res.ok || !data.jobId) throw new Error(data.erro ?? `Não deu pra iniciar a ${renovar ? "renovação" : "ativação"}.`);
       await acompanhar(data.jobId);
     } catch (e: unknown) {
       setEstado("erro");
@@ -79,10 +88,16 @@ export default function AtivarPainelButton({ idAppRegistro, nomeCliente }: { idA
           estado === "confirmar" ? "bg-red-600 hover:bg-red-700" : "bg-violet-600 hover:bg-violet-700"
         }`}
       >
-        {estado === "ativando" ? "Ativando…" : estado === "confirmar" ? "Confirmar: gasta 1 crédito" : "Ativar no painel"}
+        {estado === "ativando"
+          ? renovar ? "Renovando…" : "Ativando…"
+          : estado === "confirmar"
+            ? "Confirmar: gasta 1 crédito"
+            : renovar ? "Renovar no painel" : "Ativar no painel"}
       </button>
       {estado === "confirmar" && (
-        <span className="text-xs text-zinc-500">Ativar o aparelho de {nomeCliente}? Clique de novo para confirmar.</span>
+        <span className="text-xs text-zinc-500">
+          {renovar ? "Renovar por 1 ano" : "Ativar"} o aparelho de {nomeCliente}? Clique de novo para confirmar.
+        </span>
       )}
       {estado === "erro" && mensagem && <span className="text-xs text-red-600">{mensagem}</span>}
     </div>

@@ -21,6 +21,7 @@ export const CONFIG: AppAcessoConfig = {
   websiteUrl: "https://reseller.funplays.app",
   recaptchaKey: "6LcS2BYsAAAAALlg6fQnrKJLBTheTQbiyy6hUbnz",
   nomeApp: "FunPlays",
+  apiCliente: "https://api.funplays.app", // site do cliente (listas do aparelho, inclusive ocultas)
 };
 
 // Re-exports tipados para uso no sync route

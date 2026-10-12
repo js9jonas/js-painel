@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import { jwtValido } from "@/lib/painel-adapters/appacesso";
-import { loginFunPlays, criarPlaylist as criarFunPlays, getPlaylistsDispositivo as getFunPlaysPlaylists, selecionarPlaylist as selecionarFunPlays } from "@/lib/painel-adapters/funplays";
-import { loginLazerPlay, criarPlaylist as criarLazerPlay, getPlaylistsDispositivo as getLazerPlayPlaylists, selecionarPlaylist as selecionarLazerPlay } from "@/lib/painel-adapters/lazerplay";
-import { loginCorePlayer, criarPlaylist as criarCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists, selecionarPlaylist as selecionarCorePlayer } from "@/lib/painel-adapters/coreplayer";
+import { loginFunPlays, getPlaylistsDispositivo as getFunPlaysPlaylists, selecionarPlaylist as selecionarFunPlays } from "@/lib/painel-adapters/funplays";
+import { loginLazerPlay, getPlaylistsDispositivo as getLazerPlayPlaylists, selecionarPlaylist as selecionarLazerPlay } from "@/lib/painel-adapters/lazerplay";
+import { loginCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists, selecionarPlaylist as selecionarCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, criarPlaylist as criarSmartOne } from "@/lib/painel-adapters/smartone";
+import { configDoTipo, criarPlaylistLimpandoOculta, type TipoPainelApp } from "@/lib/app-painel";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 // Cria uma playlist nova num device existente. appacesso (FunPlays/LazerPlay/CorePlayer):
@@ -61,18 +62,19 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
   try {
     const { rows } = await pool.query<{
       mac: string | null;
+      chave: string | null;
       id_dispositivo_painel: string | null;
       id_painel_servidor: number | null;
       id_cliente: number;
     }>(
-      `SELECT mac, id_dispositivo_painel::text AS id_dispositivo_painel, id_painel_servidor, id_cliente FROM public.aplicativos WHERE id_app_registro = $1`,
+      `SELECT mac, chave, id_dispositivo_painel::text AS id_dispositivo_painel, id_painel_servidor, id_cliente FROM public.aplicativos WHERE id_app_registro = $1`,
       [idAppRegistro]
     );
     if (!rows.length || !rows[0].id_painel_servidor || !rows[0].id_dispositivo_painel) {
       jobs.set(jobId, { done: true, ok: false, erro: "Aplicativo sem painel/device vinculado." });
       return;
     }
-    const { mac, id_dispositivo_painel, id_painel_servidor: idPainel, id_cliente } = rows[0];
+    const { mac, chave, id_dispositivo_painel, id_painel_servidor: idPainel, id_cliente } = rows[0];
     // Número interno do aparelho no painel (sql/014) — a `chave` é a chave real da TV.
     const deviceId = parseInt(id_dispositivo_painel!, 10);
 
@@ -124,10 +126,16 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
         [idAppRegistro, novo.id, corpo.nome ?? null, url, novo.activation_expired ?? null]
       );
     } else {
-      const criarFn = tipo === "lazerplay" ? criarLazerPlay : tipo === "coreplayer" ? criarCorePlayer : criarFunPlays;
       const getPlaylistsFn = tipo === "lazerplay" ? getLazerPlayPlaylists : tipo === "coreplayer" ? getCorePlayerPlaylists : getFunPlaysPlaylists;
 
-      await criarFn(token, { deviceId, name: corpo.nome ?? "", url: corpo.url ?? "" });
+      // "já existe" = lista oculta igual no aparelho: apaga pelo site do cliente e cria de novo
+      const { ocultasApagadas } = await criarPlaylistLimpandoOculta(
+        configDoTipo(tipo as TipoPainelApp),
+        token,
+        { deviceId, name: corpo.nome ?? "", url: corpo.url ?? "" },
+        { mac, chave }
+      );
+      if (ocultasApagadas) aviso = `Havia ${ocultasApagadas === 1 ? "uma lista oculta igual" : `${ocultasApagadas} listas ocultas iguais`} no aparelho; foi apagada para a nova entrar.`;
 
       let playlists = await getPlaylistsFn(token, deviceId);
       let nova = playlists.find((p) => p.url === corpo.url) ?? playlists[playlists.length - 1];
@@ -143,7 +151,7 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
           // segue: a playlist já foi criada; só avisa abaixo
         }
         if (!nova.is_selected) {
-          aviso = "Playlist criada, mas não deu pra marcar como ativa. Use \"Marcar como ativa\" no menu da playlist.";
+          aviso = `${aviso ? `${aviso} ` : ""}Playlist criada, mas não deu pra marcar como ativa. Use "Marcar como ativa" no menu da playlist.`;
         }
       }
 
