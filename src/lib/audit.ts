@@ -47,7 +47,8 @@ export type AuditTipo =
   | "criacao_teste_conta"
   | "renovacao"
   | "exclusao_pagamento"
-  | "servidor_app";
+  | "servidor_app"
+  | "servidor_host";
 
 /**
  * E-mail do usuário logado, ou null fora de uma sessão (n8n/cron) ou se a

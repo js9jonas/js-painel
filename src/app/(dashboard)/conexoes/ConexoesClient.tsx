@@ -8,8 +8,9 @@ import PainelAppSyncCard from "./PainelAppSyncCard";
 import PainelServidorModal from "./PainelServidorModal";
 import PainelAppModal from "./PainelAppModal";
 import PainelAppSyncModal from "./PainelAppSyncModal";
+import HostsServidoresTab from "./HostsServidoresTab";
 
-type Tab = "contas" | "apps";
+type Tab = "contas" | "apps" | "hosts";
 
 type Props = {
   servidores: PainelServidorRow[];
@@ -50,9 +51,12 @@ export default function ConexoesClient({ servidores, apps, appSync, servidoresVi
                 {appSync.length + apps.length}
               </span>
             </TabButton>
+            <TabButton active={tab === "hosts"} onClick={() => setTab("hosts")}>
+              Hosts
+            </TabButton>
           </div>
           <div className="ml-4 pb-px">
-            {tab === "contas" ? (
+            {tab === "hosts" ? null : tab === "contas" ? (
               <button
                 onClick={() => setModalServidor("novo")}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors whitespace-nowrap"
@@ -88,6 +92,8 @@ export default function ConexoesClient({ servidores, apps, appSync, servidoresVi
             )}
           </div>
         )}
+
+        {tab === "hosts" && <HostsServidoresTab />}
 
         {/* Painéis de Aplicativo */}
         {tab === "apps" && (

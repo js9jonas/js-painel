@@ -2,6 +2,8 @@
 
 import { pool } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { normalizarHost } from "@/lib/hosts";
+import { definirPrincipal } from "@/lib/servidor-hosts";
 
 export type PainelServidorInput = {
   id?: number;
@@ -33,9 +35,14 @@ export type PainelAppInput = {
 };
 
 export async function salvarPainelServidor(input: PainelServidorInput): Promise<{ ok: boolean; erro?: string }> {
+  const hostPrincipal = normalizarHost(input.host_stream);
+  if (input.host_stream.trim() && !hostPrincipal) return { ok: false, erro: "Host stream inválido. Use o formato http://dominio.com" };
+  const client = await pool.connect();
   try {
+    await client.query("BEGIN");
+    let idPainel = input.id ?? null;
     if (input.id) {
-      await pool.query(
+      await client.query(
         `UPDATE public.painel_servidores SET
            nome = $2, tipo = $3, url_painel = $4, host_stream = $5, url_acesso_web = $6,
            usuario = $7, senha = CASE WHEN $8 = '' THEN senha ELSE $8 END,
@@ -47,7 +54,7 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
           input.nome.trim(),
           input.tipo.trim(),
           input.url_painel.trim() || null,
-          input.host_stream.trim() || null,
+          hostPrincipal,
           input.url_acesso_web.trim() || null,
           input.usuario.trim() || null,
           input.senha,
@@ -58,15 +65,16 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
         ]
       );
     } else {
-      await pool.query(
+      const { rows } = await client.query<{ id: number }>(
         `INSERT INTO public.painel_servidores
            (nome, tipo, url_painel, host_stream, url_acesso_web, usuario, senha, master, contato_master, ativo, id_servidor)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         RETURNING id`,
         [
           input.nome.trim(),
           input.tipo.trim(),
           input.url_painel.trim() || null,
-          input.host_stream.trim() || null,
+          hostPrincipal,
           input.url_acesso_web.trim() || null,
           input.usuario.trim() || null,
           input.senha || null,
@@ -76,11 +84,18 @@ export async function salvarPainelServidor(input: PainelServidorInput): Promise<
           input.id_servidor ?? null,
         ]
       );
+      idPainel = rows[0].id;
     }
+    // o host stream é o principal da lista de hosts do servidor (aba Hosts)
+    if (hostPrincipal && idPainel) await definirPrincipal(client, Number(idPainel), hostPrincipal);
+    await client.query("COMMIT");
     revalidatePath("/conexoes");
     return { ok: true };
   } catch (e: unknown) {
+    await client.query("ROLLBACK").catch(() => {});
     return { ok: false, erro: e instanceof Error ? e.message : "Erro desconhecido." };
+  } finally {
+    client.release();
   }
 }
 
