@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
 import { auth } from '@/auth'
-import { enviarTemplateWhatsapp } from '@/lib/whatsapp-template'
+import { enviarTemplateWhatsapp, templateJaEnviadoHoje } from '@/lib/whatsapp-template'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +14,10 @@ export async function POST(req: NextRequest) {
 
     if (!telefone || !template_name) {
       return NextResponse.json({ error: 'telefone e template_name obrigatórios' }, { status: 400 })
+    }
+
+    if (await templateJaEnviadoHoje(telefone, template_name)) {
+      return NextResponse.json({ error: 'Esse aviso já foi enviado hoje pra esse número.' }, { status: 409 })
     }
 
     const resultado = await enviarTemplateWhatsapp(telefone, template_name, Array.isArray(parametros) ? parametros : [])

@@ -477,6 +477,7 @@ export default function ChatPage() {
   const [rrForm, setRrForm] = useState({ atalho: '', titulo: '', texto: '', ordem: 0, fixado: false })
   const [templateConfirm, setTemplateConfirm] = useState<'amanha' | 'vencidos' | null>(null)
   const [enviandoTemplate, setEnviandoTemplate] = useState(false)
+  const [erroTemplate, setErroTemplate] = useState<string | null>(null)
   const [infoAberto, setInfoAberto] = useState(false)
   const [planosModalOpen, setPlanosModalOpen] = useState(false)
   const [pagamentoHoverAberto, setPagamentoHoverAberto] = useState(false)
@@ -1268,15 +1269,17 @@ export default function ChatPage() {
   // Envia o template oficial da Meta (lembrete/vencido) com os dados da assinatura aberta —
   // única forma de iniciar contato fora da janela de 24h do WhatsApp, ao contrário de texto livre.
   async function enviarTemplateVencimento() {
-    if (!templateConfirm || !selecionado || !cliente) return
+    if (!templateConfirm || !selecionado || !cliente || enviandoTemplate) return
     setEnviandoTemplate(true)
+    setErroTemplate(null)
+    let ok = false
     try {
       const templateName = templateConfirm === 'amanha' ? 'lembrete_vencimento_v2' : 'vencido_plano_v2'
       const primeiroNome = cliente.nome.trim().split(/\s+/)[0]
       const telasTxt = (cliente.pacote ?? '').toLowerCase()
       const identificacaoTxt = cliente.identificacao?.trim() || 'Principal'
       const dataTxt = cliente.venc_contrato ? formatData(cliente.venc_contrato) : ''
-      await fetch('/api/whatsapp/enviar-template', {
+      const resp = await fetch('/api/whatsapp/enviar-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1285,10 +1288,15 @@ export default function ChatPage() {
           parametros: [primeiroNome, telasTxt, identificacaoTxt, dataTxt],
         }),
       })
+      ok = resp.ok
+      // Recusa (ex.: já enviado hoje pra esse número) fica visível no modal em vez de sumir calada
+      if (!ok) setErroTemplate((await resp.json().catch(() => ({}))).error ?? 'Não foi possível enviar agora.')
       await carregarMensagens(selecionado)
+    } catch {
+      setErroTemplate('Sem internet ou o sistema está atualizando. Confira a conversa antes de tentar de novo.')
     } finally {
       setEnviandoTemplate(false)
-      setTemplateConfirm(null)
+      if (ok) setTemplateConfirm(null)
     }
   }
 
@@ -3712,7 +3720,7 @@ export default function ChatPage() {
       {/* Modal de confirmação — envio de template de vencimento */}
       {templateConfirm && cliente && (
         <div
-          onClick={() => !enviandoTemplate && setTemplateConfirm(null)}
+          onClick={() => { if (!enviandoTemplate) { setTemplateConfirm(null); setErroTemplate(null) } }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
         >
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, width: 360, boxShadow: '0 8px 32px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
@@ -3735,10 +3743,11 @@ export default function ChatPage() {
                 <div><b>Identificação:</b> {cliente.identificacao?.trim() || 'Principal'}</div>
                 <div><b>Vencimento:</b> {cliente.venc_contrato ? formatData(cliente.venc_contrato) : '—'}</div>
               </div>
+              {erroTemplate && <div style={{ marginTop: 10, color: '#d32f2f', fontWeight: 600 }}>{erroTemplate}</div>}
             </div>
             <div style={{ padding: '12px 20px', borderTop: '1px solid #e9edef', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button
-                onClick={() => setTemplateConfirm(null)}
+                onClick={() => { setTemplateConfirm(null); setErroTemplate(null) }}
                 disabled={enviandoTemplate}
                 style={{ background: '#e9edef', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}
               >Cancelar</button>

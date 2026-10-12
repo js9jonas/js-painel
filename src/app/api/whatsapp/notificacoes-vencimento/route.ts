@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { pool } from '@/lib/db'
-import { enviarTemplateWhatsapp } from '@/lib/whatsapp-template'
+import { enviarTemplateWhatsapp, templateJaEnviadoHoje } from '@/lib/whatsapp-template'
 import {
   listarPendentes,
   buscarDadosParaEnvio,
@@ -51,11 +51,31 @@ export async function POST(req: NextRequest) {
 
   const DELAY_ENTRE_CONTATOS_MS = 200
 
+  // Trava por tipo: um 2º POST igual (navegador reenviando ao voltar pra aba) não roda em paralelo
+  // com o 1º. Conexão dedicada porque advisory lock de sessão fica preso à conexão que o pegou.
+  const conexaoTrava = await pool.connect()
+  const chaveTrava = `notificacoes-vencimento:${tipo}`
+  try {
+    const trava = await conexaoTrava.query('SELECT pg_try_advisory_lock(hashtext($1)) AS ok', [chaveTrava])
+    if (!trava.rows[0].ok) {
+      return NextResponse.json({ error: 'Esse envio já está em andamento. Aguarde terminar.' }, { status: 409 })
+    }
+    try {
+      return NextResponse.json({ resultados: await enviarLote(ids, templateName, source, DELAY_ENTRE_CONTATOS_MS) })
+    } finally {
+      await conexaoTrava.query('SELECT pg_advisory_unlock(hashtext($1))', [chaveTrava])
+    }
+  } finally {
+    conexaoTrava.release()
+  }
+}
+
+async function enviarLote(ids: string[], templateName: string, source: string, delayMs: number) {
   const resultados: any[] = []
   for (let i = 0; i < ids.length; i++) {
     const idAssinatura: string = ids[i]
 
-    if (i > 0) await new Promise((resolve) => setTimeout(resolve, DELAY_ENTRE_CONTATOS_MS))
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, delayMs))
 
     try {
       const dados = await buscarDadosParaEnvio(idAssinatura)
@@ -65,6 +85,12 @@ export async function POST(req: NextRequest) {
       }
       if (!dados.telefone) {
         resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, ok: false, error: 'Sem telefone cadastrado' })
+        continue
+      }
+
+      // 1x por dia por número: cobre POST repetido pelo navegador e cliente com 2 assinaturas no mesmo número
+      if (await templateJaEnviadoHoje(dados.telefone, templateName)) {
+        resultados.push({ id_assinatura: idAssinatura, nome: dados.nome, telefone: dados.telefone, ok: true, pulado: true })
         continue
       }
 
@@ -101,5 +127,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ resultados })
+  return resultados
 }

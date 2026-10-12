@@ -37,7 +37,8 @@ function intervaloDoTipo(tipo: TipoNotificacaoVencimento): string {
 }
 
 export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<ItemNotificacaoVencimento[]> {
-  const source = sourceDoTipo(tipo)
+  // Mesmo critério de templateJaEnviadoHoje: o template por número, venha do disparo ou do /chat
+  const templateName = templateDoTipo(tipo)
 
   const r = await pool.query(
     `SELECT a.id_assinatura::text, c.id_cliente, c.nome, ct.telefone, p.telas, a.venc_contrato::text, a.status,
@@ -51,13 +52,14 @@ export async function listarPendentes(tipo: TipoNotificacaoVencimento): Promise<
      LEFT JOIN LATERAL (
        SELECT true AS tentou, wm.status
        FROM public.whatsapp_mensagens wm
-       WHERE wm.telefone = ct.telefone AND wm.source = $1 AND wm.recebida_em::date = CURRENT_DATE
+       WHERE wm.telefone = ct.telefone AND wm.recebida_em >= CURRENT_DATE AND wm.tipo = 'template'
+         AND CASE WHEN wm.tipo = 'template' AND wm.conteudo LIKE '{%' THEN wm.conteudo::jsonb->>'name' END = $1
        ORDER BY wm.recebida_em DESC LIMIT 1
      ) ultimo ON true
      WHERE a.venc_contrato::date = ${intervaloDoTipo(tipo)}
        AND a.status NOT IN ('inativo')
      ORDER BY c.nome`,
-    [source]
+    [templateName]
   )
 
   return r.rows.map((row) => {

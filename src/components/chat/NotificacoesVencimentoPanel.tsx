@@ -66,7 +66,10 @@ function ListaNotificacao({ tipo, onAbrirConversa }: { tipo: Tipo; onAbrirConver
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [carregando, setCarregando] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
   const requestId = useRef(0)
+  // Trava síncrona contra clique duplo (o state `enviando` só vale no próximo render)
+  const enviandoRef = useRef(false)
 
   const carregar = useCallback(async () => {
     const meuId = ++requestId.current
@@ -109,18 +112,25 @@ function ListaNotificacao({ tipo, onAbrirConversa }: { tipo: Tipo; onAbrirConver
 
   async function disparar() {
     const ids = Array.from(selecionados)
-    if (ids.length === 0) return
+    if (ids.length === 0 || enviandoRef.current) return
 
     if (!confirm(`Enviar "${TITULOS[tipo]}" para ${ids.length} cliente${ids.length !== 1 ? 's' : ''}?`)) return
 
+    enviandoRef.current = true
     setEnviando(true)
+    setAviso(null)
     try {
       const resp = await fetch('/api/whatsapp/notificacoes-vencimento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo, ids }),
       })
-      const j = await resp.json()
+      const j = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        setAviso(j.error ?? 'Não foi possível enviar agora. Tente de novo em instantes.')
+        await carregar()
+        return
+      }
       const resultados: { id_assinatura: string; ok: boolean; error?: string }[] = j.resultados ?? []
 
       setItens((prev) =>
@@ -135,7 +145,11 @@ function ListaNotificacao({ tipo, onAbrirConversa }: { tipo: Tipo; onAbrirConver
         for (const r of resultados) if (r.ok) novo.delete(r.id_assinatura)
         return novo
       })
+    } catch {
+      setAviso('Sem internet ou o sistema está atualizando. Confira a lista antes de enviar de novo.')
+      await carregar()
     } finally {
+      enviandoRef.current = false
       setEnviando(false)
     }
   }
@@ -170,6 +184,7 @@ function ListaNotificacao({ tipo, onAbrirConversa }: { tipo: Tipo; onAbrirConver
         >
           {enviando ? 'Enviando...' : `${TITULOS[tipo]} (${selecionados.size})`}
         </button>
+        {aviso && <div style={{ marginTop: 6, color: '#d32f2f', fontSize: 11 }}>{aviso}</div>}
       </div>
 
       <div style={{ overflowY: 'auto', flex: 1 }}>
