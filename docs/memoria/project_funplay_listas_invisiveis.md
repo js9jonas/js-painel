@@ -1,9 +1,30 @@
 ---
 name: project-funplay-listas-invisiveis
-description: "FunPlay não mostra no site (nem na API) as listas que os clientes usam de fato — só 27 de 937 apps ativos têm lista no js-painel; plano do Jonas (04/10/2026) de recriar via URL fictícia + migração em massa do site"
+description: "FunPlay não mostra no site (nem na API) as listas que os clientes usam de fato (ocultas). Contorno em uso desde 11/10/2026: migrar as ocultas de cada servidor para um host secundário e recriar as listas no host principal — FAST e Central feitos, Uniplay em andamento"
 metadata:
   type: project
 ---
+
+## Andamento por servidor (Fun Play 106) — atualizado 11/10/2026
+
+Procedimento: (1) Jonas cadastra o servidor no painel com o host principal e migra para o host secundário **levando**
+as listas (ocultas saem do principal); (2) script devolve ao principal as listas visíveis conhecidas e cria
+"<PrimeiroNome> TV" (marcada ativa, gravada em `aplicativo_playlists` com `id_conta`) nos aparelhos de clientes
+com uma única conta daquele servidor; (3) casos com várias contas: triagem por observação do aparelho/rótulo da
+conta, Jonas aprova; (4) Jonas migra o servidor de volta ao principal **sem** levar as listas. Hosts registrados na
+aba Hosts de /conexoes (tabela `servidor_hosts`).
+
+| Servidor | Principal | Ocultas em | Situação |
+|---|---|---|---|
+| FAST | ligaf.me | bandeiraf.vip | ✅ 245 listas (209 + 36) |
+| Central | pfun.store | bandeira5.info | ✅ 9 devolvidas + 128 únicas + 22 várias contas; servidor de volta no principal |
+| Uniplay | chdef.site | monitor3.cfd | 🔄 11/10: 4 devolvidas, 182 únicas e 42 de várias contas rodando; falta Jonas voltar o servidor para chdef.site sem levar listas |
+| NOW, Lazer Play, Core Player | — | — | 📋 a fazer |
+
+- Uniplay: `blushes.top` é do próprio servidor mas já é padrão em outro painel — usar na migração do Fun Play dá erro; por isso as ocultas foram para `monitor3.cfd`.
+- Ficaram sem lista os clientes com várias contas sem indicação de qual vai em cada aparelho (Central: 19 clientes; Uniplay: 19) — ficam para quando o cliente pedir.
+- Sessão do painel 106 dura ~1 h; script espera e relê o token quando o Jonas renova pela produção.
+- **Não fazer `source` do `.env.local`** ao rodar scripts/dev local (CRLF quebra os valores) — passar só `DATABASE_URL` limpa.
 
 ## Problema (03/10/2026)
 
@@ -17,7 +38,7 @@ Comparação (apps com lista): Smartone 480, Fun Play 27, POP Player 21, Lazer P
 2. Ferramenta de **migração em massa** do próprio site FunPlay → trocou para a URL principal (a que era recusada como "já existe").
 3. Resultado: a lista passou a aparecer no painel com a URL real. Suspeita (não confirmada): no app do cliente ela pode aparecer **2x** em Listas.
 
-## Plano do Jonas (executar 04/10/2026, NÃO feito ainda)
+## Plano original do Jonas (04/10/2026) — substituído pelo procedimento por servidor (ver "Andamento por servidor")
 
 Script que, para cada app Fun Play ativo **sem lista** cujo cliente tem **exatamente 1 conta ativa**, cria uma playlist com **URL fictícia** que identifique o servidor; depois Jonas usa a migração em massa do site: fictícia → URL principal do servidor. Clientes com 2+ contas ficam de fora (não dá pra saber qual conta vai em qual aparelho).
 

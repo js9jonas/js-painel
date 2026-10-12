@@ -36,16 +36,16 @@ js-painel).
 - Lacuna achada: antes disso o js-painel **não ativava app no painel**; o "+1 ano" de /alertas e o renovar de app só gravam a data no banco.
 - Base comum: `src/lib/app-painel.ts` (painel ativo por app, sessão com captcha, lista ativa), `src/lib/apps-painel-ids.ts` (ids 3/2/31, sem servidor), `validarMac`/`buscarDispositivoPorMac` em `appacesso.ts`.
 
-## Servidores de lista + migração em massa no js-painel (11/10/2026, local, aguardando teste do Jonas)
+## Servidores de lista + migração em massa no js-painel (11/10/2026) — ✅ commit afb9c8f, Jonas usou em produção
 - /conexoes → aba Painéis de Aplicativo → botão **"Servidores"** nos cards Fun Play/Lazer Play/Core Player: lista (com recontagem), cadastrar (nome + host + código), **Migrar** (novo host + "Levar as listas junto", revisão e confirmação em 2 passos). Rota `/api/paineis/servidores/[id]/servidores-app`; auditoria tipo `servidor_app`.
 - **Descoberto:** a contagem de aparelhos do servidor é **por host**, mas só se atualiza com `PUT /reseller/server/sync_device_count { id }` (a tela reconta sozinha).
 - **Feito a pedido do Jonas:** FAST do FunPlay (id 2317) migrado `bandeiraf.vip` → `ligaf.me` com `replace:false` ("Server is updated"). Lista do Miguel (bandeiraf) intacta; recontado = **245** (exatamente as `ligaf.me` do lote). As `bandeiraf.vip` (inclusive ocultas) ficaram fora de qualquer servidor, de propósito.
 - ⚠️ Cuidado ao criar servidores pros outros hosts (Central `pfun.store`, Uniplay `chdef.site`…): as ocultas desses servidores provavelmente ainda estão no host original e passariam a contar (e migrar) junto. LazerPlay 107 não tem nenhum servidor (11/10).
 
-## Hosts de cada servidor (11/10/2026)
+## Hosts de cada servidor (11/10/2026) — ✅ commit 0055d1d, Jonas testou e já atribuiu os desconhecidos
 
 - Tabela `servidor_hosts` (sql/015, já aplicada): endereços de lista por `painel_servidores`, papel `principal`/`secundario`/`inativo`; 1 principal por servidor, endereço único no banco. O principal é espelhado em `painel_servidores.host_stream` (`definirPrincipal` em `src/lib/servidor-hosts.ts`), então o resto do sistema não mudou. Salvar o "Host stream" no modal do painel também redefine o principal.
 - Aba **Hosts** em /conexoes: cards por servidor (tornar principal com 2º clique, inativar/reativar, remover só sem listas, adicionar) + quadro "Endereços ainda não identificados" (hosts das playlists do banco fora da tabela, com servidor sugerido pela conta da lista) para atribuir. Audit `servidor_host`.
 - Carga inicial: host_stream de cada servidor como principal; secundários `bandeiraf.vip` (FAST) e `bandeira5.info` (Central), onde ficaram as listas ocultas do Fun Play.
-- Desconhecidos em 11/10: blushes.top (112 listas, sugere Uniplay), tvlol32.com (55, Central), cdn-user.com, monitor3.cfd, ponto.jsnow.cfd, cdn4k.org e outros pequenos — Jonas ainda vai atribuir.
-- Central no Fun Play 106 (11/10): Jonas migrou as listas para `bandeira5.info`; script devolveu 9 listas conhecidas para `pfun.store` e criou lista nova (`<Nome> TV`, ativa) nos aparelhos de clientes com uma única conta (Central). Falta voltar o servidor do painel para `pfun.store` sem levar as listas.
+- Desconhecidos de 11/10 já atribuídos pelo Jonas (todos como secundário, exceto xc.s-dns.org inativo em NATV): Uniplay blushes.top/monitor3.cfd/techonhd.top; Central tvlol32.com/cdn-user.com/cdn4k.org/conecta5.store; NOW ponto.jsnow.cfd; CLUB novo conectajs.club; FAST techtvon.cc.
+- Central no Fun Play 106 (11/10): Jonas migrou as listas para `bandeira5.info`; script devolveu 9 listas conhecidas para `pfun.store` e criou lista nova (`<Nome> TV`, ativa) nos aparelhos de clientes com uma única conta (Central). Servidor já de volta em `pfun.store` (Jonas). Andamento dos demais servidores: `project_funplay_listas_invisiveis.md`.
