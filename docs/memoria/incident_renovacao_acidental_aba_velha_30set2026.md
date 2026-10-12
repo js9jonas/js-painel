@@ -16,3 +16,5 @@ metadata:
 4. Trava no `RenovarAssinatura.tsx`: se a aba ficou ≥5 min em segundo plano ou o modal está aberto há ≥15 min, o 1º clique em salvar não grava. Ele recarrega os dados (`router.refresh` + `onRecarregarDados`, que no /chat recarrega o cliente) e mostra um aviso com o nome do cliente. O botão fica travado 1,5 s pra um toque duplo não passar direto. O modal agora mostra o nome do cliente no cabeçalho.
 
 **Deploy:** commit `4dde184` em produção desde 01/10/2026.
+
+**Atualização 12/10/2026 (`b83d930`):** a trava de tela parada (item 4: 1º clique não grava após 5 min em segundo plano / 15 min de modal aberto) foi **removida a pedido do Jonas**. A auditoria da renovação no `audit_log` (usuário + IP) continua.
