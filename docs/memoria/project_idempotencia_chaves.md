@@ -13,7 +13,9 @@ metadata:
 - Sem chave (n8n, webhook da Meta, cron) ou banco com erro → segue como antes (recurso acessório, nunca bloqueia a ação).
 - Limpeza: 1% das gravações apaga chaves com mais de 7 dias (as repetidas ficam 90 dias, pra medir).
 
-**Testado:** dev server local + cookie mintado, rota inexistente (sem efeito colateral): mesma chave → 404 e depois 409; chave nova / sem chave → passa; sem login → login; GET nunca barrado. Wrapper do fetch testado isolado com fetch falso (7 casos). Build ok.
+**Em produção 12/10/2026 (deploy do Jonas):** chaves das ações reais gravando com usuário (enviar, marcar-lida), repeticoes=0; curl sem sessão em https://painel.jssistemas.online → 307 pro /login (página e API). Jonas confirmou tudo funcionando.
+
+**Testado antes:** dev server local + cookie mintado, rota inexistente (sem efeito colateral): mesma chave → 404 e depois 409; chave nova / sem chave → passa; sem login → login; GET nunca barrado. Wrapper do fetch testado isolado com fetch falso (7 casos). Build ok.
 
 **Limite:** só protege repetição da MESMA requisição. Clique novo é ação nova, de propósito; contra isso continuam as regras de negócio (ex.: template 1x por dia por número).
 
