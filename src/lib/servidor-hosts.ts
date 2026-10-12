@@ -50,8 +50,9 @@ export async function definirPrincipal(client: PoolClient, idPainel: number, hos
 export async function getHostsServidores(): Promise<{ servidores: ServidorComHosts[]; desconhecidos: HostDesconhecido[] }> {
   const [srv, hosts, listas] = await Promise.all([
     pool.query<{ id: number; nome: string; tipo: string; ativo: boolean }>(
+      // só servidores ativos — os desativados (ex.: CLUB antigo) não entram mais na tela
       `SELECT id, nome, tipo, ativo FROM public.painel_servidores
-        WHERE tipo <> ALL($1::text[]) ORDER BY ativo DESC, nome`,
+        WHERE tipo <> ALL($1::text[]) AND ativo = true ORDER BY nome`,
       [TIPOS_APP]
     ),
     pool.query<{ id: number; id_painel_servidor: number; host: string; papel: PapelHost; observacao: string | null }>(
