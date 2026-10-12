@@ -35,3 +35,9 @@ js-painel).
 - /alertas "Aplicativos expirando": app desses 3 painéis sem validade aparece como se vencesse hoje, selo "Precisa ativar" (aparece até no filtro padrão "com contrato") e botão **"Ativar no painel"** (2 cliques, 1 crédito) → `POST /api/aplicativos/[id]/ativar-painel` (job). Se o painel já mostra validade > 40 dias, não ativa de novo (só copia a data). Validade gravada = a do painel.
 - Lacuna achada: antes disso o js-painel **não ativava app no painel**; o "+1 ano" de /alertas e o renovar de app só gravam a data no banco.
 - Base comum: `src/lib/app-painel.ts` (painel ativo por app, sessão com captcha, lista ativa), `src/lib/apps-painel-ids.ts` (ids 3/2/31, sem servidor), `validarMac`/`buscarDispositivoPorMac` em `appacesso.ts`.
+
+## Servidores de lista + migração em massa no js-painel (11/10/2026, local, aguardando teste do Jonas)
+- /conexoes → aba Painéis de Aplicativo → botão **"Servidores"** nos cards Fun Play/Lazer Play/Core Player: lista (com recontagem), cadastrar (nome + host + código), **Migrar** (novo host + "Levar as listas junto", revisão e confirmação em 2 passos). Rota `/api/paineis/servidores/[id]/servidores-app`; auditoria tipo `servidor_app`.
+- **Descoberto:** a contagem de aparelhos do servidor é **por host**, mas só se atualiza com `PUT /reseller/server/sync_device_count { id }` (a tela reconta sozinha).
+- **Feito a pedido do Jonas:** FAST do FunPlay (id 2317) migrado `bandeiraf.vip` → `ligaf.me` com `replace:false` ("Server is updated"). Lista do Miguel (bandeiraf) intacta; recontado = **245** (exatamente as `ligaf.me` do lote). As `bandeiraf.vip` (inclusive ocultas) ficaram fora de qualquer servidor, de propósito.
+- ⚠️ Cuidado ao criar servidores pros outros hosts (Central `pfun.store`, Uniplay `chdef.site`…): as ocultas desses servidores provavelmente ainda estão no host original e passariam a contar (e migrar) junto. LazerPlay 107 não tem nenhum servidor (11/10).

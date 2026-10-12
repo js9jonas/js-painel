@@ -2,6 +2,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PainelAppSyncRow } from "@/lib/paineis";
+import ServidoresAppModal from "./ServidoresAppModal";
+
+// Painéis com "servidores de lista" e migração em massa (plataforma appacesso).
+const TEM_SERVIDORES = new Set(["funplays", "lazerplay", "coreplayer"]);
 
 const TIPO_BADGE: Record<string, string> = {
   funplays:   "bg-green-100 text-green-700",
@@ -38,6 +42,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
+  const [servidoresAberto, setServidoresAberto] = useState(false);
 
   const sessionExpirada =
     painel.session_expiry && new Date(painel.session_expiry) < new Date();
@@ -191,6 +196,15 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         >
           {sincronizando ? "Sincronizando…" : "Sync Devices"}
         </button>
+        {TEM_SERVIDORES.has(painel.tipo) && (
+          <button
+            onClick={() => setServidoresAberto(true)}
+            title="Servidores de lista e migração em massa"
+            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+          >
+            Servidores
+          </button>
+        )}
         <button
           onClick={onEditar}
           className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
@@ -216,6 +230,10 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
           </a>
         )}
       </div>
+
+      {servidoresAberto && (
+        <ServidoresAppModal idPainel={painel.id} nomePainel={painel.nome} onClose={() => setServidoresAberto(false)} />
+      )}
     </div>
   );
 }

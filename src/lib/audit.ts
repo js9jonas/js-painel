@@ -46,7 +46,8 @@ export type AuditTipo =
   | "desvinculo_conta"
   | "criacao_teste_conta"
   | "renovacao"
-  | "exclusao_pagamento";
+  | "exclusao_pagamento"
+  | "servidor_app";
 
 /**
  * E-mail do usuário logado, ou null fora de uma sessão (n8n/cron) ou se a

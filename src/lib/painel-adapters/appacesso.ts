@@ -239,6 +239,63 @@ export async function buscarDispositivoPorMac(cfg: AppAcessoConfig, token: strin
   return rows.find((d) => d.mac.toUpperCase() === mac.toUpperCase()) ?? null;
 }
 
+// ---------- Servidores (host das listas) e migração em massa ----------
+// Formato lido no código do site (main.b0256ef8.js, igual nos 3 apps) e conferido ao vivo no FunPlay
+// em 11/10/2026 (GET). Cada "servidor" tem um host; as listas com esse host contam nele (device_count).
+
+export interface AppAcessoServidor {
+  id: number;
+  name: string;
+  host: string;
+  code: string | null;
+  device_count: number | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** GET /reseller/server (o plural /reseller/servers dá 404). */
+export async function listarServidores(cfg: AppAcessoConfig, token: string): Promise<AppAcessoServidor[]> {
+  const data = await apiFetch(cfg, token, `/reseller/server?limit=100&page=1`);
+  return (data?.rows ?? []) as AppAcessoServidor[];
+}
+
+/** POST /reseller/server { host, name, code? }. Devolve a mensagem do painel (pode ser "enviado para aprovação"). */
+export async function criarServidor(
+  cfg: AppAcessoConfig,
+  token: string,
+  params: { host: string; name: string; code?: string }
+): Promise<unknown> {
+  return apiFetch(cfg, token, "/reseller/server", {
+    method: "POST",
+    body: JSON.stringify({ host: params.host, name: params.name, ...(params.code ? { code: params.code } : {}) }),
+  });
+}
+
+/**
+ * Migração em massa ("Server Migrate"): PUT /reseller/server/migrate { id, host, replace }.
+ * `replace` = checkbox "Migrate Playlists": true troca o host das listas desse servidor junto;
+ * false troca só o host cadastrado no servidor e deixa as listas como estão.
+ */
+export async function migrarServidor(
+  cfg: AppAcessoConfig,
+  token: string,
+  params: { id: number; host: string; replace: boolean }
+): Promise<unknown> {
+  return apiFetch(cfg, token, "/reseller/server/migrate", {
+    method: "PUT",
+    body: JSON.stringify({ id: params.id, host: params.host, replace: params.replace }),
+  });
+}
+
+/**
+ * Reconta os aparelhos do servidor pelo host atual: PUT /reseller/server/sync_device_count { id }.
+ * Conferido 11/10/2026: depois de migrar sem levar as listas, o FAST seguia com 277 (contagem antiga);
+ * recontado, mostrou 245 = exatamente as listas com o host novo.
+ */
+export async function recontarServidor(cfg: AppAcessoConfig, token: string, id: number): Promise<void> {
+  await apiFetch(cfg, token, "/reseller/server/sync_device_count", { method: "PUT", body: JSON.stringify({ id }) });
+}
+
 export async function getPlaylistsDispositivo(
   cfg: AppAcessoConfig,
   token: string,
