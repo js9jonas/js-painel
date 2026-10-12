@@ -1,11 +1,19 @@
 ---
 name: project-funplay-listas-invisiveis
-description: "FunPlay não mostra no site (nem na API) as listas que os clientes usam de fato (ocultas). Contorno em uso desde 11/10/2026: migrar as ocultas de cada servidor para um host secundário e recriar as listas no host principal — FAST e Central feitos, Uniplay em andamento"
+description: "Listas ocultas do FunPlay/LazerPlay/CorePlayer (o painel de revenda não mostra): RESOLVIDO em 12/10/2026 pelo site do cliente (MAC + chave) — ver, apagar e cadastro que limpa a oculta sozinho. A migração por servidor (FAST/Central/Uniplay feitos 11-12/10) foi aposentada"
 metadata:
   type: project
 ---
 
-## Andamento por servidor (Fun Play 106) — atualizado 11/10/2026
+## ✅ Situação final (12/10/2026) — decisão do Jonas
+
+A migração em massa por servidor **não é mais necessária**: as ocultas agora se resolvem aparelho a aparelho
+pelo site do cliente (seção "Achado do Jonas" abaixo) — 👁 "Listas no aparelho" em /clientes/[id] e limpeza
+automática no "já existe" ao criar lista. NOW, Lazer Play e Core Player **não** vão passar pela migração.
+O que foi feito nos três servidores (tabela abaixo) continua valendo; os hosts secundários ficam registrados
+na aba Hosts. A "Ideia do Jonas" de limpar via 3 migrações também ficou sem uso.
+
+## Histórico: andamento por servidor (Fun Play 106) — 11 e 12/10/2026
 
 Procedimento: (1) Jonas cadastra o servidor no painel com o host principal e migra para o host secundário **levando**
 as listas (ocultas saem do principal); (2) script devolve ao principal as listas visíveis conhecidas e cria
@@ -19,7 +27,7 @@ aba Hosts de /conexoes (tabela `servidor_hosts`).
 | FAST | ligaf.me | bandeiraf.vip | ✅ 245 listas (209 + 36) |
 | Central | pfun.store | bandeira5.info | ✅ 9 devolvidas + 128 únicas + 22 várias contas; servidor de volta no principal |
 | Uniplay | chdef.site | monitor3.cfd | ✅ 4 devolvidas + 178 únicas + 42 de várias contas (33 certas + 9 prováveis aprovadas); servidor de volta em chdef.site (Jonas) |
-| NOW, Lazer Play, Core Player | — | — | 📋 a fazer |
+| NOW, Lazer Play, Core Player | — | — | ⏹ não será feito (substituído pelo site do cliente) |
 
 - Uniplay: `blushes.top` é do próprio servidor mas já é padrão em outro painel — usar na migração do Fun Play dá erro; por isso as ocultas foram para `monitor3.cfd`.
 - Ficaram sem lista os clientes com várias contas sem indicação de qual vai em cada aparelho (Central: 19 clientes; Uniplay: 19) — ficam para quando o cliente pedir.
@@ -74,7 +82,7 @@ Pontos a confirmar antes de rodar em massa:
 - A migração em massa também serve pra trocar o domínio de todas as listas quando uma URL dá problema. Conferido ao vivo: as listas `ligaf.me` criadas no lote de 11/10 **não** foram afetadas pela migração.
 - 📋 Próximo (sem data): Jonas vai operar a migração em massa com Playwright aberto pra capturar o endpoint e trazer a função pro js-painel.
 
-## Ideia do Jonas (11/10/2026): lista nova recusada por "já existe" (lista oculta no mesmo host)
+## Ideia do Jonas (11/10/2026, superada em 12/10 pelo site do cliente): lista nova recusada por "já existe"
 
 Quando cadastrar uma lista e o painel do app recusar porque já existe uma igual (oculta) no aparelho, limpar via
 migração do servidor daquele host (Servidores em /conexoes, ou `PUT /reseller/server/migrate`):
