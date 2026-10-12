@@ -21,4 +21,4 @@ metadata:
 
 **Testado:** consulta contra o banco real (enviado hoje → true, outro template/ontem → false; lista "amanhã" 14/14 enviados) e disputa da trava com 2 conexões. Envio real não testado (não dá sem mandar pra cliente) — 📋 conferir no próximo disparo em massa que ninguém recebe 2x.
 
-**Lacuna conhecida:** outras rotas de envio (`/api/whatsapp/enviar` texto livre, renovar etc.) têm a mesma exposição a POST reenviado. Solução geral possível: chave de idempotência por clique (header) guardada no servidor.
+**Lacuna fechada no mesmo dia (`478122e`):** chave de idempotência em toda ação do navegador — ver `project_idempotencia_chaves`.
