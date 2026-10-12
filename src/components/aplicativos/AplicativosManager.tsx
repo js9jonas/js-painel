@@ -585,8 +585,12 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                       {/* MAC + Modelo */}
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs text-zinc-600 block">{a.mac ?? "—"}</span>
-                        {a.modelo && (
-                          <span className="text-[10px] text-zinc-400 mt-0.5 block">{a.modelo}</span>
+                        {(a.modelo || a.chave) && (
+                          <span className="text-[10px] text-zinc-400 mt-0.5 block">
+                            {a.chave && <span className="font-mono" title="Chave do dispositivo">{a.chave}</span>}
+                            {a.modelo && a.chave && " - "}
+                            {a.modelo}
+                          </span>
                         )}
                       </td>
 

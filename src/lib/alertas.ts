@@ -117,7 +117,8 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ap.observacao,
        app.nome_app,
        ult.venc_contrato_cliente,
-       ult.pacote_contrato,
+       -- mais de uma assinatura viva: "2 (1 Tela - 1 Tela)"; senão o pacote da última assinatura
+       CASE WHEN vivas.n > 1 THEN vivas.n || ' (' || vivas.pacotes || ')' ELSE ult.pacote_contrato END AS pacote_contrato,
        cnt.total_apps
      FROM public.aplicativos ap
      JOIN public.clientes c ON c.id_cliente = ap.id_cliente
@@ -134,6 +135,15 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ORDER BY a.venc_contrato DESC
        LIMIT 1
      ) ult ON true
+     -- assinaturas vivas do cliente (não inativas/canceladas) e o pacote de cada uma
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS n,
+              string_agg(COALESCE(p.contrato, '?'), ' - ' ORDER BY a.venc_contrato DESC) AS pacotes
+       FROM public.assinaturas a
+       LEFT JOIN public.pacote p ON p.id_pacote = a.id_pacote
+       WHERE a.id_cliente = ap.id_cliente
+         AND a.status NOT IN ('inativo', 'cancelado')
+     ) vivas ON true
      -- total de aplicativos ativos do cliente
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS total_apps
