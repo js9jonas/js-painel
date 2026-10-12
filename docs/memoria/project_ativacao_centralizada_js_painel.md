@@ -49,3 +49,7 @@ js-painel).
 - Carga inicial: host_stream de cada servidor como principal; secundários `bandeiraf.vip` (FAST) e `bandeira5.info` (Central), onde ficaram as listas ocultas do Fun Play.
 - Desconhecidos de 11/10 já atribuídos pelo Jonas (todos como secundário, exceto xc.s-dns.org inativo em NATV): Uniplay blushes.top/monitor3.cfd/techonhd.top; Central tvlol32.com/cdn-user.com/cdn4k.org/conecta5.store; NOW ponto.jsnow.cfd; CLUB novo conectajs.club; FAST techtvon.cc.
 - Central no Fun Play 106 (11/10): Jonas migrou as listas para `bandeira5.info`; script devolveu 9 listas conhecidas para `pfun.store` e criou lista nova (`<Nome> TV`, ativa) nos aparelhos de clientes com uma única conta (Central). Servidor já de volta em `pfun.store` (Jonas). Andamento dos demais servidores: `project_funplay_listas_invisiveis.md`.
+
+## Confirmado pelo Jonas (12/10/2026)
+- Tudo testado em produção e funcionando: cadastro de aparelho novo, apagar lista oculta pelo 👁, limpeza automática no "já existe" e "Renovar no painel" em /alertas.
+- **Renovação no painel (POST /reseller/activate em aparelho já ativado):** soma 1 ano à validade atual se ela ainda está no futuro; se já venceu, conta 1 ano a partir de hoje. Renovar antes de vencer não perde dias.
