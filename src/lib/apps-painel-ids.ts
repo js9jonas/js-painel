@@ -11,3 +11,12 @@ export const TIPO_POR_ID_APP: Record<number, TipoPainelApp> = {
 export function appTemCadastroPeloPainel(idApp: string | number | null | undefined): boolean {
   return idApp != null && idApp !== "" && TIPO_POR_ID_APP[Number(idApp)] !== undefined;
 }
+
+// SmartOne (smartone-iptv.com): outra plataforma, sem chave da TV. Aparelho novo entra pelo painel
+// junto com a lista (não existe aparelho sem lista lá) e fica "Pending" até o cliente recarregar a lista.
+export const ID_APP_SMARTONE = 4;
+
+/** Apps cujo cadastro de aparelho novo já manda a lista pelo painel (Fun/Lazer/Core + SmartOne). */
+export function appTemCadastroComLista(idApp: string | number | null | undefined): boolean {
+  return appTemCadastroPeloPainel(idApp) || (idApp != null && idApp !== "" && Number(idApp) === ID_APP_SMARTONE);
+}

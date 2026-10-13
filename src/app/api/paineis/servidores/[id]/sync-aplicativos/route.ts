@@ -391,6 +391,9 @@ async function executarSync(idPainel: number, jobId: string) {
          WHERE id_painel_servidor = ANY($1::bigint[])
            AND UPPER(mac) != ALL($2::text[])
            AND removido_em IS NULL
+           -- Cadastrado/mexido há pouco fica: no SmartOne o aparelho novo fica "Pending" (fora da
+           -- lista de ativos) até o cliente recarregar a lista na TV
+           AND atualizado_em < NOW() - INTERVAL '2 hours'
          RETURNING id_app_registro`,
         [idsPaineis, macsAtuais]
       );

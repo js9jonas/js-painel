@@ -18,6 +18,7 @@ import { CONFIG as CONFIG_FUNPLAYS } from "@/lib/painel-adapters/funplays";
 import { CONFIG as CONFIG_LAZERPLAY } from "@/lib/painel-adapters/lazerplay";
 import { CONFIG as CONFIG_COREPLAYER } from "@/lib/painel-adapters/coreplayer";
 import { TIPO_POR_ID_APP, type TipoPainelApp } from "@/lib/apps-painel-ids";
+import { loginSmartOne } from "@/lib/painel-adapters/smartone";
 
 export { TIPO_POR_ID_APP, type TipoPainelApp };
 
@@ -140,4 +141,33 @@ export function validadeDoPainel(activationExpired: string | null | undefined): 
   return activationExpired
     ? new Date(activationExpired).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     : null;
+}
+
+export type PainelSmartOne = { id: number; nome: string };
+
+/** Painel SmartOne ativo mais novo. */
+export async function painelSmartOneAtivo(): Promise<PainelSmartOne | null> {
+  const { rows } = await pool.query<{ id: number; nome: string }>(
+    `SELECT id, nome FROM public.painel_servidores WHERE tipo = 'smartone' AND ativo = true ORDER BY id DESC LIMIT 1`
+  );
+  return rows[0] ? { id: Number(rows[0].id), nome: rows[0].nome } : null;
+}
+
+/** Cookie de sessão do SmartOne: reaproveita o salvo se ainda vale (1 min de folga); senão login (Turnstile via CapSolver) e salva. */
+export async function sessaoSmartOne(idPainel: number): Promise<string> {
+  const { rows } = await pool.query<{ usuario: string; senha: string; session_cookie: string | null; session_expiry: Date | null }>(
+    `SELECT usuario, senha, session_cookie, session_expiry FROM public.painel_servidores WHERE id = $1`,
+    [idPainel]
+  );
+  const r = rows[0];
+  if (!r) throw new Error("Painel não encontrado.");
+  if (r.session_cookie && r.session_expiry && new Date(r.session_expiry).getTime() - 60_000 > Date.now()) {
+    return r.session_cookie;
+  }
+  const { token, expiry } = await loginSmartOne(r.usuario, r.senha);
+  await pool.query(
+    `UPDATE public.painel_servidores SET session_cookie = $1, session_expiry = $2 WHERE id = $3`,
+    [token, expiry, idPainel]
+  );
+  return token;
 }

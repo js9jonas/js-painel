@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { createAplicativo, updateAplicativo, type AplicativoData } from "@/app/actions/aplicativos";
 import { Select } from "@/components/ui/select";
 import type { AplicativoRow, AppRow } from "@/lib/aplicativos";
-import { appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { ID_APP_SMARTONE, appTemCadastroComLista } from "@/lib/apps-painel-ids";
 import { criarContaTeste, opcoesTesteCliente, type OpcoesTesteCliente, type ResultadoCriarTeste } from "@/app/actions/contasVinculo";
 import { ASSINATURA_PADRAO } from "@/lib/paineis-teste";
 
@@ -46,7 +46,9 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
 
   // Fun Play / Lazer Play / Core Player: cadastro direto no painel (add existing + lista, sem gastar
   // crédito). A ativação fica pra quando o cliente assinar — /alertas mostra "Precisa ativar".
-  const podePainel = !isEdit && appTemCadastroPeloPainel(idApp);
+  // SmartOne: sem chave; o aparelho só entra no painel junto com a lista (obrigatória).
+  const podePainel = !isEdit && appTemCadastroComLista(idApp);
+  const smartOne = Number(idApp) === ID_APP_SMARTONE;
   const [peloPainel, setPeloPainel] = useState(true);
   const usarPainel = podePainel && peloPainel;
   const [contas, setContas] = useState<ContaOpcao[] | null>(null);
@@ -115,8 +117,12 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
   async function cadastrarNoPainel() {
     setError(null);
     setAviso(null);
-    if (!mac.trim() || !chave.trim()) {
-      setError("Informe o MAC e a chave (Device Key) que aparecem na TV.");
+    if (!mac.trim() || (!smartOne && !chave.trim())) {
+      setError(smartOne ? "Informe o MAC que aparece na TV." : "Informe o MAC e a chave (Device Key) que aparecem na TV.");
+      return;
+    }
+    if (smartOne && !idConta) {
+      setError("No SmartOne o aparelho só entra com uma lista. Escolha a conta ou crie um teste.");
       return;
     }
     setEnviando(true);
@@ -270,7 +276,9 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
                 <span>
                   <span className="font-semibold">Cadastrar no painel do app</span>
                   <span className="block text-xs text-violet-700">
-                    Adiciona o aparelho ao painel com o MAC e a chave, sem gastar crédito. A ativação fica para quando o cliente assinar: o aparelho aparece em Alertas como &quot;Precisa ativar&quot;.
+                    {smartOne
+                      ? <>Manda a lista para o MAC pelo painel do SmartOne, sem gastar giftcode. Fica &quot;Pending&quot; até o cliente recarregar a lista na TV.</>
+                      : <>Adiciona o aparelho ao painel com o MAC e a chave, sem gastar crédito. A ativação fica para quando o cliente assinar: o aparelho aparece em Alertas como &quot;Precisa ativar&quot;.</>}
                   </span>
                 </span>
               </label>
@@ -328,7 +336,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
                       onChange={setIdConta}
                       className={selectClass}
                       options={[
-                        { value: "", label: contas.length ? "— Não criar lista —" : "Cliente sem conta com lista" },
+                        { value: "", label: smartOne ? "— Escolha a conta —" : "— Não criar lista —" },
                         ...contas.map((c) => ({
                           value: c.id_conta,
                           label: `${c.nome_painel} — ${c.rotulo?.trim() || c.usuario}${c.status_conta !== "ok" ? ` (${c.status_conta})` : ""}`,
@@ -393,7 +401,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
             <div>
               <label className={labelClass}>
                 Chave / Licença
-                {appSelecionado?.exige_licenca && (
+                {appSelecionado?.exige_licenca && !(usarPainel && smartOne) && (
                   <span className="ml-1 text-amber-600 font-normal">🔑 obrigatória</span>
                 )}
               </label>
