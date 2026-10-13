@@ -95,7 +95,7 @@ export default function ServidoresAppModal({ idPainel, nomePainel, onClose }: Pr
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !ocupado && onClose()} />
       <div className="relative z-10 w-full max-w-2xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[92vh]">
         <div className="px-6 pt-6 pb-4 border-b border-zinc-100">
-          <h2 className="text-lg font-bold text-zinc-900">Servidores de lista — {nomePainel}</h2>
+          <h2 className="text-lg font-bold text-zinc-900">Migrar endereço — {nomePainel}</h2>
           <p className="text-sm text-zinc-500 mt-0.5">
             Cada servidor guarda o endereço das listas. Migrar troca o endereço de todas as listas dele de uma vez.
           </p>

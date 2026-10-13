@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PainelAppSyncRow } from "@/lib/paineis";
 import ServidoresAppModal from "./ServidoresAppModal";
+import MigrarHostModal from "./MigrarHostModal";
 
 // Painéis com "servidores de lista" e migração em massa (plataforma appacesso).
 const TEM_SERVIDORES = new Set(["funplays", "lazerplay", "coreplayer"]);
@@ -46,6 +47,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
   const [aoVivo, setAoVivo] = useState<StatusAoVivo | null>(null);
   const [carregandoStatus, setCarregandoStatus] = useState(false);
   const [servidoresAberto, setServidoresAberto] = useState(false);
+  const [migrarHostAberto, setMigrarHostAberto] = useState(false);
 
   const sessionExpirada =
     painel.session_expiry && new Date(painel.session_expiry) < new Date();
@@ -202,10 +204,19 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         {TEM_SERVIDORES.has(painel.tipo) && (
           <button
             onClick={() => setServidoresAberto(true)}
-            title="Servidores de lista e migração em massa"
+            title="Servidores de lista e migração em massa (troca o endereço de todas as listas de um servidor)"
             className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
           >
-            Servidores
+            Migrar endereço
+          </button>
+        )}
+        {(painel.tipo === "ibopro" || painel.tipo === "smartone") && (
+          <button
+            onClick={() => setMigrarHostAberto(true)}
+            title="Trocar o endereço do servidor em todas as listas da revenda"
+            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+          >
+            Migrar endereço
           </button>
         )}
         <button
@@ -234,6 +245,9 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         )}
       </div>
 
+      {migrarHostAberto && (
+        <MigrarHostModal idPainel={painel.id} nomePainel={painel.nome} semPorta={painel.tipo === "smartone"} onClose={() => setMigrarHostAberto(false)} />
+      )}
       {servidoresAberto && (
         <ServidoresAppModal idPainel={painel.id} nomePainel={painel.nome} onClose={() => setServidoresAberto(false)} />
       )}

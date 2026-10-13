@@ -513,6 +513,30 @@ export async function transferirLicenca(
   return { ok: false, erro: msg || `sem confirmação do site (HTTP ${res.status})` };
 }
 
+/**
+ * Mass Change hostname (capturado em 13/10/2026: bandeira5.info → pfun.store, "Successfully Updated on 20
+ * playlists"). Troca só o endereço, SEM porta (a porta tem um "Mass change PORT" à parte). Devolve quantas listas.
+ */
+export async function mudarHostListas(cookie: string, antigo: string, novo: string): Promise<number> {
+  const path = `/plugin/smart_one/client_main/hostname/`;
+  const csrf = extrairCsrfToken(await getHtml(path, cookie));
+  const body = new URLSearchParams({ _csrf_token: csrf, from_server_host: antigo, to_server_host: novo, server_type: "all" });
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", cookie },
+    body: body.toString(),
+    redirect: "manual",
+  });
+  const html = res.status === 302 ? await getHtml(path, cookie) : await res.text();
+  const alertas = [...html.matchAll(/class="alert[^"]*"[^>]*>([\s\S]*?)<\/div>/g)]
+    .map((m) => semTags(m[1]).replace(/^×\s*/, ""))
+    .filter((t) => t && !/irreversible|mass change PORT/i.test(t));
+  const msg = alertas[0] ?? "";
+  const n = msg.match(/updated on (\d+) playlist/i);
+  if (n) return Number(n[1]);
+  throw new Error(`SmartOne: ${msg || `sem confirmação do site (HTTP ${res.status})`}`);
+}
+
 // ---------- PainelAdapter factory ----------
 
 export function criarSmartOneAdapter(

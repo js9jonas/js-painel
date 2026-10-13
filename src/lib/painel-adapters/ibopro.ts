@@ -288,3 +288,12 @@ export function criarIboProAdapter(creds: ServidorCredenciais, _id: number, onSa
     },
   };
 }
+
+/**
+ * Troca o endereço (hostname, com porta se tiver) de TODAS as listas da revenda que usam `antigo`
+ * (Mass Change → Hostname, capturado em 13/10/2026: techonline.me → hboard.site, totalUpdated 2).
+ */
+export async function mudarHostListasIbo(token: string, antigo: string, novo: string): Promise<number> {
+  const r = await pedir<{ totalUpdated?: number }>("POST", "/admin/playlists/mass-change-hostname", token, { old: antigo, new: novo });
+  return Number(r.totalUpdated ?? 0);
+}

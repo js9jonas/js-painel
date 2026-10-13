@@ -39,6 +39,13 @@ preenchida pelo Jonas em Conexões, nunca no repo).
 - Listas: `playlist_id_externo` = últimos 12 hex do id da lista (coluna é bigint); sem "lista ativa".
 - `id_dispositivo_painel` fica NULL (id do aparelho é hex); tudo pelo MAC.
 
+## Migração em massa de endereço
+- `POST /admin/playlists/mass-change-hostname {old,new}` → `totalUpdated` (aceita porta). Sem login no site do cliente.
+- Botão "Migrar endereço" no card de Conexões (mesma tela do SmartOne: `src/lib/migrar-host.ts`,
+  `MigrarHostModal`). SmartOne: formulário `/plugin/smart_one/client_main/hostname/` (`from_server_host`,
+  `to_server_host`, `server_type=all`, csrf) → "Successfully Updated on N playlists"; **sem porta** (o "Mass change
+  PORT" do site não foi capturado). Fun/Lazer/Core: o antigo botão "Servidores" virou "Migrar endereço".
+
 ## Histórico
 - `29038d8` — integração (sync, Renovar, Atualizar, listas sob demanda). `sql/018` aplicada.
 - `9a965d3` — 1º uso real de editar lista (Elton Alf, 13/10, produção): o IBO foi alterado, mas a tela e o banco
