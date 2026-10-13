@@ -228,18 +228,30 @@ function parseDispositivosPagina(html: string): SmartOneDevice[] {
   return dispositivos;
 }
 
+/**
+ * Todos os aparelhos do painel: aba "active" + aba "pending". O SmartOne deixa o aparelho em "Pending"
+ * até o cliente recarregar a lista na TV — inclusive depois de ativar por giftcode. Sem ler essa aba o
+ * sync não via a validade nova (caso Joel Conceição, 13/10/2026: ativo até 17/10/2027 no painel,
+ * js-painel parado na data antiga). MAC repetido (smartkey antigo + novo): fica o de validade maior.
+ */
 export async function getDispositivos(cookie: string): Promise<SmartOneDevice[]> {
-  const all: SmartOneDevice[] = [];
-  for (let page = 1; page <= 200; page++) {
-    const html = await getHtml(
-      `/plugin/smart_one/client_main/index/active/${page}/?sort=id&order=desc`,
-      cookie
-    );
-    const dispositivos = parseDispositivosPagina(html);
-    if (dispositivos.length === 0) break;
-    all.push(...dispositivos);
+  const porMac = new Map<string, SmartOneDevice>();
+  for (const aba of ["active", "pending"]) {
+    for (let page = 1; page <= 200; page++) {
+      const html = await getHtml(
+        `/plugin/smart_one/client_main/index/${aba}/${page}/?sort=id&order=desc`,
+        cookie
+      );
+      const dispositivos = parseDispositivosPagina(html);
+      if (dispositivos.length === 0) break;
+      for (const d of dispositivos) {
+        const mac = d.mac.toUpperCase();
+        const atual = porMac.get(mac);
+        if (!atual || (d.activation_expired ?? "") > (atual.activation_expired ?? "")) porMac.set(mac, d);
+      }
+    }
   }
-  return all;
+  return [...porMac.values()];
 }
 
 /**
