@@ -178,6 +178,9 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
                       </td>
                       <td className="py-2 pr-2">
                         <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-semibold ${MOTIVO[l.motivo].classes}`}>{MOTIVO[l.motivo].label}</span>
+                        {l.motivo === "cliente_saiu" && l.ultimo_venc_contrato && (
+                          <div className="text-xs text-zinc-400 mt-0.5">assinatura até {br(l.ultimo_venc_contrato)}</div>
+                        )}
                       </td>
                       <td className="py-2 pr-2 text-xs whitespace-nowrap">
                         {c?.estado === "ok"
