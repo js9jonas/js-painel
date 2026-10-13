@@ -6,7 +6,8 @@ import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
 import AtivarPainelButton from "./AtivarPainelButton";
 import LicencaSobrandoModal from "./LicencaSobrandoModal";
-import { APPS_COM_TRANSFERENCIA_PAINEL } from "@/lib/apps-painel-ids";
+import { APPS_COM_TRANSFERENCIA_PAINEL, appTemCadastroComLista } from "@/lib/apps-painel-ids";
+import AtualizarPainelButton from "@/components/aplicativos/AtualizarPainelButton";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
 
@@ -221,22 +222,26 @@ export default function AlertasAppsClient({
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            {r.sem_validade ? (
-                              <div className="flex flex-wrap items-start gap-2">
-                                <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
-                                {aparelhoNovoTransfere(r) && botaoLicenca(r)}
-                              </div>
-                            ) : r.no_painel_app ? (
-                              <div className="flex flex-wrap items-start gap-2">
-                                <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
-                                {r.painel_smartone && botaoLicenca(r)}
-                              </div>
-                            ) : aparelhoNovoTransfere(r) ? (
-                              <div className="flex flex-wrap items-start gap-2">
-                                <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
-                                {botaoLicenca(r)}
-                              </div>
-                            ) : null}
+                            <div className="flex flex-wrap items-start gap-2">
+                              {r.sem_validade ? (
+                                <>
+                                  <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                                  {aparelhoNovoTransfere(r) && botaoLicenca(r)}
+                                </>
+                              ) : r.no_painel_app ? (
+                                <>
+                                  <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
+                                  {r.painel_smartone && botaoLicenca(r)}
+                                </>
+                              ) : aparelhoNovoTransfere(r) ? (
+                                <>
+                                  <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                                  {botaoLicenca(r)}
+                                </>
+                              ) : null}
+                              {/* Painel mudou por fora (giftcode/ativação manual): acerta só esta linha, sem sync inteiro */}
+                              {appTemCadastroComLista(r.id_app) && <AtualizarPainelButton idAppRegistro={r.id_app_registro} />}
+                            </div>
                           </td>
                         </tr>
                       );

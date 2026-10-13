@@ -8,7 +8,8 @@ import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import ListasAparelhoModal from "./ListasAparelhoModal";
-import { appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { appTemCadastroComLista, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import AtualizarPainelButton from "./AtualizarPainelButton";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
 import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
@@ -663,6 +664,9 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           >
                             ✏️ Editar
                           </button>
+                          {!removido && a.mac && appTemCadastroComLista(a.id_app) && (
+                            <AtualizarPainelButton idAppRegistro={String(a.id_app_registro)} />
+                          )}
                           {!removido && (
                             <button
                               type="button"
