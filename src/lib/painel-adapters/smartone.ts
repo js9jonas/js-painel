@@ -22,6 +22,8 @@ export interface SmartOneDevice {
   model: string | null;
   activation_expired: string | null; // yyyy-mm-dd
   device_note?: { comment: string | null };
+  /** "Date Fetched" do site: último dia em que a TV buscou a lista (yyyy-mm-dd). */
+  lista_acessada_em?: string | null;
 }
 
 export interface SmartOnePlaylist {
@@ -200,6 +202,18 @@ async function obterSessao(creds: ServidorCredenciais, onSaveSession: SaveSessio
 
 // ---------- Devices / Playlists ----------
 
+const MESES: Record<string, string> = {
+  jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+  jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+};
+
+/** "Oct 13, 2026" → "2026-10-13" (montado à mão: o container roda em UTC). Outro formato → null. */
+function parseDataCurta(texto: string): string | null {
+  const m = texto.trim().match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),\s*(\d{4})$/);
+  const mes = m ? MESES[m[1].toLowerCase()] : undefined;
+  return m && mes ? `${m[3]}-${mes}-${m[2].padStart(2, "0")}` : null;
+}
+
 function parseDispositivosPagina(html: string): SmartOneDevice[] {
   const dispositivos: SmartOneDevice[] = [];
   const linhas = html.split("<tr>").slice(1);
@@ -215,6 +229,7 @@ function parseDispositivosPagina(html: string): SmartOneDevice[] {
     const expMatch = linha.match(/data-title="Expiration">([\s\S]*?)<\/td>/);
     const modelMatch = linha.match(/data-title="Device">([\s\S]*?)<\/td>/);
     const noteMatch = linha.match(/data-title="Note">([\s\S]*?)<\/td>/);
+    const fetchedMatch = linha.match(/data-title="Date Fetched">([\s\S]*?)<\/td>/);
 
     dispositivos.push({
       id: parseInt(idMatch[1], 10),
@@ -222,6 +237,7 @@ function parseDispositivosPagina(html: string): SmartOneDevice[] {
       model: modelMatch ? semTags(modelMatch[1]) || null : null,
       activation_expired: expMatch ? parseExpiracao(semTags(expMatch[1])) : null,
       device_note: { comment: noteMatch ? semTags(noteMatch[1]) || null : null },
+      lista_acessada_em: fetchedMatch ? parseDataCurta(semTags(fetchedMatch[1])) : null,
     });
   }
 

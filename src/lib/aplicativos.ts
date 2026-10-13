@@ -45,6 +45,8 @@ export type AplicativoRow = {
   data_cadastro: string | null;
   atualizado_em: string | null;
   removido_em: string | null;
+  /** Último dia em que a TV buscou a lista (SmartOne, "Date Fetched"); null = sem informação. */
+  lista_acessada_em: string | null;
   playlists: PlaylistRow[];
 };
 
@@ -111,6 +113,7 @@ export async function getAplicativosByClienteId(
        ap.data_cadastro::text,
        ap.atualizado_em::text,
        ap.removido_em::text,
+       to_char(ap.lista_acessada_em, 'YYYY-MM-DD') AS lista_acessada_em,
        COALESCE(
          JSON_AGG(
            JSON_BUILD_OBJECT(

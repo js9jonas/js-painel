@@ -62,6 +62,11 @@ function hojeStr(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
 }
 
+/** Dias corridos de `data` (yyyy-mm-dd) até hoje, no fuso de Brasília. */
+function diasDesde(data: string): number {
+  return Math.round((new Date(hojeStr() + "T00:00:00").getTime() - new Date(data.slice(0, 10) + "T00:00:00").getTime()) / 86_400_000);
+}
+
 function isVencido(validade: string | null) {
   if (!validade) return false;
   return validade.slice(0, 10) < hojeStr();
@@ -600,6 +605,13 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
 
                       {/* Resumo playlists */}
                       <td className="px-4 py-3">
+                        {/* SmartOne: último dia em que a TV buscou a lista ("Date Fetched" do site) */}
+                        {a.lista_acessada_em && (
+                          <div className="text-[11px] text-zinc-400 mb-0.5 whitespace-nowrap" title="Último dia em que a TV buscou a lista (SmartOne)">
+                            Acessou {formatDate(a.lista_acessada_em)}
+                            {diasDesde(a.lista_acessada_em) > 0 && ` · há ${diasDesde(a.lista_acessada_em)}d`}
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5">
                           {hasPlaylists ? (
                             <button

@@ -32,12 +32,12 @@ async function executar(idAppRegistro: number, jobId: string) {
     if (!app) throw new Error("Aplicativo não encontrado.");
     if (!app.mac) throw new Error("Aplicativo sem MAC cadastrado.");
 
-    let achado: { id: number | string; validade: string | null; idPainel: number; nomePainel: string } | null = null;
+    let achado: { id: number | string; validade: string | null; idPainel: number; nomePainel: string; listaAcessadaEm?: string | null } | null = null;
     if (app.id_app === ID_APP_SMARTONE) {
       const painel = await painelSmartOneAtivo();
       if (!painel) throw new Error("Nenhum painel SmartOne ativo cadastrado.");
       const dev = await buscarSmartOne(await sessaoSmartOne(painel.id), app.mac);
-      if (dev) achado = { id: dev.id, validade: dev.activation_expired, idPainel: painel.id, nomePainel: painel.nome };
+      if (dev) achado = { id: dev.id, validade: dev.activation_expired, idPainel: painel.id, nomePainel: painel.nome, listaAcessadaEm: dev.lista_acessada_em };
       else throw new Error(`O aparelho não está no painel ${painel.nome}. Confira o MAC no site.`);
     } else {
       const painel = (app.id_painel_servidor ? await painelAppPorId(app.id_painel_servidor) : null)
@@ -48,6 +48,10 @@ async function executar(idAppRegistro: number, jobId: string) {
       else throw new Error(`O aparelho não está no painel ${painel.nome}.`);
     }
 
+    // Último acesso da TV à lista (SmartOne): sempre grava, não conta como mudança nem vai pra auditoria
+    if (achado.listaAcessadaEm) {
+      await pool.query(`UPDATE public.aplicativos SET lista_acessada_em = $1::date WHERE id_app_registro = $2`, [achado.listaAcessadaEm, idAppRegistro]);
+    }
     const mudou = achado.validade !== app.validade || Number(app.id_painel_servidor) !== achado.idPainel;
     if (mudou) {
       const client = await pool.connect();

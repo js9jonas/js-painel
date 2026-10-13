@@ -73,6 +73,8 @@ type PainelSync = ServidorCredenciais & { tipo: string; id: number; nome: string
 type DeviceComum = {
   id: number; mac: string; model?: string | null; activation_expired: string | null; key?: string | number | null;
   device_note?: { comment: string | null } | null;
+  /** Só SmartOne ("Date Fetched"); nos outros fica undefined e a coluna não muda. */
+  lista_acessada_em?: string | null;
 };
 
 /** Comentário vazio pro FunPlay (o site mostra "N/A") — aparelho recém-migrado chega assim. */
@@ -232,10 +234,11 @@ async function executarSync(idPainel: number, jobId: string) {
             `UPDATE public.aplicativos
              SET validade = $1, modelo = $2, chave = $3, id_dispositivo_painel = $4, id_painel_servidor = $5,
                  chave_anterior = COALESCE($6, chave_anterior),
+                 lista_acessada_em = COALESCE($8::date, lista_acessada_em),
                  chave_mudou_em = CASE WHEN $6::varchar IS NOT NULL THEN NOW() ELSE chave_mudou_em END,
                  atualizado_em = NOW(), removido_em = NULL
              WHERE id_app_registro = $7`,
-            [validade, dev.model ?? null, chave, dev.id, idPainelDono, anterior, idAppRegistro]
+            [validade, dev.model ?? null, chave, dev.id, idPainelDono, anterior, idAppRegistro, dev.lista_acessada_em ?? null]
           );
         };
 
