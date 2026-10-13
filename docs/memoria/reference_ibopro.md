@@ -39,4 +39,13 @@ preenchida pelo Jonas em Conexões, nunca no repo).
 - Listas: `playlist_id_externo` = últimos 12 hex do id da lista (coluna é bigint); sem "lista ativa".
 - `id_dispositivo_painel` fica NULL (id do aparelho é hex); tudo pelo MAC.
 
-📋 1º uso real pendente: Renovar pela tela e editar lista em produção.
+## Histórico
+- `29038d8` — integração (sync, Renovar, Atualizar, listas sob demanda). `sql/018` aplicada.
+- `9a965d3` — 1º uso real de editar lista (Elton Alf, 13/10, produção): o IBO foi alterado, mas a tela e o banco
+  ficaram com a URL antiga, porque o `GET /playlistw` logo após o POST ainda devolve a versão velha. Agora o
+  banco grava a lista que o próprio POST devolve e a tela recarrega depois de editar.
+- Sync de 13/10: 124 aparelhos na revenda, 9 criados sem cliente (ex-clientes), 6 fora da revenda (3 ativos:
+  Jhayro IPTV 19, Maicon Rodrigues, Wellington Martins IPTV — ativados por outra conta).
+
+📋 1º uso real pendente: Renovar pela tela (próximo a vencer: Leo Gelatti, 29/10/2026). Conferir que a edição
+de lista aparece na hora depois do deploy do `9a965d3`.
