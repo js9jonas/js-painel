@@ -23,7 +23,7 @@ Site de páginas (HTML + formulários), sem API JSON. Sem token CSRF nos formul�
 - Ao salvar, o Clouddy reescreve o link para `xc://usuario:senha@servidor/` (formato Xtream Codes). Conferir lista comparando usuário/senha/servidor, não o texto do link. Página da lista mostra a credencial IPTV em texto — não logar.
 - Outras páginas: `/user/tariffs`, `/user/payments`, `/user/transactions` (renovação ainda não capturada).
 
-## Implementado 13/10/2026 (commit abaixo, ⚠️ deploy manual pendente)
+## Implementado 13/10/2026 (commit `a28e677`, ⚠️ deploy manual pendente)
 
 - Adapter `src/lib/painel-adapters/clouddy.ts` (login + Turnstile, resumo, última atividade, listas TV/VOD, senha); ações em `src/lib/clouddy.ts` com **sessão por conta em memória (6 h)** — 2ª leitura 2 s sem captcha, 1ª ~7 s.
 - **O servidor recebe o site em INGLÊS**: rótulos "State", "End service date", datas `2027-10-09 18:51:06 -0300` (no navegador do Jonas, português e `09/10/2027`). O parser aceita os dois.
