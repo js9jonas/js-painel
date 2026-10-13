@@ -28,6 +28,9 @@ function toDateInput(v: string | null): string {
   return v.split("T")[0];
 }
 
+const APPS_PRINCIPAIS = 4;
+const MAIS_APPS = "__mais_apps__";
+
 export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, onClose, onSaved }: Props) {
   const isEdit = !!aplicativo;
 
@@ -43,6 +46,14 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
   const [error, setError] = useState<string | null>(null);
 
   const appSelecionado = apps.find((a) => a.id_app === idApp) ?? null;
+  // Lista do cadastro (13/10/2026): os 4 mais usados primeiro + "Mais aplicativos…" abre o resto.
+  // O app já escolhido (edição) sempre aparece.
+  const [todosApps, setTodosApps] = useState(false);
+  const [listaAberta, setListaAberta] = useState(false);
+  const appsOrdenados = [...apps].sort((a, b) => (b.uso ?? 0) - (a.uso ?? 0) || a.nome_app.localeCompare(b.nome_app));
+  const appsDaLista = todosApps
+    ? appsOrdenados
+    : appsOrdenados.filter((a, i) => i < APPS_PRINCIPAIS || a.id_app === idApp);
 
   // Fun Play / Lazer Play / Core Player: cadastro direto no painel (add existing + lista, sem gastar
   // crédito). A ativação fica pra quando o cliente assinar — /alertas mostra "Precisa ativar".
@@ -238,14 +249,27 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
             <label className={labelClass}>Aplicativo</label>
             <Select
               value={idApp}
-              onChange={setIdApp}
+              onChange={(v) => {
+                if (v === MAIS_APPS) {
+                  // Abre de novo, agora com todos (o Radix fecha ao escolher)
+                  setTodosApps(true);
+                  setTimeout(() => setListaAberta(true), 0);
+                  return;
+                }
+                setIdApp(v);
+              }}
+              open={listaAberta}
+              onOpenChange={setListaAberta}
               className={selectClass}
               options={[
                 { value: "", label: "— Selecione —" },
-                ...apps.map((a) => ({
+                ...appsDaLista.map((a) => ({
                   value: a.id_app,
                   label: `${a.nome_app}${a.exige_licenca ? " 🔑" : ""}`,
                 })),
+                ...(!todosApps && appsOrdenados.length > appsDaLista.length
+                  ? [{ value: MAIS_APPS, label: <span className="text-blue-600">Mais aplicativos…</span> }]
+                  : []),
               ]}
             />
             {appSelecionado?.url_referencia && (

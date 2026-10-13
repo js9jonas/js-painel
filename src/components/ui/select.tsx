@@ -30,6 +30,9 @@ type SelectProps = {
   autoFocus?: boolean
   onBlur?: React.FocusEventHandler<HTMLButtonElement>
   onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>
+  // Abertura controlada (opcional) — ex.: "Mais aplicativos…" reabre a lista já completa
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 // Radix não aceita SelectItem com value="" (lança erro em runtime) — usamos um
@@ -57,6 +60,8 @@ export function Select({
   autoFocus,
   onBlur,
   onKeyDown,
+  open,
+  onOpenChange,
 }: SelectProps) {
   const controlado = value !== undefined;
   const rootProps = controlado
@@ -66,6 +71,7 @@ export function Select({
   return (
     <SelectPrimitive.Root
       {...rootProps}
+      {...(open !== undefined ? { open, onOpenChange } : {})}
       disabled={disabled}
       name={name}
     >

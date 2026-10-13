@@ -7,6 +7,8 @@ export type AppRow = {
   exige_licenca: boolean;
   observacao: string | null;
   url_referencia: string | null;
+  /** Aparelhos ativos (app 'ativa', não removido) — ordena a lista do cadastro (os 4 mais usados primeiro). */
+  uso: number;
 };
 
 export type PlaylistRow = {
@@ -148,9 +150,12 @@ export async function getAplicativosByClienteId(
 
 export async function getApps(): Promise<AppRow[]> {
   const { rows } = await pool.query<AppRow>(
-    `SELECT id_app::text, nome_app, exige_licenca, observacao, url_referencia
-     FROM public.apps
-     ORDER BY nome_app ASC`
+    `SELECT a.id_app::text, a.nome_app, a.exige_licenca, a.observacao, a.url_referencia,
+            (SELECT COUNT(*)::int FROM public.aplicativos ap
+              WHERE ap.id_app = a.id_app AND ap.removido_em IS NULL AND ap.id_cliente IS NOT NULL
+                AND lower(btrim(ap.status)) = 'ativa') AS uso
+     FROM public.apps a
+     ORDER BY a.nome_app ASC`
   );
   return rows;
 }
