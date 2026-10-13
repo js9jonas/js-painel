@@ -66,7 +66,7 @@ Pedido do Jonas em 29/09/2026. Cada imagem enviada pelo cliente no `/chat` tem u
 - `GET/POST /api/aplicativos/licencas-sobrando`; `POST /api/aplicativos/[idAppRegistro]/transferir-licenca {id_origem}` (job): confere origem transferível → `transferirLicenca(…, listas=false)` → **confirma pela transação no destino** (não confia só no alerta) → destino `validade` = maior expira do site; origem `validade NULL`, `inativa`, nota "Licença transferida para MAC (cliente) em dd/mm/aaaa"; audit nos dois.
 - Modal: mesmo cliente primeiro, depois mais dias; avisa que os dias do destino não somam; desabilita origem com menos dias que o destino. Confirmação em 2 cliques.
 
-## 📋 Para 13/10/2026 — transferência no Fun Play / Lazer Play (combinado com o Jonas na noite de 12/10)
+## ✅ 13/10/2026 — transferência no Fun Play / Lazer Play (feito: ver `reference_funplays_licenca_transferencia.md`, commit `3e5ed66`)
 
 - **Achado do Jonas:** aparelho novo cadastrado via "add existing device" (Fun/Lazer/Core, fica sem validade = "Precisa ativar" em /alertas) **pode receber transferência de uma licença sobrando** em vez de gastar crédito.
 - **Investigar amanhã:** se o painel appacesso (Fun Play / Lazer Play) tem transferência de licença; capturar o tráfego real com o Jonas fazendo 1 transferência (Playwright com a sessão do painel, como no SmartOne); descobrir regras (uma vez só? destino precisa estar sem ativação? soma dias?).

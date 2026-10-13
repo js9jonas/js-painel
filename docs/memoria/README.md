@@ -84,7 +84,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [reference_env_local_crlf](reference_env_local_crlf.md) — `.env.local` tem linhas com CRLF (`\r`) — sanitizar com `tr -d '\r\n'` ao ler valores via shell (grep/cut), senão scripts externos (ex: mintar cookie NextAuth) quebram silenciosamente
 - [reference_funplay_licencas_sem_contrato](reference_funplay_licencas_sem_contrato.md) — Query e contexto para listar licenças Fun Play ativas sem contrato IPTV ativo — usada para identificar licenças candidatas a transferência
 - [reference_funplays_api](reference_funplays_api.md) — FunPlays reseller panel — endpoints, auth, estrutura de device e quirks para construção do adapter
-- [reference_funplays_licenca_transferencia](reference_funplays_licenca_transferencia.md) — Regra de transferência de licença FunPlay — só funciona para dispositivos novos sem licença paga anterior
+- [reference_funplays_licenca_transferencia](reference_funplays_licenca_transferencia.md) — Transferência de licença Fun/Lazer/Core: só para aparelho novo sem licença paga; endpoint, teste real 13/10/2026 e botão em /alertas (`3e5ed66`)
 - [reference_internal_api_keys](reference_internal_api_keys.md) — Chaves internas (não-secretas em valor, mas documentadas) para APIs internas do js-painel acessadas por automações (n8n, scripts)
 - [reference_merge_clientes](reference_merge_clientes.md) — Procedimento e constraints a tratar ao unificar dois id_cliente no banco js (schema public)
 - [reference_query_assinaturas_vencidas](reference_query_assinaturas_vencidas.md) — Padrão de consulta SQL para listar assinaturas vencidas numa data — campos, joins e observações sobre contatos múltiplos
