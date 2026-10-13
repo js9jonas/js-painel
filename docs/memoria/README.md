@@ -85,6 +85,7 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [reference_funplay_licencas_sem_contrato](reference_funplay_licencas_sem_contrato.md) — Query e contexto para listar licenças Fun Play ativas sem contrato IPTV ativo — usada para identificar licenças candidatas a transferência
 - [reference_funplays_api](reference_funplays_api.md) — FunPlays reseller panel — endpoints, auth, estrutura de device e quirks para construção do adapter
 - [incident_smartone_sync_ignorava_pending_13out2026](incident_smartone_sync_ignorava_pending_13out2026.md) — 13/10/2026 — sync do SmartOne só lia a aba "active"; aparelho em Pending (giftcode novo) não atualizava; corrigido em `09c56c6`
+- [project_smartone_lista_acessada_em](project_smartone_lista_acessada_em.md) — 13/10/2026 — último acesso da TV à lista (SmartOne "Date Fetched") em /clientes/[id]; coluna `lista_acessada_em` (sql/017)
 - [reference_funplays_licenca_transferencia](reference_funplays_licenca_transferencia.md) — Transferência de licença Fun/Lazer/Core: só para aparelho novo sem licença paga; endpoint, teste real 13/10/2026 e botão em /alertas (`3e5ed66`)
 - [reference_internal_api_keys](reference_internal_api_keys.md) — Chaves internas (não-secretas em valor, mas documentadas) para APIs internas do js-painel acessadas por automações (n8n, scripts)
 - [reference_merge_clientes](reference_merge_clientes.md) — Procedimento e constraints a tratar ao unificar dois id_cliente no banco js (schema public)
