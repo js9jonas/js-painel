@@ -13,3 +13,5 @@ metadata:
 **Correção (`09c56c6`):** listagem lê `active` + `pending`, MAC repetido fica com a maior validade. Medido antes de subir: 484 aparelhos nas duas abas, todos já no js-painel; só o Joel mudava. ⚠️ Deploy manual + rodar sync do SmartOne em Conexões pendentes.
 
 **Lição:** `buscarDispositivoPorMac` já olhava as duas abas — quando uma função "acha" e o sync "não vê", comparar as duas listagens primeiro.
+
+**Complemento (`1b2915f`):** botão "↻ Atualizar" em /alertas e /clientes/[id] (Fun/Lazer/Core/SmartOne com MAC) — `POST /api/aplicativos/[id]/atualizar-painel` (job) busca só aquele MAC no painel e copia validade + número interno + painel, sem sync inteiro, sem gastar crédito, com audit_log. Pedido do Jonas pra não rodar o sync de todos por causa de 1 cadastro. Componente em `src/components/aplicativos/AtualizarPainelButton.tsx`.
