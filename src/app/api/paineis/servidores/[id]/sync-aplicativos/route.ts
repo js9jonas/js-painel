@@ -8,6 +8,7 @@ import { loginLazerPlay, getDispositivos as getLazerPlayDevices, getPlaylistsDis
 import { loginCorePlayer, getDispositivos as getCorePlayerDevices, getPlaylistsDispositivo as getCorePlayerPlaylists } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, getDispositivos as getSmartOneDevices, getPlaylistsDispositivo as getSmartOnePlaylists } from "@/lib/painel-adapters/smartone";
 import { jwtValido as jwtValidoAppAcesso, type AppAcessoPlaylist } from "@/lib/painel-adapters/appacesso";
+import { sincronizarIbo } from "@/lib/ibopro";
 
 const ID_APP: Record<string, number> = {
   funplays:    3,  // "Fun Play"
@@ -139,6 +140,29 @@ async function executarSync(idPainel: number, jobId: string) {
       return;
     }
     const tipo = pedido[0].tipo;
+    // IBO Pro (13/10/2026): API e regras próprias (aparelho pelo MAC; listas só sob demanda, ver src/lib/ibopro.ts)
+    if (tipo === "ibopro") {
+      const r = await sincronizarIbo(idPainel);
+      const st = r.stats;
+      const aviso = [
+        "Listas não entram no sync (o site do cliente do IBO limita os logins): use Atualizar no aparelho.",
+        st.sem_chave > 0 ? `${st.sem_chave} aparelho(s) sem chave no cadastro.` : null,
+        st.nomes_preenchidos > 0 ? `${st.nomes_preenchidos} nome(s) de cliente gravados no painel.` : null,
+        st.removidos > 0 ? `${st.removidos} aparelho(s) saíram da revenda (ficaram sem painel, validade mantida).` : null,
+        st.erros > 0 ? `${st.erros} falha(s) individuais — ver logs.` : null,
+      ].filter(Boolean).join(" ");
+      jobs.set(jobId, {
+        done: true, ok: true, total_devices: r.total,
+        stats: {
+          inseridos: st.inseridos, atualizados: st.atualizados, removidos: st.removidos, erros: st.erros,
+          playlists_sincronizadas: 0, playlists_removidas: 0,
+          chaves_restauradas: 0, chaves_mudaram: 0, chaves_limpas: 0, comentarios_preenchidos: st.nomes_preenchidos,
+        },
+        aviso: aviso || undefined,
+      });
+      setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
+      return;
+    }
     const tipoSuportado = ["funplays", "lazerplay", "coreplayer", "smartone"];
     if (!tipoSuportado.includes(tipo)) {
       jobs.set(jobId, { done: true, ok: false, erro: `Painel tipo "${tipo}" não suporta sync de aplicativos.` });

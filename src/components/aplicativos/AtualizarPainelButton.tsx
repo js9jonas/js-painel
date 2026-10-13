@@ -17,6 +17,7 @@ export default function AtualizarPainelButton({ idAppRegistro, onAtualizado }: {
   const router = useRouter();
   const [estado, setEstado] = useState<"parado" | "buscando" | "ok" | "erro">("parado");
   const [msg, setMsg] = useState("");
+  const [aviso, setAviso] = useState<string | null>(null);
 
   async function atualizar() {
     setEstado("buscando");
@@ -34,7 +35,8 @@ export default function AtualizarPainelButton({ idAppRegistro, onAtualizado }: {
         if (!job.ok) throw new Error(job.erro ?? "Não deu pra consultar o painel.");
         setEstado("ok");
         setMsg(job.mudou ? `Atualizado: até ${br(job.validade)}` : `Já estava em dia (${br(job.validade)})`);
-        if (job.mudou) router.refresh();
+        setAviso(job.aviso ?? null);
+        router.refresh(); // listas (IBO/Clouddy) podem mudar mesmo com a validade igual
         onAtualizado?.();
         return;
       }
@@ -48,8 +50,12 @@ export default function AtualizarPainelButton({ idAppRegistro, onAtualizado }: {
   // Deu certo: o botão some e fica só o aviso (os dados novos já estão na tela). Erro: botão fica pra tentar de novo.
   if (estado === "ok") {
     return (
-      <span className="inline-flex h-7 items-center gap-1 text-xs text-emerald-700" title={msg}>
-        <Check className="w-3.5 h-3.5" /> Atualizado
+      <span className="inline-flex flex-col items-start">
+        <span className="inline-flex h-7 items-center gap-1 text-xs text-emerald-700" title={msg}>
+          <Check className="w-3.5 h-3.5" /> Atualizado
+        </span>
+        {/* IBO Pro: validade ok, mas as listas não vieram (ex.: limite diário de login do site do cliente) */}
+        {aviso && <span className="max-w-56 text-xs text-amber-700">{aviso}</span>}
       </span>
     );
   }

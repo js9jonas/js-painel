@@ -8,7 +8,7 @@ import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import ListasAparelhoModal from "./ListasAparelhoModal";
-import { ID_APP_CLOUDDY, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_IBOPRO, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
 import ClouddyModal from "./ClouddyModal";
 import AtualizarPainelButton from "./AtualizarPainelButton";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
@@ -87,7 +87,7 @@ function playlistStatus(pl: PlaylistRow, tipoPainel?: string | null, vencContrat
   }
   // SmartOne não preenche expired_date (a validade fica no device, não na playlist).
   // Considerar válida se tem playlist_id_externo — "nao_reconhecida" seria falso positivo.
-  if ((tipoPainel === "smartone" || tipoPainel === "clouddy") && pl.playlist_id_externo != null) return "vinculada";
+  if ((tipoPainel === "smartone" || tipoPainel === "clouddy" || tipoPainel === "ibopro") && pl.playlist_id_externo != null) return "vinculada";
   if (pl.expired_date && pl.expired_date.slice(0, 10) < hoje) return "expirada";
   if (!pl.expired_date) return "nao_reconhecida";
   return "vinculada";
@@ -190,7 +190,7 @@ function PlaylistBadge({
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
 
   // Playlist ativa = a que o app abre no aparelho. Só FunPlay/LazerPlay/CorePlayer têm isso.
-  const podeSelecionar = tipoPainel !== "smartone" && tipoPainel !== "clouddy" && !pl.is_selected;
+  const podeSelecionar = tipoPainel !== "smartone" && tipoPainel !== "clouddy" && tipoPainel !== "ibopro" && !pl.is_selected;
 
   async function selecionar() {
     setExcluindo(true);
@@ -376,9 +376,10 @@ function PlaylistsRow({
 
 // Filtro por MAC: ignora maiúsculas e separadores (":" "-" "." espaço), então "a4307a"
 // encontra "a4:30:7a:d1:e2:4e" e "A4-30-7A" também.
-/** Tipo usado nas playlists: Clouddy não tem painel (tipo_painel null), mas tem listas TV/VOD próprias. */
+/** Tipo usado nas playlists: Clouddy não tem painel (tipo_painel null), mas tem listas TV/VOD próprias;
+ *  IBO Pro gerencia as listas pelo site do cliente, com ou sem painel. */
 function tipoPlaylists(a: AplicativoRow): string | null {
-  return Number(a.id_app) === ID_APP_CLOUDDY ? "clouddy" : a.tipo_painel;
+  return Number(a.id_app) === ID_APP_CLOUDDY ? "clouddy" : Number(a.id_app) === ID_APP_IBOPRO ? "ibopro" : a.tipo_painel;
 }
 
 function normalizarMac(v: string): string {
@@ -645,10 +646,10 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           ) : (
                             <span className="text-zinc-300 text-xs">—</span>
                           )}
-                          {a.id_painel_servidor && a.id_dispositivo_painel && !removido && (
+                          {((a.id_painel_servidor && a.id_dispositivo_painel) || (Number(a.id_app) === ID_APP_IBOPRO && a.mac && a.chave)) && !removido && (
                             <button
                               type="button"
-                              onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: a.tipo_painel })}
+                              onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: tipoPlaylists(a) })}
                               title="Adicionar playlist"
                               className="text-zinc-400 hover:text-emerald-600 transition-colors"
                             >
@@ -726,7 +727,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                         idAppRegistro={a.id_app_registro}
                         tipoPainel={tipoPlaylists(a)}
                         vencContrato={a.venc_contrato}
-                        onEditarPlaylist={(pl) => Number(a.id_app) === ID_APP_CLOUDDY ? setClouddyApp(a) : setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
+                        onEditarPlaylist={(pl) => Number(a.id_app) === ID_APP_CLOUDDY ? setClouddyApp(a) : setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: tipoPlaylists(a) })}
                         onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
                         onPlaylistSelecionada={() => { recarregarPlaylistsAoVivo(a.id_app_registro); router.refresh(); }}
                       />

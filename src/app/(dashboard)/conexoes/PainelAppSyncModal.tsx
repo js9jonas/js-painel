@@ -63,6 +63,7 @@ export default function PainelAppSyncModal({ painel, onClose, onSalvo }: Props) 
     lazerplay:  "LazerPlay",
     coreplayer: "CorePlayer",
     smartone:   "SmartOne",
+    ibopro:     "IBO Pro",
   };
 
   return (

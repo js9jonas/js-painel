@@ -8,6 +8,8 @@ import { loginLazerPlay, editarPlaylist as editarLazerPlay, excluirPlaylist as e
 import { loginCorePlayer, editarPlaylist as editarCorePlayer, excluirPlaylist as excluirCorePlayer, selecionarPlaylist as selecionarCorePlayer, getPlaylistsDispositivo as getPlaylistsCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, editarPlaylist as editarSmartOne, excluirPlaylist as excluirSmartOne } from "@/lib/painel-adapters/smartone";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
+import { ID_APP_IBOPRO } from "@/lib/apps-painel-ids";
+import { apagarListaAppIbo, editarListaAppIbo } from "@/lib/ibopro";
 
 // Editar/excluir uma playlist específica de um device de app (FunPlays/LazerPlay/
 // CorePlayer/SmartOne). Endpoints descobertos via monitoramento de rede em 16/06/2026
@@ -64,6 +66,16 @@ async function obterSessao(tipo: string, idPainel: number, usuario: string, senh
 
 async function executar(idAppRegistro: number, idPlaylist: number, acao: Acao, corpo: CorpoEdicao, jobId: string) {
   try {
+    // IBO Pro (13/10/2026): listas pelo site do cliente (MAC + chave); não tem lista "ativa"
+    const { rows: tipoApp } = await pool.query<{ id_app: number }>(`SELECT id_app::int FROM public.aplicativos WHERE id_app_registro = $1`, [idAppRegistro]);
+    if (tipoApp[0]?.id_app === ID_APP_IBOPRO) {
+      if (acao === "selecionar") throw new Error("O IBO Pro não tem lista ativa pra escolher: o cliente escolhe na TV.");
+      if (acao === "excluir") await apagarListaAppIbo(idAppRegistro, idPlaylist);
+      else await editarListaAppIbo(idAppRegistro, idPlaylist, { nome: corpo.nome?.trim() || undefined, url: corpo.url?.trim() || undefined });
+      jobs.set(jobId, { done: true, ok: true });
+      setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
+      return;
+    }
     const { rows } = await pool.query<{ mac: string | null; id_dispositivo_painel: string | null; id_painel_servidor: number | null }>(
       `SELECT mac, id_dispositivo_painel::text AS id_dispositivo_painel, id_painel_servidor FROM public.aplicativos WHERE id_app_registro = $1`,
       [idAppRegistro]

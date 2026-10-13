@@ -12,6 +12,7 @@ const TIPO_BADGE: Record<string, string> = {
   lazerplay:  "bg-yellow-100 text-yellow-700",
   coreplayer: "bg-emerald-100 text-emerald-700",
   smartone:   "bg-sky-100 text-sky-700",
+  ibopro:     "bg-violet-100 text-violet-700",
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -19,6 +20,7 @@ const TIPO_LABEL: Record<string, string> = {
   lazerplay:  "LazerPlay",
   coreplayer: "CorePlayer",
   smartone:   "SmartOne",
+  ibopro:     "IBO Pro",
 };
 
 const URL_PAINEL: Record<string, string> = {
@@ -26,6 +28,7 @@ const URL_PAINEL: Record<string, string> = {
   lazerplay:  "https://reseller.lazerplay.io",
   coreplayer: "https://reseller.coreplayer.io",
   smartone:   "https://smartone-iptv.com/client/login/",
+  ibopro:     "https://cms.iboproapp.com",
 };
 
 type StatusAoVivo = {

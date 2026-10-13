@@ -19,7 +19,7 @@ export type HostDesconhecido = {
 };
 
 // painéis de app não têm host de lista
-const TIPOS_APP = ["funplays", "lazerplay", "coreplayer", "smartone"];
+const TIPOS_APP = ["funplays", "lazerplay", "coreplayer", "smartone", "ibopro"];
 
 /** Torna `host` o principal do servidor (rebaixa o anterior para secundário) e espelha em host_stream. */
 export async function definirPrincipal(client: PoolClient, idPainel: number, host: string): Promise<void> {

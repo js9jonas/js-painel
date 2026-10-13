@@ -6,8 +6,9 @@ import { registrarAudit } from "@/lib/audit";
 import { buscarDispositivoPorMac } from "@/lib/painel-adapters/appacesso";
 import { buscarDispositivoPorMac as buscarSmartOne } from "@/lib/painel-adapters/smartone";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
-import { ID_APP_CLOUDDY, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
 import { atualizarAppClouddy } from "@/lib/clouddy";
+import { atualizarAppIbo } from "@/lib/ibopro";
 
 // Atualiza UM aparelho a partir do painel do app (Fun Play / Lazer Play / Core Player / SmartOne) ou da
 // conta do cliente (Clouddy, 13/10/2026): busca
@@ -17,7 +18,7 @@ import { atualizarAppClouddy } from "@/lib/clouddy";
 
 type JobState =
   | { done: false }
-  | { done: true; ok: true; validade: string | null; mudou: boolean }
+  | { done: true; ok: true; validade: string | null; mudou: boolean; aviso?: string }
   | { done: true; ok: false; erro: string };
 const jobs = new Map<string, JobState>();
 
@@ -38,6 +39,12 @@ async function executar(idAppRegistro: number, jobId: string) {
     if (app.id_app === ID_APP_CLOUDDY) {
       const r = await atualizarAppClouddy(idAppRegistro);
       jobs.set(jobId, { done: true, ok: true, validade: r.validade, mudou: r.mudou });
+      return;
+    }
+    // IBO Pro: validade pelo painel de revenda + listas pelo site do cliente (MAC + chave)
+    if (app.id_app === ID_APP_IBOPRO) {
+      const r = await atualizarAppIbo(idAppRegistro);
+      jobs.set(jobId, { done: true, ok: true, validade: r.validade, mudou: r.mudou, aviso: r.aviso });
       return;
     }
 

@@ -122,7 +122,8 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ap.observacao,
        app.nome_app,
        ap.id_app::int AS id_app,
-       (ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone')) IS TRUE AS no_painel_app,
+       -- IBO Pro (id_app 7) ativa pelo MAC mesmo fora da revenda: sempre tem o botão Renovar
+       ((ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro')) IS TRUE OR ap.id_app = 7) AS no_painel_app,
        (ps.tipo = 'smartone') IS TRUE AS painel_smartone,
        ult.venc_contrato_cliente,
        -- mais de uma assinatura viva: "2 (1 Tela - 1 Tela)"; senão o pacote da última assinatura
