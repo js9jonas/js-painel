@@ -57,4 +57,11 @@ Pedido do Jonas em 29/09/2026. Cada imagem enviada pelo cliente no `/chat` tem u
 - **Endpoint:** `POST /plugin/smart_one/client_transfer/license` (form) com `_csrf_token`, `from_mac`, `to_mac`, `playlists=1|0`. **Sucesso:** 302 → mesma página com alerta "License Successfully transferred to : <MAC>". **Recusa:** 200 com alerta "No available free slot for this license, or license already transferred."
 - **Regra:** a licença é a TRANSAÇÃO (`/client_transactions/`, filtro `filters[mac]` via POST com csrf). A transferência **move a transação** pro MAC novo e **tira o link "Transfer"** dela → **cada licença só transfere 1 vez**. Origem sem link `client_transactions/transfer/{id}/` = recusada (foi o caso do E8:AA:CB:C2:3C:D7, 2 tentativas). O destino pode ter licença ativa (aceitou), mas os dias dele **não somam** (fica com a maior).
 - Teste real: D0:C2:4E:74:70:72 (Geisiane #1852, até 16/07/2027) → 28:39:5E:18:1B:18 (Daniel Diemer #388, vencia 18/10/2026) ✅. Banco só atualiza no próximo sync do SmartOne.
-- Das 47 "licenças sobrando" de 12/10, 38 tinham o link (4.897 dias) e 9 não. Página `/aplicativos/licencas-sobrando` ainda sem commit nesta data.
+- Das 47 "licenças sobrando" de 12/10, 38 tinham o link (4.897 dias) e 9 não.
+
+## 12/10/2026 — "Licença sobrando" em /alertas (`44e6342`, ⚠️ deploy manual; transferência pela tela ainda não testada)
+
+- Página separada descartada a pedido do Jonas: ele decide renovar × reaproveitar em /alertas. Linhas SmartOne têm "🎁 Licença sobrando" ao lado de "Renovar no painel" → `LicencaSobrandoModal`.
+- `src/lib/licencas-sobrando.ts`: `getLicencasSobrando()` (SmartOne válido + cliente sem assinatura viva / app inativo / sem cliente) e fila em memória `conferirNoSite()`/`estadoConferencias()` (3 em paralelo, cache 6 h). Site leva ~7 s por `transacoesDoMac` (filtro POST); csrf vem de `/client_main/check/` (~1 s; a página de transações leva ~12 s).
+- `GET/POST /api/aplicativos/licencas-sobrando`; `POST /api/aplicativos/[idAppRegistro]/transferir-licenca {id_origem}` (job): confere origem transferível → `transferirLicenca(…, listas=false)` → **confirma pela transação no destino** (não confia só no alerta) → destino `validade` = maior expira do site; origem `validade NULL`, `inativa`, nota "Licença transferida para MAC (cliente) em dd/mm/aaaa"; audit nos dois.
+- Modal: mesmo cliente primeiro, depois mais dias; avisa que os dias do destino não somam; desabilita origem com menos dias que o destino. Confirmação em 2 cliques.
