@@ -242,6 +242,24 @@ export async function getDispositivos(cookie: string): Promise<SmartOneDevice[]>
   return all;
 }
 
+/**
+ * Linha do aparelho no painel pelo MAC: percorre a aba "active" (20 por página) e depois a "pending",
+ * parando no primeiro encontrado (smartkey mais novo do MAC). null = MAC não está no painel.
+ */
+export async function buscarDispositivoPorMac(cookie: string, mac: string): Promise<SmartOneDevice | null> {
+  const alvo = mac.trim().toUpperCase();
+  for (const aba of ["active", "pending"]) {
+    for (let page = 1; page <= 200; page++) {
+      const html = await getHtml(`/plugin/smart_one/client_main/index/${aba}/${page}/?sort=id&order=desc`, cookie);
+      const dispositivos = parseDispositivosPagina(html);
+      if (dispositivos.length === 0) break;
+      const achado = dispositivos.find((d) => d.mac.toUpperCase() === alvo);
+      if (achado) return achado;
+    }
+  }
+  return null;
+}
+
 export async function getPlaylistsDispositivo(
   cookie: string,
   deviceId: number

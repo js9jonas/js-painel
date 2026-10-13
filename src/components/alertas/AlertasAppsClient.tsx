@@ -258,7 +258,7 @@ export default function AlertasAppsClient({
                             {r.sem_validade ? (
                               <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
                             ) : r.no_painel_app ? (
-                              <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar />
+                              <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
                             ) : (
                               <button
                                 onClick={() => abrirModal(r)}
