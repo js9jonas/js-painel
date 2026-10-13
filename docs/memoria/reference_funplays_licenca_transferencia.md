@@ -27,7 +27,7 @@ Histórico: em 19/06/2026 a regra anotada era "não transfere entre aparelhos j�
 
 `PUT https://api.funplays.app/reseller/device/transfer` body `{"from_id":<id origem>,"to_id":<id destino>}` (ids internos, não MAC). O painel chama antes `GET /reseller/validate_mac?mac=` no destino. Função: `transferirLicenca` em `src/lib/painel-adapters/appacesso.ts`.
 
-## Implementado (commits `3e5ed66` + `73d1dbc`, 13/10/2026 — ⚠️ deploy manual e teste na tela pendentes)
+## Implementado (commits `3e5ed66` + `73d1dbc`, 13/10/2026 — ✅ em produção — Jonas confirmou "tudo certo" em 13/10/2026)
 
 - /alertas: "🎁 Licença sobrando" nas linhas de aparelho novo Fun/Lazer/Core ("Precisa ativar" ou cadastrado fora do painel), ao lado de "Ativar no painel" — `APPS_COM_TRANSFERENCIA_PAINEL = [3, 2, 31]` em `src/lib/apps-painel-ids.ts`. **Lazer e Core liberados sem teste real**, a pedido do Jonas (mesma API).
 - Pedido do Jonas: transferir **no lugar do add existing**. Rota `transferir-licenca`: origem no painel ativo com 30+ dias → destino `payed=false` → transfere direto no id do `validate_mac` → se recusar e o aparelho estiver fora do painel, add existing (grátis) + 1 nova tentativa (**caminho não testado**) → confere `payed=true` → comentário com o nome do cliente → grava os dois aparelhos + auditoria (`gravarTransferencia`, compartilhada com o SmartOne).
