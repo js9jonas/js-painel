@@ -43,3 +43,9 @@ Pedido do Jonas em 29/09/2026. Cada imagem enviada pelo cliente no `/chat` tem u
 - Limite conhecido: o SmartOne grava porta 80 sempre (`smartone-m3u.ts`) — servidor com porta diferente no `host_stream` não funcionaria (já era assim no "Adicionar lista").
 
 **12/10/2026 — SmartOne não tem "selecionar lista" remoto** (verificado no site, só leitura): painel de revenda por linha só tem ver (`view_smartkey`), editar (`edit_playlist`), apagar (`delete_smartkey`) e ativar (giftcode); páginas públicas (`/manage-devices` = a mesma conta, `main_generate` = só adicionar lista, `main_activate`) também não. A escolha da lista é feita na TV. Contornos possíveis (não testados numa TV): editar a lista que o aparelho já usa (troca servidor/usuário/senha no lugar) ou apagar as outras listas do MAC para sobrar só uma.
+
+## 12/10/2026 — Renovar SmartOne por giftcode em /alertas (`3daf7cf`, ⚠️ deploy manual; renovação real ainda não feita)
+
+- SmartOne vencendo em /alertas mostra "Renovar no painel" (`AtivarPainelButton` com `giftcode`, "Confirmar: gasta 1 giftcode") no lugar do "+1 ano" manual. `alertas.ts`: `no_painel_app` inclui smartone + campo `painel_smartone`.
+- `ativar-painel/route.ts` → `renovarSmartOne()`: `buscarDispositivoPorMac()` (novo no adapter: abas active e pending, 20/página, para no 1º achado; MAC inexistente ~16 s varrendo tudo) → mesma trava de 40 dias → `ativarDispositivo()` (1 giftcode "Unused") → relê a validade no painel. Gravação/auditoria extraída em `gravar()` (compartilhada com Fun/Lazer/Core).
+- Achado no site: Expiration pode ser data, "Trial, Days Left: N" (vira data), **"Expired"** (42 aparelhos, sync grava validade NULL → somem de /alertas) e "Lifetime" (1). Não alterado: decidir com o Jonas se o sync deve manter a última validade em vez de NULL.
