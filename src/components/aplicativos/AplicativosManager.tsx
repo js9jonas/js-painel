@@ -785,6 +785,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
           onClose={() => setEditandoPlaylist(null)}
           onSaved={() => {
             recarregarPlaylistsAoVivo(editandoPlaylist.idAppRegistro);
+            router.refresh(); // IBO Pro não tem leitura ao vivo: a lista nova vem do banco
             setEditandoPlaylist(null);
           }}
         />

@@ -251,6 +251,15 @@ export async function ativarAppIbo(idAppRegistro: number): Promise<{ validade: s
 
 // ---------- Listas (coluna Playlists de /clientes/[id]) ----------
 
+/**
+ * Logo depois de salvar, o GET /playlistw do IBO ainda pode devolver a versão antiga (edição do Elton Alf
+ * em 13/10/2026 voltou com a URL antiga): vale a lista que o próprio POST devolveu.
+ */
+function mesclar(todas: IboPlaylist[], salva: IboPlaylist | null | undefined): IboPlaylist[] {
+  if (!salva?.id) return todas;
+  return todas.some((l) => l.id === salva.id) ? todas.map((l) => (l.id === salva.id ? salva : l)) : [...todas, salva];
+}
+
 async function idRealDaLista(s: SessaoAparelhoIbo, idExterno: number): Promise<{ lista: IboPlaylist; todas: IboPlaylist[] }> {
   const todas = await listasIbo(s);
   const lista = todas.find((l) => idNumericoLista(l.id) === Number(idExterno));
@@ -274,8 +283,8 @@ async function auditarLista(app: AppIbo, descricao: string, antes: Record<string
 export async function criarListaAppIbo(idAppRegistro: number, nome: string, url: string): Promise<void> {
   const app = await carregar(idAppRegistro);
   const s = await entrarComoCliente(app);
-  await salvarListaIbo(s, { nome, url });
-  await gravarListasIbo(idAppRegistro, await listasIbo(s));
+  const nova = await salvarListaIbo(s, { nome, url });
+  await gravarListasIbo(idAppRegistro, mesclar(await listasIbo(s), nova));
   await auditarLista(app, `Lista "${nome}" criada no IBO Pro`, {}, { nome });
 }
 
@@ -283,8 +292,8 @@ export async function editarListaAppIbo(idAppRegistro: number, idExterno: number
   const app = await carregar(idAppRegistro);
   const s = await entrarComoCliente(app);
   const { lista } = await idRealDaLista(s, idExterno);
-  await salvarListaIbo(s, { id: lista.id, nome: dados.nome ?? lista.name, url: dados.url ?? lista.url });
-  await gravarListasIbo(idAppRegistro, await listasIbo(s));
+  const salva = await salvarListaIbo(s, { id: lista.id, nome: dados.nome ?? lista.name, url: dados.url ?? lista.url });
+  await gravarListasIbo(idAppRegistro, mesclar(await listasIbo(s), salva));
   await auditarLista(app, `Lista "${dados.nome ?? lista.name}" editada no IBO Pro`, { nome: lista.name }, { nome: dados.nome ?? lista.name, url_trocada: dados.url != null && dados.url !== lista.url });
 }
 
@@ -293,7 +302,7 @@ export async function apagarListaAppIbo(idAppRegistro: number, idExterno: number
   const s = await entrarComoCliente(app);
   const { lista } = await idRealDaLista(s, idExterno);
   await apagarListaIbo(s, lista.id);
-  await gravarListasIbo(idAppRegistro, await listasIbo(s));
+  await gravarListasIbo(idAppRegistro, (await listasIbo(s)).filter((l) => l.id !== lista.id));
   await auditarLista(app, `Lista "${lista.name}" apagada no IBO Pro`, { nome: lista.name }, {});
 }
 
