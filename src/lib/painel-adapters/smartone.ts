@@ -406,6 +406,85 @@ export async function getCreditosDisponiveis(cookie: string): Promise<number | n
   return m ? parseInt(m[1], 10) : null;
 }
 
+// ---------- Transferência de licença (12/10/2026) ----------
+// A licença é a transação (client_transactions). Transferir MOVE a transação pro MAC novo e tira dela o
+// link "Transfer": cada licença só transfere uma vez. Sem o link, o site recusa ("No available free slot
+// for this license, or license already transferred"). O destino não soma dias: fica com a maior validade.
+
+export interface SmartOneTransacao {
+  id: number;
+  mac: string;
+  pago_em: string | null; // yyyy-mm-dd
+  expira_em: string | null; // yyyy-mm-dd
+  transferivel: boolean;
+}
+
+/** Token csrf da sessão (o mesmo em todas as páginas) — tirado de uma página leve (~1 s; a de transações leva ~12 s). */
+export async function csrfDaSessao(cookie: string): Promise<string> {
+  return extrairCsrfToken(await getHtml(`/plugin/smart_one/client_main/check/`, cookie));
+}
+
+/** Transações (licenças) do MAC — filtro do próprio site (POST com csrf). O site leva ~7 s por consulta. */
+export async function transacoesDoMac(cookie: string, mac: string, csrf?: string): Promise<SmartOneTransacao[]> {
+  csrf ??= await csrfDaSessao(cookie);
+  const body = new URLSearchParams({ _csrf_token: csrf, "filters[mac]": mac, "filters[per_page]": "20", submit: "1" });
+  const res = await fetch(`${BASE}/plugin/smart_one/client_transactions/index/all`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", cookie },
+    body: body.toString(),
+  });
+  if (res.url.includes("/client/login")) throw new Error("SmartOne: sessão expirada.");
+  const html = await res.text();
+  const corpo = html.slice(html.indexOf("<tbody"), html.indexOf("</tbody>"));
+  const alvo = mac.trim().toUpperCase();
+  const out: SmartOneTransacao[] = [];
+  for (const tr of corpo.split(/<tr[^>]*>/).slice(1)) {
+    const cel = [...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => semTags(m[1]));
+    if (cel.length < 5 || cel[1].toUpperCase() !== alvo) continue;
+    out.push({
+      id: parseInt(cel[0], 10),
+      mac: cel[1],
+      pago_em: parseExpiracao(cel[3]),
+      expira_em: parseExpiracao(cel[4]),
+      transferivel: /client_transactions\/transfer\/\d+/.test(tr),
+    });
+  }
+  return out;
+}
+
+/** Licença em vigor do MAC (a de maior vencimento) e se ainda pode ser transferida. null = sem licença. */
+export async function licencaDoMac(cookie: string, mac: string, csrf?: string): Promise<SmartOneTransacao | null> {
+  const lista = await transacoesDoMac(cookie, mac, csrf);
+  return lista.sort((a, b) => (b.expira_em ?? "").localeCompare(a.expira_em ?? ""))[0] ?? null;
+}
+
+/** Transfere a licença de um MAC pra outro. `listas` = levar as playlists junto (padrão: não). */
+export async function transferirLicenca(
+  cookie: string,
+  deMac: string,
+  paraMac: string,
+  listas = false
+): Promise<{ ok: true } | { ok: false; erro: string }> {
+  const path = `/plugin/smart_one/client_transfer/license`;
+  const csrf = extrairCsrfToken(await getHtml(path, cookie));
+  const body = new URLSearchParams({ _csrf_token: csrf, from_mac: deMac, to_mac: paraMac, playlists: listas ? "1" : "0" });
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", cookie },
+    body: body.toString(),
+    redirect: "manual",
+  });
+  // Sucesso: 302 de volta pra página, que mostra "License Successfully transferred to : <MAC>".
+  // Recusa: 200 com o alerta do motivo. Quem chama confere nas transações de qualquer jeito.
+  const html = res.status === 302 ? await getHtml(path, cookie) : await res.text();
+  const alertas = [...html.matchAll(/class="alert[^"]*"[^>]*>([\s\S]*?)<\/div>/g)]
+    .map((m) => semTags(m[1]).replace(/^×\s*/, ""))
+    .filter((t) => t && !/irreversible/i.test(t));
+  const msg = alertas[0] ?? "";
+  if (/successfully transferred/i.test(msg)) return { ok: true };
+  return { ok: false, erro: msg || `sem confirmação do site (HTTP ${res.status})` };
+}
+
 // ---------- PainelAdapter factory ----------
 
 export function criarSmartOneAdapter(

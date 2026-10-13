@@ -7,6 +7,7 @@ import { AlertaAppRow } from "@/lib/alertas";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
 import { Select } from "@/components/ui/select";
 import AtivarPainelButton from "./AtivarPainelButton";
+import LicencaSobrandoModal from "./LicencaSobrandoModal";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
 
@@ -56,6 +57,7 @@ export default function AlertasAppsClient({
   const [valor, setValor] = useState("20");
   const [isPending, startTransition] = useTransition();
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
+  const [licencaPara, setLicencaPara] = useState<AlertaAppRow | null>(null);
 
   function copiarNome(id: string, nome: string) {
     navigator.clipboard.writeText(nome);
@@ -258,7 +260,18 @@ export default function AlertasAppsClient({
                             {r.sem_validade ? (
                               <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
                             ) : r.no_painel_app ? (
-                              <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
+                              <div className="flex flex-wrap items-start gap-2">
+                                <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
+                                {r.painel_smartone && (
+                                  <button
+                                    onClick={() => setLicencaPara(r)}
+                                    title="Transferir para este aparelho a licença de um cliente que saiu ou de um app inativo, sem gastar giftcode"
+                                    className="h-7 rounded-lg border border-violet-300 bg-white px-3 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors"
+                                  >
+                                    🎁 Licença sobrando
+                                  </button>
+                                )}
+                              </div>
                             ) : (
                               <button
                                 onClick={() => abrirModal(r)}
@@ -362,6 +375,19 @@ export default function AlertasAppsClient({
             </div>
           </div>
         </div>
+      )}
+      {licencaPara && (
+        <LicencaSobrandoModal
+          destino={{
+            id_app_registro: licencaPara.id_app_registro,
+            id_cliente: licencaPara.id_cliente,
+            nome: licencaPara.nome,
+            mac: licencaPara.mac,
+            validade: licencaPara.validade,
+            sem_validade: licencaPara.sem_validade,
+          }}
+          onClose={() => setLicencaPara(null)}
+        />
       )}
     </>
   );
