@@ -4,6 +4,8 @@ import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { getAdapterPainel } from "@/lib/painel-adapters";
+import { getPainelServidoresResumo } from "@/lib/paineis";
+import { ASSINATURA_PADRAO, TIPOS_COM_TESTE } from "@/lib/paineis-teste";
 
 export async function desvincularconta(idConta: string, idCliente: string): Promise<{ ok: boolean; erro?: string }> {
   const client = await pool.connect();
@@ -115,16 +117,55 @@ export async function buscarContasLivres(
 export type ResultadoCriarTeste = {
   ok: boolean;
   erro?: string;
+  id_conta?: string;
   usuario?: string;
   senha?: string;
   expiracao?: string;
   expiracaoHorario?: string;
 };
 
+// Assinatura "em uso" do cliente pra receber um teste: a mais recente que não foi encerrada.
+const SQL_ASSINATURA_EM_USO = `
+  SELECT a.id_assinatura::text, COALESCE(pc.contrato, 'Assinatura') AS pacote, pl.tipo AS plano, a.identificacao
+  FROM public.assinaturas a
+  LEFT JOIN public.pacote pc ON pc.id_pacote = a.id_pacote
+  LEFT JOIN public.planos pl ON pl.id_plano = a.id_plano
+  WHERE a.id_cliente = $1::bigint AND a.status NOT IN ('cancelado', 'inativo')
+  ORDER BY a.id_assinatura DESC
+  LIMIT 1`;
+
+export type OpcoesTesteCliente = {
+  paineis: { id: number; nome: string; tipo: string }[];
+  /** null = cliente sem assinatura em uso; o teste cria a assinatura padrão junto */
+  assinatura: { id_assinatura: string; descricao: string } | null;
+};
+
+/** Painéis que geram teste + a assinatura que vai receber o teste (pro cadastro de app sem conta com lista). */
+export async function opcoesTesteCliente(idCliente: string): Promise<OpcoesTesteCliente> {
+  const [paineis, { rows }] = await Promise.all([
+    getPainelServidoresResumo(),
+    pool.query<{ id_assinatura: string; pacote: string; plano: string | null; identificacao: string | null }>(
+      SQL_ASSINATURA_EM_USO, [idCliente]
+    ),
+  ]);
+  const a = rows[0];
+  return {
+    paineis: paineis.filter((p) => TIPOS_COM_TESTE.has(p.tipo)).map(({ id, nome, tipo }) => ({ id, nome, tipo })),
+    assinatura: a
+      ? { id_assinatura: a.id_assinatura, descricao: [a.pacote, a.plano, a.identificacao?.trim()].filter(Boolean).join(" · ") }
+      : null,
+  };
+}
+
+/**
+ * Gera um teste no painel e grava a conta na assinatura.
+ * idAssinatura null: usa a assinatura em uso do cliente ou, se não houver, cria a padrão
+ * (1 tela · Padrão mensal) na mesma transação da conta — teste que falha no painel não deixa assinatura vazia.
+ */
 export async function criarContaTeste(
   idPainelServidor: number,
   idCliente: string,
-  idAssinatura: string,
+  idAssinatura: string | null,
   descricao: string
 ): Promise<ResultadoCriarTeste> {
   const { rows: clienteRows } = await pool.query(
@@ -158,6 +199,7 @@ export async function criarContaTeste(
     return { ok: false, erro: resultado.erro ?? "Falha ao gerar teste no painel." };
   }
 
+  let idContaCriada: string | undefined;
   const client = await pool.connect();
   try {
     const { rows: painelMeta } = await client.query<{ id_servidor: number | null }>(
@@ -167,26 +209,53 @@ export async function criarContaTeste(
     const idServidor = painelMeta[0]?.id_servidor ?? idPainelServidor;
 
     await client.query("BEGIN");
+
+    let idAssinaturaFinal = idAssinatura;
+    let assinaturaCriada = false;
+    if (!idAssinaturaFinal) {
+      // Trava o cliente: dois cliques/abas não criam duas assinaturas padrão
+      await client.query(`SELECT 1 FROM public.clientes WHERE id_cliente = $1::bigint FOR UPDATE`, [idCliente]);
+      const { rows: emUso } = await client.query<{ id_assinatura: string }>(SQL_ASSINATURA_EM_USO, [idCliente]);
+      idAssinaturaFinal = emUso[0]?.id_assinatura ?? null;
+      if (!idAssinaturaFinal) {
+        const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+        const { rows: nova } = await client.query<{ id_assinatura: string }>(
+          `INSERT INTO public.assinaturas (id_cliente, id_pacote, id_plano, venc_contrato, status)
+           VALUES ($1::bigint, $2::bigint, $3::bigint, $4::date, 'ativo')
+           RETURNING id_assinatura::text`,
+          [idCliente, ASSINATURA_PADRAO.id_pacote, ASSINATURA_PADRAO.id_plano, hoje]
+        );
+        idAssinaturaFinal = nova[0].id_assinatura;
+        assinaturaCriada = true;
+      }
+    }
+
     const { rows } = await client.query(
       `INSERT INTO public.contas
          (id_painel_servidor, id_servidor, id_assinatura, usuario, senha, rotulo, vencimento_real_painel, status_conta, status_sinc)
        VALUES ($1, $2, $3::bigint, $4, $5, $6, $7, 'ok', 'confirmado')
        RETURNING id_conta::text`,
-      [idPainelServidor, idServidor, idAssinatura, resultado.usuario, resultado.senha ?? null, rotulo, resultado.expiracao ?? null]
+      [idPainelServidor, idServidor, idAssinaturaFinal, resultado.usuario, resultado.senha ?? null, rotulo, resultado.expiracao ?? null]
     );
-    const idConta = rows[0].id_conta;
+    const idConta: string = rows[0].id_conta;
+    idContaCriada = idConta;
 
     await registrarAudit(client, {
       tipo: "criacao_teste_conta",
       id_cliente: idCliente,
-      id_assinatura: idAssinatura,
-      descricao: `Teste criado (${resultado.usuario}) — ${descricao}`,
-      dados_depois: { id_conta: idConta, usuario: resultado.usuario, id_painel_servidor: idPainelServidor },
+      id_assinatura: idAssinaturaFinal,
+      descricao: `Teste criado (${resultado.usuario}) — ${descricao}${assinaturaCriada ? ` · assinatura ${ASSINATURA_PADRAO.descricao} criada junto` : ""}`,
+      dados_depois: {
+        id_conta: idConta, usuario: resultado.usuario, id_painel_servidor: idPainelServidor,
+        ...(assinaturaCriada ? { assinatura_criada: { id_assinatura: idAssinaturaFinal, ...ASSINATURA_PADRAO } } : {}),
+      },
     });
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK");
-    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao salvar conta de teste." };
+    // O teste já existe no painel: avisar pra não gerar outro às cegas
+    const motivo = e instanceof Error ? e.message : "erro ao salvar";
+    return { ok: false, erro: `O teste ${resultado.usuario} foi criado no painel, mas não ficou salvo aqui (${motivo}). Vincule a conta pela busca em vez de gerar outro teste.` };
   } finally {
     client.release();
   }
@@ -194,6 +263,7 @@ export async function criarContaTeste(
   revalidatePath(`/clientes/${idCliente}`);
   return {
     ok: true,
+    id_conta: idContaCriada,
     usuario: resultado.usuario,
     senha: resultado.senha,
     expiracao: resultado.expiracao,

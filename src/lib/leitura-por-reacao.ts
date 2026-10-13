@@ -58,7 +58,9 @@ export function montarMensagem(
       else linhas.push(`⚠️ ${app} (${esc(c.status ?? '—')}${val}) — <b>de outro cliente: ${esc(c.nome_cliente ?? `#${c.id_cliente}`)}</b>`)
     }
   } else if (leitura.pode_cadastrar) {
-    linhas.push('', '🆕 MAC novo neste app — dá pra cadastrar pelo /chat ou pelo cliente.')
+    linhas.push('', leitura.id_app == null
+      ? '🆕 MAC novo (app não identificado) — dá pra cadastrar pelo /chat escolhendo o app.'
+      : '🆕 MAC novo neste app — dá pra cadastrar pelo /chat ou pelo cliente.')
   }
 
   // Botão de copiar (copy_text) — até 256 caracteres por valor

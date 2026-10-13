@@ -240,7 +240,8 @@ export async function vincularCadastros(leitura: LeituraImagem, msgId: number, c
     id_app: idApp,
     cadastros,
     id_cliente_conversa: idClienteConversa,
-    pode_cadastrar: idApp != null && !!leitura.mac && !leitura.mac_suspeito && !jaNoMesmoApp,
+    // App não identificado também pode: o app é escolhido no modal (a trava de MAC repetido no mesmo app fica no createAplicativo)
+    pode_cadastrar: !!leitura.mac && !leitura.mac_suspeito && !jaNoMesmoApp,
   }
 }
 

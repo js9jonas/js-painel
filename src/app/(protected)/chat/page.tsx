@@ -2437,7 +2437,7 @@ export default function ChatPage() {
                                           })}
                                         </div>
                                       )}
-                                      {/* MAC novo nesse app, com dados suficientes → cadastrar direto */}
+                                      {/* MAC novo nesse app (ou app não identificado: escolhe no modal) → cadastrar direto */}
                                       {d.pode_cadastrar && (
                                         cliente
                                           ? <button
@@ -2446,8 +2446,15 @@ export default function ChatPage() {
                                                 marginTop: 8, width: '100%', height: 30, borderRadius: 6, border: 'none',
                                                 background: '#00a884', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                                               }}
-                                            >+ Cadastrar aplicativo</button>
-                                          : <div style={{ color: '#667781', fontSize: 11, marginTop: 6 }}>Vincule o contato a um cliente pra cadastrar este app.</div>
+                                            >{d.id_app == null ? '+ Cadastrar aplicativo (escolher app)' : '+ Cadastrar aplicativo'}</button>
+                                          : <div style={{ color: '#667781', fontSize: 11, marginTop: 6 }}>
+                                              Contato sem cliente.{' '}
+                                              <button
+                                                onClick={() => setNovoClienteOpen(true)}
+                                                style={{ background: 'none', border: 'none', padding: 0, color: '#00a884', fontWeight: 600, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+                                              >Cadastrar cliente</button>
+                                              {' '}pra cadastrar este app.
+                                            </div>
                                       )}
                                     </>
                                   )
@@ -3632,25 +3639,14 @@ export default function ChatPage() {
           }}
           onClose={() => setAppDaLeitura(null)}
           onSaved={() => {
-            const { msgId, dados } = appDaLeitura
+            const { msgId } = appDaLeitura
             setAppDaLeitura(null)
             carregarAplicativosCliente(cliente.id_cliente)
-            // Atualiza o cartão sem nova leitura: agora o MAC já consta como deste cliente
-            setLeiturasImg(prev => ({
-              ...prev,
-              [msgId]: {
-                status: 'ok',
-                dados: {
-                  ...dados,
-                  pode_cadastrar: false,
-                  cadastros: [{
-                    id_app_registro: 0, id_app: dados.id_app, nome_app: dados.app,
-                    id_cliente: cliente.id_cliente, nome_cliente: cliente.nome,
-                    status: 'ativa', validade: dados.validade, do_contato: true,
-                  }, ...dados.cadastros],
-                },
-              },
-            }))
+            // Teste/assinatura podem ter sido criados no modal
+            carregarContasCliente(cliente.id_cliente)
+            if (selecionado) carregarMensagens(selecionado)
+            // Atualiza o cartão com os cadastros reais (devolve a leitura salva, sem chamar a IA de novo)
+            void lerImagem(msgId)
           }}
         />
       )}

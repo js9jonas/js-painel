@@ -1,11 +1,13 @@
 // src/components/aplicativos/AplicativoModal.tsx
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createAplicativo, updateAplicativo, type AplicativoData } from "@/app/actions/aplicativos";
 import { Select } from "@/components/ui/select";
 import type { AplicativoRow, AppRow } from "@/lib/aplicativos";
 import { appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { criarContaTeste, opcoesTesteCliente, type OpcoesTesteCliente, type ResultadoCriarTeste } from "@/app/actions/contasVinculo";
+import { ASSINATURA_PADRAO } from "@/lib/paineis-teste";
 
 type ContaOpcao = { id_conta: string; usuario: string; rotulo: string | null; nome_painel: string; status_conta: string; host_stream: string | null };
 
@@ -52,18 +54,63 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
   const [etapa, setEtapa] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const criouAlgo = useRef(false);
 
-  useEffect(() => {
-    if (!usarPainel || contas !== null) return;
-    fetch(`/api/clientes/${idCliente}/contas`)
+  function carregarContas(selecionar?: string) {
+    return fetch(`/api/clientes/${idCliente}/contas`)
       .then((r) => (r.ok ? r.json() : []))
       .then((lista: ContaOpcao[]) => {
         const comLista = Array.isArray(lista) ? lista.filter((c) => !!c.host_stream) : [];
         setContas(comLista);
-        if (comLista.length === 1) setIdConta(comLista[0].id_conta);
+        if (selecionar && comLista.some((c) => c.id_conta === selecionar)) setIdConta(selecionar);
+        else if (comLista.length === 1) setIdConta(comLista[0].id_conta);
       })
       .catch(() => setContas([]));
+  }
+
+  useEffect(() => {
+    if (!usarPainel || contas !== null) return;
+    void carregarContas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usarPainel, contas, idCliente]);
+
+  // Cliente sem conta com lista: criar um teste aqui mesmo (e a assinatura padrão, se faltar)
+  const semConta = usarPainel && contas !== null && contas.length === 0;
+  const [opcoesTeste, setOpcoesTeste] = useState<OpcoesTesteCliente | null>(null);
+  const [idPainelTeste, setIdPainelTeste] = useState("");
+  const [descricaoTeste, setDescricaoTeste] = useState("Teste");
+  const [criandoTeste, setCriandoTeste] = useState(false);
+  const [resultadoTeste, setResultadoTeste] = useState<ResultadoCriarTeste | null>(null);
+
+  useEffect(() => {
+    if (!semConta || opcoesTeste !== null) return;
+    opcoesTesteCliente(idCliente)
+      .then((o) => {
+        setOpcoesTeste(o);
+        if (o.paineis.length === 1) setIdPainelTeste(String(o.paineis[0].id));
+      })
+      .catch(() => setOpcoesTeste({ paineis: [], assinatura: null }));
+  }, [semConta, opcoesTeste, idCliente]);
+
+  async function criarTeste() {
+    if (!idPainelTeste || !descricaoTeste.trim() || criandoTeste) return;
+    setResultadoTeste(null);
+    setCriandoTeste(true);
+    try {
+      const res = await criarContaTeste(
+        Number(idPainelTeste), idCliente, opcoesTeste?.assinatura?.id_assinatura ?? null, descricaoTeste.trim()
+      );
+      setResultadoTeste(res);
+      if (res.ok) {
+        criouAlgo.current = true;
+        await carregarContas(res.id_conta);
+      }
+    } catch {
+      setResultadoTeste({ ok: false, erro: "Sem internet ou o sistema está atualizando. Confira no painel antes de tentar de novo." });
+    } finally {
+      setCriandoTeste(false);
+    }
+  }
 
   async function cadastrarNoPainel() {
     setError(null);
@@ -114,8 +161,8 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
 
   // Depois de um cadastro com aviso, fechar também atualiza a tela do cliente.
   function fecharModal() {
-    if (enviando) return;
-    if (aviso) onSaved();
+    if (enviando || criandoTeste) return;
+    if (aviso || criouAlgo.current) onSaved();
     onClose();
   }
 
@@ -232,6 +279,49 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
                   <label className={labelClass}>Lista no aparelho</label>
                   {contas === null ? (
                     <p className="text-xs text-zinc-500">Carregando contas do cliente…</p>
+                  ) : semConta ? (
+                    <div className="rounded-lg border border-violet-200 bg-white p-3 space-y-2">
+                      <p className="text-xs text-zinc-600">Cliente sem conta com lista. Crie um teste para já mandar a lista para o aparelho.</p>
+                      {opcoesTeste === null ? (
+                        <p className="text-xs text-zinc-500">Carregando servidores…</p>
+                      ) : opcoesTeste.paineis.length === 0 ? (
+                        <p className="text-xs text-zinc-500">Nenhum servidor ativo gera teste pelo sistema.</p>
+                      ) : (
+                        <>
+                          <Select
+                            value={idPainelTeste}
+                            onChange={setIdPainelTeste}
+                            className={selectClass}
+                            options={[
+                              { value: "", label: "— Servidor do teste —" },
+                              ...opcoesTeste.paineis.map((p) => ({ value: String(p.id), label: p.nome })),
+                            ]}
+                          />
+                          <input
+                            value={descricaoTeste}
+                            onChange={(e) => setDescricaoTeste(e.target.value)}
+                            className={inputClass}
+                            placeholder="Descrição (ex: teste solicitado)"
+                          />
+                          <p className="text-xs text-zinc-500">
+                            {opcoesTeste.assinatura
+                              ? <>Vai para a assinatura {opcoesTeste.assinatura.descricao}.</>
+                              : <>Cliente sem assinatura: cria junto uma assinatura <span className="font-semibold">{ASSINATURA_PADRAO.descricao}</span> (ativa, vencimento hoje).</>}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void criarTeste()}
+                            disabled={criandoTeste || enviando || !idPainelTeste || !descricaoTeste.trim()}
+                            className="w-full h-9 rounded-xl bg-violet-600 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 transition-all"
+                          >
+                            {criandoTeste ? "Criando teste…" : "Criar teste"}
+                          </button>
+                        </>
+                      )}
+                      {resultadoTeste && !resultadoTeste.ok && (
+                        <p className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{resultadoTeste.erro}</p>
+                      )}
+                    </div>
                   ) : (
                     <Select
                       value={idConta}
@@ -245,6 +335,17 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
                         })),
                       ]}
                     />
+                  )}
+                  {resultadoTeste?.ok && (
+                    <p className="mt-2 text-xs text-emerald-700 bg-emerald-50 rounded px-3 py-2">
+                      Teste criado: <span className="font-mono font-semibold">{resultadoTeste.usuario}</span>
+                      {resultadoTeste.senha && <> / <span className="font-mono font-semibold">{resultadoTeste.senha}</span></>}
+                      {resultadoTeste.expiracao && (
+                        <> · vence {resultadoTeste.expiracao.split("-").reverse().join("/")}
+                          {resultadoTeste.expiracaoHorario && ` às ${resultadoTeste.expiracaoHorario}`}</>
+                      )}
+                      . Já selecionado acima.
+                    </p>
                   )}
                 </div>
               )}
@@ -334,7 +435,7 @@ export default function AplicativoModal({ idCliente, aplicativo, apps, inicial, 
           <button
             type="button"
             onClick={fecharModal}
-            disabled={isPending || enviando}
+            disabled={isPending || enviando || criandoTeste}
             className="h-10 rounded-xl border border-zinc-300 px-5 text-sm font-medium hover:bg-zinc-50 transition-all disabled:opacity-50"
           >
             {aviso ? "Fechar" : "Cancelar"}

@@ -3,11 +3,9 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import { buscarContasLivres, vincularContaExistente, criarContaTeste, type ContaLivre, type ResultadoCriarTeste } from "@/app/actions/contasVinculo";
 import { Select } from "@/components/ui/select";
+import { TIPOS_COM_TESTE } from "@/lib/paineis-teste";
 
 type Painel = { id: number; nome: string; tipo: string };
-
-// Tipos de painel cujo adapter implementa gerarTeste() — ver src/lib/painel-adapters/*.ts
-const TIPOS_COM_TESTE = new Set(["club", "central", "uniplay", "now", "unitv", "liebe", "natv", "fast"]);
 
 type Props = {
   idAssinatura: string;
