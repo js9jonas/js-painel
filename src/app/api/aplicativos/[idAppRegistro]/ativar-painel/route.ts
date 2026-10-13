@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
-import { ativarDispositivo, buscarDispositivoPorMac } from "@/lib/painel-adapters/appacesso";
+import { adicionarExistente, ativarDispositivo, buscarDispositivoPorMac, validarMac } from "@/lib/painel-adapters/appacesso";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
 import { ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
 import {
@@ -31,10 +31,10 @@ const jobs = new Map<string, JobState>();
 async function executar(idAppRegistro: number, jobId: string) {
   try {
     const { rows } = await pool.query<{
-      mac: string | null; id_app: number; id_painel_servidor: number | null; id_cliente: number | null;
+      mac: string | null; chave: string | null; id_app: number; id_painel_servidor: number | null; id_cliente: number | null;
       validade: string | null; nome_cliente: string | null;
     }>(
-      `SELECT ap.mac, ap.id_app, ap.id_painel_servidor, ap.id_cliente, ap.validade::text, cl.nome AS nome_cliente
+      `SELECT ap.mac, ap.chave, ap.id_app, ap.id_painel_servidor, ap.id_cliente, ap.validade::text, cl.nome AS nome_cliente
        FROM public.aplicativos ap
        LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
        WHERE ap.id_app_registro = $1 AND ap.removido_em IS NULL`,
@@ -58,8 +58,23 @@ async function executar(idAppRegistro: number, jobId: string) {
     if (!painel) throw new Error("Esse aplicativo não tem ativação pelo painel.");
 
     const token = await sessaoPainelApp(painel);
-    const antes = await buscarDispositivoPorMac(painel.cfg, token, app.mac);
-    if (!antes) throw new Error(`O aparelho não está no painel ${painel.nome}. Cadastre ele primeiro (Novo aplicativo).`);
+    let antes = await buscarDispositivoPorMac(painel.cfg, token, app.mac);
+    if (!antes) {
+      // Aparelho novo cadastrado fora do painel (em teste): traz pelo "add existing" (não gasta crédito)
+      // com a chave já salva, e só então ativa. Sem chave, não dá pra trazer.
+      if (!app.chave) throw new Error(`O aparelho não está no painel ${painel.nome} e não tem a chave (Device Key) cadastrada. Preencha a chave no aplicativo do cliente.`);
+      const validacao = await validarMac(painel.cfg, token, app.mac).catch(() => null);
+      if (!validacao) throw new Error(`O painel ${painel.nome} não encontrou esse MAC. Confira se o aplicativo já foi aberto na TV.`);
+      if (validacao.auth_type && validacao.auth_type !== "device_key") throw new Error("Esse aparelho pede o código que aparece na TV, em vez da chave. Ative pelo site do painel.");
+      try {
+        await adicionarExistente(painel.cfg, token, validacao.mac || app.mac, app.chave);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message.replace(/^[^:]+ API: /, "") : "";
+        throw new Error(`O painel recusou o aparelho${msg ? `: ${msg}` : ""}. Confira a chave (Device Key) que aparece na TV.`);
+      }
+      antes = await buscarDispositivoPorMac(painel.cfg, token, validacao.mac || app.mac);
+      if (!antes) throw new Error("O painel aceitou o aparelho, mas ele não apareceu na lista. Rode a sincronização do painel em Conexões.");
+    }
 
     const expiraAntes = antes.activation_expired ? Date.parse(antes.activation_expired) : 0;
     const jaAtivado = expiraAntes > Date.now() + DIAS_JA_ATIVADO * 86_400_000;

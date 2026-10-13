@@ -231,6 +231,19 @@ export async function validarMac(cfg: AppAcessoConfig, token: string, mac: strin
 }
 
 /**
+ * Transfere a licença de um aparelho para outro (ids internos, não MAC). Capturado no FunPlay em
+ * 13/10/2026: PUT /reseller/device/transfer { from_id, to_id }. Regras vistas no teste: o destino tem
+ * que estar SEM licença paga (payed=false; aparelho pago recusa com 400, mesmo excluído e readicionado);
+ * o destino fica com a data da origem (não soma); a origem volta a payed=false e sai da lista do revendedor.
+ */
+export async function transferirLicenca(cfg: AppAcessoConfig, token: string, fromId: number, toId: number): Promise<void> {
+  await apiFetch(cfg, token, `/reseller/device/transfer`, {
+    method: "PUT",
+    body: JSON.stringify({ from_id: fromId, to_id: toId }),
+  });
+}
+
+/**
  * Aparelho DESTE revendedor pelo MAC (null se não está no painel). Mesma busca do site
  * (main.b0256ef8.js): GET /reseller/devices?search={"mac":...}.
  */

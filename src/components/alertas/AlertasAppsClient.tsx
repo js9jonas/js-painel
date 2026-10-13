@@ -1,24 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
-import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
-import { Select } from "@/components/ui/select";
 import AtivarPainelButton from "./AtivarPainelButton";
 import LicencaSobrandoModal from "./LicencaSobrandoModal";
+import { APPS_COM_TRANSFERENCIA_PAINEL } from "@/lib/apps-painel-ids";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
-
-type ModalData = {
-  id_app_registro: string;
-  id_cliente: string;
-  nome: string;
-  nome_app: string;
-  validade: string | null;
-  novaValidade: string;
-};
 
 function diasRestantes(data: string): number {
   const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
@@ -41,6 +31,13 @@ function labelDias(dias: number) {
   return `Em ${dias}d`;
 }
 
+// Fun Play: a transferência só vale para aparelho novo, ainda sem licença paga — os "Precisa ativar"
+// (add existing sem crédito) e os cadastrados à mão, fora do painel (em teste). O servidor confere no
+// painel antes de transferir; aparelho já pago recebe aviso para usar "Renovar no painel".
+function aparelhoNovoTransfere(r: AlertaAppRow): boolean {
+  return APPS_COM_TRANSFERENCIA_PAINEL.includes(Number(r.id_app)) && (r.sem_validade || !r.no_painel_app);
+}
+
 export default function AlertasAppsClient({
   apps,
   recolhivel,
@@ -50,14 +47,20 @@ export default function AlertasAppsClient({
 }) {
   const [aberto, setAberto] = useState(true);
   const [filtro, setFiltro] = useState<Filtro>("com_contrato");
-  const [modal, setModal] = useState<ModalData | null>(null);
-  const [novaValidadeInput, setNovaValidadeInput] = useState("");
-  const [modo, setModo] = useState<"pagamento" | "somente">("pagamento");
-  const [forma, setForma] = useState("INTER");
-  const [valor, setValor] = useState("20");
-  const [isPending, startTransition] = useTransition();
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [licencaPara, setLicencaPara] = useState<AlertaAppRow | null>(null);
+
+  const botaoLicenca = (r: AlertaAppRow) => (
+    <button
+      onClick={() => setLicencaPara(r)}
+      title={r.painel_smartone
+        ? "Transferir para este aparelho a licença de um cliente que saiu ou de um app inativo, sem gastar giftcode"
+        : "Transferir para este aparelho novo a licença de um cliente que saiu ou de um app inativo, sem gastar crédito"}
+      className="h-7 rounded-lg border border-violet-300 bg-white px-3 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors"
+    >
+      🎁 Licença sobrando
+    </button>
+  );
 
   function copiarNome(id: string, nome: string) {
     navigator.clipboard.writeText(nome);
@@ -78,51 +81,6 @@ export default function AlertasAppsClient({
     if (filtro === "sem_assinatura") return !r.venc_contrato_cliente;
     return true;
   });
-
-  function calcularNovaValidade(validade: string | null): string {
-    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-    const base = new Date((validade ?? hojeStr) + "T00:00:00");
-    const hoje = new Date(hojeStr + "T00:00:00");
-    const ref = base < hoje ? hoje : base;
-    ref.setFullYear(ref.getFullYear() + 1);
-    return `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
-  }
-
-  function abrirModal(r: AlertaAppRow) {
-    const nova = calcularNovaValidade(r.validade ?? null);
-    setModal({
-      id_app_registro: r.id_app_registro,
-      id_cliente: r.id_cliente,
-      nome: r.nome,
-      nome_app: r.nome_app,
-      validade: r.validade ?? null,
-      novaValidade: nova,
-    });
-    setNovaValidadeInput(nova);
-    setModo("somente");
-    setForma("INTER");
-    setValor("20");
-  }
-
-  function fecharModal() {
-    if (isPending) return;
-    setModal(null);
-  }
-
-  function handleConfirmar() {
-    if (!modal) return;
-    startTransition(async () => {
-      await renovarAplicativo({
-        id_app_registro: Number(modal.id_app_registro),
-        id_cliente: Number(modal.id_cliente),
-        novaValidade: novaValidadeInput,
-        modo: modo === "pagamento" ? "pagamento" : "cortesia",
-        valor: modo === "pagamento" ? parseFloat(valor) || 0 : 0,
-        forma: modo === "pagamento" ? forma : undefined,
-      });
-      setModal(null);
-    });
-  }
 
   const btBase = "h-7 px-3 rounded-lg text-xs font-medium transition-colors border";
   const btAtivo = "bg-blue-600 text-white border-blue-600";
@@ -258,28 +216,21 @@ export default function AlertasAppsClient({
                           </td>
                           <td className="px-4 py-3">
                             {r.sem_validade ? (
-                              <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                              <div className="flex flex-wrap items-start gap-2">
+                                <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                                {aparelhoNovoTransfere(r) && botaoLicenca(r)}
+                              </div>
                             ) : r.no_painel_app ? (
                               <div className="flex flex-wrap items-start gap-2">
                                 <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
-                                {r.painel_smartone && (
-                                  <button
-                                    onClick={() => setLicencaPara(r)}
-                                    title="Transferir para este aparelho a licença de um cliente que saiu ou de um app inativo, sem gastar giftcode"
-                                    className="h-7 rounded-lg border border-violet-300 bg-white px-3 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors"
-                                  >
-                                    🎁 Licença sobrando
-                                  </button>
-                                )}
+                                {r.painel_smartone && botaoLicenca(r)}
                               </div>
-                            ) : (
-                              <button
-                                onClick={() => abrirModal(r)}
-                                className="h-7 rounded-lg bg-zinc-900 px-3 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
-                              >
-                                +1 ano
-                              </button>
-                            )}
+                            ) : aparelhoNovoTransfere(r) ? (
+                              <div className="flex flex-wrap items-start gap-2">
+                                <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} />
+                                {botaoLicenca(r)}
+                              </div>
+                            ) : null}
                           </td>
                         </tr>
                       );
@@ -292,94 +243,12 @@ export default function AlertasAppsClient({
         )}
       </div>
 
-      {/* Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-6 space-y-5">
-            <div>
-              <p className="text-base font-semibold text-zinc-900">Renovar aplicativo</p>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                {modal.nome} — {modal.nome_app}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-500 block">Novo vencimento</label>
-              <input
-                type="date"
-                value={novaValidadeInput}
-                onChange={(e) => setNovaValidadeInput(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setModo("pagamento")}
-                className={`rounded-xl border py-3 text-xs font-medium transition-colors ${modo === "pagamento"
-                  ? "border-zinc-900 bg-zinc-900 text-white"
-                  : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`}
-              >
-                💳 Com pagamento
-              </button>
-              <button
-                onClick={() => setModo("somente")}
-                className={`rounded-xl border py-3 text-xs font-medium transition-colors ${modo === "somente"
-                  ? "border-zinc-900 bg-zinc-900 text-white"
-                  : "border-zinc-200 text-zinc-600 hover:border-zinc-400"}`}
-              >
-                🔄 Só renovar
-              </button>
-            </div>
-            {modo === "pagamento" && (
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Forma de pagamento</label>
-                  <Select
-                    value={forma}
-                    onChange={setForma}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-                    options={["INTER", "Dinheiro", "Cartão", "Transferência"].map((f) => ({
-                      value: f,
-                      label: f,
-                    }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-500 mb-1 block">Valor (R$)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={valor}
-                    onChange={(e) => setValor(e.target.value)}
-                    placeholder="0,00"
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={fecharModal}
-                disabled={isPending}
-                className="flex-1 rounded-xl border border-zinc-200 py-2 text-sm text-zinc-600 hover:border-zinc-400 transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmar}
-                disabled={isPending || !novaValidadeInput || (modo === "pagamento" && !valor)}
-                className="flex-1 rounded-xl bg-zinc-900 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors disabled:opacity-50"
-              >
-                {isPending ? "Salvando..." : "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {licencaPara && (
         <LicencaSobrandoModal
           destino={{
             id_app_registro: licencaPara.id_app_registro,
+            id_app: Number(licencaPara.id_app),
+            nome_app: licencaPara.nome_app,
             id_cliente: licencaPara.id_cliente,
             nome: licencaPara.nome,
             mac: licencaPara.mac,

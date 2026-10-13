@@ -12,6 +12,14 @@ export function appTemCadastroPeloPainel(idApp: string | number | null | undefin
   return idApp != null && idApp !== "" && TIPO_POR_ID_APP[Number(idApp)] !== undefined;
 }
 
+// Apps da plataforma appacesso com transferência de licença (PUT /reseller/device/transfer). Testada no
+// Fun Play em 13/10/2026; Lazer Play e Core Player liberados no mesmo dia a pedido do Jonas (mesma API).
+export const APPS_COM_TRANSFERENCIA_PAINEL = [3, 2, 31];
+
+export function appTransfereLicenca(idApp: string | number | null | undefined): boolean {
+  return idApp != null && idApp !== "" && (APPS_COM_TRANSFERENCIA_PAINEL.includes(Number(idApp)) || Number(idApp) === ID_APP_SMARTONE);
+}
+
 // SmartOne (smartone-iptv.com): outra plataforma, sem chave da TV. Aparelho novo entra pelo painel
 // junto com a lista (não existe aparelho sem lista lá) e fica "Pending" até o cliente recarregar a lista.
 export const ID_APP_SMARTONE = 4;

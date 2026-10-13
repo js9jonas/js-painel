@@ -4,6 +4,14 @@ import { pool } from "@/lib/db";
 // licença" (site do SmartOne) para um MAC novo em vez de gastar giftcode (pedido do Jonas, 12/10/2026).
 // A validade é a do último sync (coluna Expiration da lista de aparelhos, que acompanha transferências);
 // o histórico de giftcodes NÃO serve pra isso — ele guarda o MAC original e não muda na transferência.
+// Fun Play (13/10/2026): mesma ideia, para aparelho novo ainda sem licença paga; só aparelhos do painel
+// ATIVO (a transferência usa o número interno do aparelho naquele painel).
+
+/** Tipo de painel cujas licenças entram na lista (smartone ou uma plataforma appacesso). */
+export type TipoLicenca = "smartone" | "funplays" | "lazerplay" | "coreplayer";
+
+/** Fun Play só transfere licença com pelo menos 30 dias restantes (regra informada pelo Jonas). */
+export const DIAS_MINIMOS_TRANSFERENCIA_PAINEL = 30;
 
 export type MotivoSobra = "sem_cliente" | "cliente_saiu" | "app_inativo";
 
@@ -23,14 +31,15 @@ export type LicencaSobrando = {
   sincronizado_em: string | null;
 };
 
-export async function getLicencasSobrando(): Promise<LicencaSobrando[]> {
+export async function getLicencasSobrando(tipo: TipoLicenca = "smartone"): Promise<LicencaSobrando[]> {
   const { rows } = await pool.query<LicencaSobrando>(
     `WITH base AS (
        SELECT ap.id_app_registro, ap.mac, ap.validade, ap.id_cliente, ap.observacao, ap.modelo, ap.atualizado_em,
               lower(btrim(ap.status)) AS status_app, cl.nome AS nome_cliente,
               ass.vivas, ass.status_assinaturas, ass.ultimo_venc
        FROM public.aplicativos ap
-       JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor AND ps.tipo = 'smartone'
+       JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor AND ps.tipo = $1
+                                         AND ($1 = 'smartone' OR ps.ativo IS TRUE)
        LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
        LEFT JOIN LATERAL (
          SELECT COUNT(*) FILTER (WHERE a.status NOT IN ('inativo', 'cancelado'))::int AS vivas,
@@ -51,7 +60,8 @@ export async function getLicencasSobrando(): Promise<LicencaSobrando[]> {
             observacao, modelo, atualizado_em::text AS sincronizado_em
      FROM base
      WHERE id_cliente IS NULL OR COALESCE(vivas, 0) = 0 OR status_app <> 'ativa'
-     ORDER BY validade DESC`
+     ORDER BY validade DESC`,
+    [tipo]
   );
   return rows;
 }

@@ -3,13 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Conferencia, LicencaSobrando, MotivoSobra } from "@/lib/licencas-sobrando";
+import { ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
 
 // /alertas → SmartOne vencendo → "Licença sobrando": em vez de gastar giftcode, transfere pra este
 // aparelho a licença de um aparelho sem uso (cliente que saiu ou app marcado inativo). O site só deixa
 // transferir cada licença uma vez — a coluna "Transfere?" é conferida no site (~7 s por aparelho,
 // 3 por vez, guardado por 6 h). Os dias que o aparelho de destino ainda tem NÃO somam.
+// Fun Play (13/10/2026): mesmo modal para aparelho novo (sem licença paga); sem conferência prévia —
+// a regra visível é a dos 30 dias; o resto (destino ainda não pago, origem no painel) o servidor confere.
 
-type Destino = { id_app_registro: string; id_cliente: string; nome: string; mac: string | null; validade: string | null; sem_validade: boolean };
+// Espelha DIAS_MINIMOS_TRANSFERENCIA_PAINEL (src/lib/licencas-sobrando.ts, que importa o banco)
+const DIAS_MINIMOS_PAINEL = 30;
+
+type Destino = { id_app_registro: string; id_app: number; nome_app: string; id_cliente: string; nome: string; mac: string | null; validade: string | null; sem_validade: boolean };
 
 const MOTIVO: Record<MotivoSobra, { label: string; classes: string }> = {
   cliente_saiu: { label: "Cliente saiu", classes: "bg-red-50 text-red-700" },
@@ -31,9 +37,10 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
   const [transferindo, setTransferindo] = useState<{ id: number; etapa: string } | null>(null);
   const [feito, setFeito] = useState<string | null>(null);
   const pediuConferencia = useRef(false);
+  const smartOne = destino.id_app === ID_APP_SMARTONE;
 
   async function carregar() {
-    const r = await fetch("/api/aplicativos/licencas-sobrando").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    const r = await fetch(`/api/aplicativos/licencas-sobrando?app=${destino.id_app}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (!r) { setErro("Sem internet ou o sistema está atualizando. Feche e abra de novo."); return null; }
     setLicencas(r.licencas);
     setResultados(r.resultados ?? {});
@@ -55,7 +62,7 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
     let parar = false;
     void (async () => {
       const r = await carregar();
-      if (!r || parar || pediuConferencia.current) return;
+      if (!r || parar || pediuConferencia.current || !smartOne) return;
       pediuConferencia.current = true;
       const mesmo = (l: LicencaSobrando) => (String(l.id_cliente ?? "") === destino.id_cliente ? 0 : 1);
       const macs = [...r.licencas]
@@ -68,8 +75,9 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
         body: JSON.stringify({ macs }),
       }).catch(() => null);
     })();
-    const t = setInterval(() => { if (!parar) void carregar(); }, 3000);
-    return () => { parar = true; clearInterval(t); };
+    // Só o SmartOne confere no site em segundo plano; os outros não precisam acompanhar
+    const t = smartOne ? setInterval(() => { if (!parar) void carregar(); }, 3000) : undefined;
+    return () => { parar = true; if (t) clearInterval(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,7 +109,7 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
         router.refresh();
         return;
       }
-      throw new Error("O SmartOne demorou para responder. Confira no site antes de tentar de novo.");
+      throw new Error(`O ${destino.nome_app} demorou para responder. Confira no site antes de tentar de novo.`);
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : "Sem internet ou o sistema está atualizando. Tente de novo.");
       void carregar();
@@ -128,9 +136,15 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
         </div>
 
         <div className="px-5 pt-3 space-y-2">
-          <p className="text-xs text-zinc-600">
-            Aparelhos SmartOne sem uso com licença válida. A licença só transfere uma vez; a coluna &quot;Transfere?&quot; é conferida no site, alguns segundos por aparelho. As listas não vão junto.
-          </p>
+          {smartOne ? (
+            <p className="text-xs text-zinc-600">
+              Aparelhos SmartOne sem uso com licença válida. A licença só transfere uma vez; a coluna &quot;Transfere?&quot; é conferida no site, alguns segundos por aparelho. As listas não vão junto.
+            </p>
+          ) : (
+            <p className="text-xs text-zinc-600">
+              Aparelhos {destino.nome_app} sem uso com licença válida. Só transfere para aparelho novo, ainda sem licença paga (em teste), e só licenças com {DIAS_MINIMOS_PAINEL} dias ou mais. O aparelho de origem sai do painel.
+            </p>
+          )}
           {diasDestino > 0 && (
             <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
               Os {diasDestino} dias que este aparelho ainda tem não somam: ele fica com a licença transferida.
@@ -160,7 +174,7 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
                 {ordenadas.map((l) => {
                   const c = resultados[l.mac.trim().toUpperCase()];
                   const conferindo = pendentes.includes(l.mac.trim().toUpperCase());
-                  const pode = c?.estado === "ok" && c.transferivel;
+                  const pode = smartOne ? c?.estado === "ok" && c.transferivel : l.dias >= DIAS_MINIMOS_PAINEL;
                   const mesmoCliente = String(l.id_cliente ?? "") === destino.id_cliente;
                   const ganha = l.dias - Math.max(diasDestino, 0);
                   return (
@@ -183,7 +197,9 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
                         )}
                       </td>
                       <td className="py-2 pr-2 text-xs whitespace-nowrap">
-                        {c?.estado === "ok"
+                        {!smartOne
+                          ? pode ? <span className="text-emerald-700 font-semibold">✓ Sim</span> : <span className="text-zinc-400">Menos de {DIAS_MINIMOS_PAINEL} dias</span>
+                          : c?.estado === "ok"
                           ? c.transferivel ? <span className="text-emerald-700 font-semibold">✓ Sim</span> : <span className="text-zinc-400">Não</span>
                           : c?.estado === "erro" ? <span className="text-red-600">Não deu pra conferir</span>
                           : conferindo ? <span className="text-zinc-400">conferindo…</span>

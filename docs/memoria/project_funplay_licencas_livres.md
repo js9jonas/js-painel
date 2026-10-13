@@ -199,3 +199,7 @@ Ver também: [[reference-funplay-licencas-sem-contrato]], [[reference-funplays-a
 ## Resultados em 2026-10-02 — "lista de aplicativos fun play que posso transferir licença"
 
 Critério "prontos" (status='ativa' + validade≥hoje + cliente com assinatura registrada e nenhuma ativa): **112 devices / 106 clientes**. Separado em 3 grupos na página: **76 prontas** (≥30 dias de licença e contrato vencido há mais de 7 dias), **28 aguardar** (contrato venceu há ≤7 dias, pode renovar; a queda do FunPlay de 28/09 pode ter atrasado renovações), **8 não transferíveis** (<30 dias, regra da FunPlay). Republicado no mesmo artifact de 26/08 (link novo após republicar: https://claude.ai/artifact/Wi7DKxvb6dLMdWXcPpAHcg). `.env.local` do js-painel não tem `dotenv` instalado: ler `DATABASE_URL` direto do arquivo e trocar host/porta para localhost:5433.
+
+## Resultados em 2026-10-13 — "10 Fun Play pra transferir licença e testar"
+
+Retomada do 📋 de 13/10 (transferência no Fun/Lazer pra aparelho novo sem validade, ver `project_chat_leitura_imagem_mac.md`). Critério: status='ativa' + validade ≥ hoje+30 (regra FunPlay) + cliente com assinatura registrada e nenhuma com venc_contrato ≥ hoje−7. **78 candidatas**; entregues as 10 com contrato vencido há mais tempo (174 a 93 dias sem contrato), só no chat.
