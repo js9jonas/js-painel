@@ -10,6 +10,10 @@ import { APPS_COM_TRANSFERENCIA_PAINEL } from "@/lib/apps-painel-ids";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
 
+function hojeSP(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+}
+
 function diasRestantes(data: string): number {
   const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
   const hoje = new Date(hojeStr + 'T00:00:00');
@@ -68,15 +72,17 @@ export default function AlertasAppsClient({
     setTimeout(() => setCopiadoId(null), 1500);
   }
 
-  const ontemStr = new Date(Date.now() - 86400000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-  const ontem = new Date(ontemStr + 'T00:00:00');
-
+  const hoje = hojeSP();
   const filtrados = apps.filter((r) => {
     if (filtro === "com_contrato") {
       // Cadastro novo sem ativação (geralmente teste, ainda sem assinatura): sempre à vista.
       if (r.sem_validade) return true;
+      // Só vale renovar a licença se o contrato vai além dela: se a assinatura vence antes (ou junto),
+      // o cliente pode não renovar e a licença não precisa ser paga (Jonas, 13/10/2026).
+      // E o contrato tem que estar em dia (vence hoje ou depois), senão volta licença antiga de quem já saiu.
       if (!r.venc_contrato_cliente) return false;
-      return new Date(r.venc_contrato_cliente + "T00:00:00") > ontem;
+      const contrato = r.venc_contrato_cliente.split("T")[0];
+      return contrato >= hoje && contrato > r.validade.slice(0, 10);
     }
     if (filtro === "sem_assinatura") return !r.venc_contrato_cliente;
     return true;
@@ -122,7 +128,7 @@ export default function AlertasAppsClient({
               {(
                 [
                   { key: "todos", label: "Todos" },
-                  { key: "com_contrato", label: "Venc. contrato > ontem" },
+                  { key: "com_contrato", label: "Contrato além da licença" },
                   { key: "sem_assinatura", label: "Sem assinatura" },
                 ] as { key: Filtro; label: string }[]
               ).map(({ key, label }) => (
