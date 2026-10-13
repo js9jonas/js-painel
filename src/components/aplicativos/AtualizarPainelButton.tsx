@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
 
 // Atualiza só este aparelho a partir do painel do app (validade + vínculo com o painel), sem rodar o
 // sync inteiro. Não gasta crédito: só consulta. Ver /api/aplicativos/[id]/atualizar-painel.
 
 const br = (d: string | null) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "sem validade");
 
-export default function AtualizarPainelButton({ idAppRegistro }: { idAppRegistro: string }) {
+export default function AtualizarPainelButton({ idAppRegistro, onAtualizado }: {
+  idAppRegistro: string;
+  /** Telas que buscam os dados por conta própria (sem router.refresh) recarregam aqui. */
+  onAtualizado?: () => void;
+}) {
   const router = useRouter();
   const [estado, setEstado] = useState<"parado" | "buscando" | "ok" | "erro">("parado");
   const [msg, setMsg] = useState("");
@@ -31,6 +35,7 @@ export default function AtualizarPainelButton({ idAppRegistro }: { idAppRegistro
         setEstado("ok");
         setMsg(job.mudou ? `Atualizado: até ${br(job.validade)}` : `Já estava em dia (${br(job.validade)})`);
         if (job.mudou) router.refresh();
+        onAtualizado?.();
         return;
       }
       throw new Error("O painel demorou para responder. Tente de novo.");
@@ -38,6 +43,15 @@ export default function AtualizarPainelButton({ idAppRegistro }: { idAppRegistro
       setEstado("erro");
       setMsg(e instanceof Error ? e.message : "Sem internet ou o sistema está atualizando. Tente de novo.");
     }
+  }
+
+  // Deu certo: o botão some e fica só o aviso (os dados novos já estão na tela). Erro: botão fica pra tentar de novo.
+  if (estado === "ok") {
+    return (
+      <span className="inline-flex h-7 items-center gap-1 text-xs text-emerald-700" title={msg}>
+        <Check className="w-3.5 h-3.5" /> Atualizado
+      </span>
+    );
   }
 
   return (
@@ -51,7 +65,7 @@ export default function AtualizarPainelButton({ idAppRegistro }: { idAppRegistro
         <RefreshCw className={`w-3.5 h-3.5 ${estado === "buscando" ? "animate-spin" : ""}`} />
         {estado === "buscando" ? "Buscando…" : "Atualizar"}
       </button>
-      {msg && <span className={`text-xs ${estado === "erro" ? "text-red-600" : "text-emerald-700"}`}>{msg}</span>}
+      {estado === "erro" && msg && <span className="text-xs text-red-600">{msg}</span>}
     </div>
   );
 }

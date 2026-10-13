@@ -28,3 +28,12 @@ export const ID_APP_SMARTONE = 4;
 export function appTemCadastroComLista(idApp: string | number | null | undefined): boolean {
   return appTemCadastroPeloPainel(idApp) || (idApp != null && idApp !== "" && Number(idApp) === ID_APP_SMARTONE);
 }
+
+// Clouddy (console.clouddy.online): sem painel de revenda — o js-painel entra na conta do CLIENTE
+// (e-mail em aplicativos.mac, senha em aplicativos.chave). Ver src/lib/clouddy.ts.
+export const ID_APP_CLOUDDY = 5;
+
+/** Apps em que o botão "Atualizar" consegue ler a validade direto na origem (painel ou conta do cliente). */
+export function appTemAtualizacao(idApp: string | number | null | undefined): boolean {
+  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && Number(idApp) === ID_APP_CLOUDDY);
+}

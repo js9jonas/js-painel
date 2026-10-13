@@ -6,9 +6,11 @@ import { registrarAudit } from "@/lib/audit";
 import { buscarDispositivoPorMac } from "@/lib/painel-adapters/appacesso";
 import { buscarDispositivoPorMac as buscarSmartOne } from "@/lib/painel-adapters/smartone";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
-import { ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { atualizarAppClouddy } from "@/lib/clouddy";
 
-// Atualiza UM aparelho a partir do painel do app (Fun Play / Lazer Play / Core Player / SmartOne): busca
+// Atualiza UM aparelho a partir do painel do app (Fun Play / Lazer Play / Core Player / SmartOne) ou da
+// conta do cliente (Clouddy, 13/10/2026): busca
 // só esse MAC e copia validade + número interno + painel. Não gasta crédito nem giftcode. Pedido do Jonas
 // em 13/10/2026 (caso Joel Conceição): rodar o sync inteiro do painel só para acertar um cadastro é lento.
 // Em segundo plano porque o login do painel (captcha) pode levar até ~2 min.
@@ -31,6 +33,13 @@ async function executar(idAppRegistro: number, jobId: string) {
     const app = rows[0];
     if (!app) throw new Error("Aplicativo não encontrado.");
     if (!app.mac) throw new Error("Aplicativo sem MAC cadastrado.");
+
+    // Clouddy: não tem painel; lê na conta do próprio cliente (e-mail + senha do aplicativo)
+    if (app.id_app === ID_APP_CLOUDDY) {
+      const r = await atualizarAppClouddy(idAppRegistro);
+      jobs.set(jobId, { done: true, ok: true, validade: r.validade, mudou: r.mudou });
+      return;
+    }
 
     let achado: { id: number | string; validade: string | null; idPainel: number; nomePainel: string; listaAcessadaEm?: string | null } | null = null;
     if (app.id_app === ID_APP_SMARTONE) {

@@ -1,6 +1,7 @@
 // src/app/(dashboard)/aplicativos/page.tsx
 import { getApps } from "@/lib/aplicativos";
 import BuscaMacClient from "@/components/aplicativos/BuscaMacClient";
+import ClouddyContasClient from "@/components/aplicativos/ClouddyContasClient";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export default async function AplicativosPage() {
       </div>
 
       <BuscaMacClient apps={apps} />
+
+      <ClouddyContasClient />
     </div>
   );
 }

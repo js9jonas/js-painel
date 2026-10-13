@@ -8,7 +8,8 @@ import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import ListasAparelhoModal from "./ListasAparelhoModal";
-import { appTemCadastroComLista, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import ClouddyModal from "./ClouddyModal";
 import AtualizarPainelButton from "./AtualizarPainelButton";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
 import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
@@ -86,7 +87,7 @@ function playlistStatus(pl: PlaylistRow, tipoPainel?: string | null, vencContrat
   }
   // SmartOne não preenche expired_date (a validade fica no device, não na playlist).
   // Considerar válida se tem playlist_id_externo — "nao_reconhecida" seria falso positivo.
-  if (tipoPainel === "smartone" && pl.playlist_id_externo != null) return "vinculada";
+  if ((tipoPainel === "smartone" || tipoPainel === "clouddy") && pl.playlist_id_externo != null) return "vinculada";
   if (pl.expired_date && pl.expired_date.slice(0, 10) < hoje) return "expirada";
   if (!pl.expired_date) return "nao_reconhecida";
   return "vinculada";
@@ -112,7 +113,7 @@ function urlExibicao(url: string, tipoPainel?: string | null): string {
   return host ? montarLinkM3uSmartOne(host, usuario, senha) : url;
 }
 
-function PlaylistOptionsButton({ onEditar, onExcluir, onSelecionar, excluindo }: { onEditar: () => void; onExcluir: () => void; onSelecionar?: () => void; excluindo: boolean }) {
+function PlaylistOptionsButton({ onEditar, onExcluir, onSelecionar, excluindo }: { onEditar: () => void; onExcluir?: () => void; onSelecionar?: () => void; excluindo: boolean }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -153,13 +154,15 @@ function PlaylistOptionsButton({ onEditar, onExcluir, onSelecionar, excluindo }:
           >
             ✏️ Editar
           </button>
-          <button
-            type="button"
-            onClick={() => { setAberto(false); onExcluir(); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
-          >
-            🗑 Excluir
-          </button>
+          {onExcluir && (
+            <button
+              type="button"
+              onClick={() => { setAberto(false); onExcluir(); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+            >
+              🗑 Excluir
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -187,7 +190,7 @@ function PlaylistBadge({
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
 
   // Playlist ativa = a que o app abre no aparelho. Só FunPlay/LazerPlay/CorePlayer têm isso.
-  const podeSelecionar = tipoPainel !== "smartone" && !pl.is_selected;
+  const podeSelecionar = tipoPainel !== "smartone" && tipoPainel !== "clouddy" && !pl.is_selected;
 
   async function selecionar() {
     setExcluindo(true);
@@ -301,8 +304,9 @@ function PlaylistBadge({
           <div className="text-[10px] text-red-600 mt-0.5">{erroExclusao}</div>
         )}
       </div>
+      {/* Clouddy: só "Editar" (TV e VOD são trocadas juntas; não tem excluir nem lista ativa) */}
       {pl.playlist_id_externo != null && (
-        <PlaylistOptionsButton onEditar={onEditar} onExcluir={excluir} onSelecionar={podeSelecionar ? selecionar : undefined} excluindo={excluindo} />
+        <PlaylistOptionsButton onEditar={onEditar} onExcluir={tipoPainel === "clouddy" ? undefined : excluir} onSelecionar={podeSelecionar ? selecionar : undefined} excluindo={excluindo} />
       )}
     </div>
   );
@@ -372,6 +376,11 @@ function PlaylistsRow({
 
 // Filtro por MAC: ignora maiúsculas e separadores (":" "-" "." espaço), então "a4307a"
 // encontra "a4:30:7a:d1:e2:4e" e "A4-30-7A" também.
+/** Tipo usado nas playlists: Clouddy não tem painel (tipo_painel null), mas tem listas TV/VOD próprias. */
+function tipoPlaylists(a: AplicativoRow): string | null {
+  return Number(a.id_app) === ID_APP_CLOUDDY ? "clouddy" : a.tipo_painel;
+}
+
 function normalizarMac(v: string): string {
   return v.toLowerCase().replace(/[^0-9a-z]/g, "");
 }
@@ -379,6 +388,7 @@ function normalizarMac(v: string): string {
 export default function AplicativosManager({ idCliente, nomeCliente, aplicativos, apps }: Props) {
   const [modalApp, setModalApp] = useState<AplicativoRow | null | "novo">(null);
   const [appPgto, setAppPgto] = useState<AplicativoRow | null>(null);
+  const [clouddyApp, setClouddyApp] = useState<AplicativoRow | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -534,7 +544,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                 const isExpanded = expandedIds.has(a.id_app_registro);
                 const plStats = (playlists ?? []).reduce(
                   (acc, pl) => {
-                    const s = playlistStatus(pl, a.tipo_painel, a.venc_contrato);
+                    const s = playlistStatus(pl, tipoPlaylists(a), a.venc_contrato);
                     acc[s]++;
                     return acc;
                   },
@@ -607,7 +617,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                       <td className="px-4 py-3">
                         {/* SmartOne: último dia em que a TV buscou a lista ("Date Fetched" do site) */}
                         {a.lista_acessada_em && (
-                          <div className="text-[11px] text-zinc-400 mb-0.5 whitespace-nowrap" title="Último dia em que a TV buscou a lista (SmartOne)">
+                          <div className="text-[11px] text-zinc-400 mb-0.5 whitespace-nowrap" title="Último dia em que a TV buscou a lista (SmartOne) ou a última atividade da conta (Clouddy)">
                             Acessou {formatDate(a.lista_acessada_em)}
                             {diasDesde(a.lista_acessada_em) > 0 && ` · há ${diasDesde(a.lista_acessada_em)}d`}
                           </div>
@@ -645,6 +655,16 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                               +
                             </button>
                           )}
+                          {Number(a.id_app) === ID_APP_CLOUDDY && a.mac && !removido && (
+                            <button
+                              type="button"
+                              onClick={() => setClouddyApp(a)}
+                              title="Definir a lista (TV e VOD) da conta Clouddy"
+                              className="text-zinc-400 hover:text-emerald-600 transition-colors"
+                            >
+                              +
+                            </button>
+                          )}
                           {appTemCadastroPeloPainel(a.id_app) && a.mac && a.chave && !removido && (
                             <button
                               type="button"
@@ -676,7 +696,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           >
                             ✏️ Editar
                           </button>
-                          {!removido && a.mac && appTemCadastroComLista(a.id_app) && (
+                          {!removido && a.mac && appTemAtualizacao(a.id_app) && (
                             <AtualizarPainelButton idAppRegistro={String(a.id_app_registro)} />
                           )}
                           {!removido && (
@@ -704,9 +724,9 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                       <PlaylistsRow
                         playlists={playlists}
                         idAppRegistro={a.id_app_registro}
-                        tipoPainel={a.tipo_painel}
+                        tipoPainel={tipoPlaylists(a)}
                         vencContrato={a.venc_contrato}
-                        onEditarPlaylist={(pl) => setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
+                        onEditarPlaylist={(pl) => Number(a.id_app) === ID_APP_CLOUDDY ? setClouddyApp(a) : setEditandoPlaylist({ idAppRegistro: a.id_app_registro, pl, tipoPainel: a.tipo_painel })}
                         onPlaylistExcluida={(pl) => handlePlaylistExcluida(a.id_app_registro, pl)}
                         onPlaylistSelecionada={() => { recarregarPlaylistsAoVivo(a.id_app_registro); router.refresh(); }}
                       />
@@ -743,6 +763,15 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
             setAppPgto(null);
             router.refresh();
           }}
+        />
+      )}
+      {clouddyApp && (
+        <ClouddyModal
+          idAppRegistro={clouddyApp.id_app_registro}
+          idCliente={Number(idCliente)}
+          email={clouddyApp.mac ?? ""}
+          urlAtual={clouddyApp.playlists.find((p) => Number(p.playlist_id_externo) === 1)?.url ?? clouddyApp.playlists[0]?.url ?? null}
+          onClose={() => setClouddyApp(null)}
         />
       )}
 

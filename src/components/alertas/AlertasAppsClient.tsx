@@ -6,7 +6,7 @@ import { Copy, Check } from "lucide-react";
 import { AlertaAppRow } from "@/lib/alertas";
 import AtivarPainelButton from "./AtivarPainelButton";
 import LicencaSobrandoModal from "./LicencaSobrandoModal";
-import { APPS_COM_TRANSFERENCIA_PAINEL, appTemCadastroComLista } from "@/lib/apps-painel-ids";
+import { APPS_COM_TRANSFERENCIA_PAINEL, appTemAtualizacao } from "@/lib/apps-painel-ids";
 import AtualizarPainelButton from "@/components/aplicativos/AtualizarPainelButton";
 
 type Filtro = "todos" | "com_contrato" | "sem_assinatura";
@@ -240,7 +240,7 @@ export default function AlertasAppsClient({
                                 </>
                               ) : null}
                               {/* Painel mudou por fora (giftcode/ativação manual): acerta só esta linha, sem sync inteiro */}
-                              {appTemCadastroComLista(r.id_app) && <AtualizarPainelButton idAppRegistro={r.id_app_registro} />}
+                              {appTemAtualizacao(r.id_app) && <AtualizarPainelButton idAppRegistro={r.id_app_registro} />}
                             </div>
                           </td>
                         </tr>
