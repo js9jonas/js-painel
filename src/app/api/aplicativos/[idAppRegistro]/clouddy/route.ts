@@ -15,7 +15,7 @@ const jobs = new Map<string, JobState>();
 const SENHA_MIN = 6;
 const SENHA_MAX = 64;
 
-async function executar(id: number, corpo: { acao: string; id_conta?: number; url?: string; nova_senha?: string; pin?: string }, jobId: string) {
+async function executar(id: number, corpo: { acao: string; id_conta?: number; url?: string; nova_senha?: string; id_cliente?: number; pin?: string }, jobId: string) {
   try {
     if (corpo.acao === "lista") {
       jobs.set(jobId, { done: false, etapa: "Entrando na conta e gravando a lista em TV e VOD…" });
@@ -26,9 +26,18 @@ async function executar(id: number, corpo: { acao: string; id_conta?: number; ur
       await trocarPinClouddy(id, corpo.pin!);
       jobs.set(jobId, { done: true, ok: true, mensagem: `PIN trocado para ${corpo.pin}.` });
     } else {
-      jobs.set(jobId, { done: false, etapa: "Trocando a senha e conferindo o login com ela…" });
-      await trocarSenhaClouddy(id, corpo.nova_senha!);
-      jobs.set(jobId, { done: true, ok: true, mensagem: "Senha trocada e conferida. Já está salva no aplicativo." });
+      const novaSenha = corpo.nova_senha ? corpo.nova_senha : null;
+      const idCliente = corpo.id_cliente != null ? Number(corpo.id_cliente) : undefined;
+      jobs.set(jobId, { done: false, etapa: novaSenha ? "Trocando a senha e conferindo o login com ela…" : "Passando a conta pro cliente novo…" });
+      const r = await trocarSenhaClouddy(id, novaSenha, idCliente);
+      const nome = r.nomeCliente ?? `#${idCliente}`;
+      const falta = "Falta gravar a lista dele (balão da lista → Editar).";
+      jobs.set(jobId, {
+        done: true, ok: true,
+        mensagem: !novaSenha ? `Conta passada para ${nome}, com a mesma senha. ${falta}`
+          : idCliente != null ? `Senha trocada e conferida; conta passada para ${nome}. ${falta}`
+          : "Senha trocada e conferida. Já está salva no aplicativo.",
+      });
     }
   } catch (e: unknown) {
     jobs.set(jobId, { done: true, ok: false, erro: e instanceof Error ? e.message : "Não deu pra concluir no Clouddy." });
@@ -37,7 +46,7 @@ async function executar(id: number, corpo: { acao: string; id_conta?: number; ur
   }
 }
 
-// POST { acao: "lista", id_conta } | { acao: "lista", url } (m3u colado) | { acao: "pin", pin } | { acao: "senha", nova_senha }
+// POST { acao: "lista", id_conta } | { acao: "lista", url } (m3u colado) | { acao: "pin", pin } | { acao: "senha", nova_senha, id_cliente? } (passa a conta pro cliente novo)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ idAppRegistro: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ erro: "Não autorizado." }, { status: 401 });
@@ -51,8 +60,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ idA
     }
   } else if (corpo.acao === "senha") {
     const s = typeof corpo.nova_senha === "string" ? corpo.nova_senha : "";
-    if (s.length < SENHA_MIN || s.length > SENHA_MAX || /\s/.test(s)) {
+    // Senha em branco + cliente novo = só passa a conta (mantém a senha)
+    if (s === "" && corpo.id_cliente == null) return NextResponse.json({ erro: "Informe a senha nova ou o cliente novo." }, { status: 400 });
+    if (s !== "" && (s.length < SENHA_MIN || s.length > SENHA_MAX || /\s/.test(s))) {
       return NextResponse.json({ erro: `A senha precisa ter de ${SENHA_MIN} a ${SENHA_MAX} caracteres, sem espaços.` }, { status: 400 });
+    }
+    if (corpo.id_cliente != null && (!Number.isInteger(Number(corpo.id_cliente)) || Number(corpo.id_cliente) <= 0)) {
+      return NextResponse.json({ erro: "Cliente novo inválido." }, { status: 400 });
     }
   } else if (corpo.acao === "pin") {
     if (typeof corpo.pin !== "string" || !PIN_RE.test(corpo.pin)) return NextResponse.json({ erro: "O PIN precisa ter 4 números." }, { status: 400 });

@@ -2,6 +2,7 @@
 // em aplicativos.chave). Cada login gasta 1 captcha, então a sessão de cada conta fica guardada em
 // memória e é reaproveitada até expirar (some ao reiniciar o sistema — aí faz login de novo).
 import { pool } from "@/lib/db";
+import type { PoolClient } from "pg";
 import { registrarAudit } from "@/lib/audit";
 import { ID_APP_CLOUDDY } from "@/lib/apps-painel-ids";
 import { montarLinkM3u } from "@/lib/dados-acesso-iptv-formato";
@@ -187,12 +188,58 @@ async function registrarListaTrocada(app: AppClouddy, idAppRegistro: number, idC
   }
 }
 
+/** Passa o aplicativo pro cliente novo (dentro da transação): desliga a assinatura antiga, que era do
+ *  cliente anterior, e deixa o app ativo; auditoria nos dois clientes. */
+async function moverParaCliente(client: PoolClient, app: AppClouddy, idClienteNovo: number, nomeCliente: string | null) {
+  await client.query(
+    `UPDATE public.aplicativos SET id_cliente = $1, id_assinatura = NULL, status = 'ativa', atualizado_em = NOW() WHERE id_app_registro = $2`,
+    [idClienteNovo, app.id_app_registro]
+  );
+  for (const id of [app.id_cliente, idClienteNovo]) {
+    await registrarAudit(client, {
+      tipo: "alteracao_app",
+      id_cliente: id,
+      id_app_registro: app.id_app_registro,
+      descricao: `Conta Clouddy ${app.email} passada do cliente #${app.id_cliente ?? "—"} para #${idClienteNovo}${nomeCliente ? ` (${nomeCliente})` : ""}`,
+      dados_antes: { id_cliente: app.id_cliente },
+      dados_depois: { id_cliente: idClienteNovo },
+    });
+  }
+}
+
 /**
  * Troca a senha da conta Clouddy e confirma entrando de novo com ela (1 captcha a mais) ANTES de gravar
  * no js-painel — se a troca não pegou, o cadastro continua com a senha que funciona.
+ * Com cliente novo, passa o aplicativo pra ele no mesmo passo. Senha nula = só troca o cliente (mantém a
+ * senha atual, sem entrar no Clouddy).
  */
-export async function trocarSenhaClouddy(idAppRegistro: number, novaSenha: string): Promise<void> {
+export async function trocarSenhaClouddy(idAppRegistro: number, novaSenha: string | null, idClienteNovo?: number): Promise<{ nomeCliente: string | null }> {
   const app = await carregar(idAppRegistro);
+  if (novaSenha == null && idClienteNovo == null) throw new Error("Informe a senha nova ou o cliente novo.");
+  // Cliente novo (passar a conta adiante, 13/10/2026): confere antes de mexer na senha
+  let nomeCliente: string | null = null;
+  if (idClienteNovo != null) {
+    const { rows } = await pool.query<{ nome: string | null }>(`SELECT nome FROM public.clientes WHERE id_cliente = $1`, [idClienteNovo]);
+    if (!rows[0]) throw new Error("Cliente novo não encontrado.");
+    nomeCliente = rows[0].nome;
+    if (novaSenha == null && idClienteNovo === app.id_cliente) throw new Error("A conta já é desse cliente.");
+  }
+
+  if (novaSenha == null) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await moverParaCliente(client, app, idClienteNovo!, nomeCliente);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    return { nomeCliente };
+  }
+
   await comSessao(app.email, app.senha, (cookie) => trocarSenha(cookie, novaSenha));
   const chave = app.email.trim().toLowerCase();
   sessoes.delete(chave);
@@ -215,6 +262,7 @@ export async function trocarSenhaClouddy(idAppRegistro: number, novaSenha: strin
       dados_antes: {},
       dados_depois: { senha_trocada: true },
     });
+    if (idClienteNovo != null && idClienteNovo !== app.id_cliente) await moverParaCliente(client, app, idClienteNovo, nomeCliente);
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
@@ -222,6 +270,7 @@ export async function trocarSenhaClouddy(idAppRegistro: number, novaSenha: strin
   } finally {
     client.release();
   }
+  return { nomeCliente };
 }
 
 /** Troca o PIN da conta (4 números; o padrão do Clouddy é 0000) + auditoria. */
