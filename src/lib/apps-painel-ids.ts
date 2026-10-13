@@ -37,7 +37,11 @@ export const ID_APP_CLOUDDY = 5;
 // MAC + chave (listas). Ver src/lib/ibopro.ts.
 export const ID_APP_IBOPRO = 7;
 
+// IBO Player (13/10/2026): revenda IBOSOL (validade, ativação por crédito) + site do cliente com MAC + chave
+// + captcha de imagem (listas). Ver src/lib/iboplayer.ts.
+export const ID_APP_IBOPLAYER = 8;
+
 /** Apps em que o botão "Atualizar" consegue ler a validade direto na origem (painel ou conta do cliente). */
 export function appTemAtualizacao(idApp: string | number | null | undefined): boolean {
-  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO].includes(Number(idApp)));
+  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER].includes(Number(idApp)));
 }

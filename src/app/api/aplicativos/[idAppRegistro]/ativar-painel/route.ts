@@ -5,8 +5,9 @@ import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
 import { adicionarExistente, ativarDispositivo, buscarDispositivoPorMac, validarMac } from "@/lib/painel-adapters/appacesso";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
-import { ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPLAYER, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
 import { ativarAppIbo } from "@/lib/ibopro";
+import { ativarAppIboPlayer } from "@/lib/iboplayer";
 import {
   ativarDispositivo as ativarSmartOne,
   buscarDispositivoPorMac as buscarSmartOne,
@@ -21,6 +22,7 @@ import {
 //
 // SmartOne (12/10/2026): mesma tela e mesma proteção, mas gasta 1 GIFTCODE ("Unused" em client_codes).
 // IBO Pro (13/10/2026): 1 crédito = 1 ano somado à validade atual; ver src/lib/ibopro.ts.
+// IBO Player (13/10/2026): revenda IBOSOL, 1 crédito = 1 ano; ver src/lib/iboplayer.ts.
 
 const DIAS_JA_ATIVADO = 40;
 
@@ -46,8 +48,8 @@ async function executar(idAppRegistro: number, jobId: string) {
     if (!app) throw new Error("Aplicativo não encontrado.");
     if (!app.mac) throw new Error("Aplicativo sem MAC cadastrado.");
 
-    if (Number(app.id_app) === ID_APP_IBOPRO) {
-      const r = await ativarAppIbo(idAppRegistro);
+    if (Number(app.id_app) === ID_APP_IBOPRO || Number(app.id_app) === ID_APP_IBOPLAYER) {
+      const r = Number(app.id_app) === ID_APP_IBOPRO ? await ativarAppIbo(idAppRegistro) : await ativarAppIboPlayer(idAppRegistro);
       jobs.set(jobId, { done: true, ok: true, validade: r.validade, jaAtivado: r.jaAtivado });
       return;
     }

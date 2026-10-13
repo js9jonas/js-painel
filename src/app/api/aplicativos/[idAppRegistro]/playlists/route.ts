@@ -9,8 +9,9 @@ import { loginCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists, sel
 import { loginSmartOne, criarPlaylist as criarSmartOne } from "@/lib/painel-adapters/smartone";
 import { configDoTipo, criarPlaylistLimpandoOculta, type TipoPainelApp } from "@/lib/app-painel";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
-import { ID_APP_IBOPRO } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPLAYER, ID_APP_IBOPRO } from "@/lib/apps-painel-ids";
 import { criarListaAppIbo } from "@/lib/ibopro";
+import { criarListaAppIboPlayer } from "@/lib/iboplayer";
 
 // Cria uma playlist nova num device existente. appacesso (FunPlays/LazerPlay/CorePlayer):
 // adiciona em aplicativo_playlists do MESMO id_app_registro. SmartOne: cria um SMARTKEY
@@ -62,11 +63,12 @@ async function obterSessao(tipo: string, idPainel: number, usuario: string, senh
 async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId: string) {
   let aviso: string | undefined;
   try {
-    // IBO Pro (13/10/2026): lista criada pelo site do cliente (MAC + chave), sem painel/device
+    // IBO Pro / IBO Player (13/10/2026): lista criada pelo site do cliente (MAC + chave), sem painel/device
     const { rows: tipoApp } = await pool.query<{ id_app: number }>(`SELECT id_app::int FROM public.aplicativos WHERE id_app_registro = $1`, [idAppRegistro]);
-    if (tipoApp[0]?.id_app === ID_APP_IBOPRO) {
+    if (tipoApp[0]?.id_app === ID_APP_IBOPRO || tipoApp[0]?.id_app === ID_APP_IBOPLAYER) {
       if (!corpo.url?.trim()) throw new Error("Informe o link da lista.");
-      await criarListaAppIbo(idAppRegistro, corpo.nome?.trim() || "Lista", corpo.url.trim());
+      const criar = tipoApp[0].id_app === ID_APP_IBOPRO ? criarListaAppIbo : criarListaAppIboPlayer;
+      await criar(idAppRegistro, corpo.nome?.trim() || "Lista", corpo.url.trim());
       jobs.set(jobId, { done: true, ok: true });
       setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
       return;

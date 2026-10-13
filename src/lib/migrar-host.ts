@@ -2,16 +2,20 @@
 // antigo, com 1 operação no painel do app, e espelha nas listas salvas aqui.
 //  - IBO Pro: Mass Change → Hostname (API, aceita porta).
 //  - SmartOne: Mass Change hostname (formulário; só o endereço, sem porta — a porta é outra opção do site).
+//  - IBO Player: revenda IBOSOL (count-playlist-domain + update-playlist). Só alcança as listas que a
+//    revenda conhece — as que o cliente pôs pelo site dele podem ficar de fora (o total vem da contagem).
 // Fun Play / Lazer Play / Core Player têm "servidores" no painel: ver servidores-app/route.ts.
 import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
-import { ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPLAYER, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
 import { sessaoIbo } from "@/lib/ibopro";
+import { comIbosol } from "@/lib/iboplayer";
+import { contarDominioIbosol, mudarDominioIbosol } from "@/lib/painel-adapters/iboplayer";
 import { sessaoSmartOne } from "@/lib/app-painel";
 import { mudarHostListasIbo } from "@/lib/painel-adapters/ibopro";
 import { mudarHostListas as mudarHostListasSmartOne } from "@/lib/painel-adapters/smartone";
 
-export const TIPOS_MIGRAR_HOST = ["ibopro", "smartone"];
+export const TIPOS_MIGRAR_HOST = ["ibopro", "smartone", "iboplayer"];
 
 export async function migrarHost(idPainel: number, antigo: string, novo: string): Promise<{ noPainel: number; noBanco: number; painel: string }> {
   const { rows } = await pool.query<{ nome: string; tipo: string }>(`SELECT nome, tipo FROM public.painel_servidores WHERE id = $1`, [idPainel]);
@@ -24,6 +28,13 @@ export async function migrarHost(idPainel: number, antigo: string, novo: string)
     if (/:\d+$/.test(antigo) || /:\d+$/.test(novo)) throw new Error("No SmartOne a troca é só do endereço, sem a porta (a porta é trocada à parte no site).");
     noPainel = await mudarHostListasSmartOne(await sessaoSmartOne(idPainel), antigo, novo);
     idApp = ID_APP_SMARTONE;
+  } else if (painel.tipo === "iboplayer") {
+    noPainel = await comIbosol(idPainel, async (token) => {
+      const n = await contarDominioIbosol(token, antigo);
+      if (n > 0) await mudarDominioIbosol(token, antigo, novo);
+      return n;
+    });
+    idApp = ID_APP_IBOPLAYER;
   } else {
     noPainel = await mudarHostListasIbo(await sessaoIbo(idPainel), antigo, novo);
     idApp = ID_APP_IBOPRO;

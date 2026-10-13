@@ -6,9 +6,10 @@ import { registrarAudit } from "@/lib/audit";
 import { buscarDispositivoPorMac } from "@/lib/painel-adapters/appacesso";
 import { buscarDispositivoPorMac as buscarSmartOne } from "@/lib/painel-adapters/smartone";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
-import { ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_IBOPLAYER, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
 import { atualizarAppClouddy } from "@/lib/clouddy";
 import { atualizarAppIbo } from "@/lib/ibopro";
+import { atualizarAppIboPlayer } from "@/lib/iboplayer";
 
 // Atualiza UM aparelho a partir do painel do app (Fun Play / Lazer Play / Core Player / SmartOne) ou da
 // conta do cliente (Clouddy, 13/10/2026): busca
@@ -42,8 +43,8 @@ async function executar(idAppRegistro: number, jobId: string) {
       return;
     }
     // IBO Pro: validade pelo painel de revenda + listas pelo site do cliente (MAC + chave)
-    if (app.id_app === ID_APP_IBOPRO) {
-      const r = await atualizarAppIbo(idAppRegistro);
+    if (app.id_app === ID_APP_IBOPRO || app.id_app === ID_APP_IBOPLAYER) {
+      const r = app.id_app === ID_APP_IBOPRO ? await atualizarAppIbo(idAppRegistro) : await atualizarAppIboPlayer(idAppRegistro);
       jobs.set(jobId, { done: true, ok: true, validade: r.validade, mudou: r.mudou, aviso: r.aviso });
       return;
     }

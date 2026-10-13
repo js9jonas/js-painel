@@ -14,6 +14,7 @@ const TIPO_BADGE: Record<string, string> = {
   coreplayer: "bg-emerald-100 text-emerald-700",
   smartone:   "bg-sky-100 text-sky-700",
   ibopro:     "bg-violet-100 text-violet-700",
+  iboplayer:  "bg-rose-100 text-rose-700",
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -22,6 +23,7 @@ const TIPO_LABEL: Record<string, string> = {
   coreplayer: "CorePlayer",
   smartone:   "SmartOne",
   ibopro:     "IBO Pro",
+  iboplayer:  "IBO Player",
 };
 
 const URL_PAINEL: Record<string, string> = {
@@ -30,6 +32,7 @@ const URL_PAINEL: Record<string, string> = {
   coreplayer: "https://reseller.coreplayer.io",
   smartone:   "https://smartone-iptv.com/client/login/",
   ibopro:     "https://cms.iboproapp.com",
+  iboplayer:  "https://ibosol.com",
 };
 
 type StatusAoVivo = {
@@ -210,7 +213,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
             Migrar endereço
           </button>
         )}
-        {(painel.tipo === "ibopro" || painel.tipo === "smartone") && (
+        {(painel.tipo === "ibopro" || painel.tipo === "smartone" || painel.tipo === "iboplayer") && (
           <button
             onClick={() => setMigrarHostAberto(true)}
             title="Trocar o endereço do servidor em todas as listas da revenda"

@@ -9,6 +9,7 @@ import { loginCorePlayer, getDispositivos as getCorePlayerDevices, getPlaylistsD
 import { loginSmartOne, getDispositivos as getSmartOneDevices, getPlaylistsDispositivo as getSmartOnePlaylists } from "@/lib/painel-adapters/smartone";
 import { jwtValido as jwtValidoAppAcesso, type AppAcessoPlaylist } from "@/lib/painel-adapters/appacesso";
 import { sincronizarIbo } from "@/lib/ibopro";
+import { sincronizarIboPlayer } from "@/lib/iboplayer";
 
 const ID_APP: Record<string, number> = {
   funplays:    3,  // "Fun Play"
@@ -140,6 +141,30 @@ async function executarSync(idPainel: number, jobId: string) {
       return;
     }
     const tipo = pedido[0].tipo;
+    // IBO Player (13/10/2026): revenda IBOSOL; listas só sob demanda (captcha no site do cliente)
+    if (tipo === "iboplayer") {
+      const r = await sincronizarIboPlayer(idPainel);
+      const st = r.stats;
+      const aviso = [
+        "Listas não entram no sync (o site do cliente pede captcha): use Atualizar no aparelho.",
+        st.inseridos > 0 ? `${st.inseridos} aparelho(s) ativados pela revenda entraram sem cliente.` : null,
+        st.nao_encontrados > 0 ? `${st.nao_encontrados} MAC(s) não encontrados no IBO Player.` : null,
+        st.sem_chave > 0 ? `${st.sem_chave} aparelho(s) sem chave.` : null,
+        st.nomes_preenchidos > 0 ? `${st.nomes_preenchidos} nome(s) de cliente gravados no comentário.` : null,
+        st.erros > 0 ? `${st.erros} falha(s) individuais — ver logs.` : null,
+      ].filter(Boolean).join(" ");
+      jobs.set(jobId, {
+        done: true, ok: true, total_devices: r.total,
+        stats: {
+          inseridos: st.inseridos, atualizados: st.atualizados, removidos: 0, erros: st.erros,
+          playlists_sincronizadas: 0, playlists_removidas: 0,
+          chaves_restauradas: 0, chaves_mudaram: 0, chaves_limpas: 0, comentarios_preenchidos: st.nomes_preenchidos,
+        },
+        aviso: aviso || undefined,
+      });
+      setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
+      return;
+    }
     // IBO Pro (13/10/2026): API e regras próprias (aparelho pelo MAC; listas só sob demanda, ver src/lib/ibopro.ts)
     if (tipo === "ibopro") {
       const r = await sincronizarIbo(idPainel);
