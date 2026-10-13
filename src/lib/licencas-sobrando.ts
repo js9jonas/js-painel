@@ -36,13 +36,14 @@ export async function getLicencasSobrando(tipo: TipoLicenca = "smartone"): Promi
     `WITH base AS (
        SELECT ap.id_app_registro, ap.mac, ap.validade, ap.id_cliente, ap.observacao, ap.modelo, ap.atualizado_em,
               lower(btrim(ap.status)) AS status_app, cl.nome AS nome_cliente,
-              ass.vivas, ass.status_assinaturas, ass.ultimo_venc
+              ass.total, ass.vivas, ass.status_assinaturas, ass.ultimo_venc
        FROM public.aplicativos ap
        JOIN public.painel_servidores ps ON ps.id = ap.id_painel_servidor AND ps.tipo = $1
                                          AND ($1 = 'smartone' OR ps.ativo IS TRUE)
        LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
        LEFT JOIN LATERAL (
-         SELECT COUNT(*) FILTER (WHERE a.status NOT IN ('inativo', 'cancelado'))::int AS vivas,
+         SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE a.status NOT IN ('inativo', 'cancelado'))::int AS vivas,
                 string_agg(DISTINCT a.status, ', ') AS status_assinaturas,
                 MAX(a.venc_contrato) AS ultimo_venc
          FROM public.assinaturas a
@@ -59,7 +60,10 @@ export async function getLicencasSobrando(tipo: TipoLicenca = "smartone"): Promi
             id_cliente::int, nome_cliente, status_assinaturas, ultimo_venc::text AS ultimo_venc_contrato,
             observacao, modelo, atualizado_em::text AS sincronizado_em
      FROM base
-     WHERE id_cliente IS NULL OR COALESCE(vivas, 0) = 0 OR status_app <> 'ativa'
+     -- Cliente sem NENHUMA assinatura cadastrada é parceiro revendedor (compra licença para os clientes
+     -- dele): essas licenças não são nossas para reaproveitar (Jonas, 13/10/2026)
+     WHERE (id_cliente IS NULL OR COALESCE(total, 0) > 0)
+       AND (id_cliente IS NULL OR COALESCE(vivas, 0) = 0 OR status_app <> 'ativa')
      ORDER BY validade DESC`,
     [tipo]
   );

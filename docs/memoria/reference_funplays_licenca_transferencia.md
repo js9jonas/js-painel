@@ -35,6 +35,7 @@ Histórico: em 19/06/2026 a regra anotada era "não transfere entre aparelhos j�
 - Botão "+1 ano" (renovação manual) **removido** de /alertas: "a aplicação manual não vai mais acontecer" (Jonas, 13/10). A action `renovarAplicativo` continua (usada em `ModalRenovarAplicativo`). Apps sem painel (ex.: Clouddy) ficam sem botão em /alertas.
 - Lista de origens: `getLicencasSobrando(tipo)` em `src/lib/licencas-sobrando.ts` (Fun/Lazer/Core só do painel ativo). Em 13/10: 84 Fun Play sobrando, 78 com 30+ dias.
 - `73d1dbc`: no modal, nome do cliente abre `/clientes/{id}` em nova guia; tabela com colunas de largura fixa (o botão mudava de texto ao confirmar e as linhas pulavam de posição).
+- Lista de licenças sobrando (os 4 apps) exclui cliente **sem nenhuma assinatura cadastrada** = parceiro revendedor que compra licença pros clientes dele (Ricardo POA IPTV, Guido IPTV/79, Alisson IPTV SP; Marcelo Oberdan Nogueira também caiu — conferir se é revendedor). "Sem cliente" continua na lista.
 
 📋 Primeiro uso real: testar num dos aparelhos em teste fora do painel (Eduarda Cardoso `D1:4B:03:2E:6C:1F`, Marco Aurélio `AC:5A:F0:4D:34:98`, Lucas Vieira `78:DD:12:66:09:FE`, Rafaela `EC:F4:51:41:95:0C`) — tira a dúvida se transfere sem estar no painel.
 
