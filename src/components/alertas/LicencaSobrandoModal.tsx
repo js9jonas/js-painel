@@ -160,14 +160,15 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
           ) : ordenadas.length === 0 ? (
             <p className="text-sm text-zinc-500 text-center py-6">Nenhuma licença sobrando.</p>
           ) : (
-            <table className="w-full text-sm">
+            // Larguras fixas: o botão muda de texto ao confirmar/transferir e não pode empurrar as colunas
+            <table className="w-full text-sm table-fixed">
               <thead className="text-xs text-zinc-500">
                 <tr>
                   <th className="py-2 text-left font-medium">Aparelho sem uso</th>
-                  <th className="py-2 text-left font-medium">Vence</th>
-                  <th className="py-2 text-left font-medium">Motivo</th>
-                  <th className="py-2 text-left font-medium">Transfere?</th>
-                  <th className="py-2" />
+                  <th className="py-2 text-left font-medium w-24">Vence</th>
+                  <th className="py-2 text-left font-medium w-32">Motivo</th>
+                  <th className="py-2 text-left font-medium w-28">Transfere?</th>
+                  <th className="py-2 w-40" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -181,10 +182,22 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
                     <tr key={l.id_app_registro} className={mesmoCliente ? "bg-emerald-50/40" : undefined}>
                       <td className="py-2 pr-2">
                         <div className="font-medium text-zinc-800">
-                          {l.nome_cliente ?? <span className="italic text-zinc-400">Sem cliente</span>}
+                          {l.nome_cliente && l.id_cliente ? (
+                            <a
+                              href={`/clientes/${l.id_cliente}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Abrir o cliente em nova guia"
+                              className="hover:underline hover:text-violet-700"
+                            >
+                              {l.nome_cliente}
+                            </a>
+                          ) : (
+                            l.nome_cliente ?? <span className="italic text-zinc-400">Sem cliente</span>
+                          )}
                           {mesmoCliente && <span className="ml-1 text-xs font-normal text-emerald-700">· mesmo cliente</span>}
                         </div>
-                        <div className="font-mono text-xs text-zinc-500">{l.mac}</div>
+                        <div className="font-mono text-xs text-zinc-500 truncate">{l.mac}</div>
                       </td>
                       <td className="py-2 pr-2 whitespace-nowrap">
                         {br(l.validade)}
@@ -207,17 +220,17 @@ export default function LicencaSobrandoModal({ destino, onClose }: { destino: De
                       </td>
                       <td className="py-2 text-right">
                         {transferindo?.id === l.id_app_registro ? (
-                          <span className="text-xs text-violet-700">{transferindo.etapa}</span>
+                          <span className="block truncate text-xs text-violet-700" title={transferindo.etapa}>{transferindo.etapa}</span>
                         ) : (
                           <button
                             onClick={() => void transferir(l)}
                             disabled={!pode || ocupado || !!feito || ganha <= 0}
                             title={ganha <= 0 ? "Este aparelho já tem mais dias do que essa licença" : undefined}
-                            className={`h-7 rounded-lg px-3 text-xs font-medium text-white transition-colors disabled:opacity-40 ${
+                            className={`h-7 w-full whitespace-nowrap rounded-lg px-2 text-xs font-medium text-white transition-colors disabled:opacity-40 ${
                               confirmar === l.id_app_registro ? "bg-red-600 hover:bg-red-700" : "bg-violet-600 hover:bg-violet-700"
                             }`}
                           >
-                            {confirmar === l.id_app_registro ? `Confirmar: ${l.dias} dias para cá` : "Transferir"}
+                            {confirmar === l.id_app_registro ? `Confirmar (${l.dias} dias)` : "Transferir"}
                           </button>
                         )}
                       </td>
