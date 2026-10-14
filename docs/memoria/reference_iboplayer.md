@@ -47,3 +47,15 @@ Código: `src/lib/painel-adapters/iboplayer.ts` (API) e `src/lib/iboplayer.ts` (
   funcionam — pedir a chave que aparece na TV.
 
 📋 Pendente: 1º Renovar real; conferir `sharp` em produção (vem com o Next) na 1ª leitura de lista.
+
+## IBO Xplayer (id_app 34) — 13/10/2026
+- Na IBOSOL é o app **IBOXXPLAYER** (`app_id` 13, módulo `IBOXXPLAYER`); site do cliente **iboxxiptv.com**.
+- 24 cadastros estavam como IBO Player com "Xplayer" na observação → movidos pro id_app 34 (`sql/020`).
+  O sync de 13/10 deu "73 não encontrados" por isso: o `check-device-status` com app_id 1 não acha MAC de outro app.
+- Mapa em `IBOSOL_POR_ID_APP` (`apps-painel-ids.ts`); sync, Atualizar, Renovar e listas atendem os dois apps.
+- Site do cliente: mesmo login e captcha do tvplayeribo; diferenças nas listas (sempre com `device_id` = `device._id` do login):
+  ver = POST `/frontend/device/playlists`; criar = POST `savePlaylist` com `current_playlist_url_id: -1`;
+  editar = PUT `/frontend/device/editPlaylist/{id}`; apagar = DELETE `deletePlayListUrl/{id}` (resposta `status: "playlist deleted successfully"`).
+- Testado: Atualizar do #2584 (Jose Rosa AM) leu validade + lista. Criar/editar/apagar pelo sistema ainda sem teste real.
+- "Migrar endereço" continua só pro IBO Player. BOB Player (BOBPLAYER, app_id 3): 2 cadastros com "BOB" na observação, app ainda não existe no banco.
+- Sync: "Device not found" conta como não encontrado (não falha); MAC fora do formato conta à parte.

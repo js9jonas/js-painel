@@ -146,9 +146,11 @@ async function executarSync(idPainel: number, jobId: string) {
       const r = await sincronizarIboPlayer(idPainel);
       const st = r.stats;
       const aviso = [
+        Object.keys(st.por_app).length > 1 ? `Atualizados: ${Object.entries(st.por_app).map(([n, q]) => `${q} ${n}`).join(", ")}.` : null,
         "Listas não entram no sync (o site do cliente pede captcha): use Atualizar no aparelho.",
         st.inseridos > 0 ? `${st.inseridos} aparelho(s) ativados pela revenda entraram sem cliente.` : null,
-        st.nao_encontrados > 0 ? `${st.nao_encontrados} MAC(s) não encontrados no IBO Player.` : null,
+        st.nao_encontrados > 0 ? `${st.nao_encontrados} MAC(s) não encontrados na IBOSOL no app do cadastro (outro app ou ativado fora da revenda).` : null,
+        st.mac_invalido > 0 ? `${st.mac_invalido} MAC(s) fora do formato XX:XX:XX:XX:XX:XX.` : null,
         st.sem_chave > 0 ? `${st.sem_chave} aparelho(s) sem chave.` : null,
         st.nomes_preenchidos > 0 ? `${st.nomes_preenchidos} nome(s) de cliente gravados no comentário.` : null,
         st.erros > 0 ? `${st.erros} falha(s) individuais — ver logs.` : null,

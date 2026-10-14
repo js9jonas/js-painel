@@ -4,12 +4,17 @@
 //    Consulta (check-device-status), ativação (1 crédito = 1 ano), comentário e troca de endereço em massa.
 //  - Site do cliente (tvplayeribo.com): login MAC + chave do aparelho + captcha de imagem próprio (SVG →
 //    PNG → CapSolver ImageToText). Token JWT de 1 dia. Listas: ver, salvar (cria/edita), apagar.
+//  - IBO Xplayer (iboxxiptv.com, 13/10/2026): mesmo login/captcha; listas com device_id no corpo e edição por PUT.
 // As listas cadastradas pelo cliente NÃO aparecem na revenda (check-device-status devolve só as da revenda).
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 import type { ContaPainel, PainelAdapter, SaveSession, ServidorCredenciais } from "./types";
 
 const API_REVENDA = "https://backend-apis.ibosol.com";
 const SITE_CLIENTE = "https://tvplayeribo.com";
+
+/** Sites do cliente da IBOSOL já mapeados (mesmo login; as listas mudam um pouco). */
+export const SITES_CLIENTE_IBOSOL = { iboplayer: "https://tvplayeribo.com", iboxplayer: "https://iboxxiptv.com" } as const;
+export type SiteClienteIbosol = keyof typeof SITES_CLIENTE_IBOSOL;
 const TURNSTILE_SITEKEY = "0x4AAAAAACJ-DZrldbwqTtbg";
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36";
 
@@ -71,6 +76,12 @@ async function revenda<T>(metodo: string, path: string, token: string | null, co
   return data as T;
 }
 
+export class MacInvalidoIbosol extends Error {
+  constructor(mac: string) {
+    super(`MAC fora do formato XX:XX:XX:XX:XX:XX (${mac}).`);
+  }
+}
+
 export class SessaoIbosolExpirada extends Error {
   constructor() { super("IBOSOL: sessão expirada."); }
 }
@@ -102,11 +113,17 @@ export type IbosolDispositivo = {
 };
 
 /** Situação do aparelho (qualquer aparelho do app, não só os ativados por você). null = não existe. */
-export async function consultarIbosol(token: string, mac: string): Promise<IbosolDispositivo | null> {
+export async function consultarIbosol(token: string, mac: string, appId = IBOSOL_APP_ID): Promise<IbosolDispositivo | null> {
   const r = await revenda<{
     status?: string; message?: string;
     device?: { mac_address?: string; expire_date?: string; last_seen?: string; device_key?: string; app_type?: string; activated_by?: string; reseller_email?: string };
-  }>("POST", "/api/check-device-status", token, { macAddress: mac.trim().toLowerCase(), app_id: IBOSOL_APP_ID });
+  }>("POST", "/api/check-device-status", token, { macAddress: mac.trim().toLowerCase(), app_id: appId }).catch((e: unknown) => {
+    // "Device not found in the selected application": o MAC não está nesse app da IBOSOL
+    if (e instanceof Error && /not found/i.test(e.message)) return null;
+    if (e instanceof Error && /invalid mac/i.test(e.message)) throw new MacInvalidoIbosol(mac);
+    throw e;
+  });
+  if (!r) return null;
   if (!r.device || (r.status !== "active" && r.status !== "expired")) return null;
   const d = r.device;
   return {
@@ -121,10 +138,10 @@ export async function consultarIbosol(token: string, mac: string): Promise<Iboso
   };
 }
 
-export type IbosolAtivado = { id: string; mac: string; validade: string | null; comentario: string | null; appType: string | null };
+export type IbosolAtivado = { id: string; mac: string; modulo: string; validade: string | null; comentario: string | null; appType: string | null };
 
 /** Aparelhos ativados pela revenda (só IBO Player). */
-export async function listarAtivadosIbosol(token: string, keyword = ""): Promise<IbosolAtivado[]> {
+export async function listarAtivadosIbosol(token: string, keyword = "", modulos: string[] = [IBOSOL_MODULO]): Promise<IbosolAtivado[]> {
   const todos: IbosolAtivado[] = [];
   for (let page = 1; page <= 50; page++) {
     const r = await revenda<{ data?: { data?: { id: string; module: string; mac_address: string; box_expiry_date?: string; comment?: string | null; app_type?: string }[]; last_page?: number } }>(
@@ -133,8 +150,8 @@ export async function listarAtivadosIbosol(token: string, keyword = ""): Promise
     );
     const itens = r.data?.data ?? [];
     for (const x of itens) {
-      if (x.module !== IBOSOL_MODULO) continue;
-      todos.push({ id: x.id, mac: x.mac_address, validade: x.box_expiry_date?.slice(0, 10) ?? null, comentario: x.comment ?? null, appType: x.app_type ?? null });
+      if (!modulos.includes(x.module)) continue;
+      todos.push({ id: x.id, mac: x.mac_address, modulo: x.module, validade: x.box_expiry_date?.slice(0, 10) ?? null, comentario: x.comment ?? null, appType: x.app_type ?? null });
     }
     if (!itens.length || page >= (r.data?.last_page ?? 1)) break;
   }
@@ -148,10 +165,10 @@ export async function comentarIbosol(token: string, idAtivacao: string, comentar
 }
 
 /** Ativa 1 ano (1 crédito) — o "Activate" da tela Check Mac. */
-export async function ativarIbosol(token: string, mac: string, emailRevenda: string): Promise<string> {
+export async function ativarIbosol(token: string, mac: string, emailRevenda: string, modulo = IBOSOL_MODULO, appId = IBOSOL_APP_ID): Promise<string> {
   const r = await revenda<{ status?: boolean; msg?: string }>("POST", "/api/get-multi-app-activate", token, {
-    module: { selectedModule: IBOSOL_MODULO },
-    requestData: { is_trial: 3, macAddress: mac.trim().toLowerCase(), appType: "single-app", email: emailRevenda, creditPoints: 1, isConfirmed: true, app_id: IBOSOL_APP_ID },
+    module: { selectedModule: modulo },
+    requestData: { is_trial: 3, macAddress: mac.trim().toLowerCase(), appType: "single-app", email: emailRevenda, creditPoints: 1, isConfirmed: true, app_id: appId },
   });
   if (!r.status) throw new Error(r.msg || "IBOSOL recusou a ativação.");
   return r.msg ?? "Ativado.";
@@ -177,15 +194,15 @@ export async function mudarDominioIbosol(token: string, antigo: string, novo: st
 
 // ---------- Site do cliente (listas) ----------
 
-async function cliente<T>(metodo: string, path: string, token: string | null, corpo?: unknown): Promise<T> {
-  const res = await fetch(`${SITE_CLIENTE}${path}`, {
+async function cliente<T>(metodo: string, path: string, token: string | null, corpo?: unknown, site: string = SITE_CLIENTE): Promise<T> {
+  const res = await fetch(`${site}${path}`, {
     method: metodo,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       "Content-Type": "application/json",
       Accept: "application/json, text/plain, */*",
-      Origin: SITE_CLIENTE,
-      Referer: `${SITE_CLIENTE}/`,
+      Origin: site,
+      Referer: `${site}/`,
       "User-Agent": UA,
     },
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
@@ -215,8 +232,8 @@ function svgParaLeitura(svg: string): string {
 const MODELO_CAPTCHA = "claude-haiku-4-5-20251001";
 
 /** Captcha de imagem do login: SVG → PNG → leitura pelo Claude. */
-async function resolverCaptchaCliente(): Promise<{ texto: string; token: string }> {
-  const { svg, token } = await cliente<{ svg: string; token: string }>("GET", "/frontend/captcha/generate", null);
+async function resolverCaptchaCliente(site: string): Promise<{ texto: string; token: string }> {
+  const { svg, token } = await cliente<{ svg: string; token: string }>("GET", "/frontend/captcha/generate", null, undefined, site);
   const sharp = (await import("sharp")).default;
   const png = await sharp(Buffer.from(svgParaLeitura(svg))).flatten({ background: "#ffffff" }).png().toBuffer();
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
@@ -236,20 +253,21 @@ async function resolverCaptchaCliente(): Promise<{ texto: string; token: string 
   return { texto, token };
 }
 
-export type SessaoClienteIboPlayer = { token: string; expira: number };
+export type SessaoClienteIboPlayer = { token: string; expira: number; site: SiteClienteIbosol; deviceId: string | null };
 
 /** Login no site do cliente (MAC + chave). Tenta o captcha até 3 vezes (o OCR às vezes erra). */
-export async function entrarClienteIboPlayer(mac: string, chave: string): Promise<SessaoClienteIboPlayer> {
+export async function entrarClienteIboPlayer(mac: string, chave: string, site: SiteClienteIbosol = "iboplayer"): Promise<SessaoClienteIboPlayer> {
+  const base = SITES_CLIENTE_IBOSOL[site];
   let ultimo = "";
   for (let i = 0; i < 3; i++) {
-    const c = await resolverCaptchaCliente();
+    const c = await resolverCaptchaCliente(base);
     try {
-      const r = await cliente<{ status?: string; token?: string; message?: string }>("POST", "/frontend/device/login", null, {
+      const r = await cliente<{ status?: string; token?: string; message?: string; device?: { _id?: string } }>("POST", "/frontend/device/login", null, {
         mac_address: mac.trim().toLowerCase(), device_key: chave.trim(), captcha: c.texto, token: c.token,
-      });
+      }, base);
       if (r.status === "success" && r.token) {
         const exp = JSON.parse(Buffer.from(r.token.split(".")[1], "base64url").toString()).exp as number | undefined;
-        return { token: r.token, expira: exp ? exp * 1000 : Date.now() + 12 * 3600_000 };
+        return { token: r.token, expira: exp ? exp * 1000 : Date.now() + 12 * 3600_000, site, deviceId: r.device?._id ?? null };
       }
       ultimo = r.message ?? "login recusado";
     } catch (e: unknown) {
@@ -258,20 +276,27 @@ export async function entrarClienteIboPlayer(mac: string, chave: string): Promis
     }
     if (!/captcha/i.test(ultimo)) break; // chave/MAC errados: não adianta outro captcha
   }
-  throw new Error(`O site do IBO Player não aceitou o login (${ultimo.replace(/^IBO Player [^:]+: /, "")}). Confira a chave do aparelho.`);
+  throw new Error(`O site do ${site === "iboxplayer" ? "IBO Xplayer" : "IBO Player"} não aceitou o login (${ultimo.replace(/^IBO Player [^:]+: /, "")}). Confira a chave do aparelho.`);
 }
 
 export type ListaIboPlayer = { id: string; nome: string; url: string; tipo: string; protegida: boolean };
 
+function deviceIdXplayer(s: SessaoClienteIboPlayer): string {
+  if (!s.deviceId) throw new Error("IBO Xplayer: o login não devolveu o id do aparelho.");
+  return s.deviceId;
+}
+
 export async function listasIboPlayer(s: SessaoClienteIboPlayer): Promise<ListaIboPlayer[]> {
+  const xp = s.site === "iboxplayer";
   const r = await cliente<{ playlists?: { _id: string; playlist_name: string; url: string; playlist_type?: string; is_protected?: number }[] }>(
-    "GET", "/frontend/device/playlists", s.token
+    xp ? "POST" : "GET", "/frontend/device/playlists", s.token, xp ? { device_id: deviceIdXplayer(s) } : undefined, SITES_CLIENTE_IBOSOL[s.site]
   );
   return (r.playlists ?? []).map((p) => ({ id: p._id, nome: p.playlist_name, url: p.url, tipo: p.playlist_type ?? "general", protegida: !!p.is_protected }));
 }
 
 /** Cria (sem id) ou edita (com id) uma lista m3u (tipo "general"). Devolve a lista salva. */
 export async function salvarListaIboPlayer(s: SessaoClienteIboPlayer, lista: { id?: string; nome: string; url: string }): Promise<ListaIboPlayer | null> {
+  if (s.site === "iboxplayer") return salvarListaXplayer(s, lista);
   const r = await cliente<{ status?: string; msg?: string; data?: { _id: string; playlist_name: string; url: string; playlist_type?: string; is_protected?: number } }>(
     "POST", "/frontend/device/savePlaylist", s.token,
     { ...(lista.id ? { current_playlist_url_id: lista.id } : {}), playlist_url: lista.url, playlist_name: lista.nome, username: "", password: "", playlist_type: "general", protect: "false", xml_url: "", pin: "" }
@@ -281,7 +306,29 @@ export async function salvarListaIboPlayer(s: SessaoClienteIboPlayer, lista: { i
   return d ? { id: d._id, nome: d.playlist_name, url: d.url, tipo: d.playlist_type ?? "general", protegida: !!d.is_protected } : null;
 }
 
+type ListaXplayer = { _id: string; playlist_name: string; url: string; playlist_type?: string; is_protected?: number };
+
+/** IBO Xplayer: criar = POST savePlaylist (id -1); editar = PUT editPlaylist/{id}. Sempre com device_id. */
+async function salvarListaXplayer(s: SessaoClienteIboPlayer, lista: { id?: string; nome: string; url: string }): Promise<ListaIboPlayer | null> {
+  const base = SITES_CLIENTE_IBOSOL.iboxplayer;
+  const comum = { playlist_name: lista.nome, username: "", password: "", playlist_type: "general", provider_email: "", provider_number: "", pin: "", device_id: deviceIdXplayer(s) };
+  const r = lista.id
+    ? await cliente<{ status?: string; msg?: string; data?: ListaXplayer }>("PUT", `/frontend/device/editPlaylist/${lista.id}`, s.token,
+        { ...comum, url: lista.url, is_protected: 0, epg_url: "", code: "", currentPin: "" }, base)
+    : await cliente<{ status?: string; msg?: string; data?: ListaXplayer }>("POST", "/frontend/device/savePlaylist", s.token,
+        { ...comum, current_playlist_url_id: -1, playlist_url: lista.url, protect: 0, xml_url: "" }, base);
+  if (r.status !== "success") throw new Error(`IBO Xplayer: lista não salva (${r.msg ?? "recusado"}).`);
+  const d = r.data;
+  return d ? { id: d._id, nome: d.playlist_name, url: d.url, tipo: d.playlist_type ?? "general", protegida: !!d.is_protected } : null;
+}
+
 export async function apagarListaIboPlayer(s: SessaoClienteIboPlayer, id: string): Promise<void> {
+  if (s.site === "iboxplayer") {
+    // responde { status: "playlist deleted successfully" }
+    const r = await cliente<{ status?: string; msg?: string }>("DELETE", `/frontend/device/deletePlayListUrl/${id}`, s.token, { device_id: deviceIdXplayer(s) }, SITES_CLIENTE_IBOSOL.iboxplayer);
+    if (!/success/i.test(r.status ?? "")) throw new Error(`IBO Xplayer: lista não apagada (${r.msg ?? r.status ?? "recusado"}).`);
+    return;
+  }
   const r = await cliente<{ status?: string; msg?: string }>("DELETE", `/frontend/device/deletePlayListUrl/${id}`, s.token, { pin: "" });
   if (r.status !== "success") throw new Error(`IBO Player: lista não apagada (${r.msg ?? "recusado"}).`);
 }

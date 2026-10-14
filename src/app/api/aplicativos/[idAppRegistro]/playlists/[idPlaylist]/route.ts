@@ -8,7 +8,7 @@ import { loginLazerPlay, editarPlaylist as editarLazerPlay, excluirPlaylist as e
 import { loginCorePlayer, editarPlaylist as editarCorePlayer, excluirPlaylist as excluirCorePlayer, selecionarPlaylist as selecionarCorePlayer, getPlaylistsDispositivo as getPlaylistsCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, editarPlaylist as editarSmartOne, excluirPlaylist as excluirSmartOne } from "@/lib/painel-adapters/smartone";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
-import { ID_APP_IBOPLAYER, ID_APP_IBOPRO } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPRO, appDaIbosol } from "@/lib/apps-painel-ids";
 import { apagarListaAppIbo, editarListaAppIbo } from "@/lib/ibopro";
 import { apagarListaAppIboPlayer, editarListaAppIboPlayer } from "@/lib/iboplayer";
 
@@ -69,7 +69,7 @@ async function executar(idAppRegistro: number, idPlaylist: number, acao: Acao, c
   try {
     // IBO Pro / IBO Player (13/10/2026): listas pelo site do cliente (MAC + chave); não tem lista "ativa"
     const { rows: tipoApp } = await pool.query<{ id_app: number }>(`SELECT id_app::int FROM public.aplicativos WHERE id_app_registro = $1`, [idAppRegistro]);
-    if (tipoApp[0]?.id_app === ID_APP_IBOPRO || tipoApp[0]?.id_app === ID_APP_IBOPLAYER) {
+    if (tipoApp[0]?.id_app === ID_APP_IBOPRO || appDaIbosol(tipoApp[0]?.id_app)) {
       const pro = tipoApp[0].id_app === ID_APP_IBOPRO;
       if (acao === "selecionar") throw new Error("O IBO não tem lista ativa pra escolher: o cliente escolhe na TV.");
       if (acao === "excluir") await (pro ? apagarListaAppIbo : apagarListaAppIboPlayer)(idAppRegistro, idPlaylist);

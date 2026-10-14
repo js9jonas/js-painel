@@ -41,7 +41,21 @@ export const ID_APP_IBOPRO = 7;
 // + captcha de imagem (listas). Ver src/lib/iboplayer.ts.
 export const ID_APP_IBOPLAYER = 8;
 
+// IBO Xplayer (13/10/2026): mesmo esquema na revenda IBOSOL (app IBOXXPLAYER); site do cliente iboxxiptv.com
+// ainda sem listas. Antes ficava cadastrado como IBO Player com "Xplayer" na observação (sql/020).
+export const ID_APP_IBOXPLAYER = 34;
+
+/** Apps da revenda IBOSOL: id do app lá (app_id) e módulo. */
+export const IBOSOL_POR_ID_APP: Record<number, { appId: number; modulo: string; nome: string }> = {
+  [ID_APP_IBOPLAYER]: { appId: 1, modulo: "IBOPLAYER", nome: "IBO Player" },
+  [ID_APP_IBOXPLAYER]: { appId: 13, modulo: "IBOXXPLAYER", nome: "IBO Xplayer" },
+};
+
+export function appDaIbosol(idApp: string | number | null | undefined): boolean {
+  return idApp != null && idApp !== "" && IBOSOL_POR_ID_APP[Number(idApp)] !== undefined;
+}
+
 /** Apps em que o botão "Atualizar" consegue ler a validade direto na origem (painel ou conta do cliente). */
 export function appTemAtualizacao(idApp: string | number | null | undefined): boolean {
-  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER].includes(Number(idApp)));
+  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER, ID_APP_IBOXPLAYER].includes(Number(idApp)));
 }

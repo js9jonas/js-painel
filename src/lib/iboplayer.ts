@@ -1,4 +1,5 @@
-// IBO Player (id_app 8) no js-painel (13/10/2026). Adapter: src/lib/painel-adapters/iboplayer.ts.
+// IBO Player (id_app 8) e IBO Xplayer (id_app 34) no js-painel (13/10/2026). Adapter: src/lib/painel-adapters/iboplayer.ts.
+// O IBO Xplayer usa a mesma revenda IBOSOL (outro app_id/módulo) e o site do cliente iboxxiptv.com.
 //
 // - Revenda IBOSOL (painel_servidores tipo 'iboplayer'): validade, último acesso, chave do aparelho,
 //   ativação (1 crédito = 1 ano), comentário com o nome do cliente, troca de endereço em massa.
@@ -7,7 +8,7 @@
 // id_dispositivo_painel fica NULL (id do aparelho é hex); tudo pelo MAC.
 import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
-import { ID_APP_IBOPLAYER } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOXPLAYER, IBOSOL_POR_ID_APP } from "@/lib/apps-painel-ids";
 import { idNumericoLista } from "@/lib/painel-adapters/ibopro";
 import {
   apagarListaIboPlayer,
@@ -18,6 +19,7 @@ import {
   listarAtivadosIbosol,
   listasIboPlayer,
   loginIbosol,
+  MacInvalidoIbosol,
   salvarListaIboPlayer,
   SessaoIbosolExpirada,
   type IbosolDispositivo,
@@ -92,12 +94,12 @@ export async function gravarListasIboPlayer(idAppRegistro: number, listas: Lista
 // ---------- Aplicativo do cliente ----------
 
 type AppIboPlayer = {
-  id_app_registro: number; id_cliente: number | null; mac: string; chave: string | null;
+  id_app_registro: number; id_app: number; id_cliente: number | null; mac: string; chave: string | null;
   validade: string | null; id_painel_servidor: number | null; nome_cliente: string | null;
 };
 
 async function carregar(idAppRegistro: number): Promise<AppIboPlayer> {
-  const { rows } = await pool.query<AppIboPlayer & { id_app: number }>(
+  const { rows } = await pool.query<AppIboPlayer>(
     `SELECT ap.id_app_registro::int, ap.id_cliente::int, ap.mac, ap.chave, ap.validade::text, ap.id_painel_servidor::int,
             ap.id_app::int, cl.nome AS nome_cliente
      FROM public.aplicativos ap LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
@@ -106,7 +108,7 @@ async function carregar(idAppRegistro: number): Promise<AppIboPlayer> {
   );
   const a = rows[0];
   if (!a) throw new Error("Aplicativo não encontrado.");
-  if (a.id_app !== ID_APP_IBOPLAYER) throw new Error("Esse aplicativo não é IBO Player.");
+  if (!IBOSOL_POR_ID_APP[a.id_app]) throw new Error("Esse aplicativo não é da revenda IBOSOL.");
   if (!a.mac) throw new Error("Aplicativo sem MAC cadastrado.");
   return a;
 }
@@ -122,10 +124,11 @@ async function entrarComoCliente(app: AppIboPlayer): Promise<SessaoClienteIboPla
   if (!app.chave || chaveMascarada(app.chave)) {
     throw new Error("Falta a chave (Device Key) real do aparelho no cadastro (a revenda só mostra ******). Peça a chave que aparece na TV e preencha em Editar.");
   }
-  const k = `${app.mac.trim().toLowerCase()}|${app.chave.trim()}`;
+  const site = app.id_app === ID_APP_IBOXPLAYER ? "iboxplayer" : "iboplayer";
+  const k = `${site}|${app.mac.trim().toLowerCase()}|${app.chave.trim()}`;
   const guardada = tokensCliente.get(k);
   if (guardada && guardada.expira - 5 * 60_000 > Date.now()) return guardada;
-  const s = await entrarClienteIboPlayer(app.mac, app.chave);
+  const s = await entrarClienteIboPlayer(app.mac, app.chave, site);
   tokensCliente.set(k, s);
   return s;
 }
@@ -171,8 +174,9 @@ export async function atualizarAppIboPlayer(idAppRegistro: number): Promise<{ va
   const app = await carregar(idAppRegistro);
   const painel = await painelIboPlayerAtivo();
   if (!painel) throw new Error("Nenhum painel IBO Player ativo cadastrado (Conexões).");
-  const dev = await comIbosol(painel.id, (t) => consultarIbosol(t, app.mac));
-  if (!dev) throw new Error("O IBO Player não encontrou esse MAC. Confira se o aplicativo já foi aberto na TV.");
+  const cfg = IBOSOL_POR_ID_APP[app.id_app];
+  const dev = await comIbosol(painel.id, (t) => consultarIbosol(t, app.mac, cfg.appId));
+  if (!dev) throw new Error(`O ${cfg.nome} não encontrou esse MAC na IBOSOL. Confira se o aplicativo já foi aberto na TV e se o app do cadastro está certo.`);
   const mudou = dev.validade !== app.validade || app.id_painel_servidor !== painel.id;
   await gravarDaRevenda(app, dev, painel.id, `Validade atualizada pelo painel ${painel.nome} (só este aparelho)`);
 
@@ -192,23 +196,24 @@ export async function ativarAppIboPlayer(idAppRegistro: number): Promise<{ valid
   const app = await carregar(idAppRegistro);
   const painel = await painelIboPlayerAtivo();
   if (!painel) throw new Error("Nenhum painel IBO Player ativo cadastrado (Conexões).");
+  const cfg = IBOSOL_POR_ID_APP[app.id_app];
   return comIbosol(painel.id, async (token) => {
-    const antes = await consultarIbosol(token, app.mac);
-    if (!antes) throw new Error("O IBO Player não encontrou esse MAC. Confira se o aplicativo já foi aberto na TV.");
+    const antes = await consultarIbosol(token, app.mac, cfg.appId);
+    if (!antes) throw new Error(`O ${cfg.nome} não encontrou esse MAC na IBOSOL. Confira se o aplicativo já foi aberto na TV e se o app do cadastro está certo.`);
     const expira = antes.validade ? Date.parse(`${antes.validade}T23:59:59-03:00`) : 0;
     const jaAtivado = antes.status === "active" && expira > Date.now() + DIAS_JA_ATIVADO * 86_400_000;
     let depois = antes;
     if (!jaAtivado) {
       try {
-        await ativarIbosol(token, app.mac, painel.email);
+        await ativarIbosol(token, app.mac, painel.email, cfg.modulo, cfg.appId);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "";
         throw new Error(/credit/i.test(msg) ? "Sem crédito no IBOSOL. Compre mais antes de renovar." : `O IBOSOL recusou a ativação${msg ? ` (${msg})` : ""}.`);
       }
-      depois = (await consultarIbosol(token, app.mac)) ?? antes;
+      depois = (await consultarIbosol(token, app.mac, cfg.appId)) ?? antes;
       // Nome do cliente no registro de ativação (acessório)
       if (app.nome_cliente) {
-        const reg = (await listarAtivadosIbosol(token, app.mac).catch(() => [])).find((x) => x.mac.toLowerCase() === app.mac.toLowerCase());
+        const reg = (await listarAtivadosIbosol(token, app.mac, [cfg.modulo]).catch(() => [])).find((x) => x.mac.toLowerCase() === app.mac.toLowerCase());
         if (reg && !reg.comentario) await comentarIbosol(token, reg.id, app.nome_cliente.slice(0, 100)).catch(() => {});
       }
     }
@@ -251,7 +256,7 @@ export async function criarListaAppIboPlayer(idAppRegistro: number, nome: string
   const s = await entrarComoCliente(app);
   const nova = await salvarListaIboPlayer(s, { nome, url });
   await gravarListasIboPlayer(idAppRegistro, mesclar(await listasIboPlayer(s), nova));
-  await auditarLista(app, `Lista "${nome}" criada no IBO Player`, {}, { nome });
+  await auditarLista(app, `Lista "${nome}" criada no ${IBOSOL_POR_ID_APP[app.id_app].nome}`, {}, { nome });
 }
 
 export async function editarListaAppIboPlayer(idAppRegistro: number, idExterno: number, dados: { nome?: string; url?: string }): Promise<void> {
@@ -260,7 +265,7 @@ export async function editarListaAppIboPlayer(idAppRegistro: number, idExterno: 
   const lista = await idRealDaLista(s, idExterno);
   const salva = await salvarListaIboPlayer(s, { id: lista.id, nome: dados.nome ?? lista.nome, url: dados.url ?? lista.url });
   await gravarListasIboPlayer(idAppRegistro, mesclar(await listasIboPlayer(s), salva));
-  await auditarLista(app, `Lista "${dados.nome ?? lista.nome}" editada no IBO Player`, { nome: lista.nome }, { nome: dados.nome ?? lista.nome, url_trocada: dados.url != null && dados.url !== lista.url });
+  await auditarLista(app, `Lista "${dados.nome ?? lista.nome}" editada no ${IBOSOL_POR_ID_APP[app.id_app].nome}`, { nome: lista.nome }, { nome: dados.nome ?? lista.nome, url_trocada: dados.url != null && dados.url !== lista.url });
 }
 
 export async function apagarListaAppIboPlayer(idAppRegistro: number, idExterno: number): Promise<void> {
@@ -269,12 +274,15 @@ export async function apagarListaAppIboPlayer(idAppRegistro: number, idExterno: 
   const lista = await idRealDaLista(s, idExterno);
   await apagarListaIboPlayer(s, lista.id);
   await gravarListasIboPlayer(idAppRegistro, (await listasIboPlayer(s)).filter((l) => l.id !== lista.id));
-  await auditarLista(app, `Lista "${lista.nome}" apagada no IBO Player`, { nome: lista.nome }, {});
+  await auditarLista(app, `Lista "${lista.nome}" apagada no ${IBOSOL_POR_ID_APP[app.id_app].nome}`, { nome: lista.nome }, {});
 }
 
 // ---------- Sync do painel (Conexões) ----------
 
-export type StatsSyncIboPlayer = { inseridos: number; atualizados: number; erros: number; sem_chave: number; nomes_preenchidos: number; nao_encontrados: number };
+export type StatsSyncIboPlayer = {
+  inseridos: number; atualizados: number; erros: number; sem_chave: number; nomes_preenchidos: number;
+  nao_encontrados: number; mac_invalido: number; por_app: Record<string, number>;
+};
 
 /**
  * Lê os aparelhos ativados pela revenda e consulta, um por um, os IBO Player cadastrados aqui (ativos):
@@ -282,33 +290,38 @@ export type StatsSyncIboPlayer = { inseridos: number; atualizados: number; erros
  * nome do cliente no comentário vazio. NÃO lê listas (cada login do site do cliente gasta captcha).
  */
 export async function sincronizarIboPlayer(idPainel: number): Promise<{ total: number; stats: StatsSyncIboPlayer }> {
-  const stats: StatsSyncIboPlayer = { inseridos: 0, atualizados: 0, erros: 0, sem_chave: 0, nomes_preenchidos: 0, nao_encontrados: 0 };
+  const stats: StatsSyncIboPlayer = { inseridos: 0, atualizados: 0, erros: 0, sem_chave: 0, nomes_preenchidos: 0, nao_encontrados: 0, mac_invalido: 0, por_app: {} };
+  const idsApp = Object.keys(IBOSOL_POR_ID_APP).map(Number);
+  const idAppDoModulo = new Map(idsApp.map((id) => [IBOSOL_POR_ID_APP[id].modulo, id]));
   return comIbosol(idPainel, async (token) => {
-    const ativados = await listarAtivadosIbosol(token);
-    const { rows: apps } = await pool.query<{ id_app_registro: number; mac: string; chave: string | null; nome: string | null }>(
-      `SELECT ap.id_app_registro::int, ap.mac, ap.chave, cl.nome
+    const ativados = await listarAtivadosIbosol(token, "", [...idAppDoModulo.keys()]);
+    const chaveDe = (idApp: number, mac: string) => `${idApp}|${mac.toLowerCase()}`;
+    const { rows: apps } = await pool.query<{ id_app_registro: number; id_app: number; mac: string; chave: string | null; nome: string | null }>(
+      `SELECT ap.id_app_registro::int, ap.id_app::int, ap.mac, ap.chave, cl.nome
        FROM public.aplicativos ap LEFT JOIN public.clientes cl ON cl.id_cliente = ap.id_cliente
-       WHERE ap.id_app = $1 AND ap.removido_em IS NULL AND ap.mac IS NOT NULL
-         AND (lower(btrim(ap.status)) = 'ativa' OR lower(ap.mac) = ANY($2::text[]))`,
-      [ID_APP_IBOPLAYER, ativados.map((a) => a.mac.toLowerCase())]
+       WHERE ap.id_app = ANY($1::bigint[]) AND ap.removido_em IS NULL AND ap.mac IS NOT NULL
+         AND (lower(btrim(ap.status)) = 'ativa' OR (ap.id_app::text || '|' || lower(ap.mac)) = ANY($2::text[]))`,
+      [idsApp, ativados.map((a) => chaveDe(idAppDoModulo.get(a.modulo)!, a.mac))]
     );
-    const porMac = new Map(apps.map((a) => [a.mac.toLowerCase(), a]));
+    const porChave = new Map(apps.map((a) => [chaveDe(a.id_app, a.mac), a]));
 
-    // Ativados pela revenda que não existem aqui: entram sem cliente
+    // Ativados pela revenda que não existem aqui: entram sem cliente, no app certo
     for (const a of ativados) {
-      if (porMac.has(a.mac.toLowerCase())) continue;
+      const idApp = idAppDoModulo.get(a.modulo)!;
+      if (porChave.has(chaveDe(idApp, a.mac))) continue;
       const { rows } = await pool.query<{ id_app_registro: number }>(
         `INSERT INTO public.aplicativos (id_app, mac, validade, modelo, id_painel_servidor, status, data_cadastro, atualizado_em)
          VALUES ($1, $2, $3::date, $4, $5, 'ativa', NOW(), NOW()) RETURNING id_app_registro::int`,
-        [ID_APP_IBOPLAYER, a.mac, a.validade, a.appType, idPainel]
+        [idApp, a.mac, a.validade, a.appType, idPainel]
       );
       stats.inseridos++;
-      porMac.set(a.mac.toLowerCase(), { id_app_registro: rows[0].id_app_registro, mac: a.mac, chave: null, nome: null });
+      porChave.set(chaveDe(idApp, a.mac), { id_app_registro: rows[0].id_app_registro, id_app: idApp, mac: a.mac, chave: null, nome: null });
     }
 
-    for (const app of porMac.values()) {
+    for (const app of porChave.values()) {
+      const cfg = IBOSOL_POR_ID_APP[app.id_app];
       try {
-        const dev = await consultarIbosol(token, app.mac);
+        const dev = await consultarIbosol(token, app.mac, cfg.appId);
         if (!dev) { stats.nao_encontrados++; continue; }
         await pool.query(
           `UPDATE public.aplicativos
@@ -320,19 +333,21 @@ export async function sincronizarIboPlayer(idPainel: number): Promise<{ total: n
           [dev.validade, idPainel, dev.appType, dev.ultimoAcesso, dev.chave, app.id_app_registro]
         );
         stats.atualizados++;
+        stats.por_app[cfg.nome] = (stats.por_app[cfg.nome] ?? 0) + 1;
         if ((!app.chave || chaveMascarada(app.chave)) && !dev.chave) stats.sem_chave++;
       } catch (e: unknown) {
         if (e instanceof SessaoIbosolExpirada) throw e;
+        if (e instanceof MacInvalidoIbosol) { stats.mac_invalido++; continue; }
         stats.erros++;
-        console.error(`[sync-iboplayer] ${app.mac}:`, e instanceof Error ? e.message : e);
+        console.error(`[sync-ibosol] ${cfg.nome} ${app.mac}:`, e instanceof Error ? e.message : e);
       }
     }
 
     // Nome do cliente no comentário vazio do registro de ativação
     for (const a of ativados) {
-      const nome = porMac.get(a.mac.toLowerCase())?.nome?.trim();
+      const nome = porChave.get(chaveDe(idAppDoModulo.get(a.modulo)!, a.mac))?.nome?.trim();
       if (nome && !a.comentario) await comentarIbosol(token, a.id, nome.slice(0, 100)).then(() => stats.nomes_preenchidos++).catch(() => {});
     }
-    return { total: porMac.size, stats };
+    return { total: porChave.size, stats };
   });
 }

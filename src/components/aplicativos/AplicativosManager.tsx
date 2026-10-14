@@ -8,7 +8,7 @@ import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import ListasAparelhoModal from "./ListasAparelhoModal";
-import { ID_APP_CLOUDDY, ID_APP_IBOPLAYER, ID_APP_IBOPRO, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_IBOPRO, appDaIbosol, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
 import ClouddyModal from "./ClouddyModal";
 import AtualizarPainelButton from "./AtualizarPainelButton";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
@@ -382,7 +382,7 @@ function PlaylistsRow({
 /** Tipo usado nas playlists: Clouddy não tem painel (tipo_painel null), mas tem listas TV/VOD próprias;
  *  IBO Pro gerencia as listas pelo site do cliente, com ou sem painel. */
 function tipoPlaylists(a: AplicativoRow): string | null {
-  return Number(a.id_app) === ID_APP_CLOUDDY ? "clouddy" : [ID_APP_IBOPRO, ID_APP_IBOPLAYER].includes(Number(a.id_app)) ? "ibopro" : a.tipo_painel;
+  return Number(a.id_app) === ID_APP_CLOUDDY ? "clouddy" : (Number(a.id_app) === ID_APP_IBOPRO || appDaIbosol(a.id_app)) ? "ibopro" : a.tipo_painel;
 }
 
 function normalizarMac(v: string): string {
@@ -649,7 +649,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           ) : (
                             <span className="text-zinc-300 text-xs">—</span>
                           )}
-                          {((a.id_painel_servidor && a.id_dispositivo_painel) || ([ID_APP_IBOPRO, ID_APP_IBOPLAYER].includes(Number(a.id_app)) && a.mac && a.chave)) && !removido && (
+                          {((a.id_painel_servidor && a.id_dispositivo_painel) || ((Number(a.id_app) === ID_APP_IBOPRO || appDaIbosol(a.id_app)) && a.mac && a.chave)) && !removido && (
                             <button
                               type="button"
                               onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: tipoPlaylists(a) })}

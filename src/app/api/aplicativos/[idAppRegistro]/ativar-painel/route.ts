@@ -5,7 +5,7 @@ import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
 import { adicionarExistente, ativarDispositivo, buscarDispositivoPorMac, validarMac } from "@/lib/painel-adapters/appacesso";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
-import { ID_APP_IBOPLAYER, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPRO, ID_APP_SMARTONE, appDaIbosol } from "@/lib/apps-painel-ids";
 import { ativarAppIbo } from "@/lib/ibopro";
 import { ativarAppIboPlayer } from "@/lib/iboplayer";
 import {
@@ -48,7 +48,7 @@ async function executar(idAppRegistro: number, jobId: string) {
     if (!app) throw new Error("Aplicativo não encontrado.");
     if (!app.mac) throw new Error("Aplicativo sem MAC cadastrado.");
 
-    if (Number(app.id_app) === ID_APP_IBOPRO || Number(app.id_app) === ID_APP_IBOPLAYER) {
+    if (Number(app.id_app) === ID_APP_IBOPRO || appDaIbosol(app.id_app)) {
       const r = Number(app.id_app) === ID_APP_IBOPRO ? await ativarAppIbo(idAppRegistro) : await ativarAppIboPlayer(idAppRegistro);
       jobs.set(jobId, { done: true, ok: true, validade: r.validade, jaAtivado: r.jaAtivado });
       return;
