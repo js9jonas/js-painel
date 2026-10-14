@@ -175,17 +175,17 @@ export async function ativarIbosol(token: string, mac: string, emailRevenda: str
 }
 
 /** Quantas listas (cadastradas pela revenda) usam o endereço. */
-export async function contarDominioIbosol(token: string, antigo: string): Promise<number> {
+export async function contarDominioIbosol(token: string, antigo: string, modulo = IBOSOL_MODULO, appId = IBOSOL_APP_ID): Promise<number> {
   const r = await revenda<{ status?: boolean; matchedCount?: number; message?: string }>("POST", "/api/count-playlist-domain", token, {
-    current_playlist_url: antigo, app_platform: IBOSOL_MODULO, app_id: IBOSOL_APP_ID,
+    current_playlist_url: antigo, app_platform: modulo, app_id: appId,
   });
   if (!r.status) throw new Error(r.message || "IBOSOL não contou as listas.");
   return Number(r.matchedCount ?? 0);
 }
 
 /** Troca o endereço em todas as listas (da revenda) que usam o antigo. */
-export async function mudarDominioIbosol(token: string, antigo: string, novo: string): Promise<string> {
-  const corpo = { current_playlist_url: antigo, new_domain: novo, app_platform: IBOSOL_MODULO, app_id: IBOSOL_APP_ID, change_scope: "all", confirmed: true };
+export async function mudarDominioIbosol(token: string, antigo: string, novo: string, modulo = IBOSOL_MODULO, appId = IBOSOL_APP_ID): Promise<string> {
+  const corpo = { current_playlist_url: antigo, new_domain: novo, app_platform: modulo, app_id: appId, change_scope: "all", confirmed: true };
   const r = await revenda<{ status?: boolean; message?: string; needs_confirmation?: boolean; warnings?: string[] }>("POST", "/api/update-playlist", token, corpo);
   if (r.needs_confirmation) throw new Error(`IBOSOL pediu confirmação: ${(r.warnings ?? []).join(" ")}`);
   if (!r.status) throw new Error(r.message || "IBOSOL recusou a troca.");

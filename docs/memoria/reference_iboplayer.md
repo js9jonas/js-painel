@@ -57,5 +57,5 @@ Código: `src/lib/painel-adapters/iboplayer.ts` (API) e `src/lib/iboplayer.ts` (
   ver = POST `/frontend/device/playlists`; criar = POST `savePlaylist` com `current_playlist_url_id: -1`;
   editar = PUT `/frontend/device/editPlaylist/{id}`; apagar = DELETE `deletePlayListUrl/{id}` (resposta `status: "playlist deleted successfully"`).
 - Testado: Atualizar do #2584 (Jose Rosa AM) leu validade + lista. Criar/editar/apagar pelo sistema ainda sem teste real.
-- "Migrar endereço" continua só pro IBO Player. BOB Player (BOBPLAYER, app_id 3): 2 cadastros com "BOB" na observação, app ainda não existe no banco.
+- "Migrar endereço" do painel IBOSOL troca nos dois apps (uma chamada por app_platform/app_id; contagem conferida 13/10). BOB Player (BOBPLAYER, app_id 3): 2 cadastros com "BOB" na observação, app ainda não existe no banco.
 - Sync: "Device not found" conta como não encontrado (não falha); MAC fora do formato conta à parte.

@@ -2,12 +2,12 @@
 // antigo, com 1 operação no painel do app, e espelha nas listas salvas aqui.
 //  - IBO Pro: Mass Change → Hostname (API, aceita porta).
 //  - SmartOne: Mass Change hostname (formulário; só o endereço, sem porta — a porta é outra opção do site).
-//  - IBO Player: revenda IBOSOL (count-playlist-domain + update-playlist). Só alcança as listas que a
-//    revenda conhece — as que o cliente pôs pelo site dele podem ficar de fora (o total vem da contagem).
+//  - IBO Player e IBO Xplayer: revenda IBOSOL (count-playlist-domain + update-playlist), uma vez por app
+//    (app_platform/app_id de IBOSOL_POR_ID_APP). Só alcança as listas que a revenda conhece — as que o cliente pôs pelo site dele podem ficar de fora (o total vem da contagem).
 // Fun Play / Lazer Play / Core Player têm "servidores" no painel: ver servidores-app/route.ts.
 import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
-import { ID_APP_IBOPLAYER, ID_APP_IBOPRO, ID_APP_SMARTONE } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPRO, ID_APP_SMARTONE, IBOSOL_POR_ID_APP } from "@/lib/apps-painel-ids";
 import { sessaoIbo } from "@/lib/ibopro";
 import { comIbosol } from "@/lib/iboplayer";
 import { contarDominioIbosol, mudarDominioIbosol } from "@/lib/painel-adapters/iboplayer";
@@ -23,30 +23,35 @@ export async function migrarHost(idPainel: number, antigo: string, novo: string)
   if (!painel || !TIPOS_MIGRAR_HOST.includes(painel.tipo)) throw new Error("Esse painel não tem migração de endereço por aqui.");
 
   let noPainel: number;
-  let idApp: number;
+  let idsApp: number[];
   if (painel.tipo === "smartone") {
     if (/:\d+$/.test(antigo) || /:\d+$/.test(novo)) throw new Error("No SmartOne a troca é só do endereço, sem a porta (a porta é trocada à parte no site).");
     noPainel = await mudarHostListasSmartOne(await sessaoSmartOne(idPainel), antigo, novo);
-    idApp = ID_APP_SMARTONE;
+    idsApp = [ID_APP_SMARTONE];
   } else if (painel.tipo === "iboplayer") {
+    idsApp = Object.keys(IBOSOL_POR_ID_APP).map(Number);
     noPainel = await comIbosol(idPainel, async (token) => {
-      const n = await contarDominioIbosol(token, antigo);
-      if (n > 0) await mudarDominioIbosol(token, antigo, novo);
-      return n;
+      let total = 0;
+      for (const id of idsApp) {
+        const { modulo, appId } = IBOSOL_POR_ID_APP[id];
+        const n = await contarDominioIbosol(token, antigo, modulo, appId);
+        if (n > 0) await mudarDominioIbosol(token, antigo, novo, modulo, appId);
+        total += n;
+      }
+      return total;
     });
-    idApp = ID_APP_IBOPLAYER;
   } else {
     noPainel = await mudarHostListasIbo(await sessaoIbo(idPainel), antigo, novo);
-    idApp = ID_APP_IBOPRO;
+    idsApp = [ID_APP_IBOPRO];
   }
 
   // Listas salvas aqui: troca o começo da URL quando ele é exatamente o host antigo
   const { rowCount } = await pool.query(
     `UPDATE public.aplicativo_playlists pl SET url = $2 || substr(pl.url, length($1) + 1), atualizado_em = NOW()
      FROM public.aplicativos ap
-     WHERE ap.id_app_registro = pl.id_app_registro AND ap.id_app = $3
+     WHERE ap.id_app_registro = pl.id_app_registro AND ap.id_app = ANY($3::bigint[])
        AND lower(left(pl.url, length($1))) = lower($1) AND substr(pl.url, length($1) + 1, 1) IN ('/', ':', '?', '')`,
-    [antigo, novo, idApp]
+    [antigo, novo, idsApp]
   );
 
   const client = await pool.connect();

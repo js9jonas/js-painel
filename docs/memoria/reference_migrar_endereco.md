@@ -16,7 +16,7 @@ registra no `audit_log` (tipo `servidor_app`).
 | Fun Play / Lazer Play / Core Player | "Servidores" do painel appacesso: escolhe o servidor, endereço novo, listas migram junto | `servidores-app/route.ts`, `ServidoresAppModal` (antes "Servidores") |
 | IBO Pro | `POST /admin/playlists/mass-change-hostname {old,new}` → `totalUpdated`; aceita porta | `src/lib/migrar-host.ts`, `MigrarHostModal` |
 | SmartOne | formulário `/plugin/smart_one/client_main/hostname/` (`from_server_host`, `to_server_host`, `server_type=all`, csrf) → "Successfully Updated on N playlists"; **sem porta** | idem |
-| IBO Player | IBOSOL `count-playlist-domain` + `update-playlist` (só listas da revenda) | idem |
+| IBO Player + IBO Xplayer | IBOSOL `count-playlist-domain` + `update-playlist` por app (IBOPLAYER/1, IBOXXPLAYER/13; só listas da revenda) | idem |
 | Clouddy | não tem revenda: troca conta por conta (balão Editar) | `src/lib/clouddy.ts` |
 
 - O modal sugere os hosts da aba Hosts e preenche o novo com o principal do mesmo servidor; confirmação em 2 cliques.
