@@ -150,7 +150,26 @@ function calcularStatus(activationExpired: string | null): ContaPainel["status"]
 
 // ---------- Auth ----------
 
-export async function loginSmartOne(
+// Login compartilhado por e-mail: card, sync, listas e Alertas chamam loginSmartOne cada um por si,
+// e pedidos em paralelo faziam vários logins seguidos (3 em 70 ms em 14/10/2026) — cada um gasta
+// captcha e derruba a sessão do anterior. Em andamento ou feito há menos de 1 min → mesmo resultado.
+const REUSO_LOGIN_MS = 60_000;
+const loginsSmartOne = new Map<string, { p: Promise<{ token: string; expiry: Date }>; em: number }>();
+
+export function loginSmartOne(email: string, senha: string): Promise<{ token: string; expiry: Date }> {
+  const chave = email.trim().toLowerCase();
+  const atual = loginsSmartOne.get(chave);
+  if (atual && Date.now() - atual.em < REUSO_LOGIN_MS) return atual.p;
+  const p = loginSmartOneDireto(email, senha);
+  loginsSmartOne.set(chave, { p, em: Date.now() });
+  // Falhou → não guarda (o próximo tenta de novo). O catch só evita unhandledRejection; quem chamou recebe o erro.
+  p.catch(() => {
+    if (loginsSmartOne.get(chave)?.p === p) loginsSmartOne.delete(chave);
+  });
+  return p;
+}
+
+async function loginSmartOneDireto(
   email: string,
   senha: string
 ): Promise<{ token: string; expiry: Date }> {

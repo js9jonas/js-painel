@@ -23,7 +23,8 @@ SELECT tipo, login_em, expira_previsto, ultimo_ok_em, recusado_em, substituido_e
        ultimo_ok_em - login_em AS durou_no_minimo, recusado_em - login_em AS durou_no_maximo
   FROM public.painel_sessao_log WHERE tipo = 'iboplayer' ORDER BY login_em DESC NULLS LAST;
 ```
-⚠️ Achado no 1º dia: SmartOne gravou 3 logins em 70 ms (06:50:49) — chamadas em paralelo relogam cada uma sem dividir
-o login (sem dedup como o do CLUB/IBOSOL), e cada login gasta captcha. Não corrigido ainda.
+✅ Achado no 1º dia, corrigido 14/10: SmartOne gravou 3 logins em 70 ms (06:50:49) — card, sync, listas e Alertas
+chamavam `loginSmartOne` cada um por si. Agora `loginSmartOne` divide o login por e-mail (em andamento ou feito há < 1 min
+→ mesmo resultado; falha não fica guardada). Testado: 4 pedidos simultâneos por 2 caminhos = 1 login.
 
 📋 Conferir em alguns dias e ajustar as 12 h do `loginIbosol`. Pra outros painéis ganharem recusa exata, ligar o gancho no detector de 401 de cada adapter.
