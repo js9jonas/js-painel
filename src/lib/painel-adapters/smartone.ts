@@ -12,6 +12,7 @@ import type {
 } from "./types";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 const BASE = "https://smartone-iptv.com";
 const TURNSTILE_SITEKEY = "0x4AAAAAAAP8nNwILjC5_ux6";
@@ -94,8 +95,10 @@ function extrairCookieBlesta(res: Response, anterior?: string): string {
 async function getHtml(path: string, cookie: string): Promise<string> {
   const res = await fetch(`${BASE}${path}`, { headers: { cookie } });
   if (res.url.includes("/client/login")) {
+    registrarRecusaToken(cookie, path);
     throw new Error("SmartOne: sessão expirada.");
   }
+  registrarUsoOkToken(cookie);
   return res.text();
 }
 
@@ -393,6 +396,7 @@ export async function excluirPlaylist(cookie: string, id: number): Promise<void>
     headers: { cookie },
   });
   if (res.url.includes("/client/login")) {
+    registrarRecusaToken(cookie, `delete_smartkey/${id}`);
     throw new Error("SmartOne: sessão expirada.");
   }
 }
@@ -461,7 +465,10 @@ export async function transacoesDoMac(cookie: string, mac: string, csrf?: string
     headers: { "content-type": "application/x-www-form-urlencoded", cookie },
     body: body.toString(),
   });
-  if (res.url.includes("/client/login")) throw new Error("SmartOne: sessão expirada.");
+  if (res.url.includes("/client/login")) {
+    registrarRecusaToken(cookie, "client_transactions");
+    throw new Error("SmartOne: sessão expirada.");
+  }
   const html = await res.text();
   const corpo = html.slice(html.indexOf("<tbody"), html.indexOf("</tbody>"));
   const alvo = mac.trim().toUpperCase();

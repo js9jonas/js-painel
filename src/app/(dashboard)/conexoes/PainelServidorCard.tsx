@@ -32,6 +32,7 @@ type StatusAoVivo = {
   vencidas: number;
   bloqueadas: number;
   erro?: string;
+  session_expiry?: string | null;
 };
 
 type Props = { painel: PainelServidorRow; onEditar: () => void };
@@ -93,8 +94,9 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
   // erro) cai pros números do banco.
   const vivo = aoVivo?.conectado ? aoVivo : null;
 
-  const sessionExpirada =
-    painel.session_expiry && new Date(painel.session_expiry) < new Date();
+  // Após "Atualizar" vale a validade devolvida (o adapter pode ter relogado).
+  const tokenExpira = aoVivo?.session_expiry ?? painel.session_expiry;
+  const sessionExpirada = tokenExpira && new Date(tokenExpira) < new Date();
 
   function statusConexao() {
     if (aoVivo?.conectado === false)
@@ -275,11 +277,17 @@ export default function PainelServidorCard({ painel, onEditar }: Props) {
         <p className="text-xs text-zinc-500 bg-zinc-50 rounded px-3 py-2">{mensagem}</p>
       )}
 
+      {tokenExpira && (
+        <p className="text-xs text-zinc-400">
+          Token expira: {new Date(tokenExpira).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+        </p>
+      )}
+
 
       {/* Renovar sessão — exclusivo para CLUB; mostra sem sessão, expirada ou com status offline */}
       {painel.tipo === "club" && (
         !painel.tem_session ||
-        (painel.session_expiry && new Date(painel.session_expiry) < new Date()) ||
+        sessionExpirada ||
         aoVivo?.conectado === false
       ) && (
         <button

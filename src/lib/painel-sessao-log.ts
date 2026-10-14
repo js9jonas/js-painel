@@ -1,5 +1,6 @@
 // Uso e recusa de token de painel (sql/022). Login e troca já vêm do gatilho no banco;
-// aqui só o que o banco não vê. Acessório: falha de gravação nunca derruba a chamada real.
+// aqui só o que o banco não vê. Só atualiza linha existente (todo token gravado tem linha):
+// token que nunca foi pro banco não vira linha solta. Acessório: falha nunca derruba a chamada.
 import { createHash } from "node:crypto";
 import { pool } from "@/lib/db";
 
@@ -12,20 +13,26 @@ function gravar(sql: string, params: unknown[]) {
   });
 }
 
+// Trava em memória: um sync faz centenas de chamadas com o mesmo token — no máx. 1 gravação/min por token.
+const ultimoOk = new Map<string, number>();
+
 export function registrarUsoOkToken(token: string) {
+  const h = hash(token);
+  const agora = Date.now();
+  if ((ultimoOk.get(h) ?? 0) > agora - 60_000) return;
+  if (ultimoOk.size > 200) ultimoOk.clear();
+  ultimoOk.set(h, agora);
   gravar(
-    `INSERT INTO public.painel_sessao_log (token_hash, ultimo_ok_em) VALUES ($1, now())
-     ON CONFLICT (token_hash) DO UPDATE SET ultimo_ok_em = now()
-     WHERE painel_sessao_log.ultimo_ok_em IS NULL OR painel_sessao_log.ultimo_ok_em < now() - interval '1 minute'`,
-    [hash(token)]
+    `UPDATE public.painel_sessao_log SET ultimo_ok_em = now()
+      WHERE token_hash = $1 AND (ultimo_ok_em IS NULL OR ultimo_ok_em < now() - interval '1 minute')`,
+    [h]
   );
 }
 
 export function registrarRecusaToken(token: string, chamada: string) {
   gravar(
-    `INSERT INTO public.painel_sessao_log (token_hash, recusado_em, chamada_recusada) VALUES ($1, now(), $2)
-     ON CONFLICT (token_hash) DO UPDATE SET recusado_em = now(), chamada_recusada = $2
-     WHERE painel_sessao_log.recusado_em IS NULL`,
+    `UPDATE public.painel_sessao_log SET recusado_em = now(), chamada_recusada = $2
+      WHERE token_hash = $1 AND recusado_em IS NULL`,
     [hash(token), chamada]
   );
 }

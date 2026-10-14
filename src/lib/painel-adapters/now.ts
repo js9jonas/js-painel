@@ -1,5 +1,6 @@
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 // Painel N (pnw7.cc) — PHP session + reCAPTCHA v2
 // Auto-login: CapSolver ReCaptchaV2TaskProxyLess → POST validar-login.php → PHPSESSID no Set-Cookie
@@ -185,9 +186,12 @@ export function criarNowAdapter(
   async function withRelogin<T>(fn: (session: string) => Promise<T>): Promise<T> {
     const session = await getSession();
     try {
-      return await fn(session);
+      const r = await fn(session);
+      registrarUsoOkToken(session);
+      return r;
     } catch (err) {
       if (!(err instanceof NowSessionExpiredError)) throw err;
+      registrarRecusaToken(session, "resposta HTML de login");
       // Sessão PHP expirou no servidor — força re-login via CapSolver
       const nova = await doLogin();
       return fn(nova);

@@ -1,6 +1,7 @@
 import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 // API base: https://gesapioffice.com/api
 // Auth: JWT Bearer — auto-login com TLS Chrome (via impit)
@@ -97,6 +98,8 @@ async function listarUsuarios(
   const res = await authFetch(session.token, `users-iptv?reg_password=${encodeURIComponent(session.cryptPass)}`);
 
   // Sessão stale — força re-login uma vez
+  if (res.status === 404 || res.status === 401) registrarRecusaToken(JSON.stringify(session), "users-iptv");
+  else if (res.ok) registrarUsoOkToken(JSON.stringify(session));
   if ((res.status === 404 || res.status === 401) && !jaRelogou) {
     const nova = await freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
     return listarUsuarios(nova, onSaveSession, creds, true);
@@ -188,11 +191,13 @@ export function criarUniplayAdapter(creds: ServidorCredenciais, id: number, onSa
         let session = await obterSessao();
         let res = await authFetch(session.token, "dash-reseller");
         if (res.status === 401 || res.status === 404) {
+          registrarRecusaToken(JSON.stringify(session), "dash-reseller");
           session = await freshLogin(onSaveSession, creds.painel_usuario, creds.painel_senha);
           resetarSessao(session);
           res = await authFetch(session.token, "dash-reseller");
         }
         if (!res.ok) return null;
+        registrarUsoOkToken(JSON.stringify(session));
         const data = await res.json() as any;
         return data.credits != null ? parseFloat(data.credits) : null;
       } catch {

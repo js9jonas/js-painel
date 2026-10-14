@@ -2,6 +2,7 @@ import { Impit, type HttpMethod } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ResultadoCriacao, DetalhesConta, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { impitFetch } from "./proxy-retry";
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 // API: https://pdcapi.io/   Auth: X-ACCESS-TOKEN
 // ⚠️ Duração real da sessão observada em produção: ~1h ou menos (não os "~7 dias" nominais que
@@ -189,8 +190,10 @@ async function apiFetch(token: string, path: string, options: { method?: HttpMet
   if (!res.ok) throw new Error(`pdcapi.io/${path} → ${res.status}`);
   const data = await res.json() as any;
   if (data?.result === false && /expirad/i.test(data.msg ?? "")) {
+    registrarRecusaToken(token, path);
     throw new ClubSessionExpiredError(data.msg);
   }
+  registrarUsoOkToken(token);
   return data;
 }
 
@@ -319,8 +322,10 @@ export function criarClubAdapter(
           if (!res.ok) throw new Error(`CLUB stats → ${res.status}`);
           const data = await res.json() as any;
           if (data?.result === false && /expirad/i.test(data.msg ?? "")) {
+            registrarRecusaToken(token, "stats");
             throw new ClubSessionExpiredError(data.msg);
           }
+          registrarUsoOkToken(token);
           return data?.data?.credits != null ? parseFloat(data.data.credits) : null;
         });
       } catch {

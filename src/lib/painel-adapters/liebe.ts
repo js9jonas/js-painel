@@ -1,6 +1,7 @@
 import { Impit } from "impit";
 import { impitFetch } from "./proxy-retry";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 // LIEBE (liebeapp.sigma.vin) — Laravel Sanctum Bearer token
 // Auto-login: POST /api/auth/login → token longa duração
@@ -40,11 +41,15 @@ class LiebeUnauthorizedError extends Error {}
 
 async function liebeGet(token: string, path: string): Promise<any> {
   const res = await impitFetch(impit, `${API_BASE}${path}`, { headers: baseHeaders(token) });
-  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (res.status === 401 || res.status === 403) {
+    registrarRecusaToken(token, path);
+    throw new LiebeUnauthorizedError();
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`LIEBE GET ${path} → ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}`);
   }
+  registrarUsoOkToken(token);
   return res.json();
 }
 
@@ -54,11 +59,15 @@ async function liebePost(token: string, path: string, body?: object): Promise<an
     headers: baseHeaders(token),
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (res.status === 401 || res.status === 403) {
+    registrarRecusaToken(token, path);
+    throw new LiebeUnauthorizedError();
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`LIEBE POST ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
   }
+  registrarUsoOkToken(token);
   return res.json();
 }
 
@@ -67,11 +76,15 @@ async function liebeDelete(token: string, path: string): Promise<void> {
     method: "DELETE",
     headers: baseHeaders(token),
   });
-  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (res.status === 401 || res.status === 403) {
+    registrarRecusaToken(token, path);
+    throw new LiebeUnauthorizedError();
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`LIEBE DELETE ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
   }
+  registrarUsoOkToken(token);
 }
 
 async function liebePut(token: string, path: string, body?: object): Promise<any> {
@@ -80,11 +93,15 @@ async function liebePut(token: string, path: string, body?: object): Promise<any
     headers: baseHeaders(token),
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401 || res.status === 403) throw new LiebeUnauthorizedError();
+  if (res.status === 401 || res.status === 403) {
+    registrarRecusaToken(token, path);
+    throw new LiebeUnauthorizedError();
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`LIEBE PUT ${path} → ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
   }
+  registrarUsoOkToken(token);
   return res.json();
 }
 

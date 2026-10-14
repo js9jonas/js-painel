@@ -3,6 +3,7 @@ import { Impit } from "impit";
 import { impitFetch } from "./proxy-retry";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 // UNITV (ResellerSystem) — https://panel-web.revenda.watch/
 // Auth: dealer_token retornado no login. Re-login automático via CapSolver (ImageToTextTask) quando returnCode=300.
@@ -173,6 +174,8 @@ export function criarUnitvAdapter(
   onSaveContas: SaveContaVencimento,
 ): PainelAdapter {
   let session = parseSession(creds.session_cookie);
+  // Texto como está gravado no banco (o registro de tokens usa o md5 dele).
+  let gravada = creds.session_cookie;
   const usuario = creds.painel_usuario ?? DEALER_NAME;
   const senha   = creds.painel_senha ?? "";
 
@@ -180,7 +183,8 @@ export function criarUnitvAdapter(
     if (!session?.token) {
       const token = await loginUnitv(usuario, senha);
       session = { token };
-      await onSaveSession(JSON.stringify(session));
+      gravada = JSON.stringify(session);
+      await onSaveSession(gravada);
     }
     return session.token;
   }
@@ -188,13 +192,17 @@ export function criarUnitvAdapter(
   async function callWithRelogin(action: string, bodyFn: (token: string) => object, requireData = true): Promise<any> {
     let token = await ensureToken();
     try {
-      return await apiCall(token, action, bodyFn(token), requireData);
+      const r = await apiCall(token, action, bodyFn(token), requireData);
+      if (gravada) registrarUsoOkToken(gravada);
+      return r;
     } catch (err) {
       if (!(err instanceof UnitvSessionExpiredError)) throw err;
+      if (gravada) registrarRecusaToken(gravada, action);
       // Re-login automático
       token = await loginUnitv(usuario, senha);
       session = { token };
-      await onSaveSession(JSON.stringify(session));
+      gravada = JSON.stringify(session);
+      await onSaveSession(gravada);
       return await apiCall(token, action, bodyFn(token), requireData);
     }
   }

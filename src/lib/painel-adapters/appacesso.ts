@@ -9,6 +9,7 @@ import type {
   SaveSession,
   SaveContaVencimento,
 } from "./types";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 export interface AppAcessoConfig {
   apiBase: string;
@@ -163,9 +164,17 @@ async function apiFetch(
       ...(options.headers as Record<string, string> | undefined),
     },
   });
-  if (res.status === 401) throw new Error(`${cfg.nomeApp}: token inválido (401).`);
+  if (res.status === 401) {
+    registrarRecusaToken(token, path);
+    throw new Error(`${cfg.nomeApp}: token inválido (401).`);
+  }
   const data = (await res.json()) as any;
-  if (data.error) throw new Error(`${cfg.nomeApp} API: ${data.message ?? JSON.stringify(data)}`);
+  if (data.error) {
+    // Token ruim/vencido vem com HTTP 200 e erro no corpo ("jwt malformed", "jwt expired").
+    if (/jwt|token/i.test(String(data.message ?? ""))) registrarRecusaToken(token, path);
+    throw new Error(`${cfg.nomeApp} API: ${data.message ?? JSON.stringify(data)}`);
+  }
+  registrarUsoOkToken(token);
   return data.message;
 }
 

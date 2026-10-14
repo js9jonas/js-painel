@@ -1,6 +1,7 @@
 import { Impit } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 
 // API base: https://api.controle.fit/api
 // Auth: JWT Bearer, expira em 1h
@@ -141,8 +142,13 @@ async function apiFetch(token: string, path: string, options: RequestInit = {}) 
     // Expõe o "code" do corpo (quando existe) pra quem chama decidir se vale tentar
     // de novo com login novo — ver nota em fetchComRetry sobre "sessao_nao_renderizada".
     try { (err as any).code = JSON.parse(msg)?.code; } catch {}
+    // "sessao_nao_renderizada" não é token morto (ver fetchComRetry) — não conta como recusa.
+    if ((res.status === 401 || res.status === 403) && (err as { code?: unknown }).code !== "sessao_nao_renderizada") {
+      registrarRecusaToken(token, path);
+    }
     throw err;
   }
+  registrarUsoOkToken(token);
   return res.json();
 }
 
