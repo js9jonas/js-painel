@@ -39,6 +39,7 @@ type StatusAoVivo = {
   conectado: boolean;
   creditos: number | null;
   erro?: string;
+  sessionExpiry: string | null;
 };
 
 type Props = { painel: PainelAppSyncRow; onEditar: () => void };
@@ -66,7 +67,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
     try {
       const res = await fetch(`/api/paineis/servidores/${painel.id}/status`);
       const json = await res.json();
-      setAoVivo({ conectado: !json.erro, creditos: json.creditos ?? null, erro: json.erro });
+      setAoVivo({ conectado: !json.erro, creditos: json.creditos ?? null, erro: json.erro, sessionExpiry: json.session_expiry ?? null });
     } catch {
       // silencioso
     } finally {
@@ -132,6 +133,8 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
   }
 
   const status = statusConexao();
+  // Após "Atualizar" vale a validade devolvida (o adapter pode ter relogado).
+  const tokenExpira = aoVivo?.sessionExpiry ?? painel.session_expiry;
   const pctVinculados = painel.total_devices > 0
     ? Math.round((painel.devices_vinculados / painel.total_devices) * 100)
     : 0;
@@ -189,9 +192,9 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
       )}
 
       {/* Última sync */}
-      {painel.session_expiry && (
+      {tokenExpira && (
         <p className="text-xs text-zinc-400">
-          Token expira: {new Date(painel.session_expiry).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          Token expira: {new Date(tokenExpira).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </p>
       )}
 

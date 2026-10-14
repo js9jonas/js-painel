@@ -65,3 +65,5 @@ Código: `src/lib/painel-adapters/iboplayer.ts` (API) e `src/lib/iboplayer.ts` (
   mas o adapter do card (`criarIboPlayerAdapter`) não: reusava o token morto e o "Atualizar" dava "Sem conexão" até o prazo salvo vencer.
 - Agora o adapter reloga uma vez no 401, com login compartilhado entre aparelhos e créditos (pedidos em paralelo → 1 captcha só,
   e um login não derruba o token do outro). Testado local contra o painel 109: 13 aparelhos, 3 créditos.
+- "Token expira:" do card agora vem da resposta do Atualizar (rota `/status` devolve `session_expiry`), não só do carregamento da página.
+  ⚠️ A data é palpite nosso (login + 12 h); a IBOSOL não informa a validade e já derrubou token antes disso.

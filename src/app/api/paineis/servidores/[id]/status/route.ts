@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdapterPainel } from "@/lib/painel-adapters";
+import { pool } from "@/lib/db";
 
 const TIMEOUT_MS = 30_000;
 
@@ -36,9 +37,17 @@ export async function GET(
     comTimeout(adapter.getCreditos?.() ?? Promise.resolve(null), TIMEOUT_MS),
   ]);
 
+  // Validade do token depois das chamadas: se o adapter relogou, o card mostra a nova.
+  // timestamptz → ISO (instante exato, lido igual por qualquer navegador).
+  const { rows } = await pool.query<{ session_expiry: Date | null }>(
+    `SELECT session_expiry FROM public.painel_servidores WHERE id = $1`,
+    [idPainel]
+  );
+  const sessionExpiry = rows[0]?.session_expiry?.toISOString() ?? null;
+
   if (contas.status === "rejected") {
     const msg = contas.reason instanceof Error ? contas.reason.message : "Erro ao conectar.";
-    return NextResponse.json({ erro: msg, conectado: false });
+    return NextResponse.json({ erro: msg, conectado: false, session_expiry: sessionExpiry });
   }
 
   const lista = contas.value;
@@ -49,5 +58,6 @@ export async function GET(
     vencidas:   lista.filter((c) => c.status === "vencida").length,
     bloqueadas: lista.filter((c) => c.status === "bloqueada").length,
     creditos:   creditos.status === "fulfilled" ? creditos.value : null,
+    session_expiry: sessionExpiry,
   });
 }
