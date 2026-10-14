@@ -28,3 +28,7 @@ registra no `audit_log` (tipo `servidor_app`).
 Fun Play 865 aparelhos · SmartOne 394 · Lazer Play 141 · POP Player 58 (sem integração, Cloudflare) · Clouddy 45 ·
 IBO PRO 41 · IBO Player 21 (outro app, sem integração) · Ninja 8 · Core Player 6. Integrados ≈ 94% dos aparelhos ativos.
 **Dream TV** adicionado em `public.apps` (id_app 33, exige licença) em 13/10/2026, a pedido do Jonas.
+
+**13/10/2026 (noite):** limpeza — 54 IBO Player vencidos e não achados na IBOSOL marcados `inativa` (audit por app);
+**DuplexPlay extinto** (sem painel): os 307 cadastros (id_app 1) excluídos, backup em `public.bkp_aplicativos_duplexplay_20261013`.
+O app continua em `public.apps`. Sem varredura agora: POP Player (51 com cliente ativo), Ninja (7), Duplecast (2), resto 0–1.
