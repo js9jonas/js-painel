@@ -7,6 +7,7 @@
 //  - IBO Xplayer (iboxxiptv.com, 13/10/2026): mesmo login/captcha; listas com device_id no corpo e edição por PUT.
 // As listas cadastradas pelo cliente NÃO aparecem na revenda (check-device-status devolve só as da revenda).
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
+import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
 import type { ContaPainel, PainelAdapter, SaveSession, ServidorCredenciais } from "./types";
 
 const API_REVENDA = "https://backend-apis.ibosol.com";
@@ -71,8 +72,12 @@ async function revenda<T>(metodo: string, path: string, token: string | null, co
     signal: AbortSignal.timeout(60_000),
   });
   const data = (await res.json().catch(() => null)) as { status?: unknown; msg?: string; message?: string } | null;
-  if (res.status === 401) throw new SessaoIbosolExpirada();
+  if (res.status === 401) {
+    if (token) registrarRecusaToken(token, path);
+    throw new SessaoIbosolExpirada();
+  }
   if (!res.ok) throw new Error(`IBOSOL ${path}: ${data?.msg ?? data?.message ?? `HTTP ${res.status}`}`);
+  if (token) registrarUsoOkToken(token);
   return data as T;
 }
 
