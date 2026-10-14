@@ -31,4 +31,4 @@ IBO PRO 41 · IBO Player 21 (outro app, sem integração) · Ninja 8 · Core Pla
 
 **13/10/2026 (noite):** limpeza — 54 IBO Player vencidos e não achados na IBOSOL marcados `inativa` (audit por app);
 **DuplexPlay extinto** (sem painel): os 307 cadastros (id_app 1) excluídos, backup em `public.bkp_aplicativos_duplexplay_20261013`.
-O app continua em `public.apps`. Sem varredura agora: POP Player (51 com cliente ativo), Ninja (7), Duplecast (2), resto 0–1.
+App removido de `public.apps` também (era id_app 1: `DuplexPlay`, exige_licenca true). Sem varredura agora: POP Player (51 com cliente ativo), Ninja (7), Duplecast (2), resto 0–1.
