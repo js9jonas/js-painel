@@ -47,7 +47,10 @@ export async function definirPrincipal(client: PoolClient, idPainel: number, hos
   await client.query(`UPDATE public.painel_servidores SET host_stream = $2 WHERE id = $1`, [idPainel, host]);
 }
 
-export async function getHostsServidores(): Promise<{ servidores: ServidorComHosts[]; desconhecidos: HostDesconhecido[] }> {
+/** Hosts sem servidor (id_painel_servidor NULL, sql/021): listas de fora, que não são de servidor nosso. */
+export type HostsServidores = { servidores: ServidorComHosts[]; externos: HostServidor[]; desconhecidos: HostDesconhecido[] };
+
+export async function getHostsServidores(): Promise<HostsServidores> {
   const [srv, hosts, listas] = await Promise.all([
     pool.query<{ id: number; nome: string; tipo: string; ativo: boolean }>(
       // só servidores ativos — os desativados (ex.: CLUB antigo) não entram mais na tela
@@ -55,7 +58,7 @@ export async function getHostsServidores(): Promise<{ servidores: ServidorComHos
         WHERE tipo <> ALL($1::text[]) AND ativo = true ORDER BY nome`,
       [TIPOS_APP]
     ),
-    pool.query<{ id: number; id_painel_servidor: number; host: string; papel: PapelHost; observacao: string | null }>(
+    pool.query<{ id: number; id_painel_servidor: number | null; host: string; papel: PapelHost; observacao: string | null }>(
       `SELECT id, id_painel_servidor, host, papel, observacao FROM public.servidor_hosts
         ORDER BY CASE papel WHEN 'principal' THEN 0 WHEN 'secundario' THEN 1 ELSE 2 END, host`
     ),
@@ -109,5 +112,9 @@ export async function getHostsServidores(): Promise<{ servidores: ServidorComHos
     })
     .sort((a, b) => b.listas - a.listas);
 
-  return { servidores, desconhecidos };
+  const externos: HostServidor[] = hosts.rows
+    .filter((h) => h.id_painel_servidor == null)
+    .map((h) => ({ id: Number(h.id), host: h.host, papel: h.papel, observacao: h.observacao, listas: listasPorChave.get(chaveHost(h.host)) ?? 0 }));
+
+  return { servidores, externos, desconhecidos };
 }

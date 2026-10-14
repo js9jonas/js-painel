@@ -1,10 +1,15 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import type { HostDesconhecido, PapelHost, ServidorComHosts } from "@/lib/servidor-hosts";
+import { ArrowLeftRight } from "lucide-react";
+import type { HostDesconhecido, HostServidor, PapelHost, ServidorComHosts } from "@/lib/servidor-hosts";
 
 // Aba "Hosts" de /conexoes: endereços de lista de cada servidor. O principal é o usado para montar
-// credenciais e listas novas (espelhado em host_stream). Embaixo, endereços achados nas playlists do
-// banco que ainda não pertencem a nenhum servidor, para atribuir.
+// credenciais e listas novas (espelhado em host_stream). Em cima, endereços achados nas playlists do
+// banco que ainda não pertencem a nenhum servidor, para atribuir. Card "Desconhecidos" (13/10/2026): endereços
+// de listas que não são de servidor nosso (sem servidor no banco). O ⇄ de cada endereço transfere de card.
+
+// destino "Desconhecidos" nos selects (o banco grava id_painel_servidor NULL)
+const DESCONHECIDO = "desconhecido";
 
 const PAPEL_ROTULO: Record<PapelHost, string> = { principal: "Principal", secundario: "Secundário", inativo: "Inativo" };
 const PAPEL_COR: Record<PapelHost, string> = {
@@ -19,6 +24,7 @@ const inputClass =
 export default function HostsServidoresTab() {
   const [servidores, setServidores] = useState<ServidorComHosts[] | null>(null);
   const [desconhecidos, setDesconhecidos] = useState<HostDesconhecido[]>([]);
+  const [externos, setExternos] = useState<HostServidor[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   // confirmação em 2 cliques para trocar o principal
@@ -31,6 +37,7 @@ export default function HostsServidoresTab() {
       if (!res.ok) throw new Error(json.erro ?? "Não deu pra ler os hosts.");
       setServidores(json.servidores);
       setDesconhecidos(json.desconhecidos);
+      setExternos(json.externos ?? []);
     } catch (e: unknown) {
       setServidores((s) => s ?? []);
       setErro(e instanceof Error ? e.message : "Sem internet ou o sistema está atualizando. Tente de novo.");
@@ -100,60 +107,150 @@ export default function HostsServidoresTab() {
             ) : (
               <ul className="space-y-2">
                 {s.hosts.map((h) => (
-                  <li key={h.id} className="rounded-lg border border-zinc-100 px-3 py-2 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs text-zinc-800 break-all">{h.host}</span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${PAPEL_COR[h.papel]}`}>
-                        {PAPEL_ROTULO[h.papel]}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
-                      <span>{h.listas} {h.listas === 1 ? "lista" : "listas"} no banco</span>
-                      {h.papel !== "principal" && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            disabled={ocupado}
-                            onClick={() =>
-                              confirmarPrincipal === h.id
-                                ? enviar({ acao: "papel", id: h.id, papel: "principal" })
-                                : setConfirmarPrincipal(h.id)
-                            }
-                            className={`rounded px-2 py-0.5 font-medium disabled:opacity-50 ${
-                              confirmarPrincipal === h.id ? "bg-red-600 text-white hover:bg-red-700" : "text-emerald-700 hover:bg-emerald-50"
-                            }`}
-                          >
-                            {confirmarPrincipal === h.id ? "Confirmar principal" : "Tornar principal"}
-                          </button>
-                          <button
-                            disabled={ocupado}
-                            onClick={() => enviar({ acao: "papel", id: h.id, papel: h.papel === "inativo" ? "secundario" : "inativo" })}
-                            className="rounded px-2 py-0.5 hover:bg-zinc-100 disabled:opacity-50"
-                          >
-                            {h.papel === "inativo" ? "Reativar" : "Inativar"}
-                          </button>
-                          {h.listas === 0 && (
-                            <button
-                              disabled={ocupado}
-                              onClick={() => enviar({ acao: "remover", id: h.id })}
-                              className="rounded px-2 py-0.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                            >
-                              Remover
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {h.observacao && <p className="text-xs text-zinc-400">{h.observacao}</p>}
-                  </li>
+                  <ItemHost
+                    key={h.id}
+                    h={h}
+                    idAtual={s.id}
+                    servidores={servidores}
+                    ocupado={ocupado}
+                    confirmandoPrincipal={confirmarPrincipal === h.id}
+                    onPrincipal={() =>
+                      confirmarPrincipal === h.id ? enviar({ acao: "papel", id: h.id, papel: "principal" }) : setConfirmarPrincipal(h.id)
+                    }
+                    enviar={enviar}
+                  />
                 ))}
               </ul>
             )}
             <NovoHost idPainel={s.id} temPrincipal={s.hosts.some((h) => h.papel === "principal")} ocupado={ocupado} onAdicionar={enviar} />
           </div>
         ))}
+
+        <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4 space-y-3">
+          <div>
+            <p className="font-semibold text-zinc-900">Desconhecidos</p>
+            <p className="text-xs text-zinc-500">Endereços de listas que não são de servidor nosso.</p>
+          </div>
+          {externos.length === 0 ? (
+            <p className="text-xs text-zinc-400">Nenhum. Escolha &quot;Desconhecido&quot; em um endereço não identificado.</p>
+          ) : (
+            <ul className="space-y-2">
+              {externos.map((h) => (
+                <ItemHost key={h.id} h={h} idAtual={null} servidores={servidores} ocupado={ocupado} enviar={enviar} />
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
       {ativos.length === 0 && <p className="text-sm text-zinc-400">Nenhum servidor ativo.</p>}
     </div>
+  );
+}
+
+function ItemHost({
+  h,
+  idAtual,
+  servidores,
+  ocupado,
+  confirmandoPrincipal = false,
+  onPrincipal,
+  enviar,
+}: {
+  h: HostServidor;
+  /** servidor do card; null = card Desconhecidos */
+  idAtual: number | null;
+  servidores: ServidorComHosts[];
+  ocupado: boolean;
+  confirmandoPrincipal?: boolean;
+  onPrincipal?: () => void;
+  enviar: (c: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [movendo, setMovendo] = useState(false);
+  const [destino, setDestino] = useState("");
+  const externo = idAtual === null;
+  const destinos = servidores.filter((s) => s.id !== idAtual);
+
+  return (
+    <li className="rounded-lg border border-zinc-100 bg-white px-3 py-2 space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-xs text-zinc-800 break-all">{h.host}</span>
+        <div className="flex shrink-0 items-center gap-1">
+          {h.papel !== "principal" && (
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => { setMovendo((m) => !m); setDestino(""); }}
+              title="Transferir para outro servidor"
+              aria-label="Transferir para outro servidor"
+              className={`rounded p-1 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-50 ${movendo ? "text-zinc-700" : "text-zinc-300"}`}
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {!externo && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PAPEL_COR[h.papel]}`}>{PAPEL_ROTULO[h.papel]}</span>
+          )}
+        </div>
+      </div>
+      {movendo && (
+        <div className="flex gap-2">
+          <select value={destino} onChange={(e) => setDestino(e.target.value)} className={inputClass} disabled={ocupado}>
+            <option value="">Transferir para…</option>
+            {destinos.map((s) => (
+              <option key={s.id} value={s.id}>{s.nome}</option>
+            ))}
+            {!externo && <option value={DESCONHECIDO}>Desconhecidos (não é nosso)</option>}
+          </select>
+          <button
+            type="button"
+            disabled={ocupado || !destino}
+            onClick={async () => {
+              if (await enviar({ acao: "mover", id: h.id, id_painel_servidor: destino === DESCONHECIDO ? null : Number(destino) })) setMovendo(false);
+            }}
+            className="rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            Mover
+          </button>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+        <span>{h.listas} {h.listas === 1 ? "lista" : "listas"} no banco</span>
+        {h.papel !== "principal" && (
+          <div className="flex items-center gap-1">
+            {!externo && onPrincipal && (
+              <button
+                disabled={ocupado}
+                onClick={onPrincipal}
+                className={`rounded px-2 py-0.5 font-medium disabled:opacity-50 ${
+                  confirmandoPrincipal ? "bg-red-600 text-white hover:bg-red-700" : "text-emerald-700 hover:bg-emerald-50"
+                }`}
+              >
+                {confirmandoPrincipal ? "Confirmar principal" : "Tornar principal"}
+              </button>
+            )}
+            {!externo && (
+              <button
+                disabled={ocupado}
+                onClick={() => enviar({ acao: "papel", id: h.id, papel: h.papel === "inativo" ? "secundario" : "inativo" })}
+                className="rounded px-2 py-0.5 hover:bg-zinc-100 disabled:opacity-50"
+              >
+                {h.papel === "inativo" ? "Reativar" : "Inativar"}
+              </button>
+            )}
+            {h.listas === 0 && (
+              <button
+                disabled={ocupado}
+                onClick={() => enviar({ acao: "remover", id: h.id })}
+                className="rounded px-2 py-0.5 text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Remover
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {h.observacao && <p className="text-xs text-zinc-400">{h.observacao}</p>}
+    </li>
   );
 }
 
@@ -239,14 +336,15 @@ function LinhaDesconhecido({
               {s.nome}{d.sugestao_id === s.id ? " (sugerido)" : ""}
             </option>
           ))}
+          <option value={DESCONHECIDO}>Desconhecido (não é nosso)</option>
         </select>
-        <select value={papel} onChange={(e) => setPapel(e.target.value as PapelHost)} className={`${inputClass} w-36`} disabled={ocupado}>
+        <select value={papel} onChange={(e) => setPapel(e.target.value as PapelHost)} className={`${inputClass} w-36`} disabled={ocupado || idPainel === DESCONHECIDO}>
           <option value="secundario">Secundário</option>
           <option value="inativo">Inativo</option>
         </select>
         <button
           disabled={ocupado || !idPainel}
-          onClick={() => onAtribuir({ acao: "adicionar", id_painel_servidor: Number(idPainel), host: d.host, papel })}
+          onClick={() => onAtribuir({ acao: "adicionar", id_painel_servidor: idPainel === DESCONHECIDO ? null : Number(idPainel), host: d.host, papel: idPainel === DESCONHECIDO ? "secundario" : papel })}
           className="rounded-lg bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           Atribuir

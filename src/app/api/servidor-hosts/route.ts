@@ -10,8 +10,10 @@ import { definirPrincipal, getHostsServidores, type PapelHost } from "@/lib/serv
 // Hosts de lista de cada servidor (aba "Hosts" de /conexoes).
 // GET → servidores com hosts + hosts desconhecidos achados nas playlists
 // POST { acao: "adicionar", id_painel_servidor, host, papel } · { acao: "papel", id, papel } · { acao: "remover", id }
+//      · { acao: "mover", id, id_painel_servidor } — id_painel_servidor null = card "Desconhecidos" (não é servidor nosso)
 
 const PAPEIS: PapelHost[] = ["principal", "secundario", "inativo"];
+const NOME_DESCONHECIDOS = "Desconhecidos";
 const NOME_PAPEL: Record<PapelHost, string> = { principal: "principal", secundario: "secundário", inativo: "inativo" };
 
 export async function GET() {
@@ -42,13 +44,16 @@ export async function POST(req: NextRequest) {
     let depois: Record<string, unknown> = {};
 
     if (acao === "adicionar") {
-      const idPainel = Number(corpo?.id_painel_servidor);
+      const idPainel = corpo?.id_painel_servidor == null ? null : Number(corpo.id_painel_servidor);
       const host = normalizarHost(corpo?.host);
       if (!host) throw new ErroUsuario("Endereço inválido. Use o formato http://dominio.com");
-      const { rows: ps } = await client.query<{ nome: string }>(`SELECT nome FROM public.painel_servidores WHERE id = $1`, [idPainel]);
+      if (idPainel == null && papel === "principal") throw new ErroUsuario("Endereço desconhecido não pode ser principal.");
+      const { rows: ps } = idPainel == null
+        ? { rows: [{ nome: NOME_DESCONHECIDOS }] }
+        : await client.query<{ nome: string }>(`SELECT nome FROM public.painel_servidores WHERE id = $1`, [idPainel]);
       if (!ps[0]) throw new ErroUsuario("Servidor não encontrado.");
       const { rows: dup } = await client.query<{ nome: string }>(
-        `SELECT ps.nome FROM public.servidor_hosts h JOIN public.painel_servidores ps ON ps.id = h.id_painel_servidor
+        `SELECT coalesce(ps.nome, '${NOME_DESCONHECIDOS}') AS nome FROM public.servidor_hosts h LEFT JOIN public.painel_servidores ps ON ps.id = h.id_painel_servidor
           WHERE lower(h.host) = lower($1)`,
         [host]
       );
@@ -57,7 +62,7 @@ export async function POST(req: NextRequest) {
       const { rows: todos } = await client.query<{ host: string }>(`SELECT host FROM public.servidor_hosts`);
       if (todos.some((t) => chaveHost(t.host) === chaveHost(host))) throw new ErroUsuario("Esse endereço já está cadastrado.");
 
-      if (papel === "principal") {
+      if (papel === "principal" && idPainel != null) {
         await definirPrincipal(client, idPainel, host);
       } else {
         await client.query(
@@ -65,12 +70,14 @@ export async function POST(req: NextRequest) {
           [idPainel, host, papel]
         );
       }
-      descricao = `Host ${host} adicionado ao servidor ${ps[0].nome} como ${NOME_PAPEL[papel]}`;
+      descricao = idPainel == null
+        ? `Host ${host} marcado como desconhecido (não é de servidor nosso)`
+        : `Host ${host} adicionado ao servidor ${ps[0].nome} como ${NOME_PAPEL[papel]}`;
       depois = { id_painel_servidor: idPainel, host, papel };
-    } else if (acao === "papel" || acao === "remover") {
-      const { rows } = await client.query<{ id: number; id_painel_servidor: number; host: string; papel: PapelHost; nome: string }>(
-        `SELECT h.id, h.id_painel_servidor, h.host, h.papel, ps.nome
-           FROM public.servidor_hosts h JOIN public.painel_servidores ps ON ps.id = h.id_painel_servidor
+    } else if (acao === "papel" || acao === "remover" || acao === "mover") {
+      const { rows } = await client.query<{ id: number; id_painel_servidor: number | null; host: string; papel: PapelHost; nome: string }>(
+        `SELECT h.id, h.id_painel_servidor, h.host, h.papel, coalesce(ps.nome, '${NOME_DESCONHECIDOS}') AS nome
+           FROM public.servidor_hosts h LEFT JOIN public.painel_servidores ps ON ps.id = h.id_painel_servidor
           WHERE h.id = $1 FOR UPDATE OF h`,
         [Number(corpo?.id)]
       );
@@ -79,12 +86,25 @@ export async function POST(req: NextRequest) {
       if (h.papel === "principal") {
         throw new ErroUsuario("Esse é o principal. Escolha outro host como principal antes de mudar ou remover este.");
       }
-      antes = { host: h.host, papel: h.papel };
-      if (acao === "remover") {
+      antes = { host: h.host, papel: h.papel, id_painel_servidor: h.id_painel_servidor };
+      if (acao === "mover") {
+        const destino = corpo?.id_painel_servidor == null ? null : Number(corpo.id_painel_servidor);
+        if (destino === (h.id_painel_servidor == null ? null : Number(h.id_painel_servidor))) throw new ErroUsuario("O endereço já está nesse lugar.");
+        const { rows: ps } = destino == null
+          ? { rows: [{ nome: NOME_DESCONHECIDOS }] }
+          : await client.query<{ nome: string }>(`SELECT nome FROM public.painel_servidores WHERE id = $1`, [destino]);
+        if (!ps[0]) throw new ErroUsuario("Servidor não encontrado.");
+        // vindo de Desconhecidos entra como secundário; entre servidores mantém o papel
+        const papelNovo: PapelHost = h.id_painel_servidor == null ? "secundario" : h.papel;
+        await client.query(`UPDATE public.servidor_hosts SET id_painel_servidor = $2, papel = $3, atualizado_em = now() WHERE id = $1`, [h.id, destino, papelNovo]);
+        descricao = `Host ${h.host} transferido de ${h.nome} para ${ps[0].nome}`;
+        depois = { host: h.host, papel: papelNovo, id_painel_servidor: destino };
+      } else if (acao === "remover") {
         await client.query(`DELETE FROM public.servidor_hosts WHERE id = $1`, [h.id]);
         descricao = `Host ${h.host} removido do servidor ${h.nome}`;
         depois = { removido: true };
       } else if (papel === "principal") {
+        if (h.id_painel_servidor == null) throw new ErroUsuario("Endereço desconhecido não pode ser principal. Transfira para um servidor antes.");
         await definirPrincipal(client, Number(h.id_painel_servidor), h.host);
         descricao = `Host ${h.host} virou o principal do servidor ${h.nome} (credenciais e listas novas usam ele)`;
         depois = { host: h.host, papel };
