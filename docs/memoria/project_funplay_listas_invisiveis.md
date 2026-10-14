@@ -107,3 +107,8 @@ Capturado com Playwright no site do cliente do Lazer Play (`lazerplay.io/#/playl
 - `DELETE /api/palylist_from_web {id}` (sic, "palylist") → `"Deleted"`. Jonas apagou assim uma lista oculta para liberar o cadastro pelo painel.
 - Consequência: dá para ver e apagar as ocultas de qualquer aparelho cuja chave temos, sem precisar do cliente nem da migração de servidor. ⚠️ A resposta traz usuário/senha das listas: não registrar em log nem em memória.
 - ✅ **Implementado (commit 8909709, 12/10)**: APIs do cliente — Fun Play `api.funplays.app`, Lazer Play `api.lazerplay.io` (≠ do painel de revenda `api.appacesso.com`), Core Player `api.coreplayer.io` (sem Origin) — em `entrarComoAparelho`/`listasNoAparelho`/`apagarListaNoAparelho` (`appacesso.ts`). "Oculta" = está no aparelho mas não no `getPlaylistsDispositivo` do painel de revenda (o `reseller_id` varia entre painéis, não serve). Tela: 👁 no aplicativo em /clientes/[id] → "Listas no aparelho" (apagar com 2º clique, audit). Criar lista (cadastro novo e "+" de playlist): no "already exist" apaga a oculta de mesma URL e tenta de novo (`criarPlaylistLimpandoOculta` em `app-painel.ts`).
+
+## 13/10/2026 — aba Hosts: Desconhecidos e transferir (`3edfb47`)
+Host de lista que não é de servidor nosso vai pro card **Desconhecidos** (`servidor_hosts.id_painel_servidor` NULL,
+`sql/021`; check impede principal). Ícone ⇄ em cada host (menos o principal) move entre servidores/Desconhecidos
+(POST `/api/servidor-hosts` `{acao:"mover", id, id_painel_servidor|null}`), com audit `servidor_host`.
