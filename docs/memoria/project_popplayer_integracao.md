@@ -16,3 +16,10 @@ Contornar o Cloudflare com stealth/anti-detecção está fora (decisão de 30/08
 
 Cobertura: os apps integrados somam ~94% dos aparelhos ativos; o POP é o maior que falta.
 Histórico do fornecedor: memória global `project_popplayer_avaliacao_fornecedor`.
+
+**13/10/2026 (noite):** Jonas perguntou por ferramenta/plano pago pra contornar o Cloudflare (POP e Central).
+Resposta: existem (proxy residencial, APIs "desbloqueadoras", navegador stealth), mas é o que a decisão de 30/08
+descarta — risco de perder a conta no fornecedor, credenciais passando por terceiro, e na Central o bloqueio nem é
+captcha. Caminho indicado: renovador no desktop dele (Chrome real, IP de casa, fila no js-painel) — mesmo plano
+parado da Central (`project_central_renovacao_navegador`). Não perguntar de novo sem fato novo.
+Lacuna medida no mesmo dia: POP = 51 dos 64 aparelhos de clientes ativos sem varredura.
