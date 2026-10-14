@@ -12,6 +12,7 @@ import { ID_APP_CLOUDDY, ID_APP_IBOPLAYER, ID_APP_IBOPRO, appTemAtualizacao, app
 import ClouddyModal from "./ClouddyModal";
 import AtualizarPainelButton from "./AtualizarPainelButton";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
+import type { ContaPainelVinculada } from "@/lib/clientes";
 import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
 
 type Props = {
@@ -19,6 +20,8 @@ type Props = {
   nomeCliente: string;
   aplicativos: AplicativoRow[];
   apps: AppRow[];
+  /** Contas do cliente, oferecidas no "+" de adicionar lista */
+  contas?: ContaPainelVinculada[];
 };
 
 function statusBadge(status: string | null) {
@@ -386,7 +389,7 @@ function normalizarMac(v: string): string {
   return v.toLowerCase().replace(/[^0-9a-z]/g, "");
 }
 
-export default function AplicativosManager({ idCliente, nomeCliente, aplicativos, apps }: Props) {
+export default function AplicativosManager({ idCliente, nomeCliente, aplicativos, apps, contas }: Props) {
   const [modalApp, setModalApp] = useState<AplicativoRow | null | "novo">(null);
   const [appPgto, setAppPgto] = useState<AplicativoRow | null>(null);
   const [clouddyApp, setClouddyApp] = useState<AplicativoRow | null>(null);
@@ -807,6 +810,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
         <AdicionarPlaylistModal
           idAppRegistro={criandoPlaylist.idAppRegistro}
           tipoPainel={criandoPlaylist.tipoPainel}
+          contas={contas}
           onClose={() => setCriandoPlaylist(null)}
           onSaved={() => {
             recarregarPlaylistsAoVivo(criandoPlaylist.idAppRegistro);

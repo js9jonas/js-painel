@@ -274,13 +274,23 @@ async function clienteFetch(cfg: AppAcessoConfig, path: string, tokenAparelho: s
     ...options,
     headers: { "Content-Type": "application/json", authorization: `Bearer ${tokenAparelho ?? "null"}` },
   });
+  // 13/10/2026: o site barra logins seguidos (o 2º em ~1,5 s já volta 429 com corpo "404"); o bloqueio passa de 2 min
+  if (res.status === 429) throw new Error(`${cfg.nomeApp}: o site do cliente recusou por muitas tentativas seguidas. Espere alguns minutos e tente de novo.`);
   const data = (await res.json().catch(() => null)) as any;
   if (!data || data.error) throw new Error(`${cfg.nomeApp} (site do cliente): ${data?.message ?? `HTTP ${res.status}`}`);
   return data.message;
 }
 
+// Token do aparelho reaproveitado enquanto vale: abrir as listas, apagar e reabrir fazia 3 logins
+// seguidos e o 2º já caía no limite do site. O token não traz validade (sem "exp"): vale 10 min aqui.
+const tokensAparelho = new Map<string, { token: string; em: number }>();
+const VIDA_TOKEN_APARELHO = 10 * 60 * 1000;
+
 /** Entra no site do cliente como o aparelho. A chave é a "Device Key" da TV (`aplicativos.chave`). */
 export async function entrarComoAparelho(cfg: AppAcessoConfig, mac: string, chave: string): Promise<string> {
+  const chaveCache = `${cfg.apiCliente}|${mac.toLowerCase()}|${String(chave).trim()}`;
+  const guardado = tokensAparelho.get(chaveCache);
+  if (guardado && Date.now() - guardado.em < VIDA_TOKEN_APARELHO) return guardado.token;
   // o MAC precisa ir como o app registrou (maiúsculas/minúsculas): o validate_mac devolve a forma certa
   const v = await clienteFetch(cfg, `/api/validate_mac?mac=${encodeURIComponent(mac)}`, null).catch(() => null);
   const token = await clienteFetch(cfg, "/api/login_by_mac", null, {
@@ -288,6 +298,7 @@ export async function entrarComoAparelho(cfg: AppAcessoConfig, mac: string, chav
     body: JSON.stringify({ mac: v?.mac ?? mac, key: String(chave).trim() }),
   });
   if (typeof token !== "string" || !token) throw new Error(`${cfg.nomeApp}: o site do cliente não aceitou MAC + chave.`);
+  tokensAparelho.set(chaveCache, { token, em: Date.now() });
   return token;
 }
 

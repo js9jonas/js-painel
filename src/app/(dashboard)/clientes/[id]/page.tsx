@@ -239,6 +239,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
           nomeCliente={cliente?.nome ?? ""}
           aplicativos={aplicativosTodos}
           apps={apps}
+          contas={contasPainel}
         />
 
         <TabelaPagamentos pagamentos={todosPagamentos} />
