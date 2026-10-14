@@ -59,3 +59,9 @@ Código: `src/lib/painel-adapters/iboplayer.ts` (API) e `src/lib/iboplayer.ts` (
 - Testado: Atualizar do #2584 (Jose Rosa AM) leu validade + lista. Criar/editar/apagar pelo sistema ainda sem teste real.
 - "Migrar endereço" do painel IBOSOL troca nos dois apps (uma chamada por app_platform/app_id; contagem conferida 13/10). BOB Player (BOBPLAYER, app_id 3): 2 cadastros com "BOB" na observação, app ainda não existe no banco.
 - Sync: "Device not found" conta como não encontrado (não falha); MAC fora do formato conta à parte.
+
+## Card de /conexoes "Sem conexão" — 14/10/2026 (corrigido)
+- A IBOSOL derruba o token antes das 12 h que guardamos (401). O resto do sistema relogava via `comIbosol`,
+  mas o adapter do card (`criarIboPlayerAdapter`) não: reusava o token morto e o "Atualizar" dava "Sem conexão" até o prazo salvo vencer.
+- Agora o adapter reloga uma vez no 401, com login compartilhado entre aparelhos e créditos (pedidos em paralelo → 1 captcha só,
+  e um login não derruba o token do outro). Testado local contra o painel 109: 13 aparelhos, 3 créditos.

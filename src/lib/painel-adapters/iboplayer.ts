@@ -338,25 +338,42 @@ export async function apagarListaIboPlayer(s: SessaoClienteIboPlayer, id: string
 export function criarIboPlayerAdapter(creds: ServidorCredenciais, _id: number, onSaveSession: SaveSession): PainelAdapter {
   let token = creds.session_cookie;
   let expira = creds.session_expiry ? new Date(creds.session_expiry).getTime() : 0;
-  const sessao = async () => {
-    if (token && expira - 60_000 > Date.now()) return token;
-    if (!creds.painel_usuario || !creds.painel_senha) throw new Error("Painel IBO Player sem usuário/senha.");
-    const r = await loginIbosol(creds.painel_usuario, creds.painel_senha);
-    token = r.token;
-    expira = r.expiry.getTime();
-    await onSaveSession(r.token, r.expiry);
-    return r.token;
+  // Login em andamento compartilhado: o card pede aparelhos e créditos em paralelo,
+  // e dois logins seguidos gastam 2 captchas e um derruba o token do outro.
+  let logando: Promise<string> | null = null;
+  const logar = (tokenMorto: string | null) => {
+    if (tokenMorto !== null && token !== tokenMorto) return Promise.resolve(token as string); // outro já relogou
+    logando ??= (async () => {
+      if (!creds.painel_usuario || !creds.painel_senha) throw new Error("Painel IBO Player sem usuário/senha.");
+      const r = await loginIbosol(creds.painel_usuario, creds.painel_senha);
+      token = r.token;
+      expira = r.expiry.getTime();
+      await onSaveSession(r.token, r.expiry);
+      return r.token;
+    })().finally(() => { logando = null; });
+    return logando;
+  };
+  const sessao = async () => (token && expira - 60_000 > Date.now() ? token : logar(null));
+  // O site derruba o token antes das 12 h salvas (401): reloga uma vez, como o comIbosol.
+  const comSessao = async <T>(fn: (t: string) => Promise<T>): Promise<T> => {
+    const t = await sessao();
+    try {
+      return await fn(t);
+    } catch (e) {
+      if (!(e instanceof SessaoIbosolExpirada)) throw e;
+      return fn(await logar(t));
+    }
   };
   return {
     async listarContas(): Promise<ContaPainel[]> {
       const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
-      return (await listarAtivadosIbosol(await sessao())).map((d) => ({
+      return (await comSessao(listarAtivadosIbosol)).map((d) => ({
         usuario: d.mac, rotulo: d.comentario ?? "", vencimento: d.validade,
         status: d.validade && d.validade >= hoje ? "ok" : "vencida",
       }));
     },
     async getCreditos() {
-      return creditosIbosol(await sessao());
+      return comSessao(creditosIbosol);
     },
     async renovar() {
       return { ok: false, erro: "No IBO Player a renovação é por aparelho (Alertas → Renovar)." };
