@@ -5,6 +5,7 @@ import { JS_PAINEL_URL, TOKEN } from "./config.js";
 const SITES = {
   popplayer: { url: "https://popplayer.pro/meuplayer/users.php", prefixo: "https://popplayer.pro/" },
   duplecast: { url: "https://duplecast.com/client/", prefixo: "https://duplecast.com/" },
+  central: { url: "https://painel.fun/users", prefixo: "https://painel.fun/" },
 };
 const abaTrabalho = {};
 const ultimoPedido = {};
@@ -28,7 +29,7 @@ chrome.runtime.onMessage.addListener((m, sender, responder) => {
     if (abaTrabalho[site] == null) abaTrabalho[site] = aba;
     if (aba !== abaTrabalho[site]) { responder({ parar: true }); return false; }
     ultimoPedido[site] = Date.now();
-    chamar("/api/interno/robo/proxima", { alvos: [site], versao: chrome.runtime.getManifest().version })
+    chamar("/api/interno/robo/proxima", { alvos: [site], versao: chrome.runtime.getManifest().version, sem_tarefa: !!m.sem_tarefa })
       .then((j) => responder({ ok: true, ...j }))
       .catch((e) => responder({ ok: false, erro: String(e) }));
     return true;

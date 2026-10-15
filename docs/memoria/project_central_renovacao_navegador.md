@@ -1,11 +1,24 @@
 ---
 name: project-central-renovacao-navegador
-description: "Automação de renovação do CENTRAL via navegador real (Playwright+Chrome+Xvfb) na VPS — ABANDONADA e revertida em 27/08/2026 após 0/4 sucessos reais em produção contra o Turnstile interativo; CENTRAL voltou a não ter renovação automática confiável; 03/10/2026: captcha (2captcha/CapSolver) descartado como solução, próximo passo é testar worker no desktop com IP residencial"
+description: "✅ 15/10/2026 resolvido pelo robô de navegador (Chrome comum + extensão no PC, renova de dentro da página). Histórico: automação de renovação do CENTRAL via navegador real (Playwright+Chrome+Xvfb) na VPS — ABANDONADA e revertida em 27/08/2026 após 0/4 sucessos reais em produção contra o Turnstile interativo; CENTRAL voltou a não ter renovação automática confiável; 03/10/2026: captcha (2captcha/CapSolver) descartado como solução, próximo passo é testar worker no desktop com IP residencial"
 metadata:
   node_type: memory
   type: project
   modified: 2026-08-27T13:30:00.000Z
 ---
+
+## ✅ 15/10/2026 — RESOLVIDO pelo robô de navegador (Chrome comum + extensão, IP de casa)
+
+O "renovador em casa" virou o robô de navegador (`project_robo_navegador.md`): Chrome comum (sem CDP) numa tela virtual do PC do Jonas, extensão `robo-navegador/extensao/central.js` + `central-pagina.js` (mundo da página, registra as chamadas da tela).
+- **Login:** o robô preenche e envia; o Turnstile do login passou sozinho ("Sucesso!").
+- **Como a tela chama a API** (registro de 15/10): só `accept` + `authorization: Bearer <token do localStorage session-store>`, sem cookies. O "sessao_nao_renderizada" depende de QUEM chama (navegador real com a página aberta), não de cabeçalho secreto — por isso a chamada feita de dentro da página passa.
+- **Renovação capturada** (Jonas renovou `u5t64o` à mão na janela do robô): `GET payments/plans?audience=client` → `POST users/{id}/renew {"mounth":1,"plan_id":130608,"amount":35}`. O robô lê o plano ativo de 30 dias na hora (Mensal 130608, R$ 35,00) em vez de fixar.
+- **1ª renovação pelo robô:** `biancbrt` (Bianca Bortolini) 17/10 → 17/11/2026, conferida. Proteção: conta que já vale por mais de 25 dias não é renovada (aviso "nenhum crédito gasto").
+- **Ligado no js-painel:** `central.ts renovar()` usa o robô quando ele está online (`executarNoRobo('central','renovar')`), senão cai na API direta (403). Rota `/api/paineis/servidores/[id]/renovar` mostra o aviso.
+- **Sessão viva:** o robô faz `GET profile` a cada 4 min parado, pra não cair na tela de bloqueio (/lock) com a caixa "Confirme que é humano". Se cair, o título vira "TELA DE BLOQUEIO — precisa de alguém" e ele NÃO tenta marcar a caixa (decisão: não burlar verificação humana).
+- **Modal de avisos** ao entrar (só botão Fechar, aparece depois de muito tempo inativo — Jonas, 15/10): não atrapalha, a renovação é por chamada de API.
+- Pegadinhas: o Chrome não libera sozinho os sites novos do manifesto ao reiniciar — precisou do botão "Atualizar" em chrome://extensions; o robô não pega pedido na tela de login (o login troca de página e o pedido se perdia).
+- 📋 Aviso no Telegram quando cair na tela de bloqueio; ver em uso real se a sessão tranca mesmo com o toque de 4 min. O cron `central_refresh_token.js` (token pras leituras via API) continua.
 
 ## 🔎 03/10/2026 — conclusão: captcha não resolve; próximo passo é "renovador em casa" (IP residencial)
 

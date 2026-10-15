@@ -2,6 +2,7 @@ import { Impit } from "impit";
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
 import { avisarSaldoZerado, ehErroSaldoZerado } from "@/lib/aviso-saldo-captcha";
 import { registrarRecusaToken, registrarUsoOkToken } from "@/lib/painel-sessao-log";
+import { executarNoRobo, roboOnline } from "@/lib/robo";
 
 // API base: https://api.controle.fit/api
 // Auth: JWT Bearer, expira em 1h
@@ -224,6 +225,25 @@ export function criarCentralAdapter(
     },
 
     async renovar(usuario: string, _meses = 1): Promise<ResultadoRenovacao> {
+      // 15/10/2026: renovação pelo robô de navegador (Chrome comum no PC do Jonas, IP de casa), que chama a API
+      // de dentro da página aberta — o único jeito aceito desde 25/08 ("sessao_nao_renderizada" pela API direta).
+      // Mesmo payload da tela (plano Mensal). Robô desligado: cai na API direta abaixo (que hoje dá 403).
+      if (await roboOnline("central")) {
+        try {
+          const r = await executarNoRobo<{ vencimento: string | null; ja_renovado: boolean; antes: string | null }>(
+            "central", "renovar", { usuario }, { timeoutMs: 90_000 }
+          );
+          if (r.vencimento) await onSaveContas(usuario, r.vencimento);
+          return {
+            ok: true,
+            novoVencimento: r.vencimento ?? undefined,
+            aviso: r.ja_renovado ? "Já estava renovada na Central (vale por mais de 25 dias): nenhum crédito gasto." : undefined,
+          };
+        } catch (e: unknown) {
+          return { ok: false, erro: e instanceof Error ? e.message : "O robô não conseguiu renovar na Central." };
+        }
+      }
+
       let page = 1;
       const per = 100;
       let conta: any = null;

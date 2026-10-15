@@ -11,6 +11,8 @@ export interface ContaPainel {
 export interface ResultadoRenovacao {
   ok: boolean;
   novoVencimento?: string;
+  /** Renovação não feita de propósito (ex.: já estava renovada) — vai na mensagem da tela. */
+  aviso?: string;
   comprovante?: string;
   erro?: string;
 }

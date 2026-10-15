@@ -12,7 +12,8 @@ import { ALVOS_ROBO, ESPERA_MAX_FILA_MS, type AlvoRobo } from "@/lib/robo";
 const ESPERA_LONG_POLL_MS = 20_000;
 
 export async function POST(req: NextRequest) {
-  const corpo = (await req.json().catch(() => ({}))) as { alvos?: string[]; versao?: string };
+  // sem_tarefa: o robô só quer as credenciais (ex.: Central na tela de login) — não pega pedido que ia se perder no login
+  const corpo = (await req.json().catch(() => ({}))) as { alvos?: string[]; versao?: string; sem_tarefa?: boolean };
   const alvos = (corpo.alvos ?? []).filter((a): a is AlvoRobo => (ALVOS_ROBO as readonly string[]).includes(a));
   if (!alvos.length) return NextResponse.json({ erro: "Informe os alvos." }, { status: 400 });
 
@@ -30,6 +31,18 @@ export async function POST(req: NextRequest) {
        WHERE status = 'pendente' AND criado_em < NOW() - make_interval(secs => $1)`,
       [ESPERA_MAX_FILA_MS / 1000]
     );
+    // Pega e não respondeu em 5 min (página recarregou no meio, PC desligou): erro, pra não ficar pendurada
+    await pool.query(
+      `UPDATE public.robo_tarefas SET status = 'erro', erro = 'O robô pegou o pedido mas não respondeu (página recarregou ou o PC desligou no meio). Confira no site se a ação entrou.', concluido_em = NOW()
+       WHERE status = 'executando' AND iniciado_em < NOW() - interval '5 minutes'`
+    );
+    if (corpo.sem_tarefa) {
+      const { rows: cred } = await pool.query<{ usuario: string | null; senha: string | null }>(
+        `SELECT usuario, senha FROM public.painel_servidores WHERE tipo = $1 AND ativo = true ORDER BY id DESC LIMIT 1`,
+        [alvos[0]]
+      );
+      return NextResponse.json({ tarefa: null, credenciais: cred[0] ? { usuario: cred[0].usuario, senha: cred[0].senha } : null });
+    }
     const { rows } = await pool.query<{ id: string; alvo: string; acao: string; params: unknown }>(
       `UPDATE public.robo_tarefas SET status = 'executando', iniciado_em = NOW()
        WHERE id = (SELECT id FROM public.robo_tarefas WHERE status = 'pendente' AND alvo = ANY($1)
@@ -48,7 +61,14 @@ export async function POST(req: NextRequest) {
         credenciais: cred[0] ? { usuario: cred[0].usuario, senha: cred[0].senha } : null,
       });
     }
-    if (Date.now() - inicio > ESPERA_LONG_POLL_MS) return NextResponse.json({ tarefa: null });
+    // Sem tarefa também vão as credenciais: a Central faz login pela tela (Turnstile), não dá pra esperar uma tarefa
+    if (Date.now() - inicio > ESPERA_LONG_POLL_MS) {
+      const { rows: cred } = await pool.query<{ usuario: string | null; senha: string | null }>(
+        `SELECT usuario, senha FROM public.painel_servidores WHERE tipo = $1 AND ativo = true ORDER BY id DESC LIMIT 1`,
+        [alvos[0]]
+      );
+      return NextResponse.json({ tarefa: null, credenciais: cred[0] ? { usuario: cred[0].usuario, senha: cred[0].senha } : null });
+    }
     await new Promise((r) => setTimeout(r, 1000));
   }
 }

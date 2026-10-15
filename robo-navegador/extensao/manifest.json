@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JS Painel — robô do navegador",
-  "description": "Executa no navegador as ações do js-painel em sites que só abrem em navegador real (POP Player, Duplecast).",
-  "version": "1.1.0",
+  "description": "Executa no navegador as ações do js-painel em sites que só abrem em navegador real (POP Player, Duplecast, Central).",
+  "version": "1.2.0",
   "permissions": [
     "tabs",
     "alarms"
@@ -10,6 +10,8 @@
   "host_permissions": [
     "https://popplayer.pro/*",
     "https://duplecast.com/*",
+    "https://api.controle.fit/*",
+    "https://painel.fun/*",
     "https://painel.jssistemas.online/*",
     "http://localhost:*/*"
   ],
@@ -33,6 +35,25 @@
       ],
       "js": [
         "duplecast.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://painel.fun/*"
+      ],
+      "js": [
+        "central-pagina.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://painel.fun/*"
+      ],
+      "js": [
+        "central.js"
       ],
       "run_at": "document_idle"
     }

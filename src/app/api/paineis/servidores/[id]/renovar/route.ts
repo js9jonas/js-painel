@@ -82,7 +82,9 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       novoVencimento: resultado.novoVencimento ?? null,
-      mensagem: resultado.novoVencimento
+      mensagem: resultado.aviso
+        ? `${resultado.aviso}${resultado.novoVencimento ? ` Válido até ${resultado.novoVencimento.split("-").reverse().join("/")}.` : ""}`
+        : resultado.novoVencimento
         ? `Renovado até ${resultado.novoVencimento.split("-").reverse().join("/")}`
         : "Renovação solicitada com sucesso.",
     });

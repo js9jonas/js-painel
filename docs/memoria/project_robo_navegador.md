@@ -22,6 +22,9 @@ POP Player (e Duplecast) têm *managed challenge* do Cloudflare no site inteiro:
 ✅ Em produção (`f664e59` + `daaf02c`, deploy pelo Jonas 15/10); POP e Duplecast conferidos pela fila de produção, robô versão 1.1.0.
 Mesmo robô, janela própria (background.js mantém uma aba de trabalho por site; janela, não aba de fundo, porque aba escondida tem timers freados). Detalhe em `reference_duplecast_revenda.md`.
 
+## Central (15/10/2026)
+Renovação 1 mês de dentro da página (robô), ligada no adapter `central.ts`; detalhe em `project_central_renovacao_navegador.md`. Tarefa pega e sem resposta em 5 min vira erro (`/proxima`); `sem_tarefa` = só credenciais (tela de login/bloqueio).
+
 ## Estado (15/10/2026)
 - ✅ Testado via fila contra o POP real (js-painel local na porta 3055): leitura por MAC (1 s, com login), criar/editar/apagar em MAC de teste `AA:BB:CC:00:00:01` (apagado no fim), recusa por MAC errado.
 - ✅ Migração de DNS feita (Jonas rodou o script — o modo automático bloqueia o Claude de enviar migração): cdn4k/conecta5→pfun.store, monitor3/blushes→chdef.site, techonline/conectajs→hboard.site, bandeiraf→ligaf.me. Conferido: 28 listas migradas certas, 39 intactas, 0 alteradas indevidamente. Cópia antes: `~/.local/share/js-robo/backups/pop_listas_20261015_antes_migracao_dns.json` (tem senhas de cliente, pasta 700).
