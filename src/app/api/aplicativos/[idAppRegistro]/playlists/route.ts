@@ -9,9 +9,10 @@ import { loginCorePlayer, getPlaylistsDispositivo as getCorePlayerPlaylists, sel
 import { loginSmartOne, criarPlaylist as criarSmartOne } from "@/lib/painel-adapters/smartone";
 import { configDoTipo, criarPlaylistLimpandoOculta, type TipoPainelApp } from "@/lib/app-painel";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
-import { ID_APP_IBOPRO, appDaIbosol } from "@/lib/apps-painel-ids";
+import { ID_APP_IBOPRO, ID_APP_POPPLAYER, appDaIbosol } from "@/lib/apps-painel-ids";
 import { criarListaAppIbo } from "@/lib/ibopro";
 import { criarListaAppIboPlayer } from "@/lib/iboplayer";
+import { criarListaAppPop } from "@/lib/popplayer";
 
 // Cria uma playlist nova num device existente. appacesso (FunPlays/LazerPlay/CorePlayer):
 // adiciona em aplicativo_playlists do MESMO id_app_registro. SmartOne: cria um SMARTKEY
@@ -69,6 +70,14 @@ async function executarCriacao(idAppRegistro: number, corpo: CorpoCriacao, jobId
       if (!corpo.url?.trim()) throw new Error("Informe o link da lista.");
       const criar = tipoApp[0].id_app === ID_APP_IBOPRO ? criarListaAppIbo : criarListaAppIboPlayer;
       await criar(idAppRegistro, corpo.nome?.trim() || "Lista", corpo.url.trim());
+      jobs.set(jobId, { done: true, ok: true });
+      setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
+      return;
+    }
+    // POP Player (15/10/2026): pelo robô de navegador; a lista nova também cadastra o MAC lá
+    if (tipoApp[0]?.id_app === ID_APP_POPPLAYER) {
+      if (!corpo.url?.trim()) throw new Error("Informe o link da lista.");
+      await criarListaAppPop(idAppRegistro, corpo.nome?.trim() || "Lista", corpo.url.trim());
       jobs.set(jobId, { done: true, ok: true });
       setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
       return;

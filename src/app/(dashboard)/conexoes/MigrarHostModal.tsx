@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ServidorComHosts } from "@/lib/servidor-hosts";
 
-// Migração em massa de endereço (IBO Pro e SmartOne, 13/10/2026): troca o endereço do servidor em TODAS as
+// Migração em massa de endereço (IBO Pro e SmartOne, 13/10/2026; POP Player pelo robô, 15/10/2026): troca o endereço do servidor em TODAS as
 // listas da revenda (Mass Change → Hostname do painel). Sugere os hosts cadastrados na aba Hosts: ao escolher o antigo,
 // o novo vem preenchido com o principal do mesmo servidor. Confirmação em 2 cliques.
 

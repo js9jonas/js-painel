@@ -6,10 +6,11 @@ import { registrarAudit } from "@/lib/audit";
 import { buscarDispositivoPorMac } from "@/lib/painel-adapters/appacesso";
 import { buscarDispositivoPorMac as buscarSmartOne } from "@/lib/painel-adapters/smartone";
 import { painelAppPorId, painelAtivoDoApp, painelSmartOneAtivo, sessaoPainelApp, sessaoSmartOne, validadeDoPainel } from "@/lib/app-painel";
-import { ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_SMARTONE, appDaIbosol } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_POPPLAYER, ID_APP_SMARTONE, appDaIbosol } from "@/lib/apps-painel-ids";
 import { atualizarAppClouddy } from "@/lib/clouddy";
 import { atualizarAppIbo } from "@/lib/ibopro";
 import { atualizarAppIboPlayer } from "@/lib/iboplayer";
+import { atualizarAppPop } from "@/lib/popplayer";
 
 // Atualiza UM aparelho a partir do painel do app (Fun Play / Lazer Play / Core Player / SmartOne) ou da
 // conta do cliente (Clouddy, 13/10/2026): busca
@@ -45,6 +46,12 @@ async function executar(idAppRegistro: number, jobId: string) {
     // IBO Pro: validade pelo painel de revenda + listas pelo site do cliente (MAC + chave)
     if (app.id_app === ID_APP_IBOPRO || appDaIbosol(app.id_app)) {
       const r = app.id_app === ID_APP_IBOPRO ? await atualizarAppIbo(idAppRegistro) : await atualizarAppIboPlayer(idAppRegistro);
+      jobs.set(jobId, { done: true, ok: true, validade: r.validade, mudou: r.mudou, aviso: r.aviso });
+      return;
+    }
+    // POP Player (15/10/2026): só as listas do MAC, pelo robô de navegador (o POP não tem validade)
+    if (app.id_app === ID_APP_POPPLAYER) {
+      const r = await atualizarAppPop(idAppRegistro);
       jobs.set(jobId, { done: true, ok: true, validade: r.validade, mudou: r.mudou, aviso: r.aviso });
       return;
     }

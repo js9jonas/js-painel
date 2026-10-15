@@ -8,7 +8,7 @@ import ModalRenovarAplicativo from "./ModalRenovarAplicativo";
 import EditarPlaylistModal from "./EditarPlaylistModal";
 import AdicionarPlaylistModal from "./AdicionarPlaylistModal";
 import ListasAparelhoModal from "./ListasAparelhoModal";
-import { ID_APP_CLOUDDY, ID_APP_IBOPRO, appDaIbosol, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
+import { ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_POPPLAYER, appDaIbosol, appTemAtualizacao, appTemCadastroPeloPainel } from "@/lib/apps-painel-ids";
 import ClouddyModal from "./ClouddyModal";
 import AtualizarPainelButton from "./AtualizarPainelButton";
 import type { AplicativoRow, AppRow, PlaylistRow } from "@/lib/aplicativos";
@@ -90,7 +90,7 @@ function playlistStatus(pl: PlaylistRow, tipoPainel?: string | null, vencContrat
   }
   // SmartOne não preenche expired_date (a validade fica no device, não na playlist).
   // Considerar válida se tem playlist_id_externo — "nao_reconhecida" seria falso positivo.
-  if ((tipoPainel === "smartone" || tipoPainel === "clouddy" || tipoPainel === "ibopro") && pl.playlist_id_externo != null) return "vinculada";
+  if ((tipoPainel === "smartone" || tipoPainel === "clouddy" || tipoPainel === "ibopro" || tipoPainel === "popplayer") && pl.playlist_id_externo != null) return "vinculada";
   if (pl.expired_date && pl.expired_date.slice(0, 10) < hoje) return "expirada";
   if (!pl.expired_date) return "nao_reconhecida";
   return "vinculada";
@@ -193,7 +193,7 @@ function PlaylistBadge({
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
 
   // Playlist ativa = a que o app abre no aparelho. Só FunPlay/LazerPlay/CorePlayer têm isso.
-  const podeSelecionar = tipoPainel !== "smartone" && tipoPainel !== "clouddy" && tipoPainel !== "ibopro" && !pl.is_selected;
+  const podeSelecionar = tipoPainel !== "smartone" && tipoPainel !== "clouddy" && tipoPainel !== "ibopro" && tipoPainel !== "popplayer" && !pl.is_selected;
 
   async function selecionar() {
     setExcluindo(true);
@@ -380,8 +380,9 @@ function PlaylistsRow({
 // Filtro por MAC: ignora maiúsculas e separadores (":" "-" "." espaço), então "a4307a"
 // encontra "a4:30:7a:d1:e2:4e" e "A4-30-7A" também.
 /** Tipo usado nas playlists: Clouddy não tem painel (tipo_painel null), mas tem listas TV/VOD próprias;
- *  IBO Pro gerencia as listas pelo site do cliente, com ou sem painel. */
+ *  IBO Pro gerencia as listas pelo site do cliente, com ou sem painel; POP Player, pelo robô de navegador. */
 function tipoPlaylists(a: AplicativoRow): string | null {
+  if (Number(a.id_app) === ID_APP_POPPLAYER) return "popplayer";
   return Number(a.id_app) === ID_APP_CLOUDDY ? "clouddy" : (Number(a.id_app) === ID_APP_IBOPRO || appDaIbosol(a.id_app)) ? "ibopro" : a.tipo_painel;
 }
 
@@ -649,7 +650,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
                           ) : (
                             <span className="text-zinc-300 text-xs">—</span>
                           )}
-                          {((a.id_painel_servidor && a.id_dispositivo_painel) || ((Number(a.id_app) === ID_APP_IBOPRO || appDaIbosol(a.id_app)) && a.mac && a.chave)) && !removido && (
+                          {((a.id_painel_servidor && a.id_dispositivo_painel) || ((Number(a.id_app) === ID_APP_IBOPRO || appDaIbosol(a.id_app)) && a.mac && a.chave) || (Number(a.id_app) === ID_APP_POPPLAYER && a.mac)) && !removido && (
                             <button
                               type="button"
                               onClick={() => setCriandoPlaylist({ idAppRegistro: a.id_app_registro, tipoPainel: tipoPlaylists(a) })}

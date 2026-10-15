@@ -24,6 +24,7 @@ const TIPO_LABEL: Record<string, string> = {
   smartone:   "SmartOne",
   ibopro:     "IBO Pro",
   iboplayer:  "IBO Player",
+  popplayer:  "POP Player",
 };
 
 const URL_PAINEL: Record<string, string> = {
@@ -33,6 +34,7 @@ const URL_PAINEL: Record<string, string> = {
   smartone:   "https://smartone-iptv.com/client/login/",
   ibopro:     "https://cms.iboproapp.com",
   iboplayer:  "https://ibosol.com",
+  popplayer:  "https://popplayer.pro/meuplayer/index.php",
 };
 
 type StatusAoVivo = {
@@ -199,7 +201,12 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
       )}
 
       {/* Ações */}
+      {/* POP Player (15/10/2026): o site só abre em navegador real; listas pelo robô do PC, aparelho por aparelho */}
+      {painel.tipo === "popplayer" && (
+        <p className="text-xs text-zinc-500">Pelo robô do navegador no PC de casa: as listas são lidas e alteradas aparelho por aparelho, no botão Atualizar e nas playlists do cliente.</p>
+      )}
       <div className="flex gap-2 pt-1">
+        {painel.tipo !== "popplayer" && (
         <button
           onClick={sincronizar}
           disabled={sincronizando}
@@ -207,6 +214,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         >
           {sincronizando ? "Sincronizando…" : "Sync Devices"}
         </button>
+        )}
         {TEM_SERVIDORES.has(painel.tipo) && (
           <button
             onClick={() => setServidoresAberto(true)}
@@ -216,7 +224,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
             Migrar endereço
           </button>
         )}
-        {(painel.tipo === "ibopro" || painel.tipo === "smartone" || painel.tipo === "iboplayer") && (
+        {(painel.tipo === "ibopro" || painel.tipo === "smartone" || painel.tipo === "iboplayer" || painel.tipo === "popplayer") && (
           <button
             onClick={() => setMigrarHostAberto(true)}
             title="Trocar o endereço do servidor em todas as listas da revenda"
@@ -231,6 +239,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         >
           Editar
         </button>
+        {painel.tipo !== "popplayer" && (
         <button
           onClick={buscarStatus}
           disabled={carregandoStatus}
@@ -239,6 +248,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         >
           ↻
         </button>
+        )}
         {urlPainel && (
           <a
             href={urlPainel}

@@ -102,3 +102,6 @@ Migrado da memória global do Claude Code em 24/08/2026 (reorganização de mem�
 - [reference_venc_contas_trigger](reference_venc_contas_trigger.md) — Distinção venc_contrato vs venc_contas e trigger trg_sync_venc_contas criado em 08/06/2026
 - [schema_planos_pacotes](schema_planos_pacotes.md) — Estrutura definitiva de planos e pacotes do js-painel após migração de 08/06/2026
 - [schema_public_tables](schema_public_tables.md) — Colunas reais das tabelas public.assinaturas, public.clientes, public.pacote e public.pagamentos no banco js
+- [PWA instalável](project_pwa_instalavel.md) — app no celular: manifest + ícones do logo (15/10/2026)
+- [Duplecast — revenda](reference_duplecast_revenda.md) — fluxo de login e ativação por código capturado 15/10/2026 (CSRF + Cloudflare)
+- [Robô de navegador](project_robo_navegador.md) — POP Player via Chrome comum + extensão na tela virtual (15/10/2026)

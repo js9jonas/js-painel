@@ -1,0 +1,16 @@
+# Serviço do usuário que mantém o robô do navegador no ar (tela virtual + Chrome com a extensão).
+# Instalar: ln -sf ~/js-painel/robo-navegador/js-robo.service ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now js-robo
+[Unit]
+Description=JS Painel - robô do navegador (POP Player)
+After=graphical-session.target network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/js-painel/robo-navegador/iniciar.sh manter
+ExecStopPost=%h/js-painel/robo-navegador/iniciar.sh parar
+KillMode=control-group
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

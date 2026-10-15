@@ -55,7 +55,11 @@ export function appDaIbosol(idApp: string | number | null | undefined): boolean 
   return idApp != null && idApp !== "" && IBOSOL_POR_ID_APP[Number(idApp)] !== undefined;
 }
 
+// POP Player (15/10/2026): popplayer.pro só abre em navegador real (Cloudflare) — listas pelo robô de
+// navegador no PC do Jonas. Ver src/lib/popplayer.ts.
+export const ID_APP_POPPLAYER = 32;
+
 /** Apps em que o botão "Atualizar" consegue ler a validade direto na origem (painel ou conta do cliente). */
 export function appTemAtualizacao(idApp: string | number | null | undefined): boolean {
-  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER, ID_APP_IBOXPLAYER].includes(Number(idApp)));
+  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER, ID_APP_IBOXPLAYER, ID_APP_POPPLAYER].includes(Number(idApp)));
 }
