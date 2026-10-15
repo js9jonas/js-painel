@@ -64,7 +64,7 @@ export async function getPainelServidores(): Promise<PainelServidorRow[]> {
     LEFT JOIN public.contas c ON c.id_painel_servidor = ps.id AND c.removido_em IS NULL
     -- Painel inativo (ex.: CLUB antigo, desativado 03/10/2026) some de /conexoes e para de ter
     -- sessão renovada pelo club-keepalive. Reativar: painel_servidores.ativo = true no banco.
-    WHERE ps.tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer', 'popplayer')
+    WHERE ps.tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer', 'popplayer', 'duplecast')
       AND ps.ativo = true
     GROUP BY ps.id
     ORDER BY ps.nome
@@ -126,7 +126,7 @@ export async function getPainelAppSync(): Promise<PainelAppSyncRow[]> {
     LEFT JOIN public.aplicativo_playlists pl ON pl.id_app_registro = ap.id_app_registro
     -- Painel de app desativado (ex.: FunPlay/LazerPlay antigos depois da migração de 08/10/2026) some de
     -- /conexoes e o sync em família para de lê-lo; os aplicativos dele ficam no cadastro dos clientes.
-    WHERE ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer', 'popplayer')
+    WHERE ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer', 'popplayer', 'duplecast')
       AND ps.ativo = true
     GROUP BY ps.id
     ORDER BY ps.nome
@@ -144,7 +144,7 @@ export type PainelServidorResumo = { id: number; nome: string; tipo: string; ati
 export async function getPainelServidoresResumo(): Promise<PainelServidorResumo[]> {
   const { rows } = await pool.query<PainelServidorResumo>(
     `SELECT id, nome, tipo, ativo FROM public.painel_servidores
-     WHERE ativo = true AND tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer', 'popplayer')
+     WHERE ativo = true AND tipo NOT IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer', 'popplayer', 'duplecast')
      ORDER BY nome`
   );
   return rows;

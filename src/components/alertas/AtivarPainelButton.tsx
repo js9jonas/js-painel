@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 // Ativa no painel do app (Fun Play / Lazer Play / Core Player) um aparelho cadastrado sem ativação,
 // ou renova (mesma ativação de 1 ano) um que está vencendo — `renovar` só muda os textos.
-// SmartOne (`giftcode`): renova gastando 1 giftcode do painel.
+// SmartOne e Duplecast (`giftcode`): renova gastando 1 código (giftcode do SmartOne, código de ativação do Duplecast).
 // GASTA 1 CRÉDITO: 1º clique recarrega a tela e pede confirmação com o nome do cliente; 2º clique ativa.
 // O servidor ainda recusa gastar de novo se o painel já mostrar o aparelho ativado.
 
@@ -22,7 +22,7 @@ export default function AtivarPainelButton({
   renovar?: boolean;
   giftcode?: boolean;
 }) {
-  const unidade = giftcode ? "giftcode" : "crédito";
+  const unidade = giftcode ? "código" : "crédito";
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>("parado");
   const [mensagem, setMensagem] = useState<string | null>(null);

@@ -18,10 +18,14 @@ POP Player (e Duplecast) têm *managed challenge* do Cloudflare no site inteiro:
 - js-painel: `sql/023_robo_tarefas.sql` (`robo_tarefas`, `robo_status`, aplicado 15/10), `/api/interno/robo/proxima|resultado`, `src/lib/robo.ts` (`executarNoRobo`: robô sem contato há 90 s → erro na hora, sem enfileirar; tarefa não pega em 2 min expira), `src/lib/popplayer.ts` (Atualizar/criar/editar/apagar lista do app POP, `ID_APP_POPPLAYER = 32`), card POP em Conexões sem Sync/status.
 - 403 eventual do Cloudflare numa chamada: o robô devolve erro e recarrega a página; repetir em ~1 min resolve.
 
+## Duplecast (15/10/2026)
+Mesmo robô, janela própria (background.js mantém uma aba de trabalho por site; janela, não aba de fundo, porque aba escondida tem timers freados). Detalhe em `reference_duplecast_revenda.md`.
+
 ## Estado (15/10/2026)
 - ✅ Testado via fila contra o POP real (js-painel local na porta 3055): leitura por MAC (1 s, com login), criar/editar/apagar em MAC de teste `AA:BB:CC:00:00:01` (apagado no fim), recusa por MAC errado.
 - ✅ Migração de DNS feita (Jonas rodou o script — o modo automático bloqueia o Claude de enviar migração): cdn4k/conecta5→pfun.store, monitor3/blushes→chdef.site, techonline/conectajs→hboard.site, bandeiraf→ligaf.me. Conferido: 28 listas migradas certas, 39 intactas, 0 alteradas indevidamente. Cópia antes: `~/.local/share/js-robo/backups/pop_listas_20261015_antes_migracao_dns.json` (tem senhas de cliente, pasta 700).
-- 5x52.world e https://ennai.top: Jonas confirmou que são da Central → cadastrados na aba Hosts como secundários (ids 30/31); script de migração para pfun.store pronto, Jonas roda. Sobra xc.s-dns.org (1 lista, inativo, sem servidor).
+- 5x52.world e https://ennai.top: Jonas confirmou que são da Central → cadastrados na aba Hosts como secundários (ids 30/31); script de migração para pfun.store pronto (`migrar_pop_central.sh` na pasta temporária da sessão), Jonas ainda não rodou em 15/10. Sobra xc.s-dns.org (1 lista, inativo, sem servidor).
 - ✅ Serviço `js-robo` (systemd --user, `robo-navegador/js-robo.service` com link em ~/.config/systemd/user, `iniciar.sh manter`): sobe com a sessão do Jonas e reabre o que cair; desligar pelo botão fecha o Chrome limpo.
 - ✅ "Migrar endereço" do POP em Conexões (migrar-host.ts → ação `migrar_dns`, que conta as listas do endereço antes).
-- 📋 Falta: deploy; trocar `config.js` para `https://painel.jssistemas.online` e `iniciar.sh reiniciar`; testar a tela (Atualizar/+/editar num aparelho POP de cliente); Raspberry Pi opcional (Pi 4 4 GB+/Pi 5, Raspberry Pi OS + HA em Docker); Duplecast no mesmo robô.
+- ✅ Em produção desde 15/10/2026 (`aa41c58`, deploy pelo Jonas): `config.js` aponta para `https://painel.jssistemas.online`, leitura por MAC conferida pela fila de produção.
+- 📋 Falta: testar a tela (Atualizar/+/editar num aparelho POP de cliente); Raspberry Pi opcional (Pi 4 4 GB+/Pi 5, Raspberry Pi OS + HA em Docker); Duplecast no mesmo robô.

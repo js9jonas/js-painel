@@ -25,6 +25,7 @@ const TIPO_LABEL: Record<string, string> = {
   ibopro:     "IBO Pro",
   iboplayer:  "IBO Player",
   popplayer:  "POP Player",
+  duplecast:  "Duplecast",
 };
 
 const URL_PAINEL: Record<string, string> = {
@@ -35,6 +36,7 @@ const URL_PAINEL: Record<string, string> = {
   ibopro:     "https://cms.iboproapp.com",
   iboplayer:  "https://ibosol.com",
   popplayer:  "https://popplayer.pro/meuplayer/index.php",
+  duplecast:  "https://duplecast.com/client/login",
 };
 
 type StatusAoVivo = {
@@ -202,11 +204,11 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
 
       {/* Ações */}
       {/* POP Player (15/10/2026): o site só abre em navegador real; listas pelo robô do PC, aparelho por aparelho */}
-      {painel.tipo === "popplayer" && (
+      {(painel.tipo === "popplayer" || painel.tipo === "duplecast") && (
         <p className="text-xs text-zinc-500">Pelo robô do navegador no PC de casa: as listas são lidas e alteradas aparelho por aparelho, no botão Atualizar e nas playlists do cliente.</p>
       )}
       <div className="flex gap-2 pt-1">
-        {painel.tipo !== "popplayer" && (
+        {painel.tipo !== "popplayer" && painel.tipo !== "duplecast" && (
         <button
           onClick={sincronizar}
           disabled={sincronizando}
@@ -239,7 +241,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
         >
           Editar
         </button>
-        {painel.tipo !== "popplayer" && (
+        {painel.tipo !== "popplayer" && painel.tipo !== "duplecast" && (
         <button
           onClick={buscarStatus}
           disabled={carregandoStatus}

@@ -230,7 +230,7 @@ export default function AlertasAppsClient({
                                 </>
                               ) : r.no_painel_app ? (
                                 <>
-                                  <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone} />
+                                  <AtivarPainelButton idAppRegistro={r.id_app_registro} nomeCliente={r.nome} renovar giftcode={r.painel_smartone || r.usa_codigo} />
                                   {r.painel_smartone && botaoLicenca(r)}
                                 </>
                               ) : aparelhoNovoTransfere(r) ? (

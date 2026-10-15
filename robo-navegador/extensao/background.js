@@ -1,10 +1,13 @@
-// Robô do navegador — parte de fundo. Fala com o js-painel (a página do POP não pode, por causa do CORS)
-// e mantém UMA aba do POP aberta: é ela que executa as tarefas (ver popplayer.js).
+// Robô do navegador — parte de fundo. Fala com o js-painel (as páginas dos sites não podem, por causa do CORS)
+// e mantém UMA aba aberta por site: é ela que executa as tarefas daquele site (popplayer.js, duplecast.js).
 import { JS_PAINEL_URL, TOKEN } from "./config.js";
 
-const URL_POP = "https://popplayer.pro/meuplayer/users.php";
-let abaTrabalho = null;
-let ultimoPedido = Date.now();
+const SITES = {
+  popplayer: { url: "https://popplayer.pro/meuplayer/users.php", prefixo: "https://popplayer.pro/" },
+  duplecast: { url: "https://duplecast.com/client/", prefixo: "https://duplecast.com/" },
+};
+const abaTrabalho = {};
+const ultimoPedido = {};
 
 async function chamar(caminho, corpo) {
   const r = await fetch(`${JS_PAINEL_URL}${caminho}`, {
@@ -19,11 +22,13 @@ async function chamar(caminho, corpo) {
 chrome.runtime.onMessage.addListener((m, sender, responder) => {
   const aba = sender.tab?.id;
   if (m.tipo === "proxima") {
-    // Só a aba de trabalho busca tarefas (outra aba do POP aberta à mão não concorre com ela)
-    if (abaTrabalho == null) abaTrabalho = aba;
-    if (aba !== abaTrabalho) { responder({ parar: true }); return false; }
-    ultimoPedido = Date.now();
-    chamar("/api/interno/robo/proxima", { alvos: m.alvos, versao: chrome.runtime.getManifest().version })
+    const site = m.alvos?.[0];
+    if (!SITES[site]) { responder({ parar: true }); return false; }
+    // Só a aba de trabalho do site busca tarefas (outra aba aberta à mão não concorre com ela)
+    if (abaTrabalho[site] == null) abaTrabalho[site] = aba;
+    if (aba !== abaTrabalho[site]) { responder({ parar: true }); return false; }
+    ultimoPedido[site] = Date.now();
+    chamar("/api/interno/robo/proxima", { alvos: [site], versao: chrome.runtime.getManifest().version })
       .then((j) => responder({ ok: true, ...j }))
       .catch((e) => responder({ ok: false, erro: String(e) }));
     return true;
@@ -37,31 +42,44 @@ chrome.runtime.onMessage.addListener((m, sender, responder) => {
   return false;
 });
 
-// Vigia: garante a aba de trabalho aberta (Chrome reiniciado, aba fechada, travou em outra página).
-async function vigiar() {
-  if (abaTrabalho != null) {
+// Vigia: garante a aba de trabalho de cada site (Chrome reiniciado, aba fechada, travou em outra página).
+async function vigiarSite(site) {
+  const { url, prefixo } = SITES[site];
+  const id = abaTrabalho[site];
+  if (id != null) {
     try {
-      const t = await chrome.tabs.get(abaTrabalho);
-      // Aba no POP e pedindo tarefas: tudo certo. Parada há 2 min (travou, desafio do Cloudflare): recarrega.
-      if (t.url?.startsWith("https://popplayer.pro/")) {
-        if (Date.now() - ultimoPedido > 120_000) { ultimoPedido = Date.now(); chrome.tabs.reload(abaTrabalho); }
+      const t = await chrome.tabs.get(id);
+      // No site e pedindo tarefas: tudo certo. Parada há 2 min (travou, desafio do Cloudflare): recarrega.
+      if (t.url?.startsWith(prefixo)) {
+        if (Date.now() - (ultimoPedido[site] ?? 0) > 120_000) { ultimoPedido[site] = Date.now(); chrome.tabs.reload(id); }
         return;
       }
     } catch {
       // aba não existe mais
     }
-    abaTrabalho = null;
+    abaTrabalho[site] = null;
   }
-  const abas = await chrome.tabs.query({ url: "https://popplayer.pro/*" });
+  const abas = await chrome.tabs.query({ url: `${prefixo}*` });
   if (abas.length) {
-    abaTrabalho = abas[0].id;
-    chrome.tabs.reload(abaTrabalho);
+    // Adota a aba que já está no site (sem recarregar: pode estar no meio de uma tarefa)
+    abaTrabalho[site] = abas[0].id;
+    ultimoPedido[site] = Date.now();
   } else {
-    abaTrabalho = (await chrome.tabs.create({ url: URL_POP })).id;
+    // Janela própria (não aba de fundo): aba escondida tem os timers freados pelo Chrome
+    const janela = await chrome.windows.create({ url, focused: false });
+    abaTrabalho[site] = janela.tabs[0].id;
+    ultimoPedido[site] = Date.now();
   }
 }
 
-chrome.alarms.create("vigia", { periodInMinutes: 1 });
+async function vigiar() {
+  for (const site of Object.keys(SITES)) await vigiarSite(site).catch(() => {});
+}
+
+// Recriar o alarme a cada reinício da parte de fundo zeraria a contagem (e ela reinicia toda hora): só cria se faltar.
+chrome.alarms.get("vigia").then((a) => { if (!a) chrome.alarms.create("vigia", { periodInMinutes: 1 }); });
 chrome.alarms.onAlarm.addListener((a) => { if (a.name === "vigia") vigiar(); });
 chrome.runtime.onStartup.addListener(vigiar);
 chrome.runtime.onInstalled.addListener(vigiar);
+// Ao reiniciar, a parte de fundo esquece as abas de trabalho: confere já (a vigia acha as abas abertas pela URL)
+setTimeout(vigiar, 3000);

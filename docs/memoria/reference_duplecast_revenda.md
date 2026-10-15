@@ -24,6 +24,15 @@ Playlists (painel de revenda, mesmo login), capturado em seguida:
 
 Outras telas: `client_codes/buy/` (comprar via PayPal), `client_codes/transfer/`, `device_main/` (Manage Device).
 
-⛔ **Teste 15/10/2026: chamada direta bloqueada.** O site inteiro está atrás de *managed challenge* do Cloudflare (`cf-mitigated: challenge`, página "Just a moment..."): `fetch` do desktop e `curl` da VPS, com ou sem cabeçalhos de navegador, levam 403 já no `GET /client/login`. Só um navegador real passa (no Playwright passou sozinho). Mesmo cenário do POP Player/CENTRAL — adapter server-side no molde do SmartOne não funciona.
+✅ **Integrado pelo robô de navegador em 15/10/2026** (ver `project_robo_navegador.md`). Histórico: **chamada direta bloqueada.** O site inteiro está atrás de *managed challenge* do Cloudflare (`cf-mitigated: challenge`, página "Just a moment..."): `fetch` do desktop e `curl` da VPS, com ou sem cabeçalhos de navegador, levam 403 já no `GET /client/login`. Só um navegador real passa (no Playwright passou sozinho). Mesmo cenário do POP Player/CENTRAL — adapter server-side no molde do SmartOne não funciona.
 No banco: app `id_app` 11 "Duplecast", 46 aparelhos ativos; sem linha em `painel_servidores`.
 Caminhos (decisão do Jonas): navegador no desktop (Playwright/Tampermonkey) com IP residencial; ferramentas pagas anti-Cloudflare já foram recusadas em 13/10 para o POP Player.
+
+## Integração (15/10/2026, robô de navegador)
+`robo-navegador/extensao/duplecast.js` + `src/lib/duplecast.ts`; painel_servidores id 111 tipo 'duplecast'; `ID_APP_DUPLECAST = 11`.
+- Atualizar: validade = maior "Expire" do MAC na lista de códigos (`client_codes/index/all/<pág>/`, 20 por página) + playlists da revenda do MAC (`client_playlist/index/all/<pág>/`, detalhe em `edit/<id>/`).
+- Ativar/Renovar (Alertas): 1 código livre = 1 ano; já ativo por mais de 40 dias → não gasta (testado no MAC 28:07:08:DD:7E:97).
+- Playlists: criar pelo form M3U (`m3u_playlist` = link inteiro), editar pelos campos `server_*` (link Xtream desmontado), apagar com POST `delete/<id>/` (`_csrf_token, 0=, submit=Yes`). Testado em MAC de teste.
+- **Pegadinha:** os redirecionamentos do site apontam para `http://` — `fetch` seguindo o redirecionamento falha ("Failed to fetch", vira outra origem). A extensão usa `redirect: "manual"` e confere o resultado lendo de novo.
+- Só aparecem as playlists que a revenda cadastrou (2 em 15/10); as que o cliente pôs pelo site dele, não.
+- Existe "Mass change hostname/port" (`/plugin/duplecast/client_playlist/hostname`) — não integrado.

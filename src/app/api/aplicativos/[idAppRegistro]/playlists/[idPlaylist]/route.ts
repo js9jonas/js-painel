@@ -8,10 +8,11 @@ import { loginLazerPlay, editarPlaylist as editarLazerPlay, excluirPlaylist as e
 import { loginCorePlayer, editarPlaylist as editarCorePlayer, excluirPlaylist as excluirCorePlayer, selecionarPlaylist as selecionarCorePlayer, getPlaylistsDispositivo as getPlaylistsCorePlayer } from "@/lib/painel-adapters/coreplayer";
 import { loginSmartOne, editarPlaylist as editarSmartOne, excluirPlaylist as excluirSmartOne } from "@/lib/painel-adapters/smartone";
 import { montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
-import { ID_APP_IBOPRO, ID_APP_POPPLAYER, appDaIbosol } from "@/lib/apps-painel-ids";
+import { ID_APP_DUPLECAST, ID_APP_IBOPRO, ID_APP_POPPLAYER, appDaIbosol } from "@/lib/apps-painel-ids";
 import { apagarListaAppIbo, editarListaAppIbo } from "@/lib/ibopro";
 import { apagarListaAppIboPlayer, editarListaAppIboPlayer } from "@/lib/iboplayer";
 import { apagarListaAppPop, editarListaAppPop } from "@/lib/popplayer";
+import { apagarListaAppDuplecast, editarListaAppDuplecast } from "@/lib/duplecast";
 
 // Editar/excluir uma playlist específica de um device de app (FunPlays/LazerPlay/
 // CorePlayer/SmartOne). Endpoints descobertos via monitoramento de rede em 16/06/2026
@@ -79,11 +80,12 @@ async function executar(idAppRegistro: number, idPlaylist: number, acao: Acao, c
       setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
       return;
     }
-    // POP Player (15/10/2026): pelo robô de navegador; o POP não tem lista ativa
-    if (tipoApp[0]?.id_app === ID_APP_POPPLAYER) {
-      if (acao === "selecionar") throw new Error("O POP Player não tem lista ativa pra escolher: o cliente escolhe na TV.");
-      if (acao === "excluir") await apagarListaAppPop(idAppRegistro, idPlaylist);
-      else await editarListaAppPop(idAppRegistro, idPlaylist, { nome: corpo.nome?.trim() || undefined, url: corpo.url?.trim() || undefined });
+    // POP Player e Duplecast (15/10/2026): pelo robô de navegador; nenhum dos dois tem lista ativa
+    if (tipoApp[0]?.id_app === ID_APP_POPPLAYER || tipoApp[0]?.id_app === ID_APP_DUPLECAST) {
+      const pop = tipoApp[0].id_app === ID_APP_POPPLAYER;
+      if (acao === "selecionar") throw new Error("Esse app não tem lista ativa pra escolher: o cliente escolhe na TV.");
+      if (acao === "excluir") await (pop ? apagarListaAppPop : apagarListaAppDuplecast)(idAppRegistro, idPlaylist);
+      else await (pop ? editarListaAppPop : editarListaAppDuplecast)(idAppRegistro, idPlaylist, { nome: corpo.nome?.trim() || undefined, url: corpo.url?.trim() || undefined });
       jobs.set(jobId, { done: true, ok: true });
       setTimeout(() => jobs.delete(jobId), 15 * 60 * 1000);
       return;

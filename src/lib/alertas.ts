@@ -37,6 +37,8 @@ export type AlertaAppRow = {
     no_painel_app: boolean;
     /** SmartOne: renovação gasta 1 giftcode (não crédito). */
     painel_smartone: boolean;
+    /** Duplecast: renova gastando 1 código de ativação (não giftcode do SmartOne, sem transferência). */
+    usa_codigo: boolean;
     venc_contrato_cliente: string | null;
     pacote_contrato: string | null;  // coluna Pacote
     total_apps: number;              // sublinha do Pacote
@@ -122,9 +124,10 @@ export async function getAlertasApps(dias = 7): Promise<AlertaAppRow[]> {
        ap.observacao,
        app.nome_app,
        ap.id_app::int AS id_app,
-       -- IBO Pro (id_app 7) e IBO Player (8) ativam pelo MAC mesmo fora da revenda: sempre têm o botão Renovar
-       ((ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer')) IS TRUE OR ap.id_app IN (7, 8, 34)) AS no_painel_app,
+       -- IBO Pro (id_app 7), IBO Player (8, 34) e Duplecast (11, robô) ativam pelo MAC mesmo fora da revenda: sempre têm o botão Renovar
+       ((ps.tipo IN ('funplays', 'lazerplay', 'coreplayer', 'smartone', 'ibopro', 'iboplayer')) IS TRUE OR ap.id_app IN (7, 8, 11, 34)) AS no_painel_app,
        (ps.tipo = 'smartone') IS TRUE AS painel_smartone,
+       (ap.id_app = 11) AS usa_codigo,
        ult.venc_contrato_cliente,
        -- mais de uma assinatura viva: "2 (1 Tela - 1 Tela)"; senão o pacote da última assinatura
        CASE WHEN vivas.n > 1 THEN vivas.n || ' (' || vivas.pacotes || ')' ELSE ult.pacote_contrato END AS pacote_contrato,

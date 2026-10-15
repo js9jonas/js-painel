@@ -59,7 +59,11 @@ export function appDaIbosol(idApp: string | number | null | undefined): boolean 
 // navegador no PC do Jonas. Ver src/lib/popplayer.ts.
 export const ID_APP_POPPLAYER = 32;
 
+// Duplecast (15/10/2026): revenda Blesta atrás do mesmo Cloudflare — validade, ativação por código e listas pelo
+// robô de navegador. Ver src/lib/duplecast.ts.
+export const ID_APP_DUPLECAST = 11;
+
 /** Apps em que o botão "Atualizar" consegue ler a validade direto na origem (painel ou conta do cliente). */
 export function appTemAtualizacao(idApp: string | number | null | undefined): boolean {
-  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER, ID_APP_IBOXPLAYER, ID_APP_POPPLAYER].includes(Number(idApp)));
+  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER, ID_APP_IBOXPLAYER, ID_APP_POPPLAYER, ID_APP_DUPLECAST].includes(Number(idApp)));
 }

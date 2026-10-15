@@ -217,6 +217,8 @@
       }
       if (resp?.parar) { estado("outra aba trabalhando"); return; }
       if (!resp?.ok || !resp.tarefa) {
+        // Extensão recarregada: este código ficou órfão — recarrega a página para entrar o novo
+        if (/context invalidated/i.test(resp?.erro ?? "")) { location.reload(); return; }
         if (!resp?.ok) { estado(`sem contato com o js-painel — ${resp?.erro ?? "?"}`); await pausa(5000); }
         else estado(`aguardando ${new Date().toLocaleTimeString("pt-BR")}`);
         continue;
