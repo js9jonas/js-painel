@@ -12,4 +12,4 @@ Commit `5ae1a89` (15/10/2026): `src/app/manifest.ts` (nome "JS Painel", standalo
 
 **How to apply:** ícone novo → substituir os 4 PNGs em `public/icons/` mantendo nomes e tamanhos; maskable precisa do desenho dentro dos 80% centrais.
 
-📋 Deploy manual e 1ª instalação no celular pelo Jonas (Chrome → ⋮ → Instalar app). Ideias futuras: tela offline, notificação push de comprovante no /chat.
+✅ Deploy feito pelo Jonas em 15/10/2026 (manifest respondendo 200 em produção). Instalação: Chrome → ⋮ → Instalar app; iPhone: Safari → Compartilhar → Adicionar à Tela de Início (login começa do zero, sem atalhos). Deploy futuro aparece ao abrir o app; ícone/nome mudam só depois de dias ou reinstalando. Ideias futuras: tela offline, notificação push de comprovante no /chat.

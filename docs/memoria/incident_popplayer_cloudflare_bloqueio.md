@@ -47,3 +47,7 @@ Testes que **falharam**, em ordem, todos a partir do mesmo IP residencial (confi
 ## Se for retomar no futuro
 
 Só faz sentido reabrir se a Cloudflare mudar de postura no domínio, ou se popplayer.pro abrir uma API oficial. Não repetir as 5 abordagens acima — já esgotadas e documentadas com teste real.
+
+
+## ✅ Resolvido em 15/10/2026: robô de navegador
+Um Chrome comum (sem automação/CDP) numa tela virtual do PC do Jonas, com extensão própria rodando dentro da página, passa no Cloudflare — inclusive logado. O POP é gerenciado pelo js-painel por esse robô (listas por MAC, criar/editar/apagar, Migrar endereço). Ver `project_robo_navegador.md`. Não é stealth: navegador normal, sem mascarar sinais de automação.

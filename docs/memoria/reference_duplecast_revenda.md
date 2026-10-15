@@ -35,4 +35,4 @@ Caminhos (decisão do Jonas): navegador no desktop (Playwright/Tampermonkey) com
 - Playlists: criar pelo form M3U (`m3u_playlist` = link inteiro), editar pelos campos `server_*` (link Xtream desmontado), apagar com POST `delete/<id>/` (`_csrf_token, 0=, submit=Yes`). Testado em MAC de teste.
 - **Pegadinha:** os redirecionamentos do site apontam para `http://` — `fetch` seguindo o redirecionamento falha ("Failed to fetch", vira outra origem). A extensão usa `redirect: "manual"` e confere o resultado lendo de novo.
 - Só aparecem as playlists que a revenda cadastrou (2 em 15/10); as que o cliente pôs pelo site dele, não.
-- Existe "Mass change hostname/port" (`/plugin/duplecast/client_playlist/hostname`) — não integrado.
+- Migrar endereço (Conexões, `d4a0498`): POST `/plugin/duplecast/client_playlist/hostname` com `from_server_host, to_server_host, server_type=xtream` (sem porta, igual SmartOne); total pelo aviso "Updated on N playlists". Porta é outra tela (`.../port`), não integrada.

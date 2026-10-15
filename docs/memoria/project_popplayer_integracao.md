@@ -23,3 +23,7 @@ descarta — risco de perder a conta no fornecedor, credenciais passando por ter
 captcha. Caminho indicado: renovador no desktop dele (Chrome real, IP de casa, fila no js-painel) — mesmo plano
 parado da Central (`project_central_renovacao_navegador`). Não perguntar de novo sem fato novo.
 Lacuna medida no mesmo dia: POP = 51 dos 64 aparelhos de clientes ativos sem varredura.
+
+
+## ✅ Resolvido em 15/10/2026: robô de navegador
+Um Chrome comum (sem automação/CDP) numa tela virtual do PC do Jonas, com extensão própria rodando dentro da página, passa no Cloudflare — inclusive logado. O POP é gerenciado pelo js-painel por esse robô (listas por MAC, criar/editar/apagar, Migrar endereço). Ver `project_robo_navegador.md`. Não é stealth: navegador normal, sem mascarar sinais de automação.
