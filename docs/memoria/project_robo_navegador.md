@@ -35,3 +35,8 @@ Renovação 1 mês de dentro da página (robô), ligada no adapter `central.ts`;
 - 📋 Falta: testar a tela (Atualizar/+/editar num aparelho POP de cliente); Raspberry Pi opcional (Pi 4 4 GB+/Pi 5, Raspberry Pi OS + HA em Docker); Duplecast no mesmo robô.
 
 - 15/10/2026: Atualizar em lote nos 57 aparelhos POP (todos com lista agora, 63 listas ligadas a conta); apagadas no POP as listas sem conta de Lucas Mateus Venancio, Vanderlei Wobeto (assinaturas vencidas em setembro) e JS Contas (xc.s-dns.org, teste) — os aparelhos seguem cadastrados no js-painel sem lista.
+
+## Operação — pegadinhas (15/10/2026)
+- Mudou `config.js` (URL do js-painel) ou o manifesto: reiniciar o serviço NÃO basta — a parte de fundo continua com o valor antigo ("Failed to fetch"). Clicar em **Atualizar** em chrome://extensions do robô. A janela muda de posição na tela virtual: fotografar antes (`iniciar.sh foto`) e mirar o botão; um clique em "Carregar sem compactação" abre o seletor de pasta NA TELA DO JONAS.
+- Pra testar sem deploy: js-painel local (`next dev -p 3055`, mesmo banco) e `config.js` em `http://localhost:3055`; pedidos da tela de produção continuam atendidos (mesma fila no banco). Voltar pra produção depois do deploy.
+- Consulta ao banco travando sem erro = túnel 5433 zumbi: matar e recriar (`ssh -f -N -o ServerAliveInterval=15 -L 5433:localhost:5432 root@168.231.98.162`).
