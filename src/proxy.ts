@@ -81,5 +81,6 @@ function rotaAceitaTokenInterno(pathname: string): boolean {
 }
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  // manifest.webmanifest e /icons/ ficam fora: o Chrome lê antes do login pra oferecer "Instalar app".
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
 }
