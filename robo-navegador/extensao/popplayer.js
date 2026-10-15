@@ -233,7 +233,9 @@
         resultado = { id: t.id, ok: false, erro: e instanceof Error ? e.message : String(e) };
       }
       await chrome.runtime.sendMessage({ tipo: "resultado", resultado }).catch(() => {});
-      if (!resultado.ok && /Cloudflare/.test(resultado.erro)) { location.reload(); return; }
+      // 403 do Cloudflare = liberação (cf_clearance) vencida. Recarregar a tela de login não adianta (ela fica fora da
+      // proteção): navega para uma página protegida, onde o navegador refaz o desafio sozinho.
+      if (!resultado.ok && /Cloudflare/.test(resultado.erro)) { location.assign(BASE + "users.php"); return; }
     }
   }
 
