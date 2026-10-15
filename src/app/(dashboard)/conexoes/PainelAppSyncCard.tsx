@@ -226,7 +226,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
             Migrar endereço
           </button>
         )}
-        {(painel.tipo === "ibopro" || painel.tipo === "smartone" || painel.tipo === "iboplayer" || painel.tipo === "popplayer") && (
+        {(painel.tipo === "ibopro" || painel.tipo === "smartone" || painel.tipo === "iboplayer" || painel.tipo === "popplayer" || painel.tipo === "duplecast") && (
           <button
             onClick={() => setMigrarHostAberto(true)}
             title="Trocar o endereço do servidor em todas as listas da revenda"
@@ -264,7 +264,7 @@ export default function PainelAppSyncCard({ painel, onEditar }: Props) {
       </div>
 
       {migrarHostAberto && (
-        <MigrarHostModal idPainel={painel.id} nomePainel={painel.nome} semPorta={painel.tipo === "smartone"} onClose={() => setMigrarHostAberto(false)} />
+        <MigrarHostModal idPainel={painel.id} nomePainel={painel.nome} semPorta={painel.tipo === "smartone" || painel.tipo === "duplecast"} onClose={() => setMigrarHostAberto(false)} />
       )}
       {servidoresAberto && (
         <ServidoresAppModal idPainel={painel.id} nomePainel={painel.nome} onClose={() => setServidoresAberto(false)} />

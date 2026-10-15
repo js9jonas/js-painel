@@ -188,6 +188,23 @@
       return { ...(await aparelho(mac)), listas: await playlistsDoMac(mac) };
     },
 
+    /**
+     * Mass Change server URL (igual ao SmartOne): troca o endereço, SEM porta, em todas as playlists Xtream da
+     * revenda. Sucesso = redirecionamento; a página mostra depois "Successfully Updated on N playlists".
+     */
+    async migrar_host({ de, para }) {
+      if (!de || !para) throw new Error("Informe o endereço atual e o novo.");
+      if (/:\d+$/.test(de) || /:\d+$/.test(para)) throw new Error("No Duplecast a troca é só do endereço, sem a porta.");
+      const caminho = "/plugin/duplecast/client_playlist/hostname";
+      const pagina = await obter(caminho);
+      const r = await enviarFormulario(pagina, caminho, { from_server_host: de, to_server_host: para, server_type: "xtream" });
+      const depois = r.redirecionou ? await obter(caminho) : r;
+      const msg = alertas(depois.doc).filter((t) => !/irreversible/i.test(t))[0] ?? "";
+      const n = msg.match(/updated on (\d+) playlist/i);
+      if (n) return { de, para, listas: Number(n[1]) };
+      throw new Error(`Duplecast: ${msg || "sem confirmação do site"}`);
+    },
+
     async codigos_livres() {
       return (await codigos()).filter((c) => c.livre).map((c) => c.codigo);
     },

@@ -6,10 +6,11 @@
 //    (app_platform/app_id de IBOSOL_POR_ID_APP). Só alcança as listas que a revenda conhece — as que o cliente pôs pelo site dele podem ficar de fora (o total vem da contagem).
 //  - POP Player (15/10/2026): Migrador de DNS do site, pelo robô de navegador (src/lib/robo.ts). O endereço antigo
 //    tem que ser exatamente um dos que o POP lista (com http/https e a porta, se houver).
+//  - Duplecast (15/10/2026): Mass Change server URL (mesmo formulário do SmartOne, sem porta), pelo robô.
 // Fun Play / Lazer Play / Core Player têm "servidores" no painel: ver servidores-app/route.ts.
 import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
-import { ID_APP_IBOPRO, ID_APP_POPPLAYER, ID_APP_SMARTONE, IBOSOL_POR_ID_APP } from "@/lib/apps-painel-ids";
+import { ID_APP_DUPLECAST, ID_APP_IBOPRO, ID_APP_POPPLAYER, ID_APP_SMARTONE, IBOSOL_POR_ID_APP } from "@/lib/apps-painel-ids";
 import { sessaoIbo } from "@/lib/ibopro";
 import { comIbosol } from "@/lib/iboplayer";
 import { contarDominioIbosol, mudarDominioIbosol } from "@/lib/painel-adapters/iboplayer";
@@ -18,7 +19,7 @@ import { mudarHostListasIbo } from "@/lib/painel-adapters/ibopro";
 import { mudarHostListas as mudarHostListasSmartOne } from "@/lib/painel-adapters/smartone";
 import { executarNoRobo } from "@/lib/robo";
 
-export const TIPOS_MIGRAR_HOST = ["ibopro", "smartone", "iboplayer", "popplayer"];
+export const TIPOS_MIGRAR_HOST = ["ibopro", "smartone", "iboplayer", "popplayer", "duplecast"];
 
 export async function migrarHost(idPainel: number, antigo: string, novo: string): Promise<{ noPainel: number; noBanco: number; painel: string }> {
   const { rows } = await pool.query<{ nome: string; tipo: string }>(`SELECT nome, tipo FROM public.painel_servidores WHERE id = $1`, [idPainel]);
@@ -43,6 +44,11 @@ export async function migrarHost(idPainel: number, antigo: string, novo: string)
       }
       return total;
     });
+  } else if (painel.tipo === "duplecast") {
+    if (/:\d+$/.test(antigo) || /:\d+$/.test(novo)) throw new Error("No Duplecast a troca é só do endereço, sem a porta.");
+    const r = await executarNoRobo<{ listas: number }>("duplecast", "migrar_host", { de: antigo, para: novo });
+    noPainel = r.listas;
+    idsApp = [ID_APP_DUPLECAST];
   } else if (painel.tipo === "popplayer") {
     const r = await executarNoRobo<{ listas: number }>("popplayer", "migrar_dns", { de: antigo, para: novo });
     noPainel = r.listas;
