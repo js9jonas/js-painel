@@ -288,11 +288,21 @@ export function criarCentralAdapter(
       }
       if (!conta) return { ok: false, erro: `Usuário "${usuario}" não encontrado no CENTRAL.` };
 
+      // Mesmo corpo do formulário "Editar" do painel.fun (17/10/2026): só username + notas dava
+      // 400 "There was a problem querying the system database." — o resto vai com o valor atual
+      let bouquet: number[] = [];
+      try { bouquet = JSON.parse(conta.packages || "[]").map(Number); } catch { /* fica vazio */ }
+      if (bouquet.length === 0) return { ok: false, erro: "Não foi possível ler os pacotes da conta no CENTRAL." };
       const body: Record<string, any> = {
+        system:          conta.system,
         username:        campos.novoUsuario  ?? conta.username,
+        password:        campos.novaSenha    || conta.password,
+        full_name:       conta.full_name     ?? "",
         reseller_notes:  campos.novoRotulo   ?? conta.reseller_notes ?? "",
+        bouquet,
+        as_number:       conta.as_number && conta.as_number.length >= 5 ? conta.as_number : "",
       };
-      if (campos.novaSenha) body.password = campos.novaSenha;
+      if (conta.macaddr) body.macaddr = conta.macaddr;
 
       await fetchComRetry(`users/${conta.id}`, {
         method: "PUT",

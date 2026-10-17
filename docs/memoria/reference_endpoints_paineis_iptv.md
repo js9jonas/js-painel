@@ -47,7 +47,7 @@ metadata:
 | `/users?page&per&reseller` | GET | — | ✅ listarContas + senha |
 | `/users/{id}/renew` | POST | `{mounth:1}` | ✅ renovar |
 | `/users/{id}/set-expiry-time` | POST | `{}` | ✅ (no renovar) |
-| `/users/{id}` | PUT | `{username, password, reseller_notes, ...}` | ✅ editarConta |
+| `/users/{id}` | PUT | `{system, username, password, full_name, reseller_notes, bouquet:[ids de packages], as_number, macaddr?}` — corpo completo como o formulário do painel.fun; só username+notas dá 400 "There was a problem querying the system database." (17/10/2026) | ✅ editarConta |
 | `/trial_users` | POST | `{username, password, type:1, is_trial:true, package_id:61/62, adult_channels, g-recaptcha-response, official_credits:0, isIPTV:true}` | ✅ gerarTeste |
 | `/users/{id}/add-days` | POST | `{days:N}` | ⚠️ Reservado para alertas (venc_contrato < 30d) |
 | `/users/{id}` | DELETE | — | ❌ pendente |
