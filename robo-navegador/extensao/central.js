@@ -168,6 +168,48 @@
       return { usuario, id: conta.id, ja_renovado: false, vencimento: depois, antes };
     },
 
+    /**
+     * Soma os dias que faltam até `data` (AAAA-MM-DD, fim do contrato) — tela "Alterar vencimento" do painel.fun:
+     * POST users/{id}/renew-by-calendar {selected_date, days, credits}, 1 a 30 dias contados de max(vencimento, hoje),
+     * credits = dias / 30 × telas (2 casas). Lido no código do site em 17/10/2026. Já vale até lá: não mexe.
+     */
+    async adicionar_dias_ate({ usuario, data: alvo }) {
+      if (!usuario || !/^\d{4}-\d{2}-\d{2}$/.test(alvo ?? "")) throw new Error("Informe o usuário e a data (AAAA-MM-DD).");
+      const revenda = credenciais?.usuario;
+      if (!revenda) throw new Error("Sem o usuário da revenda Central no js-painel.");
+      let conta = null;
+      for (let pagina = 1; pagina <= 60 && !conta; pagina++) {
+        const lista = (await api(`users?page=${pagina}&per=100&reseller=${encodeURIComponent(revenda)}`))?.data ?? [];
+        conta = lista.find((u) => u.username === usuario) ?? null;
+        if (lista.length < 100) break;
+      }
+      if (!conta) throw new Error(`Conta "${usuario}" não encontrada na Central.`);
+      const dataSP = (ms) => new Date(ms).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      const antes = conta.exp_date ? dataSP(Number(conta.exp_date) * 1000) : null;
+      const hoje = dataSP(Date.now());
+      const base = antes && antes > hoje ? antes : hoje;
+      const dias = Math.round((Date.parse(`${alvo}T00:00:00Z`) - Date.parse(`${base}T00:00:00Z`)) / 86_400_000);
+      if (dias < 1) return { usuario, id: conta.id, dias: 0, antes, vencimento: antes };
+      if (dias > 30) throw new Error(`Faltam ${dias} dias até ${alvo.split("-").reverse().join("/")}: a Central soma no máximo 30 por vez. Use Renovar 1 mês.`);
+      const telas = Math.max(1, Number(conta.max_connections) || 1);
+      const credits = Number(((dias / 30) * telas).toFixed(2));
+      const r = await api(`users/${conta.id}/renew-by-calendar`, {
+        method: "POST",
+        body: JSON.stringify({ selected_date: alvo, days: dias, credits }),
+      });
+      let exp = r?.exp_date ?? r?.data?.exp_date;
+      if (!exp) {
+        for (let pagina = 1; pagina <= 60 && !exp; pagina++) {
+          const lista = (await api(`users?page=${pagina}&per=100&reseller=${encodeURIComponent(revenda)}`))?.data ?? [];
+          exp = lista.find((u) => u.username === usuario)?.exp_date;
+          if (lista.length < 100) break;
+        }
+      }
+      const depois = exp ? dataSP(Number(exp) * 1000) : null;
+      if (depois !== alvo) throw new Error(`A Central respondeu, mas o vencimento ficou ${depois ?? "?"} em vez de ${alvo}. Confira no painel antes de tentar de novo.`);
+      return { usuario, id: conta.id, dias, antes, vencimento: depois, creditos: credits };
+    },
+
     /** Só leitura: vencimento atual da conta (para conferir sem renovar). */
     async conta({ usuario }) {
       const revenda = credenciais?.usuario;

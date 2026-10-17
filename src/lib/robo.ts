@@ -4,7 +4,7 @@
 // fila e esperar o resultado. Tabelas: sql/023_robo_tarefas.sql.
 import { pool } from "@/lib/db";
 
-export const ALVOS_ROBO = ["popplayer", "duplecast", "central"] as const;
+export const ALVOS_ROBO = ["popplayer", "duplecast", "central", "fast"] as const;
 export type AlvoRobo = (typeof ALVOS_ROBO)[number];
 
 /** Sem contato do robô há mais que isso = PC desligado (o robô pergunta a cada ~20 s). */

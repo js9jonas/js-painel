@@ -5,9 +5,11 @@ type Props = {
     idPainelServidor: number | null;
     usuario: string;
     onRenovado?: (novoVencimento: string) => void;
+    /** Contrato acaba antes de 1 mês: soma só os dias até `ate` (AAAA-MM-DD) em vez de renovar o mês (FAST/Central). */
+    diasAteContrato?: { dias: number; ate: string } | null;
 };
 
-export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenovado }: Props) {
+export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenovado, diasAteContrato }: Props) {
     const [estado, setEstado] = useState<"idle" | "loading" | "ok" | "erro">("idle");
     const [mensagem, setMensagem] = useState<string | null>(null);
     const [novaData, setNovaData] = useState<string | null>(null);
@@ -20,7 +22,8 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
         setEstado("loading");
         setMensagem(null);
         try {
-            const res = await fetch(`/api/paineis/servidores/${idPainelServidor}/renovar`, {
+            const acao = diasAteContrato ? "adicionar-dias" : "renovar";
+            const res = await fetch(`/api/paineis/servidores/${idPainelServidor}/${acao}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ usuario }),
@@ -50,7 +53,7 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
         return (
             <div className="flex flex-col gap-0.5">
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                    {migrado ? "✓ Migrado" : "✓ Renovado"}
+                    {migrado ? "✓ Migrado" : diasAteContrato ? "✓ Dias somados" : "✓ Renovado"}
                     {novaData && <span className="opacity-75">→ {novaData}</span>}
                 </span>
             </div>
@@ -62,7 +65,11 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
             <button
                 onClick={renovar}
                 disabled={semPainel || estado === "loading"}
-                title={semPainel ? "Conta sem painel configurado" : `Renovar ${usuario} via API`}
+                title={semPainel
+                    ? "Conta sem painel configurado"
+                    : diasAteContrato
+                        ? `Contrato acaba em ${diasAteContrato.ate.split("-").reverse().join("/")}: soma só os dias que faltam (pelo robô do navegador)`
+                        : `Renovar ${usuario} via API`}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors
                     ${semPainel
                         ? "cursor-not-allowed bg-zinc-100 text-zinc-400"
@@ -72,7 +79,9 @@ export default function RenovarViaAPIButton({ idPainelServidor, usuario, onRenov
                     }`}
             >
                 {estado === "loading" ? (
-                    <><span className="animate-spin">⟳</span> Renovando…</>
+                    <><span className="animate-spin">⟳</span> {diasAteContrato ? "Somando dias…" : "Renovando…"}</>
+                ) : diasAteContrato ? (
+                    <>+{diasAteContrato.dias} dia{diasAteContrato.dias > 1 ? "s" : ""} (até {diasAteContrato.ate.split("-").reverse().slice(0, 2).join("/")})</>
                 ) : (
                     <>⟳ Renovar via API</>
                 )}

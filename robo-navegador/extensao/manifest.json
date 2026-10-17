@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JS Painel — robô do navegador",
-  "description": "Executa no navegador as ações do js-painel em sites que só abrem em navegador real (POP Player, Duplecast, Central).",
-  "version": "1.3.0",
+  "description": "Executa no navegador as ações do js-painel em sites que só abrem em navegador real (POP Player, Duplecast, Central, FAST).",
+  "version": "1.4.0",
   "permissions": [
     "tabs",
     "alarms"
@@ -12,6 +12,7 @@
     "https://duplecast.com/*",
     "https://api.controle.fit/*",
     "https://painel.fun/*",
+    "https://painelcliente.com/*",
     "https://painel.jssistemas.online/*",
     "http://localhost:*/*"
   ],
@@ -54,6 +55,15 @@
       ],
       "js": [
         "central.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://painelcliente.com/*"
+      ],
+      "js": [
+        "fast.js"
       ],
       "run_at": "document_idle"
     }

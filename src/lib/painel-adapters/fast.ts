@@ -1,4 +1,5 @@
 import type { ContaPainel, PainelAdapter, ResultadoRenovacao, ResultadoEdicao, ResultadoTeste, ServidorCredenciais, SaveSession, SaveContaVencimento } from "./types";
+import { executarNoRobo } from "@/lib/robo";
 
 // API base: https://api.painelcliente.com
 // Auth: token permanente na URL + secret no body JSON
@@ -87,6 +88,34 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
       if (novoVenc) await onSaveContas(usuario, novoVenc);
 
       return { ok: true, novoVencimento: novoVenc };
+    },
+
+    // A API pública só renova por mês; "Adicionar dias ao vencimento" existe só no site → robô de navegador
+    // (robo-navegador/extensao/fast.js). Conta precisa estar ativa; 1 a 30 dias; custo = dias × telas / 30 créditos.
+    async adicionarDiasAte(usuario: string, dataAlvo: string) {
+      const { token, secret } = getCredentials(creds);
+      const antes = await apiFetch(token, "get_client", { secret, username: usuario });
+      if (!antes?.id || !antes?.exp_date) return { ok: false, erro: `Conta "${usuario}" não encontrada na FAST.` };
+      const data = (ts: number) => new Date(ts * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+      const vencAntes = data(Number(antes.exp_date));
+      // Dias calculados aqui, sobre o vencimento lido agora na FAST: aba velha ou toque duplo não somam a mais
+      const dias = Math.round((Date.parse(`${dataAlvo}T00:00:00Z`) - Date.parse(`${vencAntes}T00:00:00Z`)) / 86_400_000);
+      if (dias < 1) return { ok: true, novoVencimento: vencAntes, antes: vencAntes, dias: 0 };
+      if (dias > 30) return { ok: false, erro: `Faltam ${dias} dias até ${dataAlvo.split("-").reverse().join("/")}: a FAST soma no máximo 30 por vez. Use Renovar 1 mês.` };
+      if (Number(antes.enabled) !== 1 || Number(antes.exp_date) * 1000 <= Date.now()) {
+        return { ok: false, erro: "A FAST só adiciona dias em conta ativa (não vencida nem bloqueada). Use Renovar 1 mês." };
+      }
+
+      await executarNoRobo("fast", "adicionar_dias", { client_id: antes.id, usuario, dias }, { timeoutMs: 90_000 });
+
+      const depois = await apiFetch(token, "get_client", { secret, username: usuario });
+      const somados = Math.round((Number(depois?.exp_date) - Number(antes.exp_date)) / 86_400);
+      if (somados !== dias) {
+        return { ok: false, erro: `A FAST respondeu, mas o vencimento mudou ${somados} dia(s) em vez de ${dias}. Confira no painel antes de tentar de novo.` };
+      }
+      const novoVencimento = data(Number(depois.exp_date));
+      await onSaveContas(usuario, novoVencimento);
+      return { ok: true, novoVencimento, antes: vencAntes, dias };
     },
 
     async getCreditos(): Promise<number | null> {

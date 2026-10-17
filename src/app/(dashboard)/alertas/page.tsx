@@ -213,6 +213,12 @@ export default async function AlertasPage() {
                                                 ? subContasVinculadas.map((ct) => {
                                                     const diasCt = diasRestantes(ct.vencimento_real_painel.split("T")[0]);
                                                     const dataFmt = ct.vencimento_real_painel.split("T")[0].split("-").reverse().join("/");
+                                                    // FAST/Central com contrato acabando antes de 1 mês: soma só os dias que faltam (conta ainda ativa)
+                                                    const vencContrato = r.venc_contrato.split("T")[0];
+                                                    const diasContrato = diasRestantes(vencContrato) - diasCt;
+                                                    const diasAteContrato = (ct.tipo_painel === "fast" || ct.tipo_painel === "central") && diasCt >= 0 && diasContrato >= 1 && diasContrato < 30
+                                                        ? { dias: diasContrato, ate: vencContrato }
+                                                        : null;
                                                     return (
                                                         <tr key={ct.id_conta} className="bg-zinc-50/60 hover:bg-zinc-100/60">
                                                             <td className="px-4 py-2 pl-8">
@@ -246,6 +252,7 @@ export default async function AlertasPage() {
                                                                     <RenovarViaAPIButton
                                                                         idPainelServidor={ct.id_painel_servidor}
                                                                         usuario={ct.usuario}
+                                                                        diasAteContrato={diasAteContrato}
                                                                     />
                                                                     <MigrarPainelButton
                                                                         conta={ct}

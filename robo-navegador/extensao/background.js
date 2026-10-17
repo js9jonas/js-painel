@@ -1,11 +1,12 @@
 // Robô do navegador — parte de fundo. Fala com o js-painel (as páginas dos sites não podem, por causa do CORS)
-// e mantém UMA aba aberta por site: é ela que executa as tarefas daquele site (popplayer.js, duplecast.js).
+// e mantém UMA aba aberta por site: é ela que executa as tarefas daquele site (popplayer.js, duplecast.js, central.js, fast.js).
 import { JS_PAINEL_URL, TOKEN } from "./config.js";
 
 const SITES = {
   popplayer: { url: "https://popplayer.pro/meuplayer/users.php", prefixo: "https://popplayer.pro/" },
   duplecast: { url: "https://duplecast.com/client/", prefixo: "https://duplecast.com/" },
   central: { url: "https://painel.fun/users", prefixo: "https://painel.fun/" },
+  fast: { url: "https://painelcliente.com/clients", prefixo: "https://painelcliente.com/" },
 };
 const abaTrabalho = {};
 const ultimoPedido = {};

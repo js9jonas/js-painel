@@ -215,6 +215,23 @@ export function criarCentralAdapter(
       }));
     },
 
+    // Contrato acaba antes de 1 mês: "Alterar vencimento" da tela (renew-by-calendar) pelo robô — escrita na
+    // Central só passa de dentro da página. Dias calculados no robô sobre o vencimento lido na hora.
+    async adicionarDiasAte(usuario: string, dataAlvo: string) {
+      if (!(await roboOnline("central"))) {
+        return { ok: false, erro: "O robô do navegador está desligado (o PC de casa precisa estar ligado). Tente de novo quando ele voltar." };
+      }
+      try {
+        const r = await executarNoRobo<{ dias: number; antes: string | null; vencimento: string | null }>(
+          "central", "adicionar_dias_ate", { usuario, data: dataAlvo }, { timeoutMs: 90_000 }
+        );
+        if (r.dias > 0 && r.vencimento) await onSaveContas(usuario, r.vencimento);
+        return { ok: true, novoVencimento: r.vencimento ?? undefined, antes: r.antes ?? undefined, dias: r.dias };
+      } catch (e: unknown) {
+        return { ok: false, erro: e instanceof Error ? e.message : "O robô não conseguiu alterar o vencimento na Central." };
+      }
+    },
+
     async getCreditos(): Promise<number | null> {
       try {
         const data = await fetchComRetry("profile");

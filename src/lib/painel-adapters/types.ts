@@ -47,6 +47,11 @@ export interface DetalhesConta {
 export interface PainelAdapter {
   listarContas(): Promise<ContaPainel[]>;
   renovar(usuario: string, meses: number): Promise<ResultadoRenovacao>;
+  /**
+   * Soma ao vencimento os dias que faltam até `dataAlvo` (AAAA-MM-DD) — usado quando o contrato acaba antes de
+   * 1 mês. FAST e Central, pelo robô de navegador. `dias` = quantos foram somados (0 = já valia até lá).
+   */
+  adicionarDiasAte?(usuario: string, dataAlvo: string): Promise<ResultadoRenovacao & { antes?: string; dias?: number }>;
   getCreditos?(): Promise<number | null>;
   editarConta?(usuario: string, campos: { novoUsuario?: string; novaSenha?: string; novoRotulo?: string; novoPacote?: number }): Promise<ResultadoEdicao>;
   gerarTeste?(params: { comAdultos?: boolean; horas?: number; rotulo?: string }): Promise<ResultadoTeste>;
