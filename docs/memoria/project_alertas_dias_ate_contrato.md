@@ -16,4 +16,8 @@ metadata:
 
 **Observação:** a maioria dos casos é 26–29 dias (contrato mensal que acaba poucos dias antes) — vão receber "+N dias" em vez de 1 mês.
 
-📋 Pendente: deploy + **Atualizar** a extensão em chrome://extensions do robô (manifesto mudou) + 1º login do robô na FAST + 1º uso pela tela (FAST e Central).
+✅ FAST em produção e testada pela tela em 17/10/2026: Vitor Oliveira `6gmfewcr` +6 dias, 21/10→27/10 (FAST, banco e audit_log conferidos). Robô 1.4.0 entrou na FAST sozinho (Turnstile passou sem clique).
+
+**Pegadinha da atualização:** Jonas clicou em Atualizar no Chrome errado — o do robô (tela virtual :99) seguia em 1.3.0 (`robo_status.versao` mostra). Na tela virtual não há gerenciador de janelas: **teclado não chega** (xdotool key/type sem foco); funciona só com cliques — "+" de nova aba (713,20), barra de endereço, digitar `chrome://extensions` + Enter (com a barra clicada a digitação entra), ↻ do card da extensão. Conferir com `iniciar.sh foto`.
+
+📋 Pendente: 1º uso real na Central (renew-by-calendar nunca executado de verdade).
