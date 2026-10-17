@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdapterPainel } from "@/lib/painel-adapters";
 import { pool } from "@/lib/db";
 import { migrarContaPainel } from "@/lib/migrar-painel";
+import { registrarAudit } from "@/lib/audit";
 
 export async function POST(
   req: NextRequest,
@@ -77,6 +78,31 @@ export async function POST(
          WHERE id_painel_servidor = $2 AND usuario = $3`,
         [resultado.novoVencimento, idPainel, usuario]
       );
+    }
+
+    // Renovação no painel gasta crédito: vai pro histórico com usuário da sessão (regra do audit_log).
+    // Sem isso, a 2ª renovação da Marta (ete21786, 17/10/2026) só apareceu pelo log do Traefik, sem a conta.
+    if (!resultado.aviso) {
+      const client = await pool.connect();
+      try {
+        const { rows: ct } = await client.query<{ id_cliente: string | null; id_assinatura: string | null }>(
+          `SELECT a.id_cliente::text, ct.id_assinatura::text
+             FROM public.contas ct LEFT JOIN public.assinaturas a ON a.id_assinatura = ct.id_assinatura
+            WHERE ct.id_painel_servidor = $1 AND ct.usuario = $2 AND ct.removido_em IS NULL LIMIT 1`,
+          [idPainel, usuario]
+        );
+        await registrarAudit(client, {
+          tipo: "renovacao",
+          id_cliente: ct[0]?.id_cliente ?? null,
+          id_assinatura: ct[0]?.id_assinatura ?? null,
+          descricao: `Conta ${usuario}: renovada 1 mês no painel`,
+          dados_depois: { usuario, id_painel_servidor: idPainel, vencimento_painel: resultado.novoVencimento ?? null },
+        });
+      } catch (e) {
+        console.error("[renovar] falha ao gravar audit_log:", e instanceof Error ? e.message : e);
+      } finally {
+        client.release();
+      }
     }
 
     return NextResponse.json({

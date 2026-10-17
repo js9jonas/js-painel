@@ -75,6 +75,15 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
     async renovar(usuario: string, meses = 1): Promise<ResultadoRenovacao> {
       const { token, secret } = getCredentials(creds);
 
+      // Lê o vencimento na FAST antes: com o banco atrasado (sync pendente) a conta aparece vencendo em
+      // /alertas já estando renovada — Marta ete21786 levou 2 meses seguidos em 17/10/2026. Igual à Central.
+      const atual = await apiFetch(token, "get_client", { secret, username: usuario });
+      if (atual?.exp_date && Number(atual.exp_date) * 1000 > Date.now() + 25 * 86_400_000) {
+        const venc = new Date(Number(atual.exp_date) * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+        await onSaveContas(usuario, venc);
+        return { ok: true, novoVencimento: venc, aviso: "Já estava renovada na FAST (vale por mais de 25 dias): nenhum crédito gasto." };
+      }
+
       const data = await apiFetch(token, "renew_client", {
         secret,
         username: usuario,
