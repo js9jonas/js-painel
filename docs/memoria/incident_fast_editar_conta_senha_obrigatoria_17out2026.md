@@ -17,6 +17,6 @@ metadata:
 
 **Efeito colateral do teste:** uma chamada com `idbouquet` regravou os bouquets da conta de texto (`["1","2",…]`) para número (`[1,2,…]`), mesmos canais 1,2,3,4,7. O rótulo "Marta Rodrigues - Eduardo" já foi gravado na FAST pelo teste.
 
-📋 Pendente: deploy pelo Jonas; depois clicar Salvar de novo no modal da Marta (só atualiza o rótulo no banco local, já que a FAST está igual) — é também o 1º teste pela tela.
+✅ Em produção e testado pela tela em 17/10/2026: Jonas fez o deploy e salvou de novo o modal da Marta — funcionou (rótulo atualizado no banco local).
 
 **Lição:** erro de painel externo que surge do nada em ação que já funcionava → testar o endpoint direto variando um campo por vez; a API muda as regras sem aviso.

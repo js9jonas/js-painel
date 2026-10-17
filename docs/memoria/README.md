@@ -2,7 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
-- [incident_fast_editar_conta_senha_obrigatoria_17out2026](incident_fast_editar_conta_senha_obrigatoria_17out2026.md) — 17/10/2026 ✅ na main `1e1d6c9` (deploy pendente) — editar conta FAST dava "informações inválidas": `update_client` passou a exigir password; agora lê a senha atual via get_client e pula se nada mudou (COD 1002)
+- [incident_fast_editar_conta_senha_obrigatoria_17out2026](incident_fast_editar_conta_senha_obrigatoria_17out2026.md) — 17/10/2026 ✅ `1e1d6c9` em produção, testado pela tela — editar conta FAST dava "informações inválidas": `update_client` passou a exigir password; agora lê a senha atual via get_client e pula se nada mudou (COD 1002)
 - [project_idempotencia_chaves](project_idempotencia_chaves.md) — 12/10/2026 — Idempotency-Key em toda ação do navegador que altera dados; proxy recusa repetida com 409 (tabela idempotencia_chaves)
 - [incident_template_duplicado_post_reenviado_12out2026](incident_template_duplicado_post_reenviado_12out2026.md) — 12/10/2026 ✅ em produção — disparo de templates saía 2x (POST reenviado pelo navegador ao retomar a aba; servidor seguia mesmo com 499); regra: mesmo template, mesmo número, 1x por dia + trava de lote
 - [incident_renovacao_acidental_aba_velha_30set2026](incident_renovacao_acidental_aba_velha_30set2026.md) — 30/09/2026 ✅ — cliente 2888 renovado por toque acidental em aba aberta havia 40 min; renovação/exclusão de pagamento passam a entrar no audit_log com usuário+IP, (a trava de 2º clique por tela parada foi removida em 12/10 a pedido do Jonas)
