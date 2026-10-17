@@ -2,7 +2,7 @@
 
 Migrado da memória global do Claude Code em 24/08/2026 (reorganização de memória). Ler antes de mexer em áreas cobertas aqui.
 
-- [incident_central_editar_conta_corpo_incompleto_17out2026](incident_central_editar_conta_corpo_incompleto_17out2026.md) — 17/10/2026 — editar conta da Central dava 400 "problem querying the system database": PUT /users/{id} ia incompleto; agora manda o corpo do formulário do painel.fun (system, password, full_name, bouquet…)
+- [incident_central_editar_conta_corpo_incompleto_17out2026](incident_central_editar_conta_corpo_incompleto_17out2026.md) — 17/10/2026 ✅ `8d11e9d` em produção, testado pela tela — editar conta da Central dava 400 "problem querying the system database": PUT /users/{id} ia incompleto; agora manda o corpo do formulário do painel.fun (system, password, full_name, bouquet…)
 - [incident_fast_editar_conta_senha_obrigatoria_17out2026](incident_fast_editar_conta_senha_obrigatoria_17out2026.md) — 17/10/2026 ✅ `1e1d6c9` em produção, testado pela tela — editar conta FAST dava "informações inválidas": `update_client` passou a exigir password; agora lê a senha atual via get_client e pula se nada mudou (COD 1002)
 - [project_idempotencia_chaves](project_idempotencia_chaves.md) — 12/10/2026 — Idempotency-Key em toda ação do navegador que altera dados; proxy recusa repetida com 409 (tabela idempotencia_chaves)
 - [incident_template_duplicado_post_reenviado_12out2026](incident_template_duplicado_post_reenviado_12out2026.md) — 12/10/2026 ✅ em produção — disparo de templates saía 2x (POST reenviado pelo navegador ao retomar a aba; servidor seguia mesmo com 499); regra: mesmo template, mesmo número, 1x por dia + trava de lote

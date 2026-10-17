@@ -12,6 +12,8 @@ metadata:
 
 **Correção:** o adapter monta esse mesmo corpo com os valores atuais da conta (vindos da listagem `users?…`, que já traz tudo isso, senha inclusive) e só troca o que foi editado. Testado com edição neutra no `williamlcasa` (mesmos valores) → `ok`, conta conferida igual depois. Doc do endpoint em `reference_endpoints_paineis_iptv.md`.
 
+✅ Em produção e testado pela tela em 17/10/2026: Jonas fez o deploy e refez a edição — funcionou.
+
 **Detalhe:** o rótulo no js-painel é `reseller_notes || full_name`; a edição grava em `reseller_notes` (campo "Notas" do site) e não mexe em `full_name`.
 
 **Lição:** mesmo padrão do FAST no mesmo dia (`incident_fast_editar_conta_senha_obrigatoria_17out2026`) — painel externo passou a recusar edição parcial; o caminho mais rápido foi ler o corpo que o próprio site envia (bundle JS público) em vez de chutar campos.
