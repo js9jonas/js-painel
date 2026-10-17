@@ -14,6 +14,8 @@ metadata:
 
 **Correção:** FAST lê `get_client` antes; vale por mais de 25 dias → não renova, devolve aviso "nenhum crédito gasto" e acerta a data no banco (testado na própria Marta: recusou, saldo igual). A rota grava `renovacao` no audit_log (usuário da sessão) sempre que o painel renovou de fato.
 
-📋 Os outros 10 adapters com `renovar` (CLUB, LIEBE, UNITV, Uniplay, NOW, NATV, Appacesso, SmartOne, IBO Pro, IBO Player) **não têm a trava** — mesmo risco com banco atrasado; decisão pendente com o Jonas.
+✅ `d206ca1` em produção (deploy confirmado pelo Jonas 17/10/2026).
+
+**Decisão do Jonas (17/10/2026): NÃO pôr a trava nos outros 10 adapters agora** (CLUB, LIEBE, UNITV, Uniplay, NOW, NATV, Appacesso, SmartOne, IBO Pro, IBO Player) — falha provavelmente rara. Se aparecer um caso novo, tratar o painel onde aconteceu e reavaliar os outros na mesma hora. Não repropor antes disso.
 
 **Lição:** teste que muda o painel tem que deixar o banco igual na mesma hora; quando a gravação for bloqueada, avisar claramente que a conta vai aparecer errada em /alertas até o sync.
