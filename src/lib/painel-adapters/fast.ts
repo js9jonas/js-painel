@@ -102,10 +102,16 @@ export function criarFastAdapter(creds: ServidorCredenciais, _id: number, _onSav
 
     async editarConta(usuario: string, campos: { novaSenha?: string; novoRotulo?: string }): Promise<ResultadoEdicao> {
       const { token, secret } = getCredentials(creds);
-      const body: Record<string, unknown> = { secret, username: usuario };
-      if (campos.novaSenha)   body.password = campos.novaSenha;
-      if (campos.novoRotulo !== undefined) body.notes = campos.novoRotulo;
-      await apiFetch(token, "update_client", body);
+      // update_client exige password em toda chamada (sem ela → "informações inválidas") e devolve
+      // "COD: 1002" quando nada muda (verificado 17/10/2026) — completa com a senha atual e pula se igual
+      const atual = await apiFetch(token, "get_client", { secret, username: usuario });
+      if (!atual?.password) {
+        return { ok: false, erro: "Não foi possível ler a conta atual no painel FAST para editar." };
+      }
+      const password = campos.novaSenha || atual.password;
+      const notes    = campos.novoRotulo !== undefined ? campos.novoRotulo : (atual.reseller_notes ?? "");
+      if (password === atual.password && notes === (atual.reseller_notes ?? "")) return { ok: true };
+      await apiFetch(token, "update_client", { secret, username: usuario, password, notes });
       return { ok: true };
     },
 

@@ -107,10 +107,10 @@ metadata:
 | `/get_clients_all/{token}` | POST | `{secret, page?, limit?}` | ✅ listarContas |
 | `/renew_client/{token}` | POST | `{secret, username, month}` | ✅ renovar |
 | `/profile/{token}` | POST | `{secret}` | ✅ getCreditos |
-| `/update_client/{token}` | POST | `{secret, username, password?, idbouquet?, notes?}` | ✅ editarConta |
+| `/update_client/{token}` | POST | `{secret, username, password, idbouquet?, notes?}` — **password obrigatório** (sem ele: "informações inválidas"); "COD: 1002" = nada mudou (17/10/2026) | ✅ editarConta (lê senha atual via get_client) |
 | `/trial_create/{token}` | POST | `{secret, username, password, idbouquet:[], notes?}` | ✅ gerarTeste (4h fixas) |
 | `/bouquets/{token}` | POST | `{secret}` | ✅ (no gerarTeste) |
-| `/get_client/{token}` | POST | `{secret, username}` | ❌ pendente |
+| `/get_client/{token}` | POST | `{secret, username}` | ✅ (no editarConta) |
 | `/block_client/{token}` | POST | `{secret, username, status:bool}` | ❌ pendente |
 | `/delete_client/{token}` | POST | `{secret, username}` | ❌ pendente |
 | `/screen_client/add/{token}` | POST | `{secret, username, connections}` | ❌ pendente |
