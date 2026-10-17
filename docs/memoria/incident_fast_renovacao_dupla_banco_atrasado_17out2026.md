@@ -16,6 +16,6 @@ metadata:
 
 ✅ `d206ca1` em produção (deploy confirmado pelo Jonas 17/10/2026).
 
-**Decisão do Jonas (17/10/2026): NÃO pôr a trava nos outros 10 adapters agora** (CLUB, LIEBE, UNITV, Uniplay, NOW, NATV, Appacesso, SmartOne, IBO Pro, IBO Player) — falha provavelmente rara. Se aparecer um caso novo, tratar o painel onde aconteceu e reavaliar os outros na mesma hora. Não repropor antes disso.
+**Decisão do Jonas (17/10/2026): NÃO pôr a trava nos outros 10 adapters agora** (CLUB, LIEBE, UNITV, Uniplay, NOW, NATV, Appacesso, SmartOne, IBO Pro, IBO Player) — falha provavelmente rara. Se aparecer um caso novo: **primeiro informar o Jonas** (painel, conta, o que aconteceu) e só mexer depois que ele decidir — nada de corrigir direto. Não repropor antes disso.
 
 **Lição:** teste que muda o painel tem que deixar o banco igual na mesma hora; quando a gravação for bloqueada, avisar claramente que a conta vai aparecer errada em /alertas até o sync.
