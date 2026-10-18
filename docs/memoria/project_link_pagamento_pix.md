@@ -64,7 +64,7 @@ Pedido do Jonas, preocupado com o painel, antes de ampliar a página do cliente 
 - O painel redireciona `/pagar/*` (308) pro endereço novo; `/api/pagar` no painel agora pede login. O webhook do Inter continua no endereço do painel (servidor→servidor), sem recadastrar.
 - A página `/pagar` sobrescreve os metadados do layout raiz (sem manifesto, título de app nem descrição do "JS Painel").
 - Host lido do cabeçalho `Host`, não de `req.nextUrl` (com AUTH_URL, o next-auth pode reescrever a origem). Constantes em `src/lib/enderecos.ts`.
-- DNS: `*.jssistemas.online` é wildcard pra VPS; falta só o domínio no Easypanel (serviço painel).
+- ✅ Em produção 18/10 (`ab3f32f`): domínio cadastrado no Easypanel (serviço painel, porta 80 interna como o painel; HTTPS Let's Encrypt). Conferido por `curl`: no cliente só /pagar responde e todo o resto dá 404 sem cookie; o painel ficou igual e redireciona /pagar.
 - 📋 Próximos passos da base (conversa de 18/10): usuário de banco próprio e fila de conexões pequena pras rotas públicas (o app usa `postgres` superusuário, pool padrão de 10); limite de requisições por IP; código de confirmação pelo WhatsApp antes de mostrar dado sensível (senha da conta). Ordem sugerida dos recursos: FAQ → dados da conta → indicações → pedidos de conteúdo (texto do cliente exibido no painel = maior risco de script injetado).
 
 ## Próximas fases (decididas em 18/10)
