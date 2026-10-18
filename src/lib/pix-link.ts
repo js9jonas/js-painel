@@ -8,8 +8,8 @@ import QRCode from "qrcode";
 import { pool } from "@/lib/db";
 import { registrarAudit } from "@/lib/audit";
 import { criarCob, consultarCob, novoTxid, type CobInter } from "@/lib/inter";
+import { URL_CLIENTE, URL_PAINEL } from "@/lib/enderecos";
 
-export const URL_PUBLICA = "https://painel.jssistemas.online";
 
 /** Validade da cobrança no Inter. Link aberto de novo dentro disso reaproveita o mesmo QR. */
 const EXPIRACAO_SEGUNDOS = 24 * 60 * 60;
@@ -66,7 +66,7 @@ export async function obterLinkCliente(idCliente: string): Promise<string> {
      LIMIT 1`,
     [idCliente, token]
   );
-  return `${URL_PUBLICA}/pagar/${rows[0].token}`;
+  return `${URL_CLIENTE}/pagar/${rows[0].token}`;
 }
 
 async function clientePorToken(token: string): Promise<{ id_cliente: string; nome: string } | null> {
@@ -314,7 +314,7 @@ async function avisarJonas(idCliente: string, valor: string, valorDiferente: boo
         chat_id: chatId,
         text: texto,
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "Abrir alertas", url: `${URL_PUBLICA}/alertas` }]] },
+        reply_markup: { inline_keyboard: [[{ text: "Abrir alertas", url: `${URL_PAINEL}/alertas` }]] },
       }),
     });
     if (!res.ok) console.error(`[pix-link] Telegram ${res.status}: ${(await res.text()).slice(0, 300)}`);

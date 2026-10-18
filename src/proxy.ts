@@ -1,9 +1,59 @@
 // src/proxy.ts  ← Next.js 16 renomeou middleware.ts para proxy.ts
 import { auth } from "@/auth"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server"
 import { registrarChaveIdempotencia } from "@/lib/idempotencia"
+import { HOST_CLIENTE } from "@/lib/enderecos"
 
-export default auth(async (req) => {
+// Dois endereços no mesmo app (18/10/2026):
+// - painel.jssistemas.online: o painel de gestão (login Google);
+// - cliente.jssistemas.online: só as páginas públicas do cliente (/pagar). Endereço separado =
+//   origem separada: os cookies de login do painel (__Host-/__Secure-, presos ao endereço exato)
+//   nunca chegam aqui, então um defeito numa página pública não age com a sessão do Jonas.
+//   Neste endereço não passa pelo login (nem pelo next-auth) e o que não for do cliente é 404.
+export default function proxy(req: NextRequest, ev: NextFetchEvent) {
+  const { pathname } = req.nextUrl
+  if (hostDaRequisicao(req) === HOST_CLIENTE) return proxyCliente(pathname)
+
+  // Rotas do next-auth e arquivos do "Instalar app" (o Chrome lê antes do login) seguem direto
+  if (
+    pathname.startsWith('/api/auth/') ||
+    pathname === '/manifest.webmanifest' ||
+    pathname.startsWith('/icons/')
+  ) {
+    return NextResponse.next()
+  }
+
+  // Link de pagamento aberto no endereço do painel (links enviados antes de 18/10/2026) → endereço do cliente
+  if (pathname.startsWith('/pagar/')) {
+    return NextResponse.redirect(`https://${HOST_CLIENTE}${pathname}`, 308)
+  }
+
+  return proxyPainel(req, ev)
+}
+
+// Host pelo cabeçalho Host (o Traefik repassa o original). Não usar req.nextUrl: com AUTH_URL
+// definido, o next-auth pode reescrever a origem da requisição pro endereço do painel.
+function hostDaRequisicao(req: NextRequest): string {
+  return (req.headers.get('host') ?? '').split(':')[0].trim().toLowerCase()
+}
+
+const CABECALHOS_CLIENTE: Record<string, string> = {
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Robots-Tag': 'noindex, nofollow',
+}
+
+function proxyCliente(pathname: string) {
+  const permitido = pathname.startsWith('/pagar/') || pathname.startsWith('/api/pagar/')
+  const res = permitido
+    ? NextResponse.next()
+    : new NextResponse('Página não encontrada', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+  for (const [k, v] of Object.entries(CABECALHOS_CLIENTE)) res.headers.set(k, v)
+  return res
+}
+
+const proxyPainel = auth(async (req) => {
   const { pathname } = req.nextUrl
 
   // Rotas públicas
@@ -12,11 +62,6 @@ export default auth(async (req) => {
   }
 
   if (pathname === '/sobre' || pathname.startsWith('/sobre/')) {
-    return NextResponse.next()
-  }
-
-  // Link de pagamento do cliente: o token do link é a autorização (src/lib/pix-link.ts)
-  if (pathname.startsWith('/pagar/') || pathname.startsWith('/api/pagar/')) {
     return NextResponse.next()
   }
 
@@ -75,7 +120,7 @@ export default auth(async (req) => {
   }
 
   return NextResponse.next()
-})
+}) as unknown as (req: NextRequest, ev: NextFetchEvent) => Promise<Response | undefined>
 
 // Consumidores (28/09/2026): cron local central_refresh_token.js → /api/interno/central-token.
 // (As rotas m3u-* do n8n saíram junto com os testes M3U — ver
@@ -87,6 +132,7 @@ function rotaAceitaTokenInterno(pathname: string): boolean {
 }
 
 export const config = {
-  // manifest.webmanifest e /icons/ ficam fora: o Chrome lê antes do login pra oferecer "Instalar app".
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
+  // api/auth, manifest.webmanifest e /icons/ entram no matcher pra o endereço do cliente poder
+  // recusá-los; no endereço do painel eles seguem direto, sem login (ver o início de proxy()).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }

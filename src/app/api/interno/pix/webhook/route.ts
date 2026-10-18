@@ -2,7 +2,7 @@
 // Uso único (ou ao trocar INTER_WEBHOOK_TOKEN): curl -X PUT com x-internal-token.
 import { NextResponse } from "next/server";
 import { configurarWebhook, consultarWebhook } from "@/lib/inter";
-import { URL_PUBLICA } from "@/lib/pix-link";
+import { URL_PAINEL } from "@/lib/enderecos";
 
 export const runtime = "nodejs";
 
@@ -20,7 +20,7 @@ export async function PUT() {
     return NextResponse.json({ erro: "INTER_WEBHOOK_TOKEN ausente ou curto (mínimo 32 caracteres)" }, { status: 500 });
   }
   try {
-    await configurarWebhook(`${URL_PUBLICA}/api/inter/webhook/${segredo}`);
+    await configurarWebhook(`${URL_PAINEL}/api/inter/webhook/${segredo}`);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ erro: err instanceof Error ? err.message : String(err) }, { status: 500 });

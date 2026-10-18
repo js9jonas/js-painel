@@ -5,9 +5,15 @@ import type { Metadata } from "next";
 import { dadosDoLink, qrSvg } from "@/lib/pix-link";
 import PagarCliente from "./PagarCliente";
 
+// Sobrescreve o que vem do layout raiz (feito pro painel): sem descrição, título de app nem
+// manifesto do "JS Painel" — a página do cliente não revela nada do painel.
 export const metadata: Metadata = {
   title: "Pagamento — JS Sistemas",
+  description: "Pagamento da sua assinatura",
   robots: { index: false, follow: false },
+  manifest: null,
+  appleWebApp: null,
+  icons: null,
 };
 
 export default async function PagarPage({ params }: { params: Promise<{ token: string }> }) {
