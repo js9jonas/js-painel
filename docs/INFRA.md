@@ -63,7 +63,7 @@ A **fonte** dos valores é a aba Ambiente do Easypanel. O `.env.local` do PC é 
 | Variável | Para quê | Onde há cópia do valor / como recriar |
 |---|---|---|
 | `DATABASE_URL` | Banco, usuário `postgres` (painel inteiro) | Easypanel; senha do postgres guardada pelo Jonas |
-| `DATABASE_URL_PORTAL` | Banco, usuário `app_portal_cliente` (só páginas do cliente) | `~/.secrets/portal_cliente_postgres_18out2026.txt` no PC do Jonas |
+| `DATABASE_URL_PORTAL` | Banco, usuário `app_portal_cliente` (só páginas do cliente) | Easypanel (e `.env.local`, apontando pro túnel). Perdeu? Gerar senha nova: `ALTER ROLE app_portal_cliente PASSWORD '…'` como postgres e trocar a variável |
 | `AUTH_SECRET`, `AUTH_URL` | Login (next-auth) | Easypanel. `AUTH_URL` = endereço do painel |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Login Google | Google Cloud (memória `reference_google_cloud_oauth`) |
 | `INTER_CLIENT_ID`, `INTER_CLIENT_SECRET`, `INTER_CERT_BASE64`, `INTER_KEY_BASE64`, `INTER_ACCOUNT_NUMBER` | API Pix do Inter (integração "js-painel-pix-link") | Bitwarden (Nota "Inter API — js-painel-pix-link") e `~/.config/js-painel-inter/`. BASE64 = `base64 -w0` do `.crt`/`.key` |
@@ -169,6 +169,6 @@ Se um dia o painel rodar com mais de uma réplica:
 | O quê | Onde |
 |---|---|
 | Certificado, chave e credenciais da API do Inter | Bitwarden (Nota "Inter API — js-painel-pix-link") e `~/.config/js-painel-inter/js-painel-pix-link_2026-10-18/` |
-| Senha do `app_portal_cliente` | `~/.secrets/portal_cliente_postgres_18out2026.txt` |
+| Senha do `app_portal_cliente` | Só no Easypanel e no `.env.local` (arquivo em `~/.secrets` apagado em 18/10/2026). Dá pra trocar a qualquer momento com `ALTER ROLE` |
 | Senhas das roles `app_*` | `~/.secrets/roles_postgres_least_privilege_14ago2026.sql` |
 | Demais credenciais de APIs | Google Drive → "JS Sistemas / Credenciais — APIs e Serviços" |
