@@ -123,7 +123,7 @@ export default async function AlertasPage() {
                     <div className="px-5 py-4 bg-teal-50 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-semibold text-teal-900">💸 Pix recebido pelo link — renovar</p>
-                            <p className="text-xs text-teal-700 mt-0.5">Abra o cliente e renove como de costume (forma INTER); some daqui sozinho</p>
+                            <p className="text-xs text-teal-700 mt-0.5">Atrasada, vencendo hoje ou pendente renova sozinha; aqui ficam as outras (renove como de costume, forma INTER — some daqui sozinho)</p>
                         </div>
                         <span className="text-2xl font-bold text-teal-900 mr-3">{pixRecebidos.length}</span>
                     </div>
@@ -176,6 +176,11 @@ export default async function AlertasPage() {
                                                 )}
                                                 {valorDiferente && (
                                                     <div className="text-xs font-semibold text-red-600">⚠️ Pago R$ {Number(p.valor_pago).toFixed(2).replace(".", ",")}, cobrado R$ {Number(p.valor_cobrado).toFixed(2).replace(".", ",")}</div>
+                                                )}
+                                                {p.processado_em === null ? (
+                                                    <div className="text-xs font-medium text-sky-700">⏳ renovando sozinho…</div>
+                                                ) : p.motivo && (
+                                                    <div className="text-xs font-medium text-amber-700">{p.motivo}</div>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-xs text-zinc-500">

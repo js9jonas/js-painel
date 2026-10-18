@@ -129,7 +129,7 @@ Se um dia o painel rodar com mais de uma réplica:
 - **Limite de requisições por IP** (`src/lib/limite-requisicoes.ts`) está em memória: cada réplica contaria
   sozinha. Levar pra Redis ou pro banco.
 - **Jobs em segundo plano** (`src/instrumentation.ts`: sessão do CLUB, saldo dos servidores, saldo de
-  captcha, conferência de Pix a cada 5 min) rodariam em todas as réplicas. Precisaria eleger uma só
+  captcha, conferência de Pix e renovação automática do Pix pago a cada 5 min) rodariam em todas as réplicas. A renovação automática já tem trava por item no banco (`pix_cobranca_itens.processando_desde`), então não renovaria em dobro; as outras não têm. Precisaria eleger uma só
   (trava no banco, por exemplo `pg_try_advisory_lock`) ou mover pra um serviço de jobs.
 
 ## 8. Checklists de migração

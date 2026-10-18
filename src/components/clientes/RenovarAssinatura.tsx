@@ -3,8 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
+import {
+    MESES,
+    type Periodo,
+    addMeses as addMesesBase,
+    calcVencContrato as calcVencContratoBase,
+    calcVencContratoPendente as calcVencContratoPendenteBase,
+    vencContasVencida as vencContasVencidaBase,
+    contaPrecisaRenovarNoPainel,
+} from "@/lib/datas-renovacao";
 
-type Periodo = "mensal" | "trimestral" | "semestral" | "anual";
 type StatusFinal = "ativo" | "pendente";
 
 type ContaVinculada = {
@@ -23,31 +31,24 @@ type ResultadoConta = {
 };
 
 const FORMAS_PGTO = ["INTER", "Nu PJ", "Nubank", "Lotérica", "Cortesia", "Dinheiro", "Sicredi", "Caixa", "Banrisul", "Outro"];
-const MESES: Record<Periodo, number> = { mensal: 1, trimestral: 3, semestral: 6, anual: 12 };
 
 function hojeStr(): string {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Regras de data em src/lib/datas-renovacao.ts (as mesmas da renovação automática do Pix);
+// aqui só com o "hoje" do navegador.
 function addMeses(dataStr: string | null | undefined, meses: number): string {
-    const base = new Date((dataStr ?? hojeStr()) + "T00:00:00");
-    base.setMonth(base.getMonth() + meses);
-    return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
+    return addMesesBase(dataStr, meses, hojeStr());
 }
 
-function calcVencContrato(
-    vencAtual: string | null | undefined,
-    periodo: Periodo,
-): string {
-    return addMeses(vencAtual ?? undefined, MESES[periodo]);
+function calcVencContrato(vencAtual: string | null | undefined, periodo: Periodo): string {
+    return calcVencContratoBase(vencAtual, periodo, hojeStr());
 }
 
-// Pendente: o mês em aberto já foi somado ao vencimento quando a assinatura virou pendente,
-// então um pagamento de N meses só acrescenta N-1 (trimestral +2, semestral +5, anual +11).
 function calcVencContratoPendente(vencAtual: string | null | undefined, periodo: Periodo): string {
-    if (!vencAtual) return ""; // sem vencimento: não inventa data, operador preenche se quiser
-    return addMeses(vencAtual.split("T")[0], MESES[periodo] - 1);
+    return calcVencContratoPendenteBase(vencAtual, periodo, hojeStr());
 }
 
 const OPCOES_PERIODO: { value: Periodo; label: string }[] = [
@@ -58,20 +59,11 @@ const OPCOES_PERIODO: { value: Periodo; label: string }[] = [
 ];
 
 function vencContasVencida(vencContasAtual: string | null | undefined): boolean {
-    if (!vencContasAtual) return false;
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const venc = new Date(vencContasAtual.split("T")[0] + "T00:00:00");
-    return venc <= hoje;
+    return vencContasVencidaBase(vencContasAtual, hojeStr());
 }
 
 function contasExpiradas(contas: ContaVinculada[]): ContaVinculada[] {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    return contas.filter(c => {
-        if (!c.vencimento_real_painel || c.id_painel_servidor === null) return false;
-        return new Date(c.vencimento_real_painel.split("T")[0] + "T00:00:00") <= hoje;
-    });
+    return contas.filter((c) => contaPrecisaRenovarNoPainel(c, hojeStr()));
 }
 
 /**

@@ -86,9 +86,11 @@ export async function registrarAudit(
     descricao?: string | null;
     dados_antes?: Record<string, unknown> | null;
     dados_depois?: Record<string, unknown> | null;
+    /** Quem fez, quando não há sessão (ex.: "pix-automatico"). Sem isso, o e-mail da sessão. */
+    usuario?: string | null;
   }
 ) {
-  const usuario = await usuarioAtual();
+  const usuario = params.usuario ?? (await usuarioAtual());
   await client.query(
     `INSERT INTO public.audit_log
        (tipo, id_cliente, id_assinatura, id_app_registro, descricao, dados_antes, dados_depois, usuario)

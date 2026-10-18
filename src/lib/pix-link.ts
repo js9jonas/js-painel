@@ -2,7 +2,8 @@
 // Cada cliente tem um link fixo /pagar/<token>. A página lista as assinaturas, o cliente escolhe e
 // a cobrança imediata (cob) é criada no Inter nessa hora. O Pix pago é confirmado pelo txid
 // (webhook do Inter, consulta da própria página ou o job de conferência) e cai em /alertas.
-// Fase 1: NADA renova sozinho — ver docs/memoria/project_link_pagamento_pix.md.
+// Fase 2 (18/10/2026): depois de confirmado, src/lib/pix-renovacao.ts renova sozinho o que estiver
+// atrasado/vencendo hoje e manda o resto pra /alertas — ver docs/memoria/project_link_pagamento_pix.md.
 // Bancos: o que a página pública faz com dado do visitante (token, assinaturas escolhidas, txid)
 // usa dbPortal() — usuário app_portal_cliente, só lê as colunas da página e cria cobranças.
 // O resto (link, confirmação do Pix com audit_log, /alertas, job) roda no pool do painel.
@@ -12,7 +13,8 @@ import { pool } from "@/lib/db";
 import { dbPortal } from "@/lib/db-portal";
 import { registrarAudit } from "@/lib/audit";
 import { criarCob, consultarCob, novoTxid, type CobInter } from "@/lib/inter";
-import { URL_CLIENTE, URL_PAINEL } from "@/lib/enderecos";
+import { URL_CLIENTE } from "@/lib/enderecos";
+import { processarPixPagos } from "@/lib/pix-renovacao";
 
 
 /** Validade da cobrança no Inter. Link aberto de novo dentro disso reaproveita o mesmo QR. */
@@ -278,7 +280,7 @@ export async function confirmarCobranca(txid: string): Promise<"paga" | "ja_paga
       tipo: "pix_link",
       id_cliente: c.id_cliente,
       id_assinatura: itens.length === 1 ? itens[0].id_assinatura : null,
-      descricao: `Pix pelo link recebido: R$ ${Number(pix.valor).toFixed(2).replace(".", ",")} (ainda não renovado)`,
+      descricao: `Pix pelo link recebido: R$ ${Number(pix.valor).toFixed(2).replace(".", ",")}`,
       dados_depois: {
         txid,
         end_to_end_id: pix.endToEndId,
@@ -288,43 +290,17 @@ export async function confirmarCobranca(txid: string): Promise<"paga" | "ja_paga
       },
     });
     await client.query("COMMIT");
-    avisarJonas(c.id_cliente, pix.valor, Number(pix.valor) !== Number(c.valor)).catch(() => {});
+    // Fase 2: renova sozinho o que estiver atrasado/vencendo hoje, avisa o Jonas no Telegram.
+    // Sem await: o aviso do Inter e a tela do cliente não esperam a renovação no painel.
+    processarPixPagos().catch((err) =>
+      console.error("[pix-link] processamento do Pix falhou:", err instanceof Error ? err.message : err)
+    );
     return "paga";
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
   } finally {
     client.release();
-  }
-}
-
-async function avisarJonas(idCliente: string, valor: string, valorDiferente: boolean): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID_JONAS;
-  if (!botToken || !chatId) return;
-  const { rows } = await pool.query<{ nome: string }>(
-    `SELECT nome FROM public.clientes WHERE id_cliente = $1::bigint`,
-    [idCliente]
-  );
-  const texto =
-    `💸 Pix pelo link: <b>${(rows[0]?.nome ?? `#${idCliente}`).replace(/[<>&]/g, "")}</b> — ` +
-    `R$ ${Number(valor).toFixed(2).replace(".", ",")}` +
-    (valorDiferente ? "\n⚠️ Valor diferente do cobrado — conferir." : "") +
-    `\nFalta renovar (em /alertas).`;
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: texto,
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "Abrir alertas", url: `${URL_PAINEL}/alertas` }]] },
-      }),
-    });
-    if (!res.ok) console.error(`[pix-link] Telegram ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  } catch (err) {
-    console.error("[pix-link] falha ao avisar no Telegram:", err instanceof Error ? err.message : err);
   }
 }
 
@@ -342,11 +318,14 @@ export type PixAlertaRow = {
   valor_pago: string;
   pago_em: string;
   ultimo_pagamento: string | null;
+  /** null = ainda sendo processado (renovação automática em andamento ou na fila). */
+  processado_em: string | null;
+  motivo: string | null;
 };
 
 /**
  * Assinaturas pagas pelo link que ainda não foram renovadas. Some sozinha quando aparece um
- * pagamento da assinatura registrado depois do Pix (renovação pelo botão), ou ao dispensar.
+ * pagamento da assinatura registrado depois do Pix (renovação automática ou pelo botão), ou ao dispensar.
  */
 export async function getPixParaRenovar(): Promise<PixAlertaRow[]> {
   const { rows } = await pool.query<PixAlertaRow>(
@@ -354,7 +333,7 @@ export async function getPixParaRenovar(): Promise<PixAlertaRow[]> {
             a.identificacao, a.status, a.venc_contrato::text,
             CONCAT(p.tipo, ' ', p.telas, CASE WHEN p.telas = 1 THEN ' tela' ELSE ' telas' END) AS plano,
             i.valor::text AS valor_item, c.valor::text AS valor_cobrado, c.valor_pago::text,
-            c.pago_em::text,
+            c.pago_em::text, i.processado_em::text, i.motivo,
             (SELECT MAX(pg.data_pgto)::text FROM public.pagamentos pg WHERE pg.id_assinatura = i.id_assinatura) AS ultimo_pagamento
      FROM public.pix_cobrancas c
      JOIN public.pix_cobranca_itens i ON i.id_cobranca = c.id
@@ -400,9 +379,13 @@ export async function conferirCobrancasAbertas(): Promise<void> {
 /** Job de conferência (instrumentation.ts): a cada 5 min, além do aviso do Inter e da tela do cliente. */
 const INTERVALO_CONFERENCIA_MS = 5 * 60 * 1000;
 export function iniciarConferenciaPix() {
-  setInterval(() => {
-    conferirCobrancasAbertas().catch((err) =>
+  setInterval(async () => {
+    await conferirCobrancasAbertas().catch((err) =>
       console.error("[pix-link] conferência falhou:", err instanceof Error ? err.message : err)
+    );
+    // Retenta o que ficou pra trás (processo reiniciado no meio, item travado há mais de 15 min)
+    await processarPixPagos().catch((err) =>
+      console.error("[pix-link] processamento do Pix falhou:", err instanceof Error ? err.message : err)
     );
   }, INTERVALO_CONFERENCIA_MS);
 }
