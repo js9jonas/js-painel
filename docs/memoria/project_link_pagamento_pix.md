@@ -78,6 +78,7 @@ Regra do Jonas: Pix confirmado e assinatura **atrasada ou vencendo hoje** → re
 - **Telegram:** um aviso por Pix com o que renovou sozinho (até quando, e cada conta do painel ok/erro) e o que ficou pra ele (motivo). Substituiu o aviso "falta renovar" da fase 1.
 - **Card em /alertas:** mostra o motivo, ou "⏳ renovando sozinho…" enquanto processa; itens renovados somem (o pagamento registrado esconde).
 - **Testado 18/10 (local, contra o banco, cliente de teste apagado):** regra 11/11, datas 5/5 (inclui 31/01 + 1 mês igual ao botão), ponta a ponta com 5 cenários e dois processamentos em paralelo (cada item uma vez só), rotas do botão (normal, pendente, 404, erros da rota do painel) com sessão local. **Não testado:** renovação de conta real no painel do fornecedor (gastaria crédito) — a função é a mesma do botão.
+- ✅ Em produção 18/10 (`cacba7c`): container novo subiu limpo, painel/cliente/webhook conferidos por `curl`. 📋 Falta o 1º Pix real de assinatura vencida renovando sozinho (teste do Jonas).
 - 📋 Risco que ficou: Pix renovou sozinho e depois o Jonas renova de novo pelo comprovante (o botão ainda não avisa). Mitigação hoje: o aviso do Telegram e a mensagem de renovação ao cliente. Próximo passo possível: o modal do Renovar avisar "Pix pelo link já renovou esta assinatura hoje".
 
 ## Próximas fases (decididas em 18/10)
