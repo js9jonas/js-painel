@@ -10,7 +10,7 @@ export async function GET() {
   try {
     return NextResponse.json(await consultarWebhook());
   } catch (err) {
-    return NextResponse.json({ erro: err instanceof Error ? err.message : String(err) }, { status: 502 });
+    return NextResponse.json({ erro: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }
 
@@ -23,6 +23,6 @@ export async function PUT() {
     await configurarWebhook(`${URL_PUBLICA}/api/inter/webhook/${segredo}`);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ erro: err instanceof Error ? err.message : String(err) }, { status: 502 });
+    return NextResponse.json({ erro: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

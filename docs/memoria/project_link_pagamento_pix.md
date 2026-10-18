@@ -49,6 +49,13 @@ O certificado da antiga "js-painel-cobrancas" (23/06) se perdeu, e o Inter só d
 3. Teste real: Jonas paga o link de um cliente de teste e confere o card e o Telegram.
 4. Conferir a tarifa de QR dinâmico do Inter Empresas.
 
+## Produção (18/10/2026)
+
+- Deploy de `ac79f2e` feito pelo Jonas. `curl` sem sessão ok: /pagar inválido, webhook com segredo errado (401), rotas logadas → login.
+- **Webhook cadastrado no Inter** às 16:37 (`PUT /api/interno/pix/webhook`); a consulta devolve a URL com o segredo na chave CNPJ.
+- Pegadinha: rota que responde **502/503** vira a página "Service is not reachable" do Easypanel, sem log. As rotas do link Pix passaram a usar 500 (commit seguinte ao `ac79f2e`).
+- 📋 Falta o 1º Pix real pelo link (cliente de teste) e conferir se o aviso do Inter chega (log `[pix-webhook]`), e com qual sufixo de URL.
+
 ## Próximas fases (decididas em 18/10)
 
 - **Fase 2:** Pix confirmado e assinatura **atrasada ou vencendo hoje** → renova sozinha, igual ao botão Renovar (banco + pagamento INTER + contas vencidas no painel + WhatsApp). Senão, continua indo pro card. Exige levar pro servidor a lógica que hoje está no navegador (`RenovarAssinatura.tsx` → `renovarContasViaAPI`) e não renovar se já houver pagamento recente da assinatura.

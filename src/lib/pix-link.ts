@@ -174,7 +174,7 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
   // ninguém tem o QR dela; o contrário deixaria uma cobrança no banco que não existe no Inter.
   const txid = novoTxid();
   const cob = await criarCob(txid, valor, EXPIRACAO_SEGUNDOS, "Assinatura JS Sistemas");
-  if (!cob.pixCopiaECola) throw new ErroLink("O banco não devolveu o código Pix. Tente de novo.", 502);
+  if (!cob.pixCopiaECola) throw new ErroLink("O banco não devolveu o código Pix. Tente de novo.", 500);
 
   const client = await pool.connect();
   try {

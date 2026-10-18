@@ -6,6 +6,9 @@ import { ErroInter } from "@/lib/inter";
 
 export const runtime = "nodejs";
 
+// Erros saem como 500, nunca 502/503/504: o Easypanel troca essas respostas pela página
+// "Service is not reachable" e o cliente perderia a mensagem (visto em 18/10/2026).
+
 export async function POST(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
   const body = await req.json().catch(() => null);
@@ -29,6 +32,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     const msg = err instanceof ErroInter
       ? "O banco não respondeu agora. Tente de novo em alguns minutos."
       : "Não deu certo agora. Tente de novo em alguns minutos.";
-    return NextResponse.json({ erro: msg }, { status: 502 });
+    return NextResponse.json({ erro: msg }, { status: 500 });
   }
 }

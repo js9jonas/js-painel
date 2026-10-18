@@ -13,6 +13,6 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ token: str
     return NextResponse.json({ pago: cob.pago_em !== null, expiraEm: cob.expira_em });
   } catch (err) {
     console.error("[pagar] falha ao consultar cobrança:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ pago: false }, { status: 503 });
+    return NextResponse.json({ pago: false }, { status: 500 });
   }
 }
