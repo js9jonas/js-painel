@@ -3,6 +3,7 @@ import { auth } from "@/auth"
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server"
 import { registrarChaveIdempotencia } from "@/lib/idempotencia"
 import { HOST_CLIENTE } from "@/lib/enderecos"
+import { dentroDoLimite, ipDoVisitante } from "@/lib/limite-requisicoes"
 
 // Dois endereços no mesmo app (18/10/2026):
 // - painel.jssistemas.online: o painel de gestão (login Google);
@@ -12,7 +13,7 @@ import { HOST_CLIENTE } from "@/lib/enderecos"
 //   Neste endereço não passa pelo login (nem pelo next-auth) e o que não for do cliente é 404.
 export default function proxy(req: NextRequest, ev: NextFetchEvent) {
   const { pathname } = req.nextUrl
-  if (hostDaRequisicao(req) === HOST_CLIENTE) return proxyCliente(pathname)
+  if (hostDaRequisicao(req) === HOST_CLIENTE) return proxyCliente(req)
 
   // Rotas do next-auth e arquivos do "Instalar app" (o Chrome lê antes do login) seguem direto
   if (
@@ -44,11 +45,41 @@ const CABECALHOS_CLIENTE: Record<string, string> = {
   'X-Robots-Tag': 'noindex, nofollow',
 }
 
-function proxyCliente(pathname: string) {
-  const permitido = pathname.startsWith('/pagar/') || pathname.startsWith('/api/pagar/')
-  const res = permitido
-    ? NextResponse.next()
-    : new NextResponse('Página não encontrada', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+// Limites por IP no endereço do cliente (avisar o Jonas se mudar). Ao passar: 429 com mensagem simples.
+// - abrir a página: 30/min (recarregar várias vezes ainda cabe)
+// - gerar Pix: 10 a cada 10 min (o teto de 20 cobranças/dia por cliente segue valendo, em pix-link.ts)
+// - "já pagou?": 40/min (a tela pergunta a cada 5 s = 12/min; cabe 3 abas abertas)
+const LIMITES_CLIENTE = {
+  pagina: { maximo: 30, janelaMs: 60_000 },
+  gerar: { maximo: 10, janelaMs: 10 * 60_000 },
+  situacao: { maximo: 40, janelaMs: 60_000 },
+}
+
+function proxyCliente(req: NextRequest) {
+  const { pathname } = req.nextUrl
+  const ehPagina = pathname.startsWith('/pagar/')
+  const ehApi = pathname.startsWith('/api/pagar/')
+
+  let res: NextResponse
+  if (!ehPagina && !ehApi) {
+    res = new NextResponse('Página não encontrada', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+  } else {
+    // /api/pagar/<token> = gerar Pix; /api/pagar/<token>/<txid> = "já pagou?"
+    const tipo: keyof typeof LIMITES_CLIENTE = ehPagina
+      ? 'pagina'
+      : pathname.split('/').filter(Boolean).length >= 4 ? 'situacao' : 'gerar'
+    const { maximo, janelaMs } = LIMITES_CLIENTE[tipo]
+    const ip = ipDoVisitante(req.headers.get('x-forwarded-for'))
+    if (dentroDoLimite(`${tipo}:${ip}`, maximo, janelaMs)) {
+      res = NextResponse.next()
+    } else {
+      const msg = 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.'
+      res = ehApi
+        ? NextResponse.json({ erro: msg }, { status: 429 })
+        : new NextResponse(msg, { status: 429, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      res.headers.set('Retry-After', String(Math.ceil(janelaMs / 1000)))
+    }
+  }
   for (const [k, v] of Object.entries(CABECALHOS_CLIENTE)) res.headers.set(k, v)
   return res
 }

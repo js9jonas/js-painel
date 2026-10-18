@@ -18,7 +18,23 @@ export const metadata: Metadata = {
 
 export default async function PagarPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const dados = await dadosDoLink(token);
+  let dados: Awaited<ReturnType<typeof dadosDoLink>>;
+  try {
+    dados = await dadosDoLink(token);
+  } catch (err) {
+    console.error("[pagar] falha ao abrir a página:", err instanceof Error ? err.message : err);
+    return (
+      <div className="min-h-screen bg-zinc-50 text-zinc-900">
+        <main className="mx-auto max-w-md px-4 py-8">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">JS Sistemas</p>
+          <div className="mt-6 rounded-2xl border bg-white p-6 text-center">
+            <p className="text-lg font-semibold">Página indisponível no momento</p>
+            <p className="mt-2 text-sm text-zinc-600">Tente de novo em alguns minutos.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">

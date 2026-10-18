@@ -5,9 +5,10 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL não definido");
 }
 
+// SSL vem da própria URL: sem `sslmode` = sem SSL (o banco na mesma VPS); banco gerenciado
+// externo → acrescentar `?sslmode=require` na DATABASE_URL, sem mexer aqui (docs/INFRA.md).
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false,
 });
 
 pool.on("connect", (client) => {

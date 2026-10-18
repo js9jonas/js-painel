@@ -89,6 +89,10 @@ Quando não há template aprovado pela Meta para um tipo de mensagem (ex: agrade
 
 O header `x-internal-token` (= `INTERNAL_API_TOKEN`) só libera o login nas rotas de `ROTAS_TOKEN_INTERNO` (vazia desde a remoção dos testes M3U) + prefixo `/api/interno/` (restrito em 28/09/2026 — antes valia pra toda `/api/*` e o token vazou neste repo público). **Rota nova chamada por serviço externo com esse header precisa entrar nessa lista**, senão recebe 307 pro login. No n8n, criar/usar uma credencial httpHeaderAuth com o token, nunca o valor literal no nó (a antiga `js-painel — token interno` foi apagada em 28/09 junto com os testes M3U). Commits passam pelo hook `.githooks/pre-commit` (scanner de segredos) — ativar em clone novo com `git config core.hooksPath .githooks`.
 
+## Infraestrutura e migração
+
+`docs/INFRA.md` lista domínios, variáveis de ambiente (só nomes), usuários do banco, volumes, quem chama o painel de fora e os checklists pra banco separado / nova VPS. **Toda mudança de infraestrutura atualiza esse arquivo no mesmo commit.** Páginas públicas do cliente (`cliente.jssistemas.online`) usam o usuário de banco `app_portal_cliente` via `dbPortal()` (`src/lib/db-portal.ts`) — nunca o `pool` do painel em código que recebe dado do visitante.
+
 ## Memória do projeto
 
 Antes de mexer em áreas cobertas por decisões/incidentes passados, ler docs/memoria/README.md (índice) — migrado da memória global do Claude Code em 24/08/2026.

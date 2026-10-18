@@ -3,9 +3,13 @@
 // a cobrança imediata (cob) é criada no Inter nessa hora. O Pix pago é confirmado pelo txid
 // (webhook do Inter, consulta da própria página ou o job de conferência) e cai em /alertas.
 // Fase 1: NADA renova sozinho — ver docs/memoria/project_link_pagamento_pix.md.
+// Bancos: o que a página pública faz com dado do visitante (token, assinaturas escolhidas, txid)
+// usa dbPortal() — usuário app_portal_cliente, só lê as colunas da página e cria cobranças.
+// O resto (link, confirmação do Pix com audit_log, /alertas, job) roda no pool do painel.
 import { randomBytes } from "crypto";
 import QRCode from "qrcode";
 import { pool } from "@/lib/db";
+import { dbPortal } from "@/lib/db-portal";
 import { registrarAudit } from "@/lib/audit";
 import { criarCob, consultarCob, novoTxid, type CobInter } from "@/lib/inter";
 import { URL_CLIENTE, URL_PAINEL } from "@/lib/enderecos";
@@ -71,7 +75,7 @@ export async function obterLinkCliente(idCliente: string): Promise<string> {
 
 async function clientePorToken(token: string): Promise<{ id_cliente: string; nome: string } | null> {
   if (!FORMATO_TOKEN.test(token)) return null;
-  const { rows } = await pool.query<{ id_cliente: string; nome: string }>(
+  const { rows } = await dbPortal().query<{ id_cliente: string; nome: string }>(
     `SELECT c.id_cliente::text, c.nome
      FROM public.pix_links l JOIN public.clientes c ON c.id_cliente = l.id_cliente
      WHERE l.token = $1`,
@@ -81,7 +85,7 @@ async function clientePorToken(token: string): Promise<{ id_cliente: string; nom
 }
 
 async function assinaturasPagaveis(idCliente: string): Promise<AssinaturaLink[]> {
-  const { rows } = await pool.query<AssinaturaLink>(
+  const { rows } = await dbPortal().query<AssinaturaLink>(
     `SELECT a.id_assinatura::text, a.identificacao, a.status,
             CONCAT(p.tipo, ' ', p.telas, CASE WHEN p.telas = 1 THEN ' tela' ELSE ' telas' END) AS plano,
             p.meses, p.valor::text AS valor, a.venc_contrato::text AS venc_contrato
@@ -107,7 +111,7 @@ export async function dadosDoLink(token: string): Promise<DadosLink | null> {
   if (!cliente) return null;
   const [assinaturas, abertas] = await Promise.all([
     assinaturasPagaveis(cliente.id_cliente),
-    pool.query<CobrancaLink>(
+    dbPortal().query<CobrancaLink>(
       `${SELECT_COBRANCA}
        WHERE c.id_cliente = $1::bigint AND c.status = 'ATIVA' AND c.expira_em > now() + $2::interval
        ORDER BY c.criado_em DESC LIMIT 1`,
@@ -150,7 +154,7 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
   const valor = escolhidas.reduce((s, a) => s + Number(a.valor), 0);
 
   // Mesma seleção com cobrança ainda válida: devolve o mesmo QR (cliente recarregou a página).
-  const { rows: existente } = await pool.query<CobrancaLink>(
+  const { rows: existente } = await dbPortal().query<CobrancaLink>(
     `${SELECT_COBRANCA}
      WHERE c.id_cliente = $1::bigint AND c.status = 'ATIVA' AND c.expira_em > now() + $2::interval
      ORDER BY c.criado_em DESC`,
@@ -161,7 +165,7 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
   );
   if (igual) return igual;
 
-  const { rows: cont } = await pool.query<{ n: number }>(
+  const { rows: cont } = await dbPortal().query<{ n: number }>(
     `SELECT COUNT(*)::int AS n FROM public.pix_cobrancas
      WHERE id_cliente = $1::bigint AND criado_em > now() - interval '24 hours'`,
     [cliente.id_cliente]
@@ -176,7 +180,7 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
   const cob = await criarCob(txid, valor, EXPIRACAO_SEGUNDOS, "Assinatura JS Sistemas");
   if (!cob.pixCopiaECola) throw new ErroLink("O banco não devolveu o código Pix. Tente de novo.", 500);
 
-  const client = await pool.connect();
+  const client = await dbPortal().connect();
   try {
     await client.query("BEGIN");
     const { rows } = await client.query<{ id: string }>(
@@ -200,7 +204,7 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
     client.release();
   }
 
-  const { rows: criada } = await pool.query<CobrancaLink>(`${SELECT_COBRANCA} WHERE c.txid = $1`, [txid]);
+  const { rows: criada } = await dbPortal().query<CobrancaLink>(`${SELECT_COBRANCA} WHERE c.txid = $1`, [txid]);
   return criada[0];
 }
 
@@ -208,7 +212,7 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
 export async function situacaoCobranca(token: string, txid: string): Promise<CobrancaLink | null> {
   const cliente = await clientePorToken(token);
   if (!cliente) return null;
-  const { rows } = await pool.query<CobrancaLink>(
+  const { rows } = await dbPortal().query<CobrancaLink>(
     `${SELECT_COBRANCA}
      WHERE c.txid = $1 AND c.id_cliente = $2::bigint`,
     [txid, cliente.id_cliente]
@@ -217,10 +221,11 @@ export async function situacaoCobranca(token: string, txid: string): Promise<Cob
   if (!cob) return null;
   const recente = cob.consultado_em && Date.now() - new Date(cob.consultado_em).getTime() < INTERVALO_CONSULTA_MS;
   if (cob.status === "ATIVA" && !recente) {
+    // Gravação da confirmação fica no lado do painel: o usuário do portal não altera cobrança
     await confirmarCobranca(txid).catch((err) =>
       console.error(`[pix-link] consulta ${txid} falhou:`, err instanceof Error ? err.message : err)
     );
-    const { rows: depois } = await pool.query<CobrancaLink>(`${SELECT_COBRANCA} WHERE c.txid = $1`, [txid]);
+    const { rows: depois } = await dbPortal().query<CobrancaLink>(`${SELECT_COBRANCA} WHERE c.txid = $1`, [txid]);
     return depois[0];
   }
   return cob;
