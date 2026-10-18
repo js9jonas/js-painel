@@ -169,17 +169,19 @@ export async function deleteAssinatura(
       `SELECT
          (SELECT COUNT(*) FROM public.pagamentos  WHERE id_assinatura = $1::bigint)::int AS pagamentos,
          (SELECT COUNT(*) FROM public.contas      WHERE id_assinatura = $1::bigint)::int AS contas,
-         (SELECT COUNT(*) FROM public.aplicativos WHERE id_assinatura = $1::bigint)::int AS aplicativos`,
+         (SELECT COUNT(*) FROM public.aplicativos WHERE id_assinatura = $1::bigint)::int AS aplicativos,
+         (SELECT COUNT(*) FROM public.pix_cobranca_itens WHERE id_assinatura = $1::bigint)::int AS pix_link`,
       [id_assinatura]
     );
-    const { pagamentos, contas, aplicativos } = vinc[0];
+    const { pagamentos, contas, aplicativos, pix_link } = vinc[0];
 
-    if (pagamentos > 0 || contas > 0 || aplicativos > 0) {
+    if (pagamentos > 0 || contas > 0 || aplicativos > 0 || pix_link > 0) {
       await client.query("ROLLBACK");
       const partes: string[] = [];
       if (pagamentos > 0) partes.push(`${pagamentos} pagamento(s)`);
       if (contas > 0) partes.push(`${contas} conta(s)`);
       if (aplicativos > 0) partes.push(`${aplicativos} aplicativo(s)`);
+      if (pix_link > 0) partes.push(`${pix_link} cobrança(s) Pix pelo link`);
       return {
         ok: false,
         error: `Não é possível excluir: assinatura tem ${partes.join(", ")} vinculado(s). Remova esses vínculos antes.`,

@@ -48,7 +48,8 @@ export type AuditTipo =
   | "renovacao"
   | "exclusao_pagamento"
   | "servidor_app"
-  | "servidor_host";
+  | "servidor_host"
+  | "pix_link";
 
 /**
  * E-mail do usuário logado, ou null fora de uma sessão (n8n/cron) ou se a

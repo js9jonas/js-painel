@@ -15,6 +15,8 @@ import RenovarViaAPIButton from "@/components/alertas/RenovarViaAPIButton";
 import VerificarContaButton from "@/components/clientes/VerificarContaButton";
 import MigrarPainelButton from "@/components/clientes/MigrarPainelButton";
 import AutoRefresh from "@/components/AutoRefresh";
+import DispensarPixButton from "@/components/alertas/DispensarPixButton";
+import { getPixParaRenovar } from "@/lib/pix-link";
 
 function diasRestantes(data: string): number {
     const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
@@ -38,13 +40,18 @@ function labelDias(dias: number) {
 }
 
 export default async function AlertasPage() {
-    const [contas, apps, saldos, previsoes, consumos, painelServidores] = await Promise.all([
+    const [contas, apps, saldos, previsoes, consumos, painelServidores, pixRecebidos] = await Promise.all([
         getAlertasContas(5),
         getAlertasApps(7),
         getSaldosServidores(),
         getPrevisaoEsgotamento(),
         getConsumoMensal(),
         getPainelServidoresResumo(),
+        // Acessório: se a tabela/consulta falhar, o card some e o resto de /alertas segue
+        getPixParaRenovar().catch((err) => {
+            console.error("[alertas] Pix pelo link:", err instanceof Error ? err.message : err);
+            return [];
+        }),
     ]);
 
     // Servidores com previsão < 15 dias
@@ -107,6 +114,90 @@ export default async function AlertasPage() {
                             </span>
                         </span>
                     ))}
+                </div>
+            )}
+
+            {/* Pix pago pelo link e ainda não renovado (some quando a renovação registra o pagamento) */}
+            {pixRecebidos.length > 0 && (
+                <div className="rounded-2xl border border-teal-200 bg-white overflow-hidden">
+                    <div className="px-5 py-4 bg-teal-50 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-semibold text-teal-900">💸 Pix recebido pelo link — renovar</p>
+                            <p className="text-xs text-teal-700 mt-0.5">Abra o cliente e renove como de costume (forma INTER); some daqui sozinho</p>
+                        </div>
+                        <span className="text-2xl font-bold text-teal-900 mr-3">{pixRecebidos.length}</span>
+                    </div>
+                    <div className="overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-zinc-50 border-b">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Cliente</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Assinatura</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Venc. Contrato</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Pix</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Último pgto</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-600 uppercase">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                                {pixRecebidos.map((p) => {
+                                    const venc = p.venc_contrato ? p.venc_contrato.split("T")[0] : null;
+                                    const dias = venc ? diasRestantes(venc) : null;
+                                    const pagoEm = new Date(p.pago_em).toLocaleString("pt-BR", {
+                                        timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+                                    });
+                                    const valorDiferente = Number(p.valor_pago) !== Number(p.valor_cobrado);
+                                    const varias = Number(p.valor_cobrado) !== Number(p.valor_item);
+                                    return (
+                                        <tr key={`${p.id_cobranca}-${p.id_assinatura}`} className="hover:bg-zinc-50/50">
+                                            <td className="px-4 py-3">
+                                                <Link href={`/clientes/${p.id_cliente}`} className="font-medium text-zinc-900 hover:underline">
+                                                    {p.nome}
+                                                </Link>
+                                                <div className="text-xs text-zinc-400">ID {p.id_cliente}</div>
+                                            </td>
+                                            <td className="px-4 py-3 text-zinc-600">
+                                                {p.identificacao || p.plano}
+                                                <div className="text-xs text-zinc-400">{p.identificacao ? p.plano : ""} {p.status ? `· ${p.status}` : ""}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {venc ? venc.split("-").reverse().join("/") : "—"}
+                                                {dias !== null && (
+                                                    <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold ${badgeDias(dias)}`}>
+                                                        {labelDias(dias)}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-zinc-900">R$ {Number(p.valor_item).toFixed(2).replace(".", ",")}</div>
+                                                <div className="text-xs text-zinc-400">{pagoEm}</div>
+                                                {varias && (
+                                                    <div className="text-xs text-zinc-500">Pix de R$ {Number(p.valor_pago).toFixed(2).replace(".", ",")} com outras assinaturas</div>
+                                                )}
+                                                {valorDiferente && (
+                                                    <div className="text-xs font-semibold text-red-600">⚠️ Pago R$ {Number(p.valor_pago).toFixed(2).replace(".", ",")}, cobrado R$ {Number(p.valor_cobrado).toFixed(2).replace(".", ",")}</div>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-zinc-500">
+                                                {p.ultimo_pagamento ? p.ultimo_pagamento.split("-").reverse().join("/") : "—"}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Link
+                                                        href={`/clientes/${p.id_cliente}`}
+                                                        className="h-7 inline-flex items-center rounded-lg bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700"
+                                                    >
+                                                        Renovar
+                                                    </Link>
+                                                    <DispensarPixButton idCobranca={p.id_cobranca} idAssinatura={p.id_assinatura} />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 

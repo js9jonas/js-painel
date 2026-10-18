@@ -22,4 +22,7 @@ export async function register() {
 
   const { iniciarMonitorSaldoCaptcha } = await import("@/lib/aviso-saldo-captcha");
   iniciarMonitorSaldoCaptcha();
+
+  const { iniciarConferenciaPix } = await import("@/lib/pix-link");
+  iniciarConferenciaPix();
 }

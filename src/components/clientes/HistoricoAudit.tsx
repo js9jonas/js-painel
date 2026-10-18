@@ -14,6 +14,7 @@ const TIPO_CONFIG: Record<string, { label: string; classes: string }> = {
   criacao_teste_conta:{ label: "Teste criado",      classes: "bg-sky-50 text-sky-700" },
   renovacao:       { label: "Renovação",           classes: "bg-emerald-50 text-emerald-700" },
   exclusao_pagamento:{ label: "Pagamento excluído", classes: "bg-red-50 text-red-700" },
+  pix_link:        { label: "Pix pelo link",       classes: "bg-teal-50 text-teal-700" },
 };
 
 function formatarDataHora(iso: string): string {

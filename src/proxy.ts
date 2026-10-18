@@ -15,10 +15,16 @@ export default auth(async (req) => {
     return NextResponse.next()
   }
 
+  // Link de pagamento do cliente: o token do link é a autorização (src/lib/pix-link.ts)
+  if (pathname.startsWith('/pagar/') || pathname.startsWith('/api/pagar/')) {
+    return NextResponse.next()
+  }
+
   if (
     pathname.startsWith('/api/whatsapp/webhook') ||
     pathname.startsWith('/api/whatsapp/registrar') ||
     pathname.startsWith('/api/typebot/') ||
+    pathname.startsWith('/api/inter/webhook/') ||  // segredo na URL + reconsulta no Inter (src/lib/pix-webhook.ts)
     pathname.startsWith('/stickers/')
   ) {
     return NextResponse.next()

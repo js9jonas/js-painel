@@ -20,6 +20,7 @@ import { getParceiroByIndicadoId } from "@/lib/indicacoes";
 import ScoreFidelidade from "@/components/clientes/ScoreFidelidade";
 import HistoricoAudit from "@/components/clientes/HistoricoAudit";
 import AssinaturaCard from "@/components/clientes/AssinaturaCard";
+import LinkPagamentoButton from "@/components/clientes/LinkPagamentoButton";
 import AssinaturasInativasGroup from "@/components/clientes/AssinaturasInativasGroup";
 import { getPainelServidoresResumo } from "@/lib/paineis";
 
@@ -178,6 +179,7 @@ export default async function ClienteDetalhePage({ params }: Props) {
 
           {/* Direita: botões */}
           <div className="shrink-0 flex items-center gap-2">
+            <LinkPagamentoButton idCliente={id} />
             <NovaAssinaturaButton
               idCliente={id}
               planos={planos}
