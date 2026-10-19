@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { PagamentoFullRow } from "@/lib/pagamentos";
 import PagamentoModal from "./PagamentoModal";
 import { Select } from "@/components/ui/select";
+import { CONFERENCIA_ROTULO, detalhesVisiveis } from "@/lib/conferencia-pagamento";
 
 type Props = {
   data: PagamentoFullRow[];
@@ -281,7 +282,7 @@ export default function PagamentosClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white">
-                {["Data", "", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", ""].map((h, i) => (
+                {["Data", "", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", "Conferência", ""].map((h, i) => (
                   <th
                     key={i}
                     className={`sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider ${h === "" && i === 1 ? "px-2 w-14" : "px-6"}`}
@@ -293,7 +294,9 @@ export default function PagamentosClient({
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {data.map((p) => {
-                const isPendente = p.detalhes !== "OK";
+                const isPendente = p.conferencia === "analisar";
+                const conf = CONFERENCIA_ROTULO[p.conferencia] ?? CONFERENCIA_ROTULO.analisar;
+                const detalhes = detalhesVisiveis(p);
                 return (
                   <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-zinc-900 whitespace-nowrap">
@@ -331,9 +334,14 @@ export default function PagamentosClient({
                     <td className="px-6 py-4 max-w-xs">
                       <span
                         className="text-zinc-600 text-xs truncate block"
-                        title={p.detalhes ?? ""}
+                        title={p.pagador ? `Pagador: ${p.pagador}` : detalhes ?? ""}
                       >
-                        {p.detalhes || "—"}
+                        {detalhes || "—"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset whitespace-nowrap ${conf.classe}`}>
+                        {conf.icone} {conf.texto}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

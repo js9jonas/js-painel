@@ -112,6 +112,8 @@ export type PagamentoRow = {
   tipo: string | null;
   compra: string | null;
   id_assinatura: string | null;
+  conferencia: string;
+  pagador: string | null;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -471,7 +473,9 @@ export async function getPagamentosByClienteId(id: string, limit: number = 5): P
       detalhes,
       tipo,
       compra,
-      id_assinatura::text AS id_assinatura
+      id_assinatura::text AS id_assinatura,
+      conferencia,
+      pagador
     FROM public.pagamentos
     WHERE id_cliente = $1::bigint
     ORDER BY data_pgto DESC NULLS LAST, id DESC

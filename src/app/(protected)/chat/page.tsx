@@ -9,6 +9,7 @@ import type { AplicativoRow, AppRow } from '@/lib/aplicativos'
 import { appsPorConta } from '@/lib/apps-vinculados'
 import AplicativoModal from '@/components/aplicativos/AplicativoModal'
 import type { PagamentoFullRow } from '@/lib/pagamentos'
+import { CONFERENCIA_ROTULO, detalhesVisiveis } from '@/lib/conferencia-pagamento'
 import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
 import EditClienteModal from '@/components/clientes/EditClienteModal'
 import NovoClienteModal from '@/components/clientes/NovoClienteModal'
@@ -348,7 +349,8 @@ function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boole
   const valor = p.valor
     ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     : '—'
-  const ok = (p.detalhes ?? '').toUpperCase() === 'OK'
+  const conf = CONFERENCIA_ROTULO[p.conferencia] ?? CONFERENCIA_ROTULO.analisar
+  const detalhes = detalhesVisiveis(p)
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6,
@@ -369,11 +371,16 @@ function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boole
           borderRadius: 4, padding: '1px 5px', flexShrink: 0
         }}>{p.tipo_pagamento}</span>
       )}
-      <span style={{
+      {detalhes && (
+        <span title={p.pagador ? `Pagador: ${detalhes}` : detalhes} style={{
+          color: '#667781', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
+        }}>{detalhes}</span>
+      )}
+      <span title={conf.texto} style={{
         marginLeft: 'auto', flexShrink: 0,
-        color: ok ? '#16a34a' : '#adbac1', fontWeight: 700, fontSize: 11
+        color: conf.cor, fontWeight: 700, fontSize: 11
       }}>
-        {ok ? '✓' : p.detalhes ?? ''}
+        {conf.icone}
       </span>
     </div>
   )

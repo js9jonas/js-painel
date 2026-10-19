@@ -13,14 +13,19 @@ export type PagamentoFullRow = {
   compra: string | null;
   tipo_pagamento: string | null;
   dias_relativo_vencimento: number | null;
+  conferencia: Conferencia;
+  pagador: string | null;
 };
+
+// sql/027: substitui o 'OK' em `detalhes` como marca de conferência.
+export type Conferencia = "conferido" | "analisar" | "conclusivo" | "automatico";
 
 export type GetPagamentosParams = {
   q?: string;
   page?: number;
   pageSize?: number;
   id_cliente?: string;
-  somentePendentes?: boolean;   // <-- adicionar
+  somentePendentes?: boolean;
 };
 
 
@@ -32,7 +37,7 @@ function buildWhere(params: Omit<GetPagamentosParams, "page" | "pageSize">) {
   if (q) {
     values.push(`%${q}%`);
     parts.push(
-      `(c.nome ILIKE $${values.length} OR p.detalhes ILIKE $${values.length} OR p.compra ILIKE $${values.length})`
+      `(c.nome ILIKE $${values.length} OR p.detalhes ILIKE $${values.length} OR p.pagador ILIKE $${values.length} OR p.compra ILIKE $${values.length})`
     );
   }
 
@@ -42,7 +47,7 @@ function buildWhere(params: Omit<GetPagamentosParams, "page" | "pageSize">) {
   }
 
   if (params.somentePendentes) {
-    parts.push(`(p.detalhes IS NULL OR p.detalhes <> 'OK')`);
+    parts.push(`p.conferencia = 'analisar'`);
   }
 
   return {
@@ -77,7 +82,9 @@ export async function getPagamentos(
        p.tipo,
        p.compra,
        p.tipo_pagamento,
-       p.dias_relativo_vencimento
+       p.dias_relativo_vencimento,
+       p.conferencia,
+       p.pagador
      FROM public.pagamentos p
      LEFT JOIN public.clientes c ON c.id_cliente = p.id_cliente
      ${whereSql}

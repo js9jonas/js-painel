@@ -33,6 +33,9 @@ export type EntradaRenovacao = {
   origem: Record<string, unknown>;
   /** Quem fez, quando não há sessão (renovação automática). */
   usuarioAuditoria?: string;
+  /** Marca do pagamento registrado (sql/027): renovação automática já nasce conferida pelo banco. */
+  conferencia?: "automatico" | "conclusivo";
+  pagador?: string | null;
 };
 
 export type ResultadoRenovacao = {
@@ -48,6 +51,8 @@ export type ResultadoRenovacao = {
 export async function renovarAssinatura(e: EntradaRenovacao): Promise<ResultadoRenovacao> {
   const { idAssinatura, periodo, dataManual, registrarPagamento, vencContasManual, soPagamento,
           atualizarObservacao, observacao, statusFinal, origem, usuarioAuditoria } = e;
+  const conferencia = e.conferencia ?? "analisar";
+  const pagador = e.pagador ?? null;
   const pgto = e.pagamento;
   const meses = mesesDoPeriodo(periodo);
 
@@ -115,20 +120,19 @@ export async function renovarAssinatura(e: EntradaRenovacao): Promise<ResultadoR
           [idCliente]
         );
         ehNovoSoPag = ultPgto.length === 0;
-        const detalhes = ultPgto.length > 0 && ultPgto[0].dias != null
-          ? `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`
-          : "novo";
+        // "N dias desde o último pagamento" saiu de detalhes (18/10/2026): a coluna mostra o pagador.
+        const detalhes = ultPgto.length > 0 ? null : "novo";
 
         const { rows: pgRows } = await client.query(
           `INSERT INTO public.pagamentos
            (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
-            tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura)
+            tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura, conferencia, pagador)
            VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                   $7, $8, NOW(), $9::bigint)
+                   $7, $8, NOW(), $9::bigint, $10, $11)
            RETURNING id::text`,
           [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
            pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
-           tipoPagSoPag, diasRelSoPag, idAssinatura]
+           tipoPagSoPag, diasRelSoPag, idAssinatura, conferencia, pagador]
         );
         idPagamentoSoPag = pgRows[0]?.id ?? null;
       }
@@ -250,20 +254,18 @@ RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, i
         [idCliente]
       );
       ehNovo = ultPgto.length === 0;
-      const detalhes = ultPgto.length > 0 && ultPgto[0].dias != null
-        ? `${parseInt(ultPgto[0].dias, 10)} dias desde o último pagamento`
-        : "novo";
+      const detalhes = ultPgto.length > 0 ? null : "novo";
 
       const { rows: pgRows } = await client.query(
         `INSERT INTO public.pagamentos
          (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
-          tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura)
+          tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura, conferencia, pagador)
          VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                 $7, $8, NOW(), $9::bigint)
+                 $7, $8, NOW(), $9::bigint, $10, $11)
          RETURNING id::text`,
         [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
          pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
-         tipoPagamento, diasRelVencimento, idAssinatura]
+         tipoPagamento, diasRelVencimento, idAssinatura, conferencia, pagador]
       );
       idPagamento = pgRows[0]?.id ?? null;
     }

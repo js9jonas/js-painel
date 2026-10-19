@@ -166,6 +166,7 @@ async function processarItem(item: ItemPago, hoje: string): Promise<ResultadoIte
     statusFinal: "ativo",
     origem: { tela: "pix-link-automatico", txid: item.txid },
     usuarioAuditoria: USUARIO_AUTOMATICO,
+    conferencia: "automatico",
   });
   if (r.httpStatus !== 200 || r.corpo.ok === false) {
     return { rotulo: a.rotulo, acao: "alertas", motivo: `Falha ao renovar: ${r.corpo.error ?? `HTTP ${r.httpStatus}`}` };

@@ -13,7 +13,11 @@ type PagamentoData = {
   detalhes: string;
   tipo: string;
   compra: string;
+  pagador?: string;
+  conferencia?: string;
 };
+
+const CONFERENCIAS = ["conferido", "analisar", "conclusivo", "automatico"];
 
 export async function updatePagamento(id: number, data: PagamentoData) {
   await pool.query(
@@ -26,7 +30,9 @@ export async function updatePagamento(id: number, data: PagamentoData) {
        valor      = $5,
        detalhes   = $6,
        tipo       = $7,
-       compra     = $8
+       compra     = $8,
+       pagador    = $10,
+       conferencia = COALESCE($11, conferencia)
      WHERE id = $9`,
     [
       data.id_cliente ? BigInt(data.id_cliente) : null,
@@ -38,6 +44,8 @@ export async function updatePagamento(id: number, data: PagamentoData) {
       data.tipo.trim() || null,
       data.compra.trim() || null,
       id,
+      data.pagador?.trim() || null,
+      data.conferencia && CONFERENCIAS.includes(data.conferencia) ? data.conferencia : null,
     ]
   );
 

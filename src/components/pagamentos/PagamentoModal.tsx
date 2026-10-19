@@ -6,6 +6,7 @@ import { updatePagamento } from "@/app/actions/pagamentos";
 import { buscarClientes, type ClienteBuscaRow } from "@/app/actions/buscarClientes";
 import type { PagamentoFullRow } from "@/lib/pagamentos";
 import { Select } from "@/components/ui/select";
+import { CONFERENCIA_ROTULO } from "@/lib/conferencia-pagamento";
 
 type Props = {
   pagamento: PagamentoFullRow;
@@ -23,6 +24,8 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
   const [detalhes, setDetalhes] = useState(pagamento.detalhes ?? "");
   const [tipo, setTipo] = useState(pagamento.tipo ?? "");
   const [compra, setCompra] = useState(pagamento.compra ?? "");
+  const [pagador, setPagador] = useState(pagamento.pagador ?? "");
+  const [conferencia, setConferencia] = useState<string>(pagamento.conferencia ?? "analisar");
 
   // Estado do cliente selecionado
   const [clienteId, setClienteId] = useState(pagamento.id_cliente ?? "");
@@ -115,6 +118,8 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
           detalhes,
           tipo,
           compra,
+          pagador,
+          conferencia,
         });
         onSaved();
         onClose();
@@ -268,6 +273,31 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
               className={inputClass}
               placeholder="Referência da compra..."
             />
+          </div>
+
+          {/* Pagador + conferência (sql/027) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Pagador</label>
+              <input
+                value={pagador}
+                onChange={(e) => setPagador(e.target.value)}
+                className={inputClass}
+                placeholder="Nome de quem pagou"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Conferência</label>
+              <select
+                value={conferencia}
+                onChange={(e) => setConferencia(e.target.value)}
+                className={inputClass}
+              >
+                {Object.entries(CONFERENCIA_ROTULO).map(([k, r]) => (
+                  <option key={k} value={k}>{r.icone} {r.texto}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Detalhes */}
