@@ -12,6 +12,10 @@ const ROBO_OFFLINE_MS = 90_000;
 /** Tarefa não pega nesse tempo expira: a tela já desistiu e não deve ser feita depois. */
 export const ESPERA_MAX_FILA_MS = 2 * 60_000;
 
+/** Preso na tela de login/bloqueio há mais que isso = não vai entrar logo (o desbloqueio normal leva ~10–20 s). */
+const ROBO_SEM_SESSAO_MS = 45_000;
+const NOME_SITE: Record<AlvoRobo, string> = { popplayer: "POP Player", duplecast: "Duplecast", central: "Central", fast: "FAST" };
+
 export class RoboOffline extends Error {}
 
 export async function roboOnline(alvo: AlvoRobo): Promise<boolean> {
@@ -31,6 +35,14 @@ export async function executarNoRobo<T = unknown>(
 ): Promise<T> {
   if (!(await roboOnline(alvo))) {
     throw new RoboOffline("O robô do navegador está desligado (o PC de casa precisa estar ligado). Tente de novo quando ele voltar.");
+  }
+  // Robô ligado mas sem conseguir entrar no site: o pedido só expiraria na fila — avisa na hora (19/10/2026)
+  const { rows: st } = await pool.query<{ sem_sessao_ms: number | null }>(
+    `SELECT (EXTRACT(EPOCH FROM NOW() - sem_sessao_desde) * 1000)::float8 AS sem_sessao_ms FROM public.robo_status WHERE alvo = $1`,
+    [alvo]
+  );
+  if ((st[0]?.sem_sessao_ms ?? 0) > ROBO_SEM_SESSAO_MS) {
+    throw new RoboOffline(`O robô ainda não conseguiu entrar no painel ${NOME_SITE[alvo]} (tela de login ou de bloqueio). Ele tenta de novo sozinho; tente em 1 a 2 minutos. Se continuar, alguém precisa olhar o robô no PC.`);
   }
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO public.robo_tarefas (alvo, acao, params, usuario) VALUES ($1, $2, $3, $4) RETURNING id`,

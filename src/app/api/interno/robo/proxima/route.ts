@@ -20,10 +20,13 @@ export async function POST(req: NextRequest) {
   const inicio = Date.now();
   while (true) {
     for (const alvo of alvos) {
+      // sem_sessao_desde: marca desde quando está preso no login/bloqueio (a tela recusa na hora, ver robo.ts)
       await pool.query(
-        `INSERT INTO public.robo_status (alvo, visto_em, versao) VALUES ($1, NOW(), $2)
-         ON CONFLICT (alvo) DO UPDATE SET visto_em = NOW(), versao = EXCLUDED.versao`,
-        [alvo, corpo.versao ?? null]
+        `INSERT INTO public.robo_status (alvo, visto_em, versao, sem_sessao_desde)
+         VALUES ($1, NOW(), $2, CASE WHEN $3 THEN NOW() END)
+         ON CONFLICT (alvo) DO UPDATE SET visto_em = NOW(), versao = EXCLUDED.versao,
+           sem_sessao_desde = CASE WHEN $3 THEN COALESCE(robo_status.sem_sessao_desde, NOW()) END`,
+        [alvo, corpo.versao ?? null, !!corpo.sem_tarefa]
       );
     }
     await pool.query(

@@ -53,11 +53,15 @@
 
   /**
    * Tela de bloqueio: senha + Desbloquear quando o Turnstile liberar. Botão que não libera (caixa interativa) → espera
-   * 10 min antes de tentar de novo, para não repetir idas ao desafio (eleva o rigor do Cloudflare).
+   * 10 min antes de tentar de novo, para não repetir idas ao desafio (eleva o rigor do Cloudflare). A 1ª falha espera
+   * só 1 min (página reaberta sem rede ao ligar o PC — 19/10/2026); nova tentativa sempre numa página recarregada.
    */
-  let proximoDesbloqueio = 0;
+  const ESPERA_DESBLOQUEIO = "robo-central-proximo-desbloqueio";
+  const FALHAS_DESBLOQUEIO = "robo-central-falhas-desbloqueio";
   async function desbloquear(cred) {
-    if (Date.now() < proximoDesbloqueio) { estado("TELA DE BLOQUEIO — a verificação pediu interação, precisa de alguém"); return; }
+    const proximo = Number(sessionStorage.getItem(ESPERA_DESBLOQUEIO) || 0);
+    if (Date.now() < proximo) { estado("TELA DE BLOQUEIO — a verificação pediu interação, precisa de alguém"); return; }
+    if (proximo) { sessionStorage.removeItem(ESPERA_DESBLOQUEIO); location.reload(); return new Promise(() => {}); }
     if (!cred?.senha) { estado("TELA DE BLOQUEIO — sem senha da Central no js-painel"); return; }
     const senha = document.querySelector('input[type="password"], input[name="password"]');
     if (!senha) { estado("tela de bloqueio: campo de senha não encontrado"); return; }
@@ -69,7 +73,9 @@
       if (b && !b.disabled) { b.click(); await pausa(5000); return; }
       await pausa(1000);
     }
-    proximoDesbloqueio = Date.now() + 10 * 60_000;
+    const falhas = Number(sessionStorage.getItem(FALHAS_DESBLOQUEIO) || 0) + 1;
+    sessionStorage.setItem(FALHAS_DESBLOQUEIO, String(falhas));
+    sessionStorage.setItem(ESPERA_DESBLOQUEIO, String(Date.now() + (falhas === 1 ? 60_000 : 10 * 60_000)));
     estado("TELA DE BLOQUEIO — a verificação pediu interação, precisa de alguém");
   }
 
@@ -279,6 +285,7 @@
       if (resp.credenciais) credenciais = resp.credenciais;
       if (naTelaDeLogin()) { await entrar(resp.credenciais); await pausa(5000); continue; }
       if (naTelaDeBloqueio()) { await desbloquear(resp.credenciais ?? credenciais); await pausa(5000); continue; }
+      if (!naTelaDeLogin()) { sessionStorage.removeItem(ESPERA_DESBLOQUEIO); sessionStorage.removeItem(FALHAS_DESBLOQUEIO); }
       if (pendente && tokenDaSessao()) { const t = pendente; pendente = null; jaRetentada.add(t.id); await executar(t); }
       if (!resp.tarefa) {
         await manterSessaoViva();

@@ -30,6 +30,9 @@ subir_tela() {
 
 abrir() {
   local display="$1"
+  # Logo após ligar o PC o serviço sobe antes da rede: abas reabertas sem internet falham no login/desbloqueio e o
+  # robô fica parado (19/10/2026). Espera a internet até 2 min antes de abrir o Chrome.
+  for _ in $(seq 1 40); do curl -s -o /dev/null --max-time 3 https://painel.jssistemas.online && break; sleep 3; done
   # GTK_USE_PORTAL=0: diálogos (ex.: escolher pasta) abrem na própria tela do Chrome, não no desktop.
   DISPLAY="$display" GTK_USE_PORTAL=0 nohup google-chrome --user-data-dir="$PERFIL" --no-first-run \
     --no-default-browser-check --disable-session-crashed-bubble --hide-crash-restore-bubble "$URL" \

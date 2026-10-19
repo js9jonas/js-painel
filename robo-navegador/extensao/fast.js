@@ -16,12 +16,21 @@
 
   // Login que falhou (senha errada, Turnstile pediu interação): espera 10 min antes de tentar de novo — o site
   // bloqueia o acesso por um tempo depois de várias tentativas erradas (lg-blocked-timer).
+  // A 1ª falha espera só 1 min (página reaberta sem rede ao ligar o PC, token velho "Sua sessão expirou" — 19/10/2026);
+  // nova tentativa sempre numa página recarregada.
   const ESPERA_LOGIN = "robo-fast-proximo-login";
+  const FALHAS_LOGIN = "robo-fast-falhas-login";
+  const esperarLogin = () => {
+    const falhas = Number(sessionStorage.getItem(FALHAS_LOGIN) || 0) + 1;
+    sessionStorage.setItem(FALHAS_LOGIN, String(falhas));
+    sessionStorage.setItem(ESPERA_LOGIN, String(Date.now() + (falhas === 1 ? 60_000 : 10 * 60_000)));
+  };
   async function entrar(cred) {
     if (!cred?.usuario || !cred?.senha) { estado("sem usuário/senha da FAST no js-painel"); return; }
     if (document.getElementById("lg-blocked-timer")) { estado("LOGIN BLOQUEADO pelo site (tentativas demais) — aguardando"); return; }
     const proximo = Number(sessionStorage.getItem(ESPERA_LOGIN) || 0);
-    if (Date.now() < proximo) { estado("login não entrou da última vez — esperando 10 min para tentar de novo"); return; }
+    if (Date.now() < proximo) { estado("login não entrou da última vez — esperando para tentar de novo"); return; }
+    if (proximo) { sessionStorage.removeItem(ESPERA_LOGIN); location.reload(); return new Promise(() => {}); }
     const usuario = document.querySelector('input[name="username"]');
     const senha = document.querySelector('input[name="password"]');
     if (!usuario || !senha) { estado("login: campos não encontrados"); return; }
@@ -31,13 +40,13 @@
     for (let i = 0; i < 40; i++) {
       const botao = document.getElementById("submitBtn");
       if (botao && !botao.disabled) {
-        sessionStorage.setItem(ESPERA_LOGIN, String(Date.now() + 10 * 60_000));
+        esperarLogin();
         botao.click();
         return;
       }
       await pausa(1000);
     }
-    sessionStorage.setItem(ESPERA_LOGIN, String(Date.now() + 10 * 60_000));
+    esperarLogin();
     estado("login: o botão Entrar não liberou (Turnstile pediu interação?) — precisa de alguém");
   }
 
@@ -112,6 +121,7 @@
       if (!resp?.ok) { estado(`sem contato com o js-painel — ${resp?.erro ?? "?"}`); await pausa(5000); continue; }
       if (naTelaDeLogin()) { await entrar(resp.credenciais); await pausa(5000); continue; }
       sessionStorage.removeItem(ESPERA_LOGIN);
+      sessionStorage.removeItem(FALHAS_LOGIN);
       if (!resp.tarefa) {
         await manterSessaoViva();
         estado(`aguardando ${new Date().toLocaleTimeString("pt-BR")}`);
