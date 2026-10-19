@@ -18,7 +18,7 @@ O "renovador em casa" virou o robô de navegador (`project_robo_navegador.md`): 
 - **Sessão viva:** o robô faz `GET profile` a cada 4 min parado, pra não cair na tela de bloqueio (/lock) com a caixa "Confirme que é humano". Se cair, o título vira "TELA DE BLOQUEIO — precisa de alguém" e ele NÃO tenta marcar a caixa (decisão: não burlar verificação humana).
 - **Modal de avisos** ao entrar (só botão Fechar, aparece depois de muito tempo inativo — Jonas, 15/10): não atrapalha, a renovação é por chamada de API.
 - Pegadinhas: o Chrome não libera sozinho os sites novos do manifesto ao reiniciar — precisou do botão "Atualizar" em chrome://extensions; o robô não pega pedido na tela de login (o login troca de página e o pedido se perdia).
-- 📋 Aviso no Telegram quando cair na tela de bloqueio; ver em uso real se a sessão tranca mesmo com o toque de 4 min. O cron `central_refresh_token.js` (token pras leituras via API) continua.
+- 📋 Aviso no Telegram quando a verificação pedir interação. (Tranca sim, mesmo com o toque — resolvido com desbloqueio automático, ver 15/10 noite.) O cron `central_refresh_token.js` (token pras leituras via API) continua.
 
 ## 🔎 03/10/2026 — conclusão: captcha não resolve; próximo passo é "renovador em casa" (IP residencial)
 
@@ -119,3 +119,7 @@ Tags salvas: `nao-logado`, `campo-busca-nao-encontrado`, `linha-nao-encontrada`,
 ## Nota operacional: Easypanel não responde a clique via Claude in Chrome
 
 O botão "Implantar" (e o rádio "Dockerfile" na aba Fonte, na primeira tentativa) não respondeu a cliques via automação do navegador (`left_click`, `double_click`, clique por `ref`, hover+clique — todos tentados) mesmo mirando a coordenada certa (confirmado via `zoom`) — sem nenhum erro, só nada acontecia (confirmado via SSH: nenhum build novo disparava). Causa não identificada (não é problema de coordenada). Todo deploy desta sessão precisou do Jonas clicando manualmente. Ver `[[feedback_easypanel_deploy_manual]]` na memória do Claude Code se existir, ou considerar essa uma limitação conhecida da automação nesse painel específico.
+
+## 15/10/2026 noite — 401 "Unauthenticated" no Renovar (`1fc25d2`, extensão 1.3.0)
+Renovar via API falhou 3x (20:13, 21:25, 22:50: `Central users → 401`): o token da página do robô vence (~55 min) e o toque `GET profile` não renova, só recebia 401 calado. Correção: 401 → recarrega a página (vai pro /lock) → robô digita a senha e clica Desbloquear **só quando o Turnstile libera sozinho** (mesmo comportamento do login e do cron); botão não liberou em 40 s → espera 10 min e avisa no título. A tarefa que pegou 401 fica em sessionStorage e é repetida 1x após desbloquear (descartada se passar de 2 min). Testado: robô reiniciado saiu do /lock sozinho e `conta claudmz` respondeu ok. Não é deploy no Easypanel — só a extensão no PC (`iniciar.sh reiniciar` recarregou do disco).
+- ✅ 15/10 ~23h: 1º uso real do botão Renovar da Central pela tela (/alertas, `claudmz`) deu certo, logo após o fix do desbloqueio.

@@ -40,3 +40,18 @@ Renovação 1 mês de dentro da página (robô), ligada no adapter `central.ts`;
 - Mudou `config.js` (URL do js-painel) ou o manifesto: reiniciar o serviço NÃO basta — a parte de fundo continua com o valor antigo ("Failed to fetch"). Clicar em **Atualizar** em chrome://extensions do robô. A janela muda de posição na tela virtual: fotografar antes (`iniciar.sh foto`) e mirar o botão; um clique em "Carregar sem compactação" abre o seletor de pasta NA TELA DO JONAS.
 - Pra testar sem deploy: js-painel local (`next dev -p 3055`, mesmo banco) e `config.js` em `http://localhost:3055`; pedidos da tela de produção continuam atendidos (mesma fila no banco). Voltar pra produção depois do deploy.
 - Consulta ao banco travando sem erro = túnel 5433 zumbi: matar e recriar (`ssh -f -N -o ServerAliveInterval=15 -L 5433:localhost:5432 root@168.231.98.162`).
+
+## Incidente 19/10/2026 — Central e FAST paradas ~10 min após ligar o PC
+- PC ligou 07:10:19, `js-robo` subiu 07:10:26, rede só 07:10:33. O Chrome reabriu as abas sem internet: Central ficou no /lock (botão não liberou em 40 s), FAST no login com token velho ("Sua sessão expirou"). Cada uma caiu na espera fixa de 10 min, e tentava de novo **na mesma página velha**. Pedidos das 07:15 (Central vanderleif/thiagdt/sandrads, FAST e54487frp/bgk92615 +29 dias) expiraram sem execução — nenhum crédito gasto. Voltaram sozinhas 07:21–07:22.
+- Correção (só no robô, local, sem deploy): `iniciar.sh` espera a internet (até 2 min) antes de abrir o Chrome; FAST e Central: 1ª falha espera 1 min, depois 10 min, e a nova tentativa é sempre numa página recarregada (contadores em sessionStorage, zerados ao entrar). Conferido com `iniciar.sh reiniciar`: 4 sites "aguardando" em ~20 s.
+- `e2418b8` (19/10, ✅ em produção): o /proxima grava `robo_status.sem_sessao_desde` (sql/030, aplicada) quando o robô avisa `sem_tarefa`; `executarNoRobo` recusa na hora com aviso se estiver preso no login/bloqueio há mais de 45 s (limite: desbloqueio normal leva ~10–20 s; abaixo disso o pedido entra na fila como antes).
+- 📋 Renovações que expiraram no incidente, a refazer pela tela: Central vanderleif, thiagdt, sandrads; FAST e54487frp, bgk92615.
+
+## 19/10/2026 — POP espera a verificação do Cloudflare (`a6ad7f5`, extensão 1.4.1)
+- **Antes:** o 403 (cf_clearance vencido) recusava o pedido na hora ("tente em 1 minuto"), e a 2ª tentativa passava depois de ~1–2 min (casos em 15, 16 e 19/10).
+- **Agora:**
+  - o robô guarda a tarefa em sessionStorage (`robo-pop-pendente`), vai para `users.php`, o navegador refaz o desafio e a tarefa é repetida uma vez;
+  - só repete se nada foi gravado no POP antes do 403 (flag `escreveu`; o login não conta), para não duplicar lista;
+  - descarta a tarefa guardada depois de 3 min;
+  - o painel espera o POP por 4 min (`executarNoRobo`).
+- Extensão já recarregada no PC (`iniciar.sh reiniciar`); consulta real ok. 📋 O caminho do 403 em si ainda não foi visto acontecer.

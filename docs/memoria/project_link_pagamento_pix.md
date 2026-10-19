@@ -1,6 +1,6 @@
 ---
 name: project-link-pagamento-pix
-description: "Link de pagamento por Pix com txid (Inter) — fase 1 escrita e testada local em 18/10/2026; tabelas aplicadas no banco; credencial nova do Inter pronta e testada; falta Easypanel, commit, deploy e 1º Pix real"
+description: "Link de pagamento por Pix com txid (Inter) — em produção desde 18/10/2026 (renova sozinho); 19/10: planos estendidos na página, botões Ative na hora/Chave PIX no /chat e no template de vencimento, funil de aceitação em /alertas, confirmação 'Renovado na hora'"
 metadata:
   type: project
 ---
@@ -78,10 +78,54 @@ Regra do Jonas (corrigida no mesmo dia, 18/10): **igual ao clique manual do bot�
 - **Telegram:** um aviso por Pix (`textoDoAviso`, testável sem enviar): contrato renovado até quando; cada conta (✅ renovada, válida até, ⚠️ erro / painel não integrado / vencimento desconhecido); ⚠️ sem conta vinculada; ⏳ NÃO renovado + motivo. Qualquer empecilho põe ⚠️ na 1ª linha. Substituiu o aviso "falta renovar" da fase 1.
 - **Card em /alertas:** mostra o motivo, ou "⏳ renovando sozinho…" enquanto processa; itens renovados somem (o pagamento registrado esconde).
 - **Testado 18/10 (local, contra o banco, cliente de teste apagado):** regra 11/11, datas 5/5 (inclui 31/01 + 1 mês igual ao botão), ponta a ponta com 5 cenários e dois processamentos em paralelo (cada item uma vez só), rotas do botão (normal, pendente, 404, erros da rota do painel) com sessão local. **Não testado:** renovação de conta real no painel do fornecedor (gastaria crédito) — a função é a mesma do botão.
-- ✅ Em produção 18/10 (`cacba7c`): container novo subiu limpo, painel/cliente/webhook conferidos por `curl`. 📋 Falta o 1º Pix real de assinatura vencida renovando sozinho (teste do Jonas).
-- 📋 Risco que ficou: Pix renovou sozinho e depois o Jonas renova de novo pelo comprovante (o botão ainda não avisa). Mitigação hoje: o aviso do Telegram e a mensagem de renovação ao cliente. Próximo passo possível: o modal do Renovar avisar "Pix pelo link já renovou esta assinatura hoje".
+- ✅ Em produção 18/10 (`cacba7c`; regra corrigida "igual ao botão" `f1456f9`, deploy 18/10): container novo subiu limpo, painel/cliente/webhook conferidos por `curl`. 📋 Falta o 1º Pix real renovando sozinho (de preferência com conta vencida, pra exercitar o painel do fornecedor).
+- ✅ Risco de renovar 2x resolvido 19/10 (`e22758a`): o modal Renovar avisa em vermelho quando a assinatura já tem pagamento nos últimos 3 dias (o do link nasce com conferência ⚡ Automático). Ver `project_renovacao_conclusiva_extrato.md`.
 
 ## Próximas fases (decididas em 18/10)
 
 - ~~**Fase 2**~~ ✅ feita 18/10 (seção acima). Texto original: Pix confirmado e assinatura **atrasada ou vencendo hoje** → renova sozinha, igual ao botão Renovar (banco + pagamento INTER + contas vencidas no painel + WhatsApp). Senão, continua indo pro card. Exige levar pro servidor a lógica que hoje está no navegador (`RenovarAssinatura.tsx` → `renovarContasViaAPI`) e não renovar se já houver pagamento recente da assinatura.
-- **Fase 3:** link na resposta "Chave PIX", atalho no /chat e botão de URL no template de vencimento (precisa de aprovação da Meta).
+- ~~**Fase 3**~~ ✅ 19/10 por outro caminho (seção abaixo): sem template novo — os botões do template de vencimento e o atalho Planos do /chat levam ao "⚡ Ative na hora", que manda o link.
+
+## 19/10/2026 — aceitação do link (tudo ✅ em produção, deploy confirmado pelo Jonas)
+
+Commits: `d23f09d`, `1a95e70`, `a59b1e2`, `41aebf8`, `d0d7eb9`.
+
+- **Página /pagar, planos estendidos** (`1a95e70`): cada assinatura marcada tem o link "Planos estendidos ▾", recolhido. Ao abrir, mostra os períodos do mesmo plano (tipo + telas, meses 1/3/6/12) com o valor por mês. O padrão é o período do plano atual. O valor vem sempre da tabela de planos, no servidor (`gerarCobranca(token, {id, meses}[])`; o formato antigo `string[]` continua aceito). Só reaproveita uma cobrança aberta com os mesmos períodos (`itens` = "id:meses"). A renovação já usava `pix_cobranca_itens.meses`.
+- **Mensagem de planos com 2 botões** (`d23f09d`, `a59b1e2`, `41aebf8`):
+  - Os botões são "⚡ Ative na hora" (manda uma mensagem cta_url "Pagar agora" com o link do cliente) e "⏳ Chave PIX" (chave + pedido de comprovante).
+  - O texto apresenta o link como "✨ *Novidade:* agora a renovação é na hora!".
+  - Texto e botões ficam num lugar só, `src/lib/mensagem-planos.ts` (`textoPlanos`, `BOTOES_PLANOS`). Usam esse módulo o atalho Planos do /chat e a resposta aos botões **"Pagamento mensal" / "Planos estendidos" dos templates de vencimento** (`vencido_plano_v2`/`lembrete_vencimento_v2`, que continuam iguais e UTILITY).
+  - Em "Planos estendidos" entra uma linha apontando para o link na página.
+  - A resposta é gravada como `source='chat-planos'` com o `id_assinatura`, para o clique seguinte ser reconhecido por `buscarOrigemTemplate`.
+  - O webhook tira o emoji do título do botão antes de comparar.
+- **Funil em /alertas** (`d0d7eb9`):
+  - Quadro "⚡ Link de pagamento — aceitação (7 dias)", recolhido (`src/lib/pix-funil.ts`, cache de 60 s porque /alertas recarrega a cada 5 s).
+  - Etapas: tocou Ative na hora (× Chave PIX) → recebeu o link → abriu a página (× planos estendidos) → gerou o Pix → pagou (× mais de 1 mês) → renovou sozinho (× foi para /alertas).
+  - Abaixo, a lista de quem gerou o Pix e não pagou. O cliente de teste **JS Contas (2573)** fica de fora.
+  - As aberturas vêm da tabela nova `pix_link_eventos` (sql/031, aplicada; `abriu`/`estendidos` + `celular`; o portal só tem INSERT). As prévias de link (WhatsApp, Telegram, bots) não contam. Contam só a partir do deploy de 19/10.
+  - 1º caso real: Tinho da Silva (1392) gerou R$ 30 às 12:01 de 19/10 e não tinha pago até o deploy.
+- **Confirmação própria quando renova pelo link** (`d0d7eb9`):
+  - `notificarRenovacao(..., viaLink)`, ligado por `origem.tela === 'pix-link-automatico'`, manda "⚡ *Renovado na hora, Nome!* 🎉 … Da próxima vez é só usar o mesmo link".
+  - Não manda a saudação "Recebi seu comprovante". Fonte: `notificacao-renovacao-link`.
+  - Sem janela de 24 h aberta, vai para o Telegram do Jonas, como antes.
+- 📋 Testes pela tela, não feitos ainda: tocar em "Pagamento mensal" no template mandado ao JS Contas; o quadro do funil em /alertas; o 1º "Renovado na hora" real.
+
+## Meta / WhatsApp (consultado pela API em 19/10/2026)
+
+- **Templates:**
+  - A Meta **não aceita emoji em botão de template** (erro 2388060). Nas mensagens interativas comuns (janela de 24 h) pode.
+  - Texto com "✨ Novidade" fez a Meta reclassificar o template como **MARKETING** (`planos_renovacao`, criado e abandonado; o `identificacao` também foi reclassificado no passado).
+  - O token do painel (system user, `whatsapp_business_management`) **cria mas não apaga** templates ("Need permission on WABA"). 📋 Jonas apagar o `planos_renovacao` à mão: WhatsApp Manager → Gerenciar modelos.
+- **Número +55 51 8468-3468:**
+  - qualidade GREEN, conta e empresa verificadas;
+  - limite **TIER_250** (250 conversas iniciadas por dia);
+  - **nome de exibição nunca enviado para aprovação** (`name_status: NON_EXISTS`). A Meta diz que o limite só sobe depois disso. 📋 Jonas pedir no WhatsApp Manager → Números → Nome de exibição.
+
+## Limitação conhecida — trocar depois de gerar o Pix (19/10/2026, Jonas: "deixe assim por enquanto")
+- **Quem tem 1 assinatura não consegue voltar:** a tela do Pix só tem "Escolher outras assinaturas" com mais de uma assinatura. Quem tem uma só não troca o período depois de gerar.
+- **Gerar outro não cancela o anterior:** o Pix antigo segue válido 24 h no Inter. Se o cliente pagar o antigo, renova o que estava nele; se pagar os dois, o 2º cai em /alertas como "pagou em dobro?".
+- **Proposta, se voltar ao assunto:**
+  - botão "Trocar plano ou assinaturas" sempre visível;
+  - ao gerar o novo Pix, cancelar o anterior no Inter (PATCH cob → `REMOVIDA_PELO_USUARIO_RECEBEDOR`, pelo pool do painel, sem ampliar o `app_portal_cliente`);
+  - se o anterior já estiver pago, mostrar "pagamento anterior já recebido" em vez de gerar outro.
+  - Antes, testar com R$ 0,01 se a permissão "emitir cobrança" do Inter deixa cancelar.

@@ -49,7 +49,7 @@ removido = não está em nenhum. Se um painel falhar no login/lista, nada é gra
 
 ### Histórico dos passos
 - Jonas: deploy + sincronizar (qualquer card FunPlay; LazerPlay/CorePlayer/SmartOne também, pra recuperar chaves).
-- ✅ Sync preenche comentário "N/A" com o nome do cliente (e143eb3, deploy pendente).
+- ✅ Sync preenche comentário "N/A" com o nome do cliente (e143eb3, em produção).
 - Fase 2: capturar o endpoint do "add existing device" (Jonas adiciona 1 aparelho com a rede monitorada) → script único:
   lista prévia → teste com 2 → resto devagar → sync → relatório.
 - Fase 3: painel antigo sem validade → `ativo = false`. Por último: trocar a senha do painel novo.

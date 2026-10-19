@@ -112,3 +112,17 @@ Capturado com Playwright no site do cliente do Lazer Play (`lazerplay.io/#/playl
 Host de lista que não é de servidor nosso vai pro card **Desconhecidos** (`servidor_hosts.id_painel_servidor` NULL,
 `sql/021`; check impede principal). Ícone ⇄ em cada host (menos o principal) move entre servidores/Desconhecidos
 (POST `/api/servidor-hosts` `{acao:"mover", id, id_painel_servidor|null}`), com audit `servidor_host`.
+
+## 13/10/2026 — limite de login no site do cliente (`106e45f`)
+O site do cliente (Fun/Lazer/Core) recusa logins seguidos do mesmo aparelho: o 2º `login_by_mac` em ~1,5 s volta
+**429 com corpo "404"**, e o bloqueio passou de 2 min (liberou antes de 8 min). O olho fazia 1 login por ação
+(abrir/apagar/reabrir) e mostrava "não aceitou MAC + chave". Agora `entrarComoAparelho` guarda o token 10 min em
+memória (o token não tem `exp`) e o 429 vira "muitas tentativas seguidas". Mesmo commit: o "+" de lista em
+/clientes/[id] oferece as contas do cliente (preenche nome do painel + M3U).
+
+## 19/10/2026 — "Trocar conta" no editar playlist (`8a2fb41`, ✅ em produção)
+- `EditarPlaylistModal` ganhou a mesma lista de contas do "+" de adicionar.
+- **Playlist com usuário e senha de uma conta do cliente, mas fora do host principal** (`painel_servidores.host_stream`): o modal já abre com essa conta escolhida e a URL no host principal, com um aviso azul (velho → novo).
+- **Outra conta escolhida:** a lista fica laranja e aparece o aviso "Conta diferente da atual". Se o painel for outro, o nome da playlist troca para o nome do painel novo.
+- Em 19/10 eram **202 playlists ativas** nessa situação (ex.: FAST em bandeiraf.vip × ligaf.me; CLUB (novo) em techonline.me × hboard.site).
+- 📋 1º uso pela tela, pelo Jonas.
