@@ -2,7 +2,7 @@
 // Pix recebidos do dia sempre que aparece um novo. Header x-internal-token (liberado pelo proxy em /api/interno/).
 // Grava em pix_extrato (sem duplicar) e analisa os que já esperaram o webhook do link. Modo sombra: não renova.
 import { NextRequest, NextResponse } from "next/server";
-import { analisarPixPendentes, registrarPixExtrato, type PixDoExtrato } from "@/lib/pix-extrato";
+import { analisarPixPendentes, ESPERA_ANALISE_MIN, registrarPixExtrato, type PixDoExtrato } from "@/lib/pix-extrato";
 
 export const runtime = "nodejs";
 
@@ -18,6 +18,14 @@ export async function POST(req: NextRequest) {
   try {
     const r = await registrarPixExtrato(lista);
     const analisados = await analisarPixPendentes();
+    // Pix com cobrança do link aberta ficou esperando o webhook: analisa assim que a espera vence, sem depender da
+    // volta do job de 5 min (que continua como reserva se o painel reiniciar nesse meio-tempo).
+    if (r.novos > 0) {
+      setTimeout(() => {
+        analisarPixPendentes().catch((err) =>
+          console.error("[pix-extrato] análise agendada falhou:", err instanceof Error ? err.message : err));
+      }, (ESPERA_ANALISE_MIN * 60 + 5) * 1000);
+    }
     return NextResponse.json({ ok: true, ...r, analisados });
   } catch (err) {
     console.error("[pix-extrato] falha:", err instanceof Error ? err.message : err);

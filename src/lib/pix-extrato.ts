@@ -9,7 +9,7 @@
 import { pool } from "@/lib/db";
 
 /** Espera antes de analisar: o webhook do link costuma chegar em segundos, mas a ordem não é garantida. */
-const ESPERA_ANALISE_MIN = 3;
+export const ESPERA_ANALISE_MIN = 3;
 /** Cobrança do link ainda aberta com o mesmo valor: espera a conferência de 5 em 5 min confirmar. */
 const ESPERA_COBRANCA_ABERTA_MIN = 30;
 /** Pagamento do cliente registrado nesses dias antes do Pix → não conclui (pode ser o mesmo dinheiro). */
@@ -199,9 +199,15 @@ async function analisar(p: Linha): Promise<Resultado> {
 /** Analisa os Pix pendentes com mais de alguns minutos (chamado pelo POST do n8n e de 5 em 5 min). */
 export async function analisarPixPendentes(): Promise<number> {
   const { rows } = await pool.query<Linha>(
-    `SELECT id::text, data::text, visto_em::text, valor::text, nome FROM public.pix_extrato
-      WHERE situacao = 'pendente' AND visto_em < now() - $1::interval
-      ORDER BY visto_em LIMIT 50`,
+    // A espera só existe pro webhook do link chegar primeiro: sem cobrança aberta e dentro da validade (24 h) com o
+    // mesmo valor, analisa na hora (19/10/2026 — antes todo Pix esperava 3 min + a volta do job de 5 min).
+    `SELECT e.id::text, e.data::text, e.visto_em::text, e.valor::text, e.nome FROM public.pix_extrato e
+      WHERE e.situacao = 'pendente'
+        AND (e.visto_em < now() - $1::interval
+             OR NOT EXISTS (SELECT 1 FROM public.pix_cobrancas c
+                             WHERE c.status = 'ATIVA' AND c.pago_em IS NULL AND c.expira_em > e.visto_em
+                               AND COALESCE(c.valor_pago, c.valor) = e.valor))
+      ORDER BY e.visto_em LIMIT 50`,
     [`${ESPERA_ANALISE_MIN} minutes`]
   );
   let feitos = 0;
