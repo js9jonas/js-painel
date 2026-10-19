@@ -3,29 +3,76 @@
 import { useState } from "react";
 import type { PlaylistRow } from "@/lib/aplicativos";
 import { desmontarLinkM3uSmartOne, montarLinkM3uSmartOne } from "@/lib/smartone-m3u";
+import { montarLinkM3u } from "@/lib/dados-acesso-iptv-formato";
+import type { ContaPainelVinculada } from "@/lib/clientes";
 
 type Props = {
   idAppRegistro: number;
   playlist: PlaylistRow;
   tipoPainel: string | null;
   nomeCliente: string;
+  /** Contas do cliente: "Trocar conta" preenche a URL com o host principal da conta escolhida */
+  contas?: ContaPainelVinculada[];
   onClose: () => void;
   onSaved: () => void;
 };
 
-export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPainel, nomeCliente, onClose, onSaved }: Props) {
-  const isSmartOne = tipoPainel === "smartone";
+/** Origem (protocolo + host + porta) para comparar hosts; vazio se não for URL. */
+function origem(s: string | null | undefined): string {
+  try {
+    return new URL((s ?? "").trim()).origin.toLowerCase();
+  } catch {
+    return "";
+  }
+}
 
-  // SmartOne guarda host/porta/usuário/senha separados (exigência do endpoint dele),
-  // mas na UI isso vira um único campo "link m3u", igual FunPlays/LazerPlay/CorePlayer —
-  // normaliza aqui pra exibir sempre no mesmo formato, mesmo vindo de um registro
-  // antigo (sincronizado antes dessa mudança). Ver [[smartone-m3u]].
-  const [nome, setNome] = useState(playlist.nome ?? "");
-  const [url, setUrl] = useState(() => {
-    if (!isSmartOne) return playlist.url ?? "";
-    const { host, usuario, senha } = desmontarLinkM3uSmartOne(playlist.url ?? "");
-    return montarLinkM3uSmartOne(host, usuario, senha);
+export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPainel, nomeCliente, contas = [], onClose, onSaved }: Props) {
+  const isSmartOne = tipoPainel === "smartone";
+  // Mesmo filtro do "+" de adicionar: só contas com link m3u, ativas primeiro
+  const contasM3u = contas
+    .filter((c) => c.tipo_painel !== "unitv" && c.host_stream && c.senha)
+    .sort((a, b) => Number(b.status_conta === "ok") - Number(a.status_conta === "ok"));
+  const linkDaConta = (c: ContaPainelVinculada) =>
+    isSmartOne
+      ? montarLinkM3uSmartOne(c.host_stream!, c.usuario, c.senha ?? "")
+      : montarLinkM3u({ usuario: c.usuario, senha: c.senha, rotulo: null, nomePainel: c.nome_painel, hostStream: c.host_stream });
+
+  // Lido uma vez ao abrir: a URL como está, a conta do cliente com o mesmo usuário e senha (se houver) e se o
+  // host da playlist é outro que não o principal dessa conta — nesse caso a conta já vem escolhida e a URL
+  // já vem com o host principal, pra atualizar com um clique (19/10/2026).
+  const [inicial] = useState(() => {
+    // SmartOne guarda host/porta/usuário/senha separados (exigência do endpoint dele),
+    // mas na UI isso vira um único campo "link m3u", igual FunPlays/LazerPlay/CorePlayer —
+    // normaliza aqui pra exibir sempre no mesmo formato, mesmo vindo de um registro
+    // antigo (sincronizado antes dessa mudança). Ver [[smartone-m3u]].
+    const lido = desmontarLinkM3uSmartOne(playlist.url ?? "");
+    const url = isSmartOne ? montarLinkM3uSmartOne(lido.host, lido.usuario, lido.senha) : playlist.url ?? "";
+    const conta = lido.usuario
+      ? contasM3u.find((c) => c.usuario === lido.usuario && c.senha === lido.senha) ?? null
+      : null;
+    const hostDiferente = !!conta && origem(url) !== origem(conta.host_stream);
+    return { url, conta, hostDiferente };
   });
+  const contaAtual = inicial.conta;
+
+  const [nome, setNome] = useState(playlist.nome ?? "");
+  const [idConta, setIdConta] = useState(inicial.hostDiferente ? contaAtual!.id_conta : "");
+  const [url, setUrl] = useState(() => (inicial.hostDiferente ? linkDaConta(contaAtual!) : inicial.url));
+
+  const escolhida = contasM3u.find((c) => c.id_conta === idConta) ?? null;
+  const trocandoConta = !!escolhida && escolhida.id_conta !== contaAtual?.id_conta;
+
+  function escolherConta(id: string) {
+    setIdConta(id);
+    const c = contasM3u.find((x) => x.id_conta === id);
+    if (!c) {
+      setUrl(inicial.url);
+      return;
+    }
+    setUrl(linkDaConta(c));
+    // Outro painel: o nome antigo (ex.: "CENTRAL") ficaria errado
+    if (c.id_conta !== contaAtual?.id_conta && c.nome_painel !== contaAtual?.nome_painel) setNome(c.nome_painel);
+  }
 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -86,6 +133,43 @@ export default function EditarPlaylistModal({ idAppRegistro, playlist, tipoPaine
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {contasM3u.length > 0 && (
+            <div>
+              <label className={labelClass}>Trocar conta</label>
+              <select
+                value={idConta}
+                onChange={(e) => escolherConta(e.target.value)}
+                className={`${inputClass} ${trocandoConta ? "border-amber-400 bg-amber-50 focus:ring-amber-500" : ""}`}
+              >
+                <option value="">Manter a URL atual / digitar</option>
+                {contasM3u.map((c) => (
+                  <option key={c.id_conta} value={c.id_conta}>
+                    {c.id_conta === contaAtual?.id_conta ? "✓ " : ""}
+                    {c.nome_painel} · {c.usuario}
+                    {c.rotulo_complemento ? ` · ${c.rotulo_complemento}` : ""}
+                    {c.status_conta !== "ok" ? ` (${c.status_conta})` : ""}
+                    {c.id_conta === contaAtual?.id_conta ? " — conta atual" : ""}
+                  </option>
+                ))}
+              </select>
+              {trocandoConta && (
+                <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+                  ⚠️ <b>Conta diferente da atual.</b>{" "}
+                  {contaAtual
+                    ? <>Hoje a playlist usa <b>{contaAtual.nome_painel} · {contaAtual.usuario}</b>.</>
+                    : <>Hoje a playlist não usa nenhuma conta deste cliente.</>}{" "}
+                  Ao salvar, passa a usar <b>{escolhida!.nome_painel} · {escolhida!.usuario}</b>.
+                </p>
+              )}
+              {!trocandoConta && escolhida && inicial.hostDiferente && (
+                <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800 ring-1 ring-sky-200">
+                  Mesma conta, host atualizado para o principal do {escolhida.nome_painel}:{" "}
+                  <span className="font-mono">{origem(inicial.url) || "?"}</span> → <span className="font-mono">{origem(url)}</span>. É só salvar.
+                </p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className={labelClass}>Nome</label>
             <input value={nome} onChange={(e) => setNome(e.target.value)} className={inputClass} />

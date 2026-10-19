@@ -20,7 +20,7 @@ type Props = {
   nomeCliente: string;
   aplicativos: AplicativoRow[];
   apps: AppRow[];
-  /** Contas do cliente, oferecidas no "+" de adicionar lista */
+  /** Contas do cliente, oferecidas no "+" de adicionar lista e no "Trocar conta" do editar */
   contas?: ContaPainelVinculada[];
 };
 
@@ -787,6 +787,7 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
           playlist={editandoPlaylist.pl}
           tipoPainel={editandoPlaylist.tipoPainel}
           nomeCliente={nomeCliente}
+          contas={contas}
           onClose={() => setEditandoPlaylist(null)}
           onSaved={() => {
             recarregarPlaylistsAoVivo(editandoPlaylist.idAppRegistro);
