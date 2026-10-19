@@ -121,6 +121,26 @@ const SELECT_COBRANCA = `
                WHERE i.id_cobranca = c.id ORDER BY i.id_assinatura) AS itens
   FROM public.pix_cobrancas c`;
 
+export type EventoLink = "abriu" | "estendidos";
+
+// Pré-visualização de link (WhatsApp, Facebook, Telegram...) também abre a página: não conta como cliente.
+const ROBO_PREVIA = /bot|crawler|spider|preview|facebookexternalhit|whatsapp|telegram/i;
+
+/** Registra o evento para o funil de /alertas (sql/031). Acessório: nunca derruba a página. */
+export async function registrarEventoLink(token: string, evento: EventoLink, userAgent: string | null): Promise<void> {
+  const ua = userAgent ?? "";
+  if (ROBO_PREVIA.test(ua)) return;
+  try {
+    await dbPortal().query(
+      `INSERT INTO public.pix_link_eventos (id_cliente, evento, celular)
+       SELECT id_cliente, $2, $3 FROM public.pix_links WHERE token = $1`,
+      [token, evento, ua ? /mobile|android|iphone/i.test(ua) : null]
+    );
+  } catch (err) {
+    console.error("[pagar] falha ao registrar evento:", err instanceof Error ? err.message : err);
+  }
+}
+
 export async function dadosDoLink(token: string): Promise<DadosLink | null> {
   const cliente = await clientePorToken(token);
   if (!cliente) return null;

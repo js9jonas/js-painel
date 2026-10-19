@@ -282,7 +282,11 @@ export default function PagarCliente({
               {marcada && a.opcoes.length > 1 && !estendidosAbertos.includes(a.id_assinatura) && (
                 <button
                   type="button"
-                  onClick={() => setEstendidosAbertos((l) => [...l, a.id_assinatura])}
+                  onClick={() => {
+                    setEstendidosAbertos((l) => [...l, a.id_assinatura]);
+                    // Só para o funil de /alertas; falha aqui não importa para o cliente
+                    fetch(`/api/pagar/${token}/evento`, { method: "POST", body: JSON.stringify({ evento: "estendidos" }), keepalive: true }).catch(() => {});
+                  }}
                   className="px-1 text-xs font-medium text-emerald-700 underline"
                 >
                   Planos estendidos ▾

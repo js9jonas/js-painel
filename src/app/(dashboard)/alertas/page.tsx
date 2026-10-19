@@ -17,6 +17,7 @@ import MigrarPainelButton from "@/components/clientes/MigrarPainelButton";
 import AutoRefresh from "@/components/AutoRefresh";
 import DispensarPixButton from "@/components/alertas/DispensarPixButton";
 import { getPixParaRenovar } from "@/lib/pix-link";
+import { getFunilLink, DIAS_FUNIL, type FunilLink } from "@/lib/pix-funil";
 
 function diasRestantes(data: string): number {
     const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
@@ -40,7 +41,7 @@ function labelDias(dias: number) {
 }
 
 export default async function AlertasPage() {
-    const [contas, apps, saldos, previsoes, consumos, painelServidores, pixRecebidos] = await Promise.all([
+    const [contas, apps, saldos, previsoes, consumos, painelServidores, pixRecebidos, funil] = await Promise.all([
         getAlertasContas(5),
         getAlertasApps(7),
         getSaldosServidores(),
@@ -51,6 +52,10 @@ export default async function AlertasPage() {
         getPixParaRenovar().catch((err) => {
             console.error("[alertas] Pix pelo link:", err instanceof Error ? err.message : err);
             return [];
+        }),
+        getFunilLink().catch((err): FunilLink | null => {
+            console.error("[alertas] funil do link:", err instanceof Error ? err.message : err);
+            return null;
         }),
     ]);
 
@@ -205,6 +210,9 @@ export default async function AlertasPage() {
                     </div>
                 </div>
             )}
+
+            {/* Aceitação do link de pagamento (19/10/2026): do botão tocado no WhatsApp até a renovação sozinha */}
+            {funil && <FunilLinkCard funil={funil} />}
 
             {/* Lista 1: Contas */}
             <SecaoRecolhivel
@@ -394,5 +402,61 @@ export default async function AlertasPage() {
             {/* Lista 3: Saldo de servidores */}
             <SaldoServidoresCard saldos={saldos} previsoes={previsoes} consumos={consumos} recolhivel />
         </div>
+    );
+}
+function FunilLinkCard({ funil }: { funil: FunilLink }) {
+    const etapas: { rotulo: string; valor: number; dica?: string }[] = [
+        { rotulo: "Tocou ⚡ Ative na hora", valor: funil.tocouAtiveNaHora, dica: `⏳ Chave PIX: ${funil.tocouChavePix}` },
+        { rotulo: "Recebeu o link", valor: funil.linkEnviado },
+        { rotulo: "Abriu a página", valor: funil.abriuPagina, dica: `Planos estendidos: ${funil.abriuEstendidos}` },
+        { rotulo: "Gerou o Pix", valor: funil.gerouPix },
+        { rotulo: "Pagou", valor: funil.pagou, dica: `Mais de 1 mês: ${funil.pagouEstendido}` },
+        { rotulo: "Renovou sozinho", valor: funil.renovadoSozinho, dica: `Foi para cá: ${funil.foiParaAlertas}` },
+    ];
+    return (
+        <SecaoRecolhivel
+            defaultAberto={false}
+            header={
+                <div className="px-5 py-4 bg-emerald-50">
+                    <p className="text-sm font-semibold text-emerald-900">⚡ Link de pagamento — aceitação ({DIAS_FUNIL} dias)</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                        {funil.tocouAtiveNaHora} tocaram em Ative na hora • {funil.abriuPagina} abriram a página • {funil.pagou} pagaram
+                        {funil.naoPagos.length > 0 ? ` • ${funil.naoPagos.length} gerou e não pagou` : ""} — sem o cliente de teste
+                    </p>
+                </div>
+            }
+        >
+            <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {etapas.map((e) => (
+                        <div key={e.rotulo} className="rounded-xl border bg-zinc-50 px-3 py-2">
+                            <p className="text-xs text-zinc-500">{e.rotulo}</p>
+                            <p className="text-2xl font-bold text-zinc-900">{e.valor}</p>
+                            {e.dica && <p className="text-[11px] text-zinc-500">{e.dica}</p>}
+                        </div>
+                    ))}
+                </div>
+                <p className="text-[11px] text-zinc-500">
+                    Clientes ou telefones distintos; &quot;Renovou sozinho&quot; e &quot;Foi para cá&quot; contam assinaturas. Aberturas da página contam desde 19/10/2026.
+                </p>
+                {funil.naoPagos.length > 0 && (
+                    <div>
+                        <p className="text-xs font-semibold text-zinc-700 mb-2">Gerou o Pix e não pagou</p>
+                        <ul className="divide-y divide-zinc-100 text-sm">
+                            {funil.naoPagos.map((n) => (
+                                <li key={n.id_cliente} className="py-1.5 flex flex-wrap items-center gap-x-3">
+                                    <Link href={`/clientes/${n.id_cliente}`} className="font-medium text-blue-700 hover:underline">{n.nome}</Link>
+                                    <span className="text-zinc-600">R$ {Number(n.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                                    <span className="text-xs text-zinc-500">
+                                        {new Date(n.criado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                        {n.expirou ? " • Pix expirou" : " • Pix ainda vale"}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        </SecaoRecolhivel>
     );
 }

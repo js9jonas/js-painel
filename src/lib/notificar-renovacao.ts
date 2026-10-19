@@ -105,22 +105,42 @@ function montarTexto(telas: number | null, dataTxt: string, ehNovo: boolean, ide
   )
 }
 
+/**
+ * Pagou pelo link (renovação sozinha pelo webhook do Inter, 19/10/2026): comemora a renovação na hora e reforça
+ * que da próxima vez é só usar o mesmo link. Sem saudação — "Recebi seu comprovante" não cabe aqui.
+ */
+function montarTextoLink(telas: number | null, dataTxt: string, identificacao: string | null, nome: string | null): string {
+  const pNome = primeiroNome(nome)
+  const linhaIdentificacao = identificacao ? `🏷️ ${identificacao}\n` : ''
+  return (
+    `⚡ *Renovado na hora${pNome ? `, ${pNome}` : ''}!* 🎉\n\n` +
+    `Seu Pix caiu e a renovação foi feita na hora, sem comprovante e sem espera. ${fraseTelas(telas, dataTxt, true)} 📺\n` +
+    linhaIdentificacao +
+    `\nDa próxima vez é só usar o mesmo link: em segundos está tudo liberado de novo 😉\n\n` +
+    `Obrigado por seguir com a gente! 🙏`
+  )
+}
+
 export async function notificarRenovacao(
   idCliente: string,
   novoVencimento: string | null,
   telas: number | null,
   ehNovo: boolean = false,
-  identificacao: string | null = null
+  identificacao: string | null = null,
+  viaLink: boolean = false
 ): Promise<NotificarRenovacaoResultado> {
   const cliente = await pool.query(`SELECT nome FROM public.clientes WHERE id_cliente = $1::bigint`, [idCliente])
   if (!cliente.rows[0]) return { enviado: false, motivo: 'Cliente não encontrado' }
 
   const nome: string | null = cliente.rows[0].nome
   const dataTxt = novoVencimento ? formatarData(novoVencimento) : '-'
-  const texto = montarTexto(telas, dataTxt, ehNovo, identificacao, nome)
+  const comemorarLink = viaLink && !ehNovo
+  const texto = comemorarLink
+    ? montarTextoLink(telas, dataTxt, identificacao, nome)
+    : montarTexto(telas, dataTxt, ehNovo, identificacao, nome)
   // Depois da saudação o nome já foi dito — a renovação sai sem ele pra não repetir.
   // Boas-vindas não ganha saudação: ela já é uma.
-  const saudacao = ehNovo ? null : montarSaudacao(nome)
+  const saudacao = ehNovo || comemorarLink ? null : montarSaudacao(nome)
   const textoAposSaudacao = montarTexto(telas, dataTxt, ehNovo, identificacao, null)
 
   const telefoneAtivo = await pool.query(
@@ -150,7 +170,7 @@ export async function notificarRenovacao(
       }
     }
     const msgId = await enviarTextoWhatsapp(telefone, textoFinal)
-    await registrarMensagemWhatsapp(msgId, telefone, textoFinal, { source: ehNovo ? 'notificacao-boas-vindas' : 'notificacao-renovacao' })
+    await registrarMensagemWhatsapp(msgId, telefone, textoFinal, { source: ehNovo ? 'notificacao-boas-vindas' : comemorarLink ? 'notificacao-renovacao-link' : 'notificacao-renovacao' })
     if (msgId) return { enviado: true, telefone }
     // Falha no envio direto mesmo com janela aberta (já passou pelo retry de erro
     // transitório em enviarTextoWhatsapp) — segue pro fallback Telegram como rede

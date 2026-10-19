@@ -169,7 +169,7 @@ export async function renovarAssinatura(e: EntradaRenovacao): Promise<ResultadoR
            WHERE a.id_assinatura = $1::bigint`,
           [idAssinatura]
         );
-        whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null, ehNovoSoPag, vencRows[0]?.identificacao ?? null);
+        whatsapp = await notificarRenovacao(pgto.idCliente, vencRows[0]?.venc_contrato ?? null, vencRows[0]?.telas ?? null, ehNovoSoPag, vencRows[0]?.identificacao ?? null, origem.tela === "pix-link-automatico");
       }
 
       return { httpStatus: 200, corpo: { ok: true, whatsapp } };
@@ -304,7 +304,7 @@ RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, i
         `SELECT p.telas, a.identificacao FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano WHERE a.id_assinatura = $1::bigint`,
         [idAssinatura]
       );
-      whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null, ehNovo, telasRows[0]?.identificacao ?? null);
+      whatsapp = await notificarRenovacao(assinatura.id_cliente, assinatura.venc_contrato, telasRows[0]?.telas ?? null, ehNovo, telasRows[0]?.identificacao ?? null, origem.tela === "pix-link-automatico");
     }
 
     return { httpStatus: 200, corpo: { ok: true, assinatura, whatsapp } };

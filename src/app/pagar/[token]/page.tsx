@@ -2,7 +2,8 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
-import { dadosDoLink, qrSvg } from "@/lib/pix-link";
+import { headers } from "next/headers";
+import { dadosDoLink, qrSvg, registrarEventoLink } from "@/lib/pix-link";
 import PagarCliente from "./PagarCliente";
 
 // Sobrescreve o que vem do layout raiz (feito pro painel): sem descrição, título de app nem
@@ -21,6 +22,7 @@ export default async function PagarPage({ params }: { params: Promise<{ token: s
   let dados: Awaited<ReturnType<typeof dadosDoLink>>;
   try {
     dados = await dadosDoLink(token);
+    if (dados) await registrarEventoLink(token, "abriu", (await headers()).get("user-agent"));
   } catch (err) {
     console.error("[pagar] falha ao abrir a página:", err instanceof Error ? err.message : err);
     return (
