@@ -2,7 +2,10 @@
 // Modo sombra da renovação conclusiva (etapa 3): embaixo do balão "RESUMO GERADO POR IA" no /chat, mostra o
 // que o painel concluiu do Pix no extrato do Inter e se bate com o que foi registrado. Não renova nada.
 // Lógica em src/lib/pix-extrato.ts (conclusaoDoComprovante).
-import { useState } from 'react'
+// Desde 19/10/2026 a conclusão aparece ao lado do botão sem clicar (Jonas: conferir a leitura de relance). É
+// acessório: consulta uma vez, só quando o balão entra na tela e só pra comprovante a partir de 18/10 (antes disso
+// não há extrato gravado); se falhar, o selo some e o botão continua funcionando.
+import { useEffect, useRef, useState } from 'react'
 import type { ConclusaoComprovante } from '@/lib/pix-extrato'
 
 const SITUACAO: Record<string, { icone: string; texto: string; cor: string }> = {
@@ -18,17 +21,40 @@ function hora(ts: string) {
 
 const PERIODO: Record<number, string> = { 1: 'mensal', 3: 'trimestral', 6: 'semestral', 12: 'anual' }
 
-export default function ConclusaoExtrato({ idMsg }: { idMsg: number }) {
+/** Primeiro dia com Pix gravado do extrato (sql/028): comprovante anterior nunca acharia o Pix. */
+const INICIO_EXTRATO = '2026-10-18'
+
+async function consultar(idMsg: number): Promise<ConclusaoComprovante> {
+  const r = await fetch(`/api/pix/extrato/comprovante?id_msg=${idMsg}`)
+  if (!r.ok) throw new Error()
+  return r.json()
+}
+
+export default function ConclusaoExtrato({ idMsg, recebidaEm }: { idMsg: number; recebidaEm: string }) {
   const [estado, setEstado] = useState<'fechado' | 'carregando' | 'erro' | 'ok'>('fechado')
   const [dados, setDados] = useState<ConclusaoComprovante | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+  const recente = recebidaEm.slice(0, 10) >= INICIO_EXTRATO
 
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !recente) return
+    let cancelado = false
+    const obs = new IntersectionObserver((entradas) => {
+      if (!entradas.some((e) => e.isIntersecting)) return
+      obs.disconnect()
+      consultar(idMsg).then((d) => { if (!cancelado) setDados(d) }).catch(() => {})
+    })
+    obs.observe(el)
+    return () => { cancelado = true; obs.disconnect() }
+  }, [idMsg, recente])
+
+  // Abrir consulta de novo: a análise pode ter mudado (Pix pendente, pagamento registrado depois)
   async function abrir() {
     if (estado === 'ok') { setEstado('fechado'); return }
     setEstado('carregando')
     try {
-      const r = await fetch(`/api/pix/extrato/comprovante?id_msg=${idMsg}`)
-      if (!r.ok) throw new Error()
-      setDados(await r.json())
+      setDados(await consultar(idMsg))
       setEstado('ok')
     } catch {
       setEstado('erro')
@@ -39,13 +65,23 @@ export default function ConclusaoExtrato({ idMsg }: { idMsg: number }) {
   const sit = pix ? SITUACAO[pix.situacao] ?? SITUACAO.pendente : null
 
   return (
-    <div style={{ marginTop: 6, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 5, fontSize: 12 }}>
+    <div ref={ref} style={{ marginTop: 6, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 5, fontSize: 12 }}>
       <button
         onClick={abrir}
         style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#0284c7', fontSize: 12, fontWeight: 600 }}
       >
         {estado === 'carregando' ? '…' : estado === 'ok' ? '▴ Extrato' : '◎ Ver no extrato'}
       </button>
+      {dados && estado !== 'ok' && (
+        <span style={{ marginLeft: 8, fontWeight: 600, color: sit?.cor ?? '#667781' }}>
+          {sit ? `${sit.icone} ${sit.texto}` : 'não achado no extrato'}
+          {dados.registrado && dados.confere !== null && (
+            <span style={{ marginLeft: 6, color: dados.confere ? '#16a34a' : '#dc2626' }}>
+              {dados.confere ? '✓ confere' : '✗ registrado diferente'}
+            </span>
+          )}
+        </span>
+      )}
       {estado === 'erro' && <span style={{ color: '#dc2626', marginLeft: 6 }}>não consegui consultar</span>}
       {estado === 'ok' && dados && (
         <div style={{ marginTop: 4, color: '#3b4a54', lineHeight: 1.45 }}>

@@ -2025,7 +2025,7 @@ export default function ChatPage() {
                           </div>
                         )}
                         {msg.tipo === 'text' && msg.origem === 'jonas' && msg.id > 0 && msg.conteudo?.startsWith('RESUMO GERADO POR IA') && (
-                          <ConclusaoExtrato idMsg={msg.id} />
+                          <ConclusaoExtrato idMsg={msg.id} recebidaEm={msg.recebida_em} />
                         )}
                         {msg.tipo === 'audio' && msg.conteudo && (
                           mediaErros.has(msg.id)
