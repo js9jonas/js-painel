@@ -155,11 +155,13 @@ export async function POST(req: NextRequest) {
             }
 
             // Auto-resposta a cliques nos botões do fluxo de vencimento — fire-and-forget
-            if (tipo === 'interactive_reply' && ['Falar com suporte', 'Chave PIX', 'Automático mensal', 'Pagamento mensal', 'Planos estendidos', 'Sicredi', 'Lotérica', 'Banrisul'].includes(conteudo)) {
+            // Título sem o emoji do começo ("⚡ Ative na hora" → "Ative na hora"; botões antigos vêm sem emoji)
+            const botao = tipo === 'interactive_reply' ? String(conteudo ?? '').replace(/^[^\p{L}]+/u, '').trim() : ''
+            if (tipo === 'interactive_reply' && ['Falar com suporte', 'Chave PIX', 'Ative na hora', 'Automático mensal', 'Pagamento mensal', 'Planos estendidos', 'Sicredi', 'Lotérica', 'Banrisul'].includes(botao)) {
               responderFalarComSuporte({
                 telefone: from,
                 cliqueMsgId: msgId,
-                botaoClicado: conteudo,
+                botaoClicado: botao,
                 replyToMsgId: replyToId,
               }).catch(err => console.error('[WhatsApp] auto-resposta-suporte error:', err))
             }

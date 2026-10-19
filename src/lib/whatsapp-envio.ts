@@ -124,6 +124,41 @@ export async function enviarBotoesWhatsapp(
   return data.messages?.[0]?.id ?? null
 }
 
+/**
+ * Mensagem interativa com um botão que abre um link (cta_url). Não dá pra misturar com botões de resposta na
+ * mesma mensagem (regra da Meta). Texto do botão: máx. 20 caracteres.
+ */
+export async function enviarBotaoLinkWhatsapp(
+  telefone: string,
+  texto: string,
+  botao: { texto: string; url: string }
+): Promise<string | null> {
+  const response = await fetch(`https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: telefone,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: texto },
+        action: { name: 'cta_url', parameters: { display_text: botao.texto, url: botao.url } },
+      },
+    }),
+  })
+
+  const data = await response.json()
+  if (!response.ok) {
+    console.error('[WhatsappEnvio] Erro ao enviar botão de link:', data)
+    return null
+  }
+  return data.messages?.[0]?.id ?? null
+}
+
 interface RegistrarMensagemOpts {
   source: string
   replyToMsgId?: string

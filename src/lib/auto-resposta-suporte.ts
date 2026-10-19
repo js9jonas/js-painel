@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db'
-import { enviarTextoWhatsapp, enviarBotoesWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
+import { enviarTextoWhatsapp, enviarBotoesWhatsapp, enviarBotaoLinkWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
+import { obterLinkCliente } from '@/lib/pix-link'
 
 const PIX_CHAVE = '40827286000106'
 
@@ -258,6 +259,28 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
 
     const msgIdB = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
     await registrarEnvio(msgIdB, telefone, PIX_CHAVE, cliqueMsgId)
+    return
+  }
+
+  // Link de pagamento do cliente (19/10/2026): Pix pelo link renova sozinho na hora (pix-renovacao.ts), sem comprovante.
+  if (botaoClicado === 'Ative na hora') {
+    const origem = await buscarOrigemTemplate(replyToMsgId)
+    if (!origem.reconhecido || !origem.idAssinatura) return
+    const { rows } = await pool.query<{ id_cliente: string }>(
+      `SELECT id_cliente::text FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+      [origem.idAssinatura]
+    )
+    if (!rows[0]) return
+    const url = await obterLinkCliente(rows[0].id_cliente)
+    const texto =
+      '⚡ Toque em *Pagar agora*, confira o plano e pague pelo Pix.\n\n' +
+      'A renovação é confirmada na hora, sem precisar mandar comprovante 🙌'
+    const msgId = await enviarBotaoLinkWhatsapp(telefone, texto, { texto: 'Pagar agora', url })
+    if (msgId) {
+      await registrarMensagemWhatsapp(msgId, telefone, JSON.stringify({ body: { text: texto }, buttons: [{ id: 'link', title: '🔗 Pagar agora' }], link: url }), {
+        source: 'auto-resposta-link', replyToMsgId: cliqueMsgId, tipo: 'interactive',
+      })
+    }
     return
   }
 

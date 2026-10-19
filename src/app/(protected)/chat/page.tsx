@@ -1196,9 +1196,6 @@ export default function ChatPage() {
     return ['📱 Aplicativos cadastrados:', ...linhas].join('\n')
   }
 
-  // Manda junto o botão "Planos estendidos" (interativo, mesmo mecanismo dos templates de
-  // vencimento) — ao clicar, o webhook reconhece a origem via id_assinatura e responde com
-  // as opções de outros períodos (auto-resposta-suporte.ts, botaoClicado === 'Planos estendidos').
   async function enviarFormasPagamento() {
     if (!selecionado || enviando) return
     setEnviando(true)
@@ -1214,6 +1211,8 @@ export default function ChatPage() {
     }
   }
 
+  // Manda junto os botões "⚡ Ative na hora" (link de pagamento, renova na hora) e "⏳ Chave PIX" (comprovante) —
+  // ao clicar, o webhook reconhece a origem via id_assinatura (auto-resposta-suporte.ts).
   async function enviarInfoPlano(a: AssinaturaResumo) {
     if (!selecionado || enviando || !a.id_assinatura) return
     // Foco no benefício (o que o cliente ganha), não em ficha técnica do plano
@@ -1230,7 +1229,8 @@ export default function ChatPage() {
     const texto =
       saudacao +
       `📦 Seu plano${identificacao ? ` *${identificacao}*` : ''}: *${telasTxt}*${a.valor ? ` por *${formatValor(a.valor)}/mês*` : ''}${beneficio}.\n\n` +
-      `Pra renovar, é só tocar em *Chave PIX* aqui embaixo e me mandar o comprovante. Assim que eu confirmar, te aviso por aqui ✅`
+      `Pra renovar, toque em *⚡ Ative na hora*: você paga pelo Pix no link e a renovação é confirmada na hora, sem precisar mandar comprovante 🚀\n\n` +
+      `Se preferir, toque em *⏳ Chave PIX* e me mande o comprovante. Essa confirmação é feita por mim e pode levar um tempinho.`
     setEnviando(true)
     try {
       await fetch('/api/whatsapp/enviar-planos-botao', {

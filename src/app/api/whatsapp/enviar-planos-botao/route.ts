@@ -6,8 +6,8 @@ import { enviarBotoesWhatsapp } from '@/lib/whatsapp-envio'
 export const dynamic = 'force-dynamic'
 
 // tipo/source reconhecidos por buscarOrigemTemplate() em auto-resposta-suporte.ts —
-// ao clicar em "Planos estendidos", o webhook usa o id_assinatura salvo aqui pra
-// responder com as opções de período certas, sem precisar adivinhar qual assinatura.
+// ao clicar em "Ative na hora", o webhook usa o id_assinatura salvo aqui pra achar o cliente e mandar o link
+// de pagamento dele (e em "Planos estendidos", de mensagens antigas, as opções de período certas).
 const SOURCE = 'chat-planos'
 
 export async function POST(req: NextRequest) {
@@ -21,9 +21,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'telefone, texto e id_assinatura obrigatórios' }, { status: 400 })
     }
 
+    // 19/10/2026: link de pagamento primeiro (renova na hora), Chave PIX depois (comprovante, confirmação manual).
+    // "Planos estendidos" saiu daqui; mensagens antigas com esse botão continuam respondidas pelo webhook.
     const botoes = [
-      { id: 'chave_pix', title: 'Chave PIX' },
-      { id: 'planos_estendidos', title: 'Planos estendidos' },
+      { id: 'ativar_na_hora', title: '⚡ Ative na hora' },
+      { id: 'chave_pix', title: '⏳ Chave PIX' },
     ]
     const msgId = await enviarBotoesWhatsapp(telefone, texto, botoes)
 
