@@ -220,3 +220,115 @@ export async function analisarPixPendentes(): Promise<number> {
   }
   return feitos;
 }
+
+// ── Modo sombra no /chat (etapa 3): botão ao lado do balão "RESUMO GERADO POR IA" ──────────────────────
+
+export type ConclusaoComprovante = {
+  resumo: { pagador: string | null; valor: string | null };
+  pix: {
+    id: string; visto_em: string; valor: string; nome: string | null; situacao: string; motivo: string | null;
+    cliente: string | null; id_cliente: string | null; id_assinatura: string | null;
+    identificacao: string | null; meses: number | null;
+  } | null;
+  /** Outros Pix do extrato com o mesmo valor perto da hora do comprovante (quando o nome não decidiu). */
+  outros: number;
+  /** O que foi registrado de fato depois do Pix — pra medir se a conclusão acertou. */
+  registrado: { id: number; cliente: string | null; id_cliente: string; id_assinatura: string | null; data_pgto: string } | null;
+  confere: boolean | null;
+};
+
+/** Acha o Pix do extrato que corresponde a um resumo de comprovante e devolve a conclusão do modo sombra. */
+export async function conclusaoDoComprovante(idMsg: number): Promise<ConclusaoComprovante | null> {
+  const { rows: ms } = await pool.query<{ telefone: string; criado_em: string; pagador: string | null; valor: string | null }>(
+    `SELECT telefone, criado_em::text,
+            upper(trim(substring(conteudo from 'Nome do Pagador:\\s*([^\\n]+)'))) AS pagador,
+            replace(replace(substring(conteudo from 'Valor pago:\\s*R\\$\\s*([0-9.,]+)'), '.', ''), ',', '.') AS valor
+       FROM public.whatsapp_mensagens WHERE id = $1 AND conteudo LIKE 'RESUMO GERADO POR IA%'`,
+    [idMsg]
+  );
+  const m = ms[0];
+  if (!m) return null;
+  const resumo = { pagador: m.pagador, valor: m.valor };
+  const vazio = { resumo, pix: null, outros: 0, registrado: null, confere: null };
+  if (!m.valor || !(Number(m.valor) > 0)) return vazio;
+
+  const { rows: clientesDoChat } = await pool.query<{ id_cliente: string }>(
+    `SELECT DISTINCT id_cliente::text FROM public.contatos WHERE telefone = $1 AND id_cliente IS NOT NULL`,
+    [m.telefone]
+  );
+  const idsChat = clientesDoChat.map((c) => c.id_cliente);
+
+  // Comprovante costuma vir logo depois do Pix; aceita de 12 h antes a 2 h depois. Preferência: nome igual
+  // ao do comprovante, depois cliente desta conversa, depois o mais perto no tempo.
+  const { rows: pixs } = await pool.query<NonNullable<ConclusaoComprovante["pix"]> & { ordem: number }>(
+    `SELECT e.id::text, e.visto_em::text, e.valor::text, e.nome, e.situacao, e.motivo,
+            COALESCE(cl.nome, e.analise->>'cliente') AS cliente, e.id_cliente::text, e.id_assinatura::text,
+            e.analise->>'identificacao' AS identificacao, (e.analise->>'meses')::int AS meses,
+            (CASE WHEN ${NORMALIZA_SQL("e.nome")} = ${NORMALIZA_SQL("$3")} THEN 0 ELSE 2 END
+             + CASE WHEN e.id_cliente::text = ANY($4::text[]) THEN 0 ELSE 1 END) AS ordem
+       FROM public.pix_extrato e LEFT JOIN public.clientes cl ON cl.id_cliente = e.id_cliente
+      WHERE e.valor = $1::numeric
+        AND e.visto_em BETWEEN $2::timestamptz - interval '12 hours' AND $2::timestamptz + interval '2 hours'
+      ORDER BY ordem, abs(extract(epoch FROM e.visto_em - $2::timestamptz))`,
+    [m.valor, m.criado_em, m.pagador ?? "", idsChat]
+  );
+  const pix = pixs[0] ?? null;
+  if (!pix) return vazio;
+
+  // Pagamento registrado depois do Pix (renovação pelo comprovante, pelo botão ou pelo link).
+  const ids = [...new Set([...idsChat, ...(pix.id_cliente ? [pix.id_cliente] : [])])];
+  const { rows: pgs } = await pool.query<NonNullable<ConclusaoComprovante["registrado"]>>(
+    `SELECT p.id, cl.nome AS cliente, p.id_cliente::text, p.id_assinatura::text, p.data_pgto::text
+       FROM public.pagamentos p LEFT JOIN public.clientes cl ON cl.id_cliente = p.id_cliente
+      WHERE p.id_cliente = ANY($1::bigint[]) AND p.valor = $2::numeric
+        AND p.atualizado_em >= ($3::timestamptz - interval '5 minutes') AT TIME ZONE 'America/Sao_Paulo'
+      ORDER BY p.atualizado_em LIMIT 1`,
+    [ids, pix.valor, pix.visto_em]
+  );
+  const registrado = pgs[0] ?? null;
+  const confere =
+    pix.situacao !== "conclusivo" || !registrado
+      ? null
+      : registrado.id_cliente === pix.id_cliente &&
+        (registrado.id_assinatura === null || registrado.id_assinatura === pix.id_assinatura);
+
+  const { ordem: _o, ...pixSemOrdem } = pix;
+  void _o;
+  return { resumo, pix: pixSemOrdem, outros: pixs.length - 1, registrado, confere };
+}
+
+/**
+ * Mantém a base de pagadores em dia (mesma regra da carga inicial de 18/10/2026): resumo de comprovante dos
+ * últimos dias → pagamento do cliente daquele telefone, mesmo valor, de 1 dia antes a 3 dias depois, só
+ * quando a ligação é 1↔1. Grava `pagamentos.pagador` onde ainda está vazio. Roda no job de 5 em 5 min.
+ */
+export async function aprenderPagadores(): Promise<number> {
+  const r = await pool.query(`
+    WITH r AS (
+      SELECT m.id AS id_msg, m.telefone, (m.criado_em AT TIME ZONE 'America/Sao_Paulo')::date AS d,
+             upper(regexp_replace(trim(substring(m.conteudo from 'Nome do Pagador:\\s*([^\\n]+)')), '\\s+', ' ', 'g')) AS pag,
+             nullif(replace(replace(substring(m.conteudo from 'Valor pago:\\s*R\\$\\s*([0-9.,]+)'), '.', ''), ',', '.'), '')::numeric AS valor
+        FROM public.whatsapp_mensagens m
+       WHERE m.origem = 'jonas' AND m.tipo = 'text' AND m.conteudo LIKE 'RESUMO GERADO POR IA%'
+         AND m.criado_em > now() - interval '3 days'
+    ), limpos AS (
+      -- Lixo da leitura da IA: destinatário lido como pagador, placeholders, nome de conta.
+      SELECT * FROM r
+       WHERE pag IS NOT NULL AND valor IS NOT NULL AND length(pag) >= 5
+         AND pag !~ '^[\\[(]' AND pag !~ '^(N/?A|-)$' AND pag !~ '^(NÃO |NAO |DESCONHECIDO|POUPANÇA|CONTA )'
+         AND pag !~ '^JS SISTEMAS' AND pag !~ 'JONAS.*SCHEIBE' AND pag !~ '[0-9*]'
+    ), cand AS (
+      SELECT l.id_msg, l.pag, p.id AS id_pgto, p.pagador
+        FROM limpos l
+        JOIN (SELECT DISTINCT telefone, id_cliente FROM public.contatos WHERE id_cliente IS NOT NULL) ct ON ct.telefone = l.telefone
+        JOIN public.pagamentos p ON p.id_cliente = ct.id_cliente AND p.valor = l.valor
+                                AND p.data_pgto BETWEEN l.d - 1 AND l.d + 3
+    ), um_a_um AS (
+      SELECT c.* FROM cand c
+       WHERE (SELECT count(*) FROM cand x WHERE x.id_msg = c.id_msg) = 1
+         AND (SELECT count(*) FROM cand x WHERE x.id_pgto = c.id_pgto) = 1
+    )
+    UPDATE public.pagamentos p SET pagador = u.pag
+      FROM um_a_um u WHERE p.id = u.id_pgto AND p.pagador IS NULL`);
+  return r.rowCount ?? 0;
+}

@@ -22,7 +22,9 @@ no extrato e deve ser ignorado ali. Comprovante sozinho não renova (extrato é 
   de alguns dias validando liga a renovação permanente (com chave pra desligar).
 - `pagamentos.conferencia` (conferido | analisar | conclusivo | automatico) e `pagamentos.pagador` — sql/027,
   **aplicada 18/10** (45.623 viraram conferido). Pagamento antigo sem pagador identificado fica nulo.
-- Detalhes mostra o pagador; "N dias desde o último pagamento" deixou de ser gravado.
+- Coluna `pagamentos.detalhes` **excluída** a pedido do Jonas (19/10): só tinha 'OK'/vazio; telas mostram o
+  Pagador no lugar. sql/029 recria a view `v_assinatura_atual_from_pagamentos` sem ela — ⚠️ aplicar só DEPOIS
+  do deploy do código que parou de usar a coluna.
 
 ## Etapas
 1. 🔄 Colunas + telas (código pronto, falta commit/deploy) + base de pagadores ✅ **gravada 18/10**: 3.259
@@ -45,7 +47,15 @@ no extrato e deve ser ignorado ali. Comprovante sozinho não renova (extrato é 
    Filtrar por data ou pular a execução das 00:00 NÃO resolveria (perderia os Pix da noite / repetiria às
    00:01). No painel a análise usa `visto_em`, nunca `data` (que só serve pra chave única).
    Analisar em /alertas fica pra etapa 4 (em modo sombra seria repetir o fluxo normal do Jonas).
-3. 📋 Modo sombra com botão no /chat.
+3. 🔄 Modo sombra no /chat (código pronto 19/10): "◎ Ver no extrato" embaixo do balão "RESUMO GERADO POR IA"
+   (`src/components/chat/ConclusaoExtrato.tsx` → `GET /api/pix/extrato/comprovante?id_msg=`) mostra o Pix achado
+   (mesmo valor, de 12 h antes a 2 h depois do resumo; nome igual e cliente da conversa primeiro), a conclusão e
+   o pagamento registrado depois — ✓ se bate, ✗ se diferente. Teste com 4 comprovantes de 18/10: 3 conclusivos
+   que bateram, 1 "pagador desconhecido" (Nambia paga pelo Luis Sedenir).
+   Base de pagadores aprende sozinha no job de 5 min (`aprenderPagadores`, mesma regra 1↔1, comprovantes de 3 dias).
+   ⚠️ Bug corrigido 19/10: o filtro de lixo `^(N/?A|…)` descartava todo nome começando com "NA" (Nambia, Natália…)
+   — carga completada com +35 pagamentos. Jonas preenchia o nome em Detalhes: o que vale é o campo **Pagador**
+   (movidos os 2 que ele fez: Nambia → Luis Sedenir, Adolinha → Adolfinha).
 4. 📋 Ativar renovação conclusiva.
 5. 📋 Futuro (Jonas, 18/10): extratos das **outras contas** (Nu PJ, Nubank, Sicredi, Caixa… ~6% dos
    pagamentos) pra cobrir essa minoria também.

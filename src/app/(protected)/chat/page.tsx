@@ -9,7 +9,8 @@ import type { AplicativoRow, AppRow } from '@/lib/aplicativos'
 import { appsPorConta } from '@/lib/apps-vinculados'
 import AplicativoModal from '@/components/aplicativos/AplicativoModal'
 import type { PagamentoFullRow } from '@/lib/pagamentos'
-import { CONFERENCIA_ROTULO, detalhesVisiveis } from '@/lib/conferencia-pagamento'
+import { CONFERENCIA_ROTULO } from '@/lib/conferencia-pagamento'
+import ConclusaoExtrato from '@/components/chat/ConclusaoExtrato'
 import EditAssinaturaModal from '@/components/assinaturas/EditAssinaturaModal'
 import EditClienteModal from '@/components/clientes/EditClienteModal'
 import NovoClienteModal from '@/components/clientes/NovoClienteModal'
@@ -350,7 +351,6 @@ function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boole
     ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     : '—'
   const conf = CONFERENCIA_ROTULO[p.conferencia] ?? CONFERENCIA_ROTULO.analisar
-  const detalhes = detalhesVisiveis(p)
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6,
@@ -371,10 +371,10 @@ function PagamentoLinha({ p, destaque }: { p: PagamentoFullRow; destaque?: boole
           borderRadius: 4, padding: '1px 5px', flexShrink: 0
         }}>{p.tipo_pagamento}</span>
       )}
-      {detalhes && (
-        <span title={p.pagador ? `Pagador: ${detalhes}` : detalhes} style={{
+      {p.pagador && (
+        <span title={`Pagador: ${p.pagador}`} style={{
           color: '#667781', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
-        }}>{detalhes}</span>
+        }}>{p.pagador}</span>
       )}
       <span title={conf.texto} style={{
         marginLeft: 'auto', flexShrink: 0,
@@ -2023,6 +2023,9 @@ export default function ChatPage() {
                           <div style={{ color: '#111b21', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                             {msg.conteudo}
                           </div>
+                        )}
+                        {msg.tipo === 'text' && msg.origem === 'jonas' && msg.id > 0 && msg.conteudo?.startsWith('RESUMO GERADO POR IA') && (
+                          <ConclusaoExtrato idMsg={msg.id} />
                         )}
                         {msg.tipo === 'audio' && msg.conteudo && (
                           mediaErros.has(msg.id)

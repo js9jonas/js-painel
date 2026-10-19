@@ -13,8 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     await pool.query(
-      // 'OK' em detalhes mantido por compatibilidade; a marca que vale é `conferencia` (sql/027).
-      `UPDATE pagamentos SET conferencia = 'conferido', detalhes = 'OK' WHERE id = ANY($1::int[])`,
+      `UPDATE pagamentos SET conferencia = 'conferido' WHERE id = ANY($1::int[])`,
       [ids]
     );
 

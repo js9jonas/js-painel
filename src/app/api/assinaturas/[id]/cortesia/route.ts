@@ -56,8 +56,8 @@ export async function PUT(
 
       await client.query(
         `INSERT INTO public.pagamentos
-         (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em, id_assinatura)
-         VALUES ($1::bigint, $2, $3, CURRENT_DATE, 'Cortesia', 0, 'Cortesia de indicação', 'Assinatura tv', NOW(), $4::bigint)`,
+         (id_cliente, cliente, compra, data_pgto, forma, valor, tipo, atualizado_em, id_assinatura, conferencia)
+         VALUES ($1::bigint, $2, $3, CURRENT_DATE, 'Cortesia', 0, 'Assinatura tv', NOW(), $4::bigint, 'conferido')`,
         [idCliente, nomeCliente, pacoteNome, idAssinatura]
       );
 

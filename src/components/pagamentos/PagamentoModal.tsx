@@ -21,7 +21,6 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
   const [dataPgto, setDataPgto] = useState(rawDate);
   const [forma, setForma] = useState(pagamento.forma ?? "");
   const [valor, setValor] = useState(pagamento.valor ?? "");
-  const [detalhes, setDetalhes] = useState(pagamento.detalhes ?? "");
   const [tipo, setTipo] = useState(pagamento.tipo ?? "");
   const [compra, setCompra] = useState(pagamento.compra ?? "");
   const [pagador, setPagador] = useState(pagamento.pagador ?? "");
@@ -115,7 +114,6 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
           data_pgto: dataPgto,
           forma,
           valor,
-          detalhes,
           tipo,
           compra,
           pagador,
@@ -298,18 +296,6 @@ export default function PagamentoModal({ pagamento, onClose, onSaved }: Props) {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Detalhes */}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Detalhes</label>
-            <textarea
-              value={detalhes}
-              onChange={(e) => setDetalhes(e.target.value)}
-              rows={3}
-              className="w-full rounded-xl border border-zinc-300 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all resize-none"
-              placeholder="Detalhes adicionais..."
-            />
           </div>
 
         </div>

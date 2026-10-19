@@ -8,7 +8,6 @@ export type PagamentoFullRow = {
   data_pgto: string | null;
   forma: string | null;
   valor: string | null;
-  detalhes: string | null;
   tipo: string | null;
   compra: string | null;
   tipo_pagamento: string | null;
@@ -17,7 +16,7 @@ export type PagamentoFullRow = {
   pagador: string | null;
 };
 
-// sql/027: substitui o 'OK' em `detalhes` como marca de conferência.
+// sql/027: marca de conferência (antes era o texto 'OK' na coluna detalhes, excluída no sql/029).
 export type Conferencia = "conferido" | "analisar" | "conclusivo" | "automatico";
 
 export type GetPagamentosParams = {
@@ -37,7 +36,7 @@ function buildWhere(params: Omit<GetPagamentosParams, "page" | "pageSize">) {
   if (q) {
     values.push(`%${q}%`);
     parts.push(
-      `(c.nome ILIKE $${values.length} OR p.detalhes ILIKE $${values.length} OR p.pagador ILIKE $${values.length} OR p.compra ILIKE $${values.length})`
+      `(c.nome ILIKE $${values.length} OR p.pagador ILIKE $${values.length} OR p.compra ILIKE $${values.length})`
     );
   }
 
@@ -78,7 +77,6 @@ export async function getPagamentos(
        p.data_pgto::text,
        p.forma,
        p.valor::text,
-       p.detalhes,
        p.tipo,
        p.compra,
        p.tipo_pagamento,

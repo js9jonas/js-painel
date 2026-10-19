@@ -10,7 +10,6 @@ type PagamentoData = {
   data_pgto: string;
   forma: string;
   valor: string;
-  detalhes: string;
   tipo: string;
   compra: string;
   pagador?: string;
@@ -28,19 +27,17 @@ export async function updatePagamento(id: number, data: PagamentoData) {
        data_pgto  = $3,
        forma      = $4,
        valor      = $5,
-       detalhes   = $6,
-       tipo       = $7,
-       compra     = $8,
-       pagador    = $10,
-       conferencia = COALESCE($11, conferencia)
-     WHERE id = $9`,
+       tipo       = $6,
+       compra     = $7,
+       pagador    = $9,
+       conferencia = COALESCE($10, conferencia)
+     WHERE id = $8`,
     [
       data.id_cliente ? BigInt(data.id_cliente) : null,
       data.nome_cliente?.trim() || null,
       data.data_pgto || null,
       data.forma.trim() || null,
       data.valor || null,
-      data.detalhes.trim() || null,
       data.tipo.trim() || null,
       data.compra.trim() || null,
       id,
@@ -58,16 +55,16 @@ export async function createPagamento(
   data: Omit<PagamentoData, "id_cliente" | "nome_cliente">
 ) {
   await pool.query(
-    `INSERT INTO public.pagamentos (id_cliente, data_pgto, forma, valor, detalhes, tipo, compra)
+    `INSERT INTO public.pagamentos (id_cliente, data_pgto, forma, valor, tipo, compra, pagador)
      VALUES ($1::bigint, $2, $3, $4, $5, $6, $7)`,
     [
       id_cliente,
       data.data_pgto || null,
       data.forma.trim() || null,
       data.valor || null,
-      data.detalhes.trim() || null,
       data.tipo.trim() || null,
       data.compra.trim() || null,
+      data.pagador?.trim() || null,
     ]
   );
 

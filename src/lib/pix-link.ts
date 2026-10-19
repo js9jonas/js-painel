@@ -10,7 +10,7 @@
 import { randomBytes } from "crypto";
 import QRCode from "qrcode";
 import { pool } from "@/lib/db";
-import { analisarPixPendentes } from "@/lib/pix-extrato";
+import { analisarPixPendentes, aprenderPagadores } from "@/lib/pix-extrato";
 import { dbPortal } from "@/lib/db-portal";
 import { registrarAudit } from "@/lib/audit";
 import { criarCob, consultarCob, novoTxid, type CobInter } from "@/lib/inter";
@@ -391,6 +391,9 @@ export function iniciarConferenciaPix() {
     // Pix do extrato (n8n) que chegaram e ainda esperavam o webhook do link — src/lib/pix-extrato.ts
     await analisarPixPendentes().catch((err) =>
       console.error("[pix-extrato] análise falhou:", err instanceof Error ? err.message : err)
+    );
+    await aprenderPagadores().catch((err) =>
+      console.error("[pix-extrato] base de pagadores falhou:", err instanceof Error ? err.message : err)
     );
   }, INTERVALO_CONFERENCIA_MS);
 }

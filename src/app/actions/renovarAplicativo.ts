@@ -11,7 +11,6 @@ export interface RenovarAplicativoParams {
   modo: "cortesia" | "pagamento" | "pendente";
   valor?: number;
   forma?: string;
-  detalhes?: string;
 }
 
 export async function renovarAplicativo({
@@ -21,7 +20,6 @@ export async function renovarAplicativo({
   modo,
   valor = 0,
   forma = "INTER",
-  detalhes = "",
 }: RenovarAplicativoParams) {
   const client = await pool.connect();
 
@@ -72,9 +70,9 @@ export async function renovarAplicativo({
     if (modo === "pagamento") {
       await client.query(
         `INSERT INTO public.pagamentos
-           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo, atualizado_em, id_assinatura)
-         VALUES ($1, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Licenças', NOW(), $7::bigint)`,
-        [id_cliente, cliente, nome_app, forma, valor, detalhes || "PAGO", id_assinatura ?? null]
+           (id_cliente, cliente, compra, data_pgto, forma, valor, tipo, atualizado_em, id_assinatura)
+         VALUES ($1, $2, $3, CURRENT_DATE, $4, $5::numeric, 'Licenças', NOW(), $6::bigint)`,
+        [id_cliente, cliente, nome_app, forma, valor, id_assinatura ?? null]
       );
     }
 

@@ -108,7 +108,6 @@ export type PagamentoRow = {
   data_pgto: string | null;
   forma: string | null;
   valor: string | null;
-  detalhes: string | null;
   tipo: string | null;
   compra: string | null;
   id_assinatura: string | null;
@@ -470,7 +469,6 @@ export async function getPagamentosByClienteId(id: string, limit: number = 5): P
       data_pgto::text AS data_pgto,
       forma,
       valor::text     AS valor,
-      detalhes,
       tipo,
       compra,
       id_assinatura::text AS id_assinatura,

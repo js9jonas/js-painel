@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { PagamentoFullRow } from "@/lib/pagamentos";
 import PagamentoModal from "./PagamentoModal";
 import { Select } from "@/components/ui/select";
-import { CONFERENCIA_ROTULO, detalhesVisiveis } from "@/lib/conferencia-pagamento";
+import { CONFERENCIA_ROTULO } from "@/lib/conferencia-pagamento";
 
 type Props = {
   data: PagamentoFullRow[];
@@ -232,7 +232,7 @@ export default function PagamentosClient({
             <input
               name="q"
               defaultValue={q}
-              placeholder="🔍 Buscar por cliente, detalhes ou compra..."
+              placeholder="🔍 Buscar por cliente, pagador ou compra..."
               className="h-10 w-full rounded-xl border border-zinc-300 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
             />
           </div>
@@ -282,10 +282,10 @@ export default function PagamentosClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white">
-                {["Data", "", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Detalhes", "Conferência", ""].map((h, i) => (
+                {["Data", "", "Cliente", "Forma", "Valor", "Tipo", "Compra", "Pagador", "Conf.", ""].map((h, i) => (
                   <th
                     key={i}
-                    className={`sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider ${h === "" && i === 1 ? "px-2 w-14" : "px-6"}`}
+                    className={`sticky top-0 z-10 bg-gradient-to-b from-zinc-50 to-white border-b border-zinc-200 py-4 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider ${h === "" && i === 1 ? "px-2 w-14" : h === "Pagador" ? "px-4" : h === "Conf." ? "px-2 text-center" : "px-6"}`}
                   >
                     {h}
                   </th>
@@ -296,7 +296,6 @@ export default function PagamentosClient({
               {data.map((p) => {
                 const isPendente = p.conferencia === "analisar";
                 const conf = CONFERENCIA_ROTULO[p.conferencia] ?? CONFERENCIA_ROTULO.analisar;
-                const detalhes = detalhesVisiveis(p);
                 return (
                   <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-zinc-900 whitespace-nowrap">
@@ -331,20 +330,23 @@ export default function PagamentosClient({
                     </td>
                     <td className="px-6 py-4 text-zinc-600 text-xs">{p.tipo ?? "—"}</td>
                     <td className="px-6 py-4 text-zinc-600 text-xs">{p.compra ?? "—"}</td>
-                    <td className="px-6 py-4 max-w-xs">
+                    <td className="px-4 py-4">
                       <span
-                        className="text-zinc-600 text-xs truncate block"
-                        title={p.pagador ? `Pagador: ${p.pagador}` : detalhes ?? ""}
+                        className="text-zinc-600 text-xs truncate block max-w-[160px]"
+                        title={p.pagador ?? ""}
                       >
-                        {detalhes || "—"}
+                        {p.pagador || "—"}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium ring-1 ring-inset whitespace-nowrap ${conf.classe}`}>
-                        {conf.icone} {conf.texto}
+                    <td className="px-2 py-4 text-center">
+                      <span
+                        title={conf.texto}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded text-[11px] font-bold ring-1 ring-inset ${conf.classe}`}
+                      >
+                        {conf.icone}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
                         {isPendente && (
                           <BotaoOK id={p.id} onDone={() => router.refresh()} />

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { PagamentoRow } from "@/lib/clientes";
-import { CONFERENCIA_ROTULO, detalhesVisiveis } from "@/lib/conferencia-pagamento";
+import { CONFERENCIA_ROTULO } from "@/lib/conferencia-pagamento";
 
 type Props = {
   pagamentos: PagamentoRow[];
@@ -48,7 +48,7 @@ export default function TabelaPagamentos({ pagamentos }: Props) {
               <th className="px-3 py-2 text-left font-medium">Compra</th>
               <th className="px-3 py-2 text-left font-medium">Forma</th>
               <th className="px-3 py-2 text-right font-medium">Valor</th>
-              <th className="px-3 py-2 text-left font-medium">Detalhes</th>
+              <th className="px-3 py-2 text-left font-medium">Pagador</th>
               <th className="px-3 py-2 text-left font-medium">Tipo</th>
             </tr>
           </thead>
@@ -69,7 +69,7 @@ export default function TabelaPagamentos({ pagamentos }: Props) {
                   {p.valor ? `R$ ${parseFloat(p.valor).toFixed(2)}` : "—"}
                 </td>
                 <td className="px-3 py-2 text-zinc-600">
-                  {detalhesVisiveis(p) ?? "—"}
+                  {p.pagador ?? "—"}
                   {p.conferencia !== "conferido" && (
                     <span className={`ml-1.5 inline-flex px-1 rounded text-[10px] font-medium ring-1 ring-inset ${(CONFERENCIA_ROTULO[p.conferencia] ?? CONFERENCIA_ROTULO.analisar).classe}`}>
                       {(CONFERENCIA_ROTULO[p.conferencia] ?? CONFERENCIA_ROTULO.analisar).texto}

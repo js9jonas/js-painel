@@ -120,18 +120,16 @@ export async function renovarAssinatura(e: EntradaRenovacao): Promise<ResultadoR
           [idCliente]
         );
         ehNovoSoPag = ultPgto.length === 0;
-        // "N dias desde o último pagamento" saiu de detalhes (18/10/2026): a coluna mostra o pagador.
-        const detalhes = ultPgto.length > 0 ? null : "novo";
 
         const { rows: pgRows } = await client.query(
           `INSERT INTO public.pagamentos
-           (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
+           (id_cliente, cliente, compra, data_pgto, forma, valor, tipo,
             tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura, conferencia, pagador)
-           VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                   $7, $8, NOW(), $9::bigint, $10, $11)
+           VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, 'Assinatura tv',
+                   $6, $7, NOW(), $8::bigint, $9, $10)
            RETURNING id::text`,
           [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
-           pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
+           pgto.forma ?? "INTER", pgto.valor ?? 0,
            tipoPagSoPag, diasRelSoPag, idAssinatura, conferencia, pagador]
         );
         idPagamentoSoPag = pgRows[0]?.id ?? null;
@@ -254,17 +252,16 @@ RETURNING id_assinatura::text, venc_contrato::text, venc_contas::text, status, i
         [idCliente]
       );
       ehNovo = ultPgto.length === 0;
-      const detalhes = ultPgto.length > 0 ? null : "novo";
 
       const { rows: pgRows } = await client.query(
         `INSERT INTO public.pagamentos
-         (id_cliente, cliente, compra, data_pgto, forma, valor, detalhes, tipo,
+         (id_cliente, cliente, compra, data_pgto, forma, valor, tipo,
           tipo_pagamento, dias_relativo_vencimento, atualizado_em, id_assinatura, conferencia, pagador)
-         VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, $6, 'Assinatura tv',
-                 $7, $8, NOW(), $9::bigint, $10, $11)
+         VALUES ($1::bigint, $2, $3, CURRENT_DATE, $4, $5::numeric, 'Assinatura tv',
+                 $6, $7, NOW(), $8::bigint, $9, $10)
          RETURNING id::text`,
         [idCliente, pgto.nomeCliente ?? null, pgto.pacoteNome ?? null,
-         pgto.forma ?? "INTER", pgto.valor ?? 0, detalhes,
+         pgto.forma ?? "INTER", pgto.valor ?? 0,
          tipoPagamento, diasRelVencimento, idAssinatura, conferencia, pagador]
       );
       idPagamento = pgRows[0]?.id ?? null;
