@@ -38,6 +38,8 @@ export type AssinaturaLink = {
   valor: string;
   venc_contrato: string | null;
   status: string;
+  /** Períodos do mesmo plano (tipo + telas) que o cliente pode escolher — valor sempre da tabela de planos. */
+  opcoes: { meses: number; valor: string }[];
 };
 
 export type CobrancaLink = {
@@ -50,6 +52,8 @@ export type CobrancaLink = {
   pago_em: string | null;
   consultado_em: string | null;
   assinaturas: string[];
+  /** "id_assinatura:meses" de cada item, pra reaproveitar só a cobrança com os mesmos períodos. */
+  itens: string[];
 };
 
 export type DadosLink = {
@@ -91,7 +95,13 @@ async function assinaturasPagaveis(idCliente: string): Promise<AssinaturaLink[]>
   const { rows } = await dbPortal().query<AssinaturaLink>(
     `SELECT a.id_assinatura::text, a.identificacao, a.status,
             CONCAT(p.tipo, ' ', p.telas, CASE WHEN p.telas = 1 THEN ' tela' ELSE ' telas' END) AS plano,
-            p.meses, p.valor::text AS valor, a.venc_contrato::text AS venc_contrato
+            p.meses, p.valor::text AS valor, a.venc_contrato::text AS venc_contrato,
+            -- Períodos estendidos (19/10/2026): só os que a renovação reconhece (periodoDosMeses: 1, 3, 6, 12)
+            COALESCE((SELECT json_agg(json_build_object('meses', o.meses, 'valor', o.valor::text) ORDER BY o.meses)
+                        FROM (SELECT DISTINCT ON (p2.meses) p2.meses, p2.valor FROM public.planos p2
+                               WHERE p2.tipo = p.tipo AND p2.telas = p.telas AND p2.valor > 0
+                                 AND p2.meses IN (1, 3, 6, 12)
+                               ORDER BY p2.meses, p2.valor) o), '[]'::json) AS opcoes
      FROM public.assinaturas a JOIN public.planos p ON p.id_plano = a.id_plano
      WHERE a.id_cliente = $1::bigint AND a.status = ANY($2::text[]) AND p.valor > 0
      ORDER BY a.venc_contrato NULLS LAST, a.id_assinatura`,
@@ -106,7 +116,9 @@ const SELECT_COBRANCA = `
          c.pago_em::text,
          c.consultado_em::text,
          ARRAY(SELECT i.id_assinatura::text FROM public.pix_cobranca_itens i
-               WHERE i.id_cobranca = c.id ORDER BY i.id_assinatura) AS assinaturas
+               WHERE i.id_cobranca = c.id ORDER BY i.id_assinatura) AS assinaturas,
+         ARRAY(SELECT i.id_assinatura::text || ':' || i.meses FROM public.pix_cobranca_itens i
+               WHERE i.id_cobranca = c.id ORDER BY i.id_assinatura) AS itens
   FROM public.pix_cobrancas c`;
 
 export async function dadosDoLink(token: string): Promise<DadosLink | null> {
@@ -143,17 +155,29 @@ export class ErroLink extends Error {
   }
 }
 
-/** Cria (ou reaproveita) a cobrança das assinaturas escolhidas pelo cliente. */
-export async function gerarCobranca(token: string, idsEscolhidos: string[]): Promise<CobrancaLink> {
+/** Assinatura escolhida na página; `meses` ausente = período do plano atual dela. */
+export type EscolhaLink = { id: string; meses?: number };
+
+/** Cria (ou reaproveita) a cobrança das assinaturas escolhidas pelo cliente, cada uma no período escolhido. */
+export async function gerarCobranca(token: string, escolhas: EscolhaLink[]): Promise<CobrancaLink> {
   const cliente = await clientePorToken(token);
   if (!cliente) throw new ErroLink("Link de pagamento não encontrado.", 404);
 
   const disponiveis = await assinaturasPagaveis(cliente.id_cliente);
-  const escolhidas = disponiveis.filter((a) => idsEscolhidos.includes(a.id_assinatura));
-  if (escolhidas.length === 0 || escolhidas.length !== new Set(idsEscolhidos).size) {
+  const idsEscolhidos = escolhas.map((e) => e.id);
+  const achadas = disponiveis.filter((a) => idsEscolhidos.includes(a.id_assinatura));
+  if (achadas.length === 0 || achadas.length !== new Set(idsEscolhidos).size) {
     throw new ErroLink("Escolha pelo menos uma assinatura.", 400);
   }
+  // Valor sempre da tabela de planos (opções do mesmo tipo + telas), nunca do navegador
+  const escolhidas = achadas.map((a) => {
+    const meses = escolhas.find((e) => e.id === a.id_assinatura)?.meses ?? a.meses;
+    const opcao = a.opcoes.find((o) => o.meses === meses) ?? (meses === a.meses ? { meses, valor: a.valor } : null);
+    if (!opcao) throw new ErroLink("Esse período não está disponível para esta assinatura.", 400);
+    return { id_assinatura: a.id_assinatura, meses: opcao.meses, valor: opcao.valor };
+  });
   const ids = escolhidas.map((a) => a.id_assinatura).sort();
+  const chaveItens = escolhidas.map((a) => `${a.id_assinatura}:${a.meses}`).sort();
   const valor = escolhidas.reduce((s, a) => s + Number(a.valor), 0);
 
   // Mesma seleção com cobrança ainda válida: devolve o mesmo QR (cliente recarregou a página).
@@ -164,7 +188,8 @@ export async function gerarCobranca(token: string, idsEscolhidos: string[]): Pro
     [cliente.id_cliente, `${SOBRA_MINIMA_MS / 1000} seconds`]
   );
   const igual = existente.find(
-    (c) => c.assinaturas.join(",") === ids.join(",") && Number(c.valor) === Number(valor.toFixed(2))
+    (c) => c.assinaturas.join(",") === ids.join(",") && [...c.itens].sort().join(",") === chaveItens.join(",")
+      && Number(c.valor) === Number(valor.toFixed(2))
   );
   if (igual) return igual;
 

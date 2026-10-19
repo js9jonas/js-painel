@@ -60,6 +60,7 @@ export default async function PagarPage({ params }: { params: Promise<{ token: s
                     pixCopiaECola: dados.cobrancaAberta.pix_copia_cola,
                     expiraEm: dados.cobrancaAberta.expira_em,
                     assinaturas: dados.cobrancaAberta.assinaturas,
+                    itens: dados.cobrancaAberta.itens,
                     qrSvg: await qrSvg(dados.cobrancaAberta.pix_copia_cola),
                   }
                 : null

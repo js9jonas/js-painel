@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AssinaturaLink } from "@/lib/pix-link";
 
 type Cobranca = {
@@ -8,8 +8,12 @@ type Cobranca = {
   pixCopiaECola: string;
   expiraEm: string;
   assinaturas: string[];
+  /** "id_assinatura:meses" de cada item (período escolhido). */
+  itens?: string[];
   qrSvg: string;
 };
+
+const NOME_PERIODO: Record<number, string> = { 1: "Mensal", 3: "Trimestral", 6: "Semestral", 12: "Anual" };
 
 /** Consulta "já pagou?" a cada 5 s por até 20 min; depois só volta ao reabrir a aba. */
 const INTERVALO_CONSULTA_MS = 5_000;
@@ -62,6 +66,20 @@ export default function PagarCliente({
   const [selecionadas, setSelecionadas] = useState<string[]>(() =>
     cobrancaAberta ? cobrancaAberta.assinaturas : preSelecao(assinaturas)
   );
+  // Período de cada assinatura (19/10/2026): começa no plano atual dela; outros períodos do mesmo plano são opcionais.
+  const [periodos, setPeriodos] = useState<Record<string, number>>(() => {
+    const m: Record<string, number> = Object.fromEntries(assinaturas.map((a) => [a.id_assinatura, a.meses]));
+    for (const item of cobrancaAberta?.itens ?? []) {
+      const [id, meses] = item.split(":");
+      if (id && Number(meses) > 0) m[id] = Number(meses);
+    }
+    return m;
+  });
+  // Outros períodos ficam recolhidos atrás de "Planos estendidos" (pedido do Jonas, 19/10/2026); já abertos só
+  // quando a cobrança em aberto usa um período diferente do plano atual.
+  const [estendidosAbertos, setEstendidosAbertos] = useState<string[]>(() =>
+    assinaturas.filter((a) => periodos[a.id_assinatura] !== a.meses).map((a) => a.id_assinatura)
+  );
   const [cobranca, setCobranca] = useState<Cobranca | null>(cobrancaAberta);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -69,10 +87,13 @@ export default function PagarCliente({
   const [copiado, setCopiado] = useState(false);
   const [consultaParada, setConsultaParada] = useState(false);
 
-  const total = useMemo(
-    () => assinaturas.filter((a) => selecionadas.includes(a.id_assinatura)).reduce((s, a) => s + Number(a.valor), 0),
-    [assinaturas, selecionadas]
-  );
+  function valorEscolhido(a: AssinaturaLink): string {
+    return a.opcoes.find((o) => o.meses === periodos[a.id_assinatura])?.valor ?? a.valor;
+  }
+
+  const total = assinaturas
+    .filter((a) => selecionadas.includes(a.id_assinatura))
+    .reduce((s, a) => s + Number(valorEscolhido(a)), 0);
 
   // Pergunta ao servidor se o Pix já caiu enquanto o QR está na tela.
   useEffect(() => {
@@ -124,7 +145,7 @@ export default function PagarCliente({
       const res = await fetch(`/api/pagar/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assinaturas: selecionadas }),
+        body: JSON.stringify({ assinaturas: selecionadas.map((id) => ({ id, meses: periodos[id] })) }),
       });
       const j = await res.json().catch(() => null);
       if (!res.ok || !j?.pixCopiaECola) {
@@ -236,8 +257,9 @@ export default function PagarCliente({
           const marcada = selecionadas.includes(a.id_assinatura);
           const venc = textoVencimento(a);
           const vencida = a.venc_contrato ? diasAte(a.venc_contrato) < 0 : false;
+          const meses = periodos[a.id_assinatura] ?? a.meses;
           return (
-            <li key={a.id_assinatura}>
+            <li key={a.id_assinatura} className="space-y-2">
               <label
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl border bg-white p-4 ${marcada ? "border-emerald-500 ring-1 ring-emerald-500" : ""}`}
               >
@@ -251,12 +273,44 @@ export default function PagarCliente({
                   <span className="block font-medium">{a.identificacao || a.plano}</span>
                   <span className="block text-xs text-zinc-500">
                     {a.identificacao ? `${a.plano} · ` : ""}
-                    {a.meses > 1 ? `${a.meses} meses · ` : ""}
+                    {meses > 1 ? `${meses} meses · ` : ""}
                     <span className={vencida ? "text-red-600" : ""}>{venc}</span>
                   </span>
                 </span>
-                <span className="font-semibold">{reais(a.valor)}</span>
+                <span className="font-semibold">{reais(valorEscolhido(a))}</span>
               </label>
+              {marcada && a.opcoes.length > 1 && !estendidosAbertos.includes(a.id_assinatura) && (
+                <button
+                  type="button"
+                  onClick={() => setEstendidosAbertos((l) => [...l, a.id_assinatura])}
+                  className="px-1 text-xs font-medium text-emerald-700 underline"
+                >
+                  Planos estendidos ▾
+                </button>
+              )}
+              {marcada && a.opcoes.length > 1 && estendidosAbertos.includes(a.id_assinatura) && (
+                <div className="flex flex-wrap gap-2 px-1" role="radiogroup" aria-label="Período">
+                  {a.opcoes.map((o) => {
+                    const ativo = o.meses === meses;
+                    return (
+                      <button
+                        key={o.meses}
+                        type="button"
+                        role="radio"
+                        aria-checked={ativo}
+                        onClick={() => setPeriodos((p) => ({ ...p, [a.id_assinatura]: o.meses }))}
+                        className={`rounded-xl border px-3 py-1.5 text-left text-xs ${ativo ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "bg-white text-zinc-600"}`}
+                      >
+                        <span className="block font-semibold">{NOME_PERIODO[o.meses] ?? `${o.meses} meses`}</span>
+                        <span className="block">
+                          {reais(o.valor)}
+                          {o.meses > 1 ? ` · ${reais(Number(o.valor) / o.meses)}/mês` : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </li>
           );
         })}

@@ -1,7 +1,7 @@
 // src/app/api/pagar/[token]/route.ts — pública (o token do link é a autorização).
-// POST { assinaturas: string[] } → cria ou reaproveita a cobrança Pix das assinaturas escolhidas.
+// POST { assinaturas: ({ id, meses } | string)[] } → cria ou reaproveita a cobrança Pix das assinaturas escolhidas.
 import { NextRequest, NextResponse } from "next/server";
-import { gerarCobranca, qrSvg, ErroLink } from "@/lib/pix-link";
+import { gerarCobranca, qrSvg, ErroLink, type EscolhaLink } from "@/lib/pix-link";
 import { ErroInter } from "@/lib/inter";
 
 export const runtime = "nodejs";
@@ -12,18 +12,30 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
   const body = await req.json().catch(() => null);
-  const ids = Array.isArray(body?.assinaturas)
-    ? body.assinaturas.map((x: unknown) => String(x)).filter((x: string) => /^\d{1,18}$/.test(x)).slice(0, 20)
+  // Cada item: "123" (formato antigo, período do plano atual) ou { id: "123", meses: 3 } (19/10/2026)
+  const escolhas: EscolhaLink[] = Array.isArray(body?.assinaturas)
+    ? body.assinaturas
+        .map((x: unknown): EscolhaLink => {
+          if (x && typeof x === "object") {
+            const o = x as { id?: unknown; meses?: unknown };
+            const meses = Number(o.meses);
+            return { id: String(o.id ?? ""), meses: Number.isInteger(meses) && meses > 0 ? meses : undefined };
+          }
+          return { id: String(x) };
+        })
+        .filter((e: EscolhaLink) => /^\d{1,18}$/.test(e.id))
+        .slice(0, 20)
     : [];
 
   try {
-    const cob = await gerarCobranca(token, ids);
+    const cob = await gerarCobranca(token, escolhas);
     return NextResponse.json({
       txid: cob.txid,
       valor: cob.valor,
       pixCopiaECola: cob.pix_copia_cola,
       expiraEm: cob.expira_em,
       assinaturas: cob.assinaturas,
+      itens: cob.itens,
       qrSvg: await qrSvg(cob.pix_copia_cola),
     });
   } catch (err) {
