@@ -330,5 +330,53 @@ export async function aprenderPagadores(): Promise<number> {
     )
     UPDATE public.pagamentos p SET pagador = u.pag
       FROM um_a_um u WHERE p.id = u.id_pgto AND p.pagador IS NULL`);
+  return (r.rowCount ?? 0) + (await aprenderPagadoresPeloHorario());
+}
+
+/**
+ * Comprovante sem o nome de quem pagou (19/10/2026: print da lista de movimentações do banco da cliente, só com o
+ * recebedor — a IA põe "JS SISTEMAS") não ensina a base, e o Pix seguinte caía em "Analisar" pra sempre. Aqui o
+ * nome vem do extrato: o horário do comprovante bate com o minuto em que o n8n viu o Pix (13–57 s depois nos casos
+ * de 19/10). Só grava quando o Pix é o único do mesmo valor na janela de 30 s antes a 2 min depois do horário do
+ * comprovante, o comprovante é o único daquele Pix e o pagamento do cliente da conversa é 1↔1 (mesma regra acima).
+ * Pix "INTERNO" do fim de semana entra no extrato dias depois (visto_em longe do horário): só não casa.
+ */
+async function aprenderPagadoresPeloHorario(): Promise<number> {
+  const r = await pool.query(`
+    WITH r AS (
+      SELECT m.id AS id_msg, m.telefone, (m.criado_em AT TIME ZONE 'America/Sao_Paulo')::date AS d,
+             substring(m.conteudo from 'Data de pagamento:\\s*([^\\n]+)') AS quando,
+             nullif(replace(replace(substring(m.conteudo from 'Valor pago:\\s*R\\$\\s*([0-9.,]+)'), '.', ''), ',', '.'), '')::numeric AS valor
+        FROM public.whatsapp_mensagens m
+       WHERE m.origem = 'jonas' AND m.tipo = 'text' AND m.conteudo LIKE 'RESUMO GERADO POR IA%'
+         AND m.criado_em > now() - interval '3 days'
+    ), h AS (
+      -- "18/10/2026 às 11:54:33" ou "17/10/2026 às 12h31" (hora de Brasília)
+      SELECT r.*, (make_timestamp(x[3]::int, x[2]::int, x[1]::int, x[4]::int, x[5]::int, coalesce(x[6], '0')::double precision)
+                   AT TIME ZONE 'America/Sao_Paulo') AS pago_em
+        FROM r, regexp_match(r.quando, '(\\d{2})/(\\d{2})/(\\d{4})\\D+(\\d{1,2})[:h](\\d{2})(?::(\\d{2}))?') AS x
+       WHERE r.valor IS NOT NULL AND x IS NOT NULL
+    ), pix AS (
+      SELECT h.id_msg, h.telefone, h.d, h.valor, e.id AS id_pix, upper(regexp_replace(trim(e.nome), '\\s+', ' ', 'g')) AS pag
+        FROM h JOIN public.pix_extrato e
+          ON e.valor = h.valor AND e.nome IS NOT NULL AND e.situacao <> 'link'
+         AND e.visto_em BETWEEN h.pago_em - interval '30 seconds' AND h.pago_em + interval '2 minutes'
+    ), pix_1a1 AS (
+      SELECT p.* FROM pix p
+       WHERE (SELECT count(*) FROM pix x WHERE x.id_msg = p.id_msg) = 1
+         AND (SELECT count(*) FROM pix x WHERE x.id_pix = p.id_pix) = 1
+    ), cand AS (
+      SELECT l.id_msg, l.pag, p.id AS id_pgto
+        FROM pix_1a1 l
+        JOIN (SELECT DISTINCT telefone, id_cliente FROM public.contatos WHERE id_cliente IS NOT NULL) ct ON ct.telefone = l.telefone
+        JOIN public.pagamentos p ON p.id_cliente = ct.id_cliente AND p.valor = l.valor
+                                AND p.data_pgto BETWEEN l.d - 1 AND l.d + 3
+    ), um_a_um AS (
+      SELECT c.* FROM cand c
+       WHERE (SELECT count(*) FROM cand x WHERE x.id_msg = c.id_msg) = 1
+         AND (SELECT count(*) FROM cand x WHERE x.id_pgto = c.id_pgto) = 1
+    )
+    UPDATE public.pagamentos p SET pagador = u.pag
+      FROM um_a_um u WHERE p.id = u.id_pgto AND p.pagador IS NULL`);
   return r.rowCount ?? 0;
 }
