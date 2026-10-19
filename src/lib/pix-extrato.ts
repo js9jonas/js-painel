@@ -34,6 +34,16 @@ const NORMALIZA_SQL = (col: string) =>
   `upper(regexp_replace(trim(translate(${col}, 'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ', 'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN')), '\\s+', ' ', 'g'))`;
 
 /**
+ * Horário do comprovante ("Data de pagamento: 18/10/2026 às 11:54:33" ou "17/10/2026 às 12h31", hora de Brasília)
+ * como timestamptz; NULL se não veio ou é inválido (pg_input_is_valid: data impossível não derruba a consulta).
+ */
+const PAGO_EM_SQL = (conteudo: string) =>
+  `(SELECT CASE WHEN pg_input_is_valid(s.t, 'timestamp') THEN s.t::timestamp AT TIME ZONE 'America/Sao_Paulo' END
+      FROM (SELECT x[3] || '-' || x[2] || '-' || x[1] || ' ' || x[4] || ':' || x[5] || ':' || coalesce(x[6], '00') AS t
+              FROM regexp_match(substring(${conteudo} from 'Data de pagamento:\\s*([^\\n]+)'),
+                                '(\\d{2})/(\\d{2})/(\\d{4})\\D+(\\d{1,2})[:h](\\d{2})(?::(\\d{2}))?') AS x) s)`;
+
+/**
  * Grava os Pix recebidos do dia (o n8n manda a lista inteira a cada Pix novo — reenviar é inofensivo).
  * Dois Pix iguais no mesmo dia (mesmo valor e descrição) viram linhas distintas pela ordem de ocorrência.
  */
@@ -239,8 +249,8 @@ export type ConclusaoComprovante = {
 
 /** Acha o Pix do extrato que corresponde a um resumo de comprovante e devolve a conclusão do modo sombra. */
 export async function conclusaoDoComprovante(idMsg: number): Promise<ConclusaoComprovante | null> {
-  const { rows: ms } = await pool.query<{ telefone: string; criado_em: string; pagador: string | null; valor: string | null }>(
-    `SELECT telefone, criado_em::text,
+  const { rows: ms } = await pool.query<{ telefone: string; criado_em: string; pagador: string | null; valor: string | null; pago_em: string | null }>(
+    `SELECT telefone, criado_em::text, ${PAGO_EM_SQL("conteudo")}::text AS pago_em,
             upper(trim(substring(conteudo from 'Nome do Pagador:\\s*([^\\n]+)'))) AS pagador,
             replace(replace(substring(conteudo from 'Valor pago:\\s*R\\$\\s*([0-9.,]+)'), '.', ''), ',', '.') AS valor
        FROM public.whatsapp_mensagens WHERE id = $1 AND conteudo LIKE 'RESUMO GERADO POR IA%'`,
@@ -260,6 +270,9 @@ export async function conclusaoDoComprovante(idMsg: number): Promise<ConclusaoCo
 
   // Comprovante costuma vir logo depois do Pix; aceita de 12 h antes a 2 h depois. Preferência: nome igual
   // ao do comprovante, depois cliente desta conversa, depois o mais perto no tempo.
+  // Só vale Pix com prova de ser o deste comprovante — nome igual, cliente da conversa ou horário do comprovante
+  // (−30 s a +2 min do visto_em). Sem isso, qualquer Pix de mesmo valor nas 12 h servia: comprovante pago em outra
+  // conta (Silvana, Nubank, 19/10/2026) aparecia como o Pix de outro cliente em vez de "não achado".
   const { rows: pixs } = await pool.query<NonNullable<ConclusaoComprovante["pix"]> & { ordem: number }>(
     `SELECT e.id::text, e.visto_em::text, e.valor::text, e.nome, e.situacao, e.motivo,
             COALESCE(cl.nome, e.analise->>'cliente') AS cliente, e.id_cliente::text, e.id_assinatura::text,
@@ -269,8 +282,11 @@ export async function conclusaoDoComprovante(idMsg: number): Promise<ConclusaoCo
        FROM public.pix_extrato e LEFT JOIN public.clientes cl ON cl.id_cliente = e.id_cliente
       WHERE e.valor = $1::numeric
         AND e.visto_em BETWEEN $2::timestamptz - interval '12 hours' AND $2::timestamptz + interval '2 hours'
+        AND (${NORMALIZA_SQL("e.nome")} = ${NORMALIZA_SQL("$3")}
+             OR e.id_cliente::text = ANY($4::text[])
+             OR e.visto_em BETWEEN $5::timestamptz - interval '30 seconds' AND $5::timestamptz + interval '2 minutes')
       ORDER BY ordem, abs(extract(epoch FROM e.visto_em - $2::timestamptz))`,
-    [m.valor, m.criado_em, m.pagador ?? "", idsChat]
+    [m.valor, m.criado_em, m.pagador ?? "", idsChat, m.pago_em]
   );
   const pix = pixs[0] ?? null;
   if (!pix) return vazio;
@@ -343,23 +359,17 @@ export async function aprenderPagadores(): Promise<number> {
  */
 async function aprenderPagadoresPeloHorario(): Promise<number> {
   const r = await pool.query(`
-    WITH r AS (
+    WITH h AS (
       SELECT m.id AS id_msg, m.telefone, (m.criado_em AT TIME ZONE 'America/Sao_Paulo')::date AS d,
-             substring(m.conteudo from 'Data de pagamento:\\s*([^\\n]+)') AS quando,
-             nullif(replace(replace(substring(m.conteudo from 'Valor pago:\\s*R\\$\\s*([0-9.,]+)'), '.', ''), ',', '.'), '')::numeric AS valor
+             nullif(replace(replace(substring(m.conteudo from 'Valor pago:\\s*R\\$\\s*([0-9.,]+)'), '.', ''), ',', '.'), '')::numeric AS valor,
+             ${PAGO_EM_SQL("m.conteudo")} AS pago_em
         FROM public.whatsapp_mensagens m
        WHERE m.origem = 'jonas' AND m.tipo = 'text' AND m.conteudo LIKE 'RESUMO GERADO POR IA%'
          AND m.criado_em > now() - interval '3 days'
-    ), h AS (
-      -- "18/10/2026 às 11:54:33" ou "17/10/2026 às 12h31" (hora de Brasília)
-      SELECT r.*, (make_timestamp(x[3]::int, x[2]::int, x[1]::int, x[4]::int, x[5]::int, coalesce(x[6], '0')::double precision)
-                   AT TIME ZONE 'America/Sao_Paulo') AS pago_em
-        FROM r, regexp_match(r.quando, '(\\d{2})/(\\d{2})/(\\d{4})\\D+(\\d{1,2})[:h](\\d{2})(?::(\\d{2}))?') AS x
-       WHERE r.valor IS NOT NULL AND x IS NOT NULL
     ), pix AS (
       SELECT h.id_msg, h.telefone, h.d, h.valor, e.id AS id_pix, upper(regexp_replace(trim(e.nome), '\\s+', ' ', 'g')) AS pag
         FROM h JOIN public.pix_extrato e
-          ON e.valor = h.valor AND e.nome IS NOT NULL AND e.situacao <> 'link'
+          ON h.valor IS NOT NULL AND h.pago_em IS NOT NULL AND e.valor = h.valor AND e.nome IS NOT NULL AND e.situacao <> 'link'
          AND e.visto_em BETWEEN h.pago_em - interval '30 seconds' AND h.pago_em + interval '2 minutes'
     ), pix_1a1 AS (
       SELECT p.* FROM pix p
@@ -379,4 +389,53 @@ async function aprenderPagadoresPeloHorario(): Promise<number> {
     UPDATE public.pagamentos p SET pagador = u.pag
       FROM um_a_um u WHERE p.id = u.id_pgto AND p.pagador IS NULL`);
   return r.rowCount ?? 0;
+}
+
+export type FormaSugerida = { forma: string | null; aviso: string | null };
+
+/** 1º dia com o extrato do Inter gravado (o envio do n8n começou na noite de 18/10): comprovante anterior não compara. */
+const INICIO_EXTRATO = "2026-10-19";
+const FORMAS_OUTRA_CONTA = ["Nu PJ", "Nubank", "Sicredi", "Caixa", "Banrisul", "Lotérica"];
+
+/**
+ * Forma do pagamento pro modal Renovar (19/10/2026). Por padrão a tela marca INTER; quando o comprovante mais
+ * recente do cliente (24 h) não tem Pix no extrato do Inter, o dinheiro caiu em outra conta (Silvana, Nubank):
+ * sugere a última forma de outra conta do histórico do cliente, ou Outro se ele nunca pagou em outra conta, e avisa.
+ * Sem comprovante recente → sem sugestão (a tela mantém INTER).
+ */
+export async function formaSugerida(idAssinatura: number): Promise<FormaSugerida> {
+  const nada = { forma: null, aviso: null };
+  const { rows } = await pool.query<{ id: number; id_cliente: string; recente: boolean }>(
+    `SELECT m.id, a.id_cliente::text, m.criado_em > now() - interval '2 minutes' AS recente
+       FROM public.assinaturas a
+       JOIN public.contatos ct ON ct.id_cliente = a.id_cliente
+       JOIN public.whatsapp_mensagens m ON m.telefone = ct.telefone
+      WHERE a.id_assinatura = $1 AND m.origem = 'jonas' AND m.tipo = 'text'
+        AND m.conteudo LIKE 'RESUMO GERADO POR IA%' AND m.criado_em > now() - interval '24 hours'
+        AND m.criado_em >= $2::date
+      ORDER BY m.criado_em DESC LIMIT 1`,
+    [idAssinatura, INICIO_EXTRATO]
+  );
+  const msg = rows[0];
+  if (!msg) return nada;
+  const c = await conclusaoDoComprovante(Number(msg.id));
+  if (!c?.resumo.valor) return nada;
+  if (c.pix) return { forma: "INTER", aviso: null };
+
+  // Só contas atuais que recebem Pix fora do Inter (formas antigas como 'PIX' ficam de fora; Dinheiro/Cortesia não
+  // têm comprovante de Pix; INTER já foi descartado pelo extrato; Outro é o padrão).
+  const { rows: hist } = await pool.query<{ forma: string; data: string }>(
+    `SELECT forma, to_char(data_pgto, 'DD/MM/YYYY') AS data FROM public.pagamentos
+      WHERE id_cliente = $1::bigint AND forma = ANY($2::text[]) AND data_pgto > CURRENT_DATE - 365
+      ORDER BY data_pgto DESC, id DESC LIMIT 1`,
+    [msg.id_cliente, FORMAS_OUTRA_CONTA]
+  );
+  const h = hist[0];
+  const inicio = msg.recente
+    ? "O Pix do comprovante ainda não apareceu no extrato do Inter (pode levar 1 minuto)."
+    : "O Pix do comprovante não está no extrato do Inter.";
+  return {
+    forma: h?.forma ?? "Outro",
+    aviso: `${inicio} ${h ? `Marquei ${h.forma}, a última conta que esse cliente usou (${h.data}).` : "Marquei Outro: esse cliente não tem pagamento em outra conta."} Confira a forma antes de salvar.`,
+  };
 }

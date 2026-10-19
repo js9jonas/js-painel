@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { CONFERENCIA_ROTULO } from "@/lib/conferencia-pagamento";
@@ -214,6 +214,10 @@ export default function RenovarAssinatura({
     // Pagamentos dos últimos dias desta assinatura: aviso pra não renovar duas vezes o mesmo Pix
     // (link Pix renova sozinho; o comprovante pode chegar depois).
     const [recentes, setRecentes] = useState<PagamentoRecente[]>([]);
+    // Forma sugerida pelo extrato do Inter + histórico do cliente (Pix do comprovante fora do Inter → outra conta).
+    // Só aplica se a forma ainda não foi mexida desde que o modal abriu.
+    const [avisoForma, setAvisoForma] = useState<string | null>(null);
+    const formaMexida = useRef(false);
     const podeEditarObs = observacaoAtual !== undefined;
 
     function handlePeriodoChange(p: Periodo) {
@@ -242,7 +246,18 @@ export default function RenovarAssinatura({
     function handleOpen() {
         resetarCampos();
         setRecentes([]);
+        setForma("INTER");
+        setAvisoForma(null);
+        formaMexida.current = false;
         setOpen(true);
+        fetch(`/api/assinaturas/${idAssinatura}/forma-sugerida`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((j: { forma: string | null; aviso: string | null } | null) => {
+                if (!j?.forma || formaMexida.current) return;
+                setForma(j.forma);
+                setAvisoForma(j.aviso);
+            })
+            .catch(() => {});
         fetch(`/api/assinaturas/${idAssinatura}/pagamentos-recentes`, { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : []))
             .then((rows) => setRecentes(Array.isArray(rows) ? rows : []))
@@ -387,6 +402,11 @@ export default function RenovarAssinatura({
                                     <p className="mt-1">Confira se não é o mesmo Pix antes de renovar de novo.</p>
                                 </div>
                             )}
+                            {avisoForma && (
+                                <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                                    ⚠️ {avisoForma}
+                                </div>
+                            )}
                             {isPendente && (
                                 <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
                                     Assinatura pendente — o mês em aberto já está no vencimento atual. Mensal só ativa; trimestral soma +2 meses, semestral +5, anual +11.
@@ -522,7 +542,7 @@ export default function RenovarAssinatura({
                                                 <Select
                                                     className={inputClass}
                                                     value={forma}
-                                                    onChange={setForma}
+                                                    onChange={(f) => { formaMexida.current = true; setForma(f); }}
                                                     options={FORMAS_PGTO.map((f) => ({ value: f, label: f }))}
                                                 />
                                             </div>
