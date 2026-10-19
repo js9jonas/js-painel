@@ -56,6 +56,9 @@ no extrato e deve ser ignorado ali. Comprovante sozinho não renova (extrato é 
    ⚠️ Bug corrigido 19/10: o filtro de lixo `^(N/?A|…)` descartava todo nome começando com "NA" (Nambia, Natália…)
    — carga completada com +35 pagamentos. Jonas preenchia o nome em Detalhes: o que vale é o campo **Pagador**
    (movidos os 2 que ele fez: Nambia → Luis Sedenir, Adolinha → Adolfinha).
-4. 📋 Ativar renovação conclusiva.
+4. 📋 Ativar renovação conclusiva. Pré-requisito ✅ (código 19/10): modal Renovar avisa em vermelho quando a
+   assinatura já tem pagamento nos últimos 3 dias (`GET /api/assinaturas/[id]/pagamentos-recentes`), com
+   forma, conferência e pagador — evita renovar 2x o Pix que o link/extrato já renovou. Só aviso, sem trava
+   (Jonas não quer clique extra; a trava de tela parada foi removida a pedido em 12/10).
 5. 📋 Futuro (Jonas, 18/10): extratos das **outras contas** (Nu PJ, Nubank, Sicredi, Caixa… ~6% dos
    pagamentos) pra cobrir essa minoria também.

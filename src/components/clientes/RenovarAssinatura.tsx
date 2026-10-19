@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
+import { CONFERENCIA_ROTULO } from "@/lib/conferencia-pagamento";
 import {
     MESES,
     type Periodo,
@@ -134,6 +135,11 @@ async function renovarContasViaAPI(contas: ContaVinculada[]): Promise<ResultadoC
     );
 }
 
+type PagamentoRecente = {
+    id: number; data_pgto: string; valor: string; forma: string | null;
+    conferencia: string; pagador: string | null; registrado_em: string | null;
+};
+
 export default function RenovarAssinatura({
     idAssinatura,
     vencAtual,
@@ -205,6 +211,9 @@ export default function RenovarAssinatura({
     const [vencContratoEditado, setVencContratoEditado] = useState(false);
     const [resultadosContas, setResultadosContas] = useState<ResultadoConta[]>([]);
     const [observacao, setObservacao] = useState(observacaoAtual ?? "");
+    // Pagamentos dos últimos dias desta assinatura: aviso pra não renovar duas vezes o mesmo Pix
+    // (link Pix renova sozinho; o comprovante pode chegar depois).
+    const [recentes, setRecentes] = useState<PagamentoRecente[]>([]);
     const podeEditarObs = observacaoAtual !== undefined;
 
     function handlePeriodoChange(p: Periodo) {
@@ -232,7 +241,12 @@ export default function RenovarAssinatura({
 
     function handleOpen() {
         resetarCampos();
+        setRecentes([]);
         setOpen(true);
+        fetch(`/api/assinaturas/${idAssinatura}/pagamentos-recentes`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : []))
+            .then((rows) => setRecentes(Array.isArray(rows) ? rows : []))
+            .catch(() => {});
     }
 
     function fecharComRefresh() {
@@ -359,6 +373,20 @@ export default function RenovarAssinatura({
                                 Assinatura #{idAssinatura}
                                 {vencAtual ? ` • vencimento atual: ${vencAtual.split("T")[0].split("-").reverse().join("/")}` : ""}
                             </p>
+                            {recentes.length > 0 && (
+                                <div className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                                    <p className="font-semibold">⚠️ Já tem pagamento registrado nos últimos dias:</p>
+                                    {recentes.map((p) => (
+                                        <p key={p.id}>
+                                            {p.data_pgto.split("-").reverse().join("/")} · R$ {Number(p.valor).toFixed(2).replace(".", ",")} · {p.forma ?? "—"}
+                                            {" · "}{CONFERENCIA_ROTULO[p.conferencia]?.icone} {CONFERENCIA_ROTULO[p.conferencia]?.texto ?? p.conferencia}
+                                            {p.pagador ? ` · ${p.pagador}` : ""}
+                                            {p.registrado_em ? ` (registrado ${p.registrado_em})` : ""}
+                                        </p>
+                                    ))}
+                                    <p className="mt-1">Confira se não é o mesmo Pix antes de renovar de novo.</p>
+                                </div>
+                            )}
                             {isPendente && (
                                 <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
                                     Assinatura pendente — o mês em aberto já está no vencimento atual. Mensal só ativa; trimestral soma +2 meses, semestral +5, anual +11.
