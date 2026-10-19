@@ -1,6 +1,7 @@
 import { pool } from '@/lib/db'
 import { enviarTextoWhatsapp, enviarBotoesWhatsapp, enviarBotaoLinkWhatsapp, registrarMensagemWhatsapp } from '@/lib/whatsapp-envio'
 import { obterLinkCliente } from '@/lib/pix-link'
+import { BOTOES_PLANOS, textoPlanos } from '@/lib/mensagem-planos'
 
 const PIX_CHAVE = '40827286000106'
 
@@ -69,6 +70,8 @@ async function registrarEnvio(
 }
 
 type AssinaturaEncontrada = {
+  idAssinatura: string
+  identificacao: string | null
   primeiroNome: string
   tipo: string
   telas: number
@@ -86,7 +89,7 @@ type BuscaAssinatura =
 async function buscarAssinaturaCliente(telefone: string, idAssinatura: string | null): Promise<BuscaAssinatura> {
   if (idAssinatura) {
     const r = await pool.query(
-      `SELECT c.nome, p.tipo, p.telas, p.valor, p.meses
+      `SELECT a.id_assinatura::text, a.identificacao, c.nome, p.tipo, p.telas, p.valor, p.meses
        FROM public.assinaturas a
        JOIN public.clientes c ON c.id_cliente = a.id_cliente
        JOIN public.planos p ON p.id_plano = a.id_plano
@@ -99,6 +102,8 @@ async function buscarAssinaturaCliente(telefone: string, idAssinatura: string | 
     return {
       status: 'ok',
       dados: {
+        idAssinatura: row.id_assinatura,
+        identificacao: row.identificacao,
         primeiroNome: row.nome.trim().split(/\s+/)[0],
         tipo: row.tipo,
         telas: row.telas,
@@ -109,7 +114,7 @@ async function buscarAssinaturaCliente(telefone: string, idAssinatura: string | 
   }
 
   const r = await pool.query(
-    `SELECT c.nome, p.tipo, p.telas, p.valor, p.meses
+    `SELECT a.id_assinatura::text, a.identificacao, c.nome, p.tipo, p.telas, p.valor, p.meses
      FROM public.contatos ct
      JOIN public.clientes c ON c.id_cliente = ct.id_cliente
      JOIN public.assinaturas a ON a.id_cliente = c.id_cliente
@@ -126,6 +131,8 @@ async function buscarAssinaturaCliente(telefone: string, idAssinatura: string | 
   return {
     status: 'ok',
     dados: {
+      idAssinatura: row.id_assinatura,
+      identificacao: row.identificacao,
       primeiroNome: row.nome.trim().split(/\s+/)[0],
       tipo: row.tipo,
       telas: row.telas,
@@ -158,8 +165,8 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
 
   const jaRespondido = await pool.query(
     `SELECT 1 FROM public.whatsapp_mensagens
-     WHERE reply_to_wa_msg_id = $1 AND source = 'auto-resposta-suporte' LIMIT 1`,
-    [cliqueMsgId]
+     WHERE reply_to_wa_msg_id = $1 AND source IN ('auto-resposta-suporte', $2) LIMIT 1`,
+    [cliqueMsgId, SOURCE_CHAT_PLANOS]
   )
   if ((jaRespondido.rowCount ?? 0) > 0) return
 
@@ -194,7 +201,10 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
     return
   }
 
-  if (botaoClicado === 'Pagamento mensal') {
+  // Botões dos templates de vencimento (19/10/2026): os dois respondem com a mesma mensagem de planos do /chat —
+  // "⚡ Ative na hora" (link) e "⏳ Chave PIX". Gravada como 'chat-planos' com o id_assinatura, para o próximo clique
+  // ser reconhecido por buscarOrigemTemplate. Planos estendidos agora ficam na página do link.
+  if (botaoClicado === 'Pagamento mensal' || botaoClicado === 'Planos estendidos') {
     const origem = await buscarOrigemTemplate(replyToMsgId)
     if (!origem.reconhecido) return
 
@@ -208,57 +218,21 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
       return
     }
 
-    const plano = await pool.query(
+    const d = busca.dados
+    const mensal = await pool.query(
       `SELECT valor FROM public.planos WHERE tipo = $1 AND telas = $2 AND meses = 1 LIMIT 1`,
-      [busca.dados.tipo, busca.dados.telas]
+      [d.tipo, d.telas]
     )
-    if (!plano.rows[0]) return
-
-    const texto =
-      `Pagamento mensal: R$ ${formatValor(Number(plano.rows[0].valor))} 💰\n\n` +
-      `Segue abaixo nossa chave PIX (CNPJ):`
-    const msgIdA = await enviarTextoWhatsapp(telefone, texto)
-    await registrarEnvio(msgIdA, telefone, texto, cliqueMsgId)
-
-    const msgIdB = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
-    await registrarEnvio(msgIdB, telefone, PIX_CHAVE, cliqueMsgId)
-    return
-  }
-
-  if (botaoClicado === 'Planos estendidos') {
-    const origem = await buscarOrigemTemplate(replyToMsgId)
-    if (!origem.reconhecido) return
-
-    const busca = await buscarAssinaturaCliente(telefone, origem.idAssinatura)
-    if (busca.status === 'nao_encontrado') return
-
-    if (busca.status === 'ambiguo') {
-      const texto = textoAmbiguo(busca.primeiroNome)
-      const msgId = await enviarTextoWhatsapp(telefone, texto)
-      await registrarEnvio(msgId, telefone, texto, cliqueMsgId)
-      return
-    }
-
-    const opcoes = await pool.query(
-      `SELECT descricao, valor FROM public.planos
-       WHERE tipo = $1 AND telas = $2
-       ORDER BY meses ASC`,
-      [busca.dados.tipo, busca.dados.telas]
-    )
-    if (opcoes.rows.length === 0) return
-
-    const NUMEROS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
-    const linhas = opcoes.rows
-      .map((o, i) => `${NUMEROS[i] ?? '🔹'} ${o.descricao} — R$ ${formatValor(Number(o.valor))}`)
-      .join('\n')
-    const texto =
-      `🗓️ Opções de plano disponíveis:\n\n${linhas}\n\n` +
-      `🔑 Envie o comprovante do valor escolhido pela nossa chave PIX (CNPJ) abaixo:`
-    const msgIdA = await enviarTextoWhatsapp(telefone, texto)
-    await registrarEnvio(msgIdA, telefone, texto, cliqueMsgId)
-
-    const msgIdB = await enviarTextoWhatsapp(telefone, PIX_CHAVE)
-    await registrarEnvio(msgIdB, telefone, PIX_CHAVE, cliqueMsgId)
+    const texto = textoPlanos({
+      identificacao: d.identificacao,
+      telas: d.telas,
+      valorMensal: mensal.rows[0] ? Number(mensal.rows[0].valor) : d.valorAtual / d.mesesAtual,
+      estendidos: botaoClicado === 'Planos estendidos',
+    })
+    const msgId = await enviarBotoesWhatsapp(telefone, texto, BOTOES_PLANOS)
+    await registrarMensagemWhatsapp(msgId, telefone, JSON.stringify({ body: { text: texto }, buttons: BOTOES_PLANOS, id_assinatura: d.idAssinatura }), {
+      source: SOURCE_CHAT_PLANOS, replyToMsgId: cliqueMsgId, tipo: 'interactive',
+    })
     return
   }
 

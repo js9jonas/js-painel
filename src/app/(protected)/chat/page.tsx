@@ -24,6 +24,7 @@ import TranscribeButton from '@/components/chat/TranscribeButton'
 import AgenteAtendimentoPanel from '@/components/chat/AgenteAtendimentoPanel'
 import { Info, ClipboardList, Smartphone, CalendarClock, AlertTriangle, Pin, X, Package, CreditCard, Unplug, ScanText, Copy, Check, RotateCw, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import type { LeituraImagem } from '@/lib/ler-imagem-app'
+import { textoPlanos } from '@/lib/mensagem-planos'
 
 interface Conversa {
   telefone: string
@@ -1215,22 +1216,13 @@ export default function ChatPage() {
   // ao clicar, o webhook reconhece a origem via id_assinatura (auto-resposta-suporte.ts).
   async function enviarInfoPlano(a: AssinaturaResumo) {
     if (!selecionado || enviando || !a.id_assinatura) return
-    // Foco no benefício (o que o cliente ganha), não em ficha técnica do plano
-    const identificacao = a.identificacao?.trim()
-    const nTelas = pacotes.find(p => p.id_pacote === String(a.id_pacote))?.telas ?? null
-    const pNome = (cliente?.nome ?? '').trim().split(/\s+/)[0]?.replace(/[^\p{L}'-]/gu, '') ?? ''
-    const saudacao = pNome
-      ? `Oi, ${pNome.charAt(0).toLocaleUpperCase('pt-BR')}${pNome.slice(1).toLocaleLowerCase('pt-BR')}! 👋\n\n`
-      : ''
-    const telasTxt = nTelas == null
-      ? (a.pacote ?? a.plano ?? 'sua assinatura')
-      : nTelas === 1 ? '1 tela' : `${nTelas} telas`
-    const beneficio = nTelas && nTelas > 1 ? ', cada um assistindo na sua TV' : ' pra assistir sem interrupção'
-    const texto =
-      saudacao +
-      `📦 Seu plano${identificacao ? ` *${identificacao}*` : ''}: *${telasTxt}*${a.valor ? ` por *${formatValor(a.valor)}/mês*` : ''}${beneficio}.\n\n` +
-      `✨ *Novidade:* agora a renovação é na hora! Toque em *⚡ Ative na hora*, pague pelo Pix no link seguro da JS Sistemas e pronto: liberado em segundos, sem mandar comprovante 🚀\n\n` +
-      `Prefere o jeito de antes? Toque em *⏳ Chave PIX* e me mande o comprovante (confirmação manual, pode levar um tempinho).`
+    const texto = textoPlanos({
+      primeiroNome: cliente?.nome,
+      identificacao: a.identificacao,
+      telas: pacotes.find(p => p.id_pacote === String(a.id_pacote))?.telas ?? null,
+      rotuloPlano: a.pacote ?? a.plano,
+      valorMensal: a.valor,
+    })
     setEnviando(true)
     try {
       await fetch('/api/whatsapp/enviar-planos-botao', {
