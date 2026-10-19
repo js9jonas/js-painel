@@ -110,6 +110,7 @@ Trocar só de **VPS** mantendo os domínios não exige mexer em nada desta lista
 | Inter (Pix recebido) | `painel…/api/inter/webhook/<INTER_WEBHOOK_TOKEN>` | No Inter, pela API: `curl -X PUT -H "x-internal-token: …" https://painel.jssistemas.online/api/interno/pix/webhook` (GET consulta) |
 | Google (login) | `painel…/api/auth/callback/google` | Google Cloud → credencial OAuth (URIs de redirecionamento) |
 | n8n | `painel…/api/whatsapp/registrar` e outras | Workflows do n8n (memória `reference_n8n_api`) |
+| n8n (extrato do Inter, a cada Pix novo) | `painel…/api/interno/pix/extrato` | Workflow "Automações JS" (`J6sUbsVsN0yRpOk7`), nó "Envia Pix ao painel", credencial `js-painel — token interno` (header `x-internal-token`) — trocar a URL lá ao mudar o domínio |
 | Typebot | `painel…/api/typebot/*` | Typebot |
 | Robô de navegador (PC do Jonas) | `painel…/api/interno/robo/*` | `robo-navegador/extensao/config.js` + `manifest.json` |
 | Cron local (PC do Jonas) | `painel…/api/interno/central-token` | `crontab` → `src/scripts/central_refresh_token.js` |
