@@ -123,7 +123,7 @@ export default async function AlertasPage() {
                     <div className="px-5 py-4 bg-teal-50 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-semibold text-teal-900">💸 Pix recebido pelo link — renovar</p>
-                            <p className="text-xs text-teal-700 mt-0.5">Atrasada, vencendo hoje ou pendente renova sozinha; aqui ficam as outras (renove como de costume, forma INTER — some daqui sozinho)</p>
+                            <p className="text-xs text-teal-700 mt-0.5">O contrato renova sozinho; aqui ficam só os que não renovaram (valor diferente, pagou em dobro, assinatura inativa) — renove como de costume, forma INTER, e some daqui</p>
                         </div>
                         <span className="text-2xl font-bold text-teal-900 mr-3">{pixRecebidos.length}</span>
                     </div>

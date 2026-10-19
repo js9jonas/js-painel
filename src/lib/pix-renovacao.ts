@@ -1,7 +1,11 @@
 // src/lib/pix-renovacao.ts — fase 2 do link de pagamento (18/10/2026): o que fazer com cada
-// assinatura paga pelo Pix. Regra do Jonas: atrasada ou vencendo hoje → renova sozinha, igual ao
-// botão Renovar (banco + pagamento INTER + contas vencidas no painel + aviso no WhatsApp); senão →
-// fica em /alertas pra ele renovar. Pendente (mês já liberado, falta o pagamento) também renova.
+// assinatura paga pelo Pix. Regra do Jonas (corrigida no mesmo dia):
+// - o CONTRATO renova sempre, em qualquer data, igual ao botão Renovar (banco + pagamento INTER +
+//   histórico + aviso no WhatsApp); pendente vira ativa;
+// - a CONTA no painel do fornecedor só renova se estiver vencida ou vencendo hoje;
+// - sem conta vinculada ou qualquer empecilho → aviso no Telegram (⚠️).
+// Só não renova (vai pra /alertas com o motivo) quando há sinal de erro no pagamento: valor diferente,
+// pagamento em dobro, assinatura inativa/cancelada.
 //
 // Usa as MESMAS funções do botão: renovarAssinatura (banco), datasPadraoDoBotao (datas) e
 // renovarContaNoPainel (painel do fornecedor, com as travas dos adapters).
@@ -11,7 +15,6 @@
 import { pool } from "@/lib/db";
 import { renovarAssinatura } from "@/lib/renovar-assinatura";
 import { renovarContaNoPainel } from "@/lib/renovar-conta-painel";
-import { getContasPainelByClienteId } from "@/lib/clientes";
 import { datasPadraoDoBotao, periodoDosMeses, contaPrecisaRenovarNoPainel, type Periodo } from "@/lib/datas-renovacao";
 import { URL_PAINEL } from "@/lib/enderecos";
 
@@ -71,19 +74,28 @@ export function decidir(p: {
   if (status !== "ativo" && status !== "atrasado") {
     return { acao: "alertas", motivo: `Assinatura com status "${p.status ?? "—"}"` };
   }
-  if (!p.vencContrato) return { acao: "alertas", motivo: "Assinatura sem vencimento" };
-  const venc = p.vencContrato.split("T")[0];
-  if (venc <= p.hoje) return { acao: "renovar", periodo, pendente: false };
-  return { acao: "alertas", motivo: `Ainda não venceu (vence em ${venc.split("-").reverse().join("/")})` };
+  // Qualquer data (adiantado também): o botão soma o período ao vencimento atual, ou a partir de
+  // hoje se o vencimento das contas já passou / não houver vencimento.
+  return { acao: "renovar", periodo, pendente: false };
 }
 
-type ResultadoItem = {
+type ResultadoConta = {
+  usuario: string;
+  painel: string;
+  /** renovada | valida (não precisou) | erro | atencao (precisa de alguém) */
+  situacao: "renovada" | "valida" | "erro" | "atencao";
+  mensagem: string;
+};
+
+export type ResultadoItem = {
   rotulo: string;
   acao: "renovado" | "alertas";
   motivo: string | null;
   vencContrato?: string | null;
   whatsapp?: unknown;
-  contas?: { usuario: string; painel: string; ok: boolean; mensagem: string }[];
+  contas?: ResultadoConta[];
+  /** Empecilhos depois de renovar o contrato (sem conta, conta com erro...). Viram ⚠️ no Telegram. */
+  atencao?: string[];
 };
 
 async function hojeBrasilia(): Promise<string> {
@@ -159,22 +171,57 @@ async function processarItem(item: ItemPago, hoje: string): Promise<ResultadoIte
     return { rotulo: a.rotulo, acao: "alertas", motivo: `Falha ao renovar: ${r.corpo.error ?? `HTTP ${r.httpStatus}`}` };
   }
 
-  // 2) Painel do fornecedor: contas da assinatura vencidas até hoje, como o botão faz depois de salvar
-  const contas = (await getContasPainelByClienteId(item.id_cliente)).filter(
-    (c) => String(c.id_assinatura) === item.id_assinatura && contaPrecisaRenovarNoPainel(c, hoje)
+  // 2) Painel do fornecedor: contas da assinatura vencidas até hoje, como o botão faz depois de salvar.
+  //    Todas as contas da assinatura entram na conta (inclusive sem painel integrado), pra avisar.
+  const { rows: contas } = await pool.query<{
+    usuario: string;
+    id_painel_servidor: number | null;
+    nome_painel: string | null;
+    vencimento_real_painel: string | null;
+  }>(
+    `SELECT c.usuario, c.id_painel_servidor, ps.nome AS nome_painel, c.vencimento_real_painel::text
+       FROM public.contas c
+       LEFT JOIN public.painel_servidores ps ON ps.id = c.id_painel_servidor
+      WHERE c.id_assinatura = $1::bigint AND c.removido_em IS NULL
+      ORDER BY ps.nome, c.usuario`,
+    [item.id_assinatura]
   );
-  const resultadosContas: NonNullable<ResultadoItem["contas"]> = [];
+  const atencao: string[] = [];
+  const resultadosContas: ResultadoConta[] = [];
+  if (contas.length === 0) atencao.push("sem conta vinculada no painel — confira à mão");
+
   for (const c of contas) {
-    const rc = await renovarContaNoPainel(c.id_painel_servidor!, c.usuario, { usuarioAuditoria: USUARIO_AUTOMATICO });
-    resultadosContas.push({
-      usuario: c.usuario,
-      painel: c.nome_painel,
-      ok: rc.ok,
-      mensagem: rc.ok ? rc.mensagem : rc.erro,
-    });
+    const painel = c.nome_painel ?? "sem painel";
+    if (c.id_painel_servidor === null) {
+      resultadosContas.push({ usuario: c.usuario, painel, situacao: "atencao", mensagem: "painel não integrado — renove à mão se precisar" });
+      continue;
+    }
+    if (!c.vencimento_real_painel) {
+      resultadosContas.push({ usuario: c.usuario, painel, situacao: "atencao", mensagem: "vencimento da conta desconhecido — confira no painel" });
+      continue;
+    }
+    if (!contaPrecisaRenovarNoPainel(c, hoje)) {
+      resultadosContas.push({ usuario: c.usuario, painel, situacao: "valida", mensagem: `válida até ${dataBR(c.vencimento_real_painel)}` });
+      continue;
+    }
+    const rc = await renovarContaNoPainel(c.id_painel_servidor, c.usuario, { usuarioAuditoria: USUARIO_AUTOMATICO });
+    resultadosContas.push(
+      rc.ok
+        ? { usuario: c.usuario, painel, situacao: "renovada", mensagem: rc.mensagem }
+        : { usuario: c.usuario, painel, situacao: "erro", mensagem: rc.erro }
+    );
+  }
+  for (const c of resultadosContas) {
+    if (c.situacao === "erro" || c.situacao === "atencao") atencao.push(`conta ${c.usuario} (${c.painel}): ${c.mensagem}`);
   }
 
-  const vencNovo = r.corpo.assinatura?.venc_contrato ?? null;
+  // O caminho "pendente → ativo" do botão não devolve a assinatura; a data vem do banco
+  const vencNovo =
+    r.corpo.assinatura?.venc_contrato ??
+    (await pool.query<{ v: string | null }>(
+      `SELECT venc_contrato::text AS v FROM public.assinaturas WHERE id_assinatura = $1::bigint`,
+      [item.id_assinatura]
+    )).rows[0]?.v ?? null;
   return {
     rotulo: a.rotulo,
     acao: "renovado",
@@ -182,6 +229,7 @@ async function processarItem(item: ItemPago, hoje: string): Promise<ResultadoIte
     vencContrato: vencNovo,
     whatsapp: r.corpo.whatsapp ?? null,
     contas: resultadosContas,
+    atencao,
   };
 }
 
@@ -245,7 +293,10 @@ function esc(s: string): string {
   return s.replace(/[<>&]/g, "");
 }
 
-/** Um aviso por Pix: o que renovou sozinho e o que ficou pra ele. */
+/**
+ * Um aviso por Pix: o que renovou sozinho e o que precisa dele. Com qualquer empecilho (sem conta,
+ * conta com erro, item que não renovou) a 1ª linha já sai marcada com ⚠️.
+ */
 async function avisarJonas(lista: { item: ItemPago; res: ResultadoItem }[]): Promise<void> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID_JONAS;
@@ -255,28 +306,37 @@ async function avisarJonas(lista: { item: ItemPago; res: ResultadoItem }[]): Pro
     `SELECT nome FROM public.clientes WHERE id_cliente = $1::bigint`,
     [item.id_cliente]
   );
-  const linhas = [
-    `💸 Pix pelo link: <b>${esc(rows[0]?.nome ?? `#${item.id_cliente}`)}</b> — R$ ${Number(item.valor_pago ?? 0).toFixed(2).replace(".", ",")}`,
-  ];
-  for (const { res } of lista) {
-    if (res.acao === "renovado") {
-      linhas.push(`✅ ${esc(res.rotulo)}: renovado sozinho até ${dataBR(res.vencContrato)}`);
-      for (const c of res.contas ?? []) {
-        linhas.push(`   ${c.ok ? "↳" : "⚠️"} conta ${esc(c.usuario)} (${esc(c.painel)}): ${esc(c.mensagem)}`);
-      }
-    } else {
-      linhas.push(`⏳ ${esc(res.rotulo)}: falta renovar — ${esc(res.motivo ?? "")}`);
-    }
-  }
+  const texto = textoDoAviso(rows[0]?.nome ?? `#${item.id_cliente}`, item.valor_pago, lista.map((x) => x.res));
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
-      text: linhas.join("\n"),
+      text: texto,
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: [[{ text: "Abrir alertas", url: `${URL_PAINEL}/alertas` }]] },
     }),
   });
   if (!res.ok) console.error(`[pix-renovacao] Telegram ${res.status}: ${(await res.text()).slice(0, 300)}`);
+}
+
+/** Texto do aviso (separado do envio pra dar pra testar sem mandar mensagem). */
+export function textoDoAviso(nome: string, valorPago: string | null, itens: ResultadoItem[]): string {
+  const precisaAtencao = itens.some((res) => res.acao === "alertas" || (res.atencao?.length ?? 0) > 0);
+  const linhas = [
+    `${precisaAtencao ? "⚠️ " : ""}💸 Pix pelo link: <b>${esc(nome)}</b> — R$ ${Number(valorPago ?? 0).toFixed(2).replace(".", ",")}`,
+  ];
+  for (const res of itens) {
+    if (res.acao === "renovado") {
+      linhas.push(`✅ ${esc(res.rotulo)}: contrato renovado até ${dataBR(res.vencContrato)}`);
+      for (const c of res.contas ?? []) {
+        const icone = c.situacao === "renovada" ? "↳ ✅" : c.situacao === "valida" ? "↳" : "↳ ⚠️";
+        linhas.push(`   ${icone} conta ${esc(c.usuario)} (${esc(c.painel)}): ${esc(c.mensagem)}`);
+      }
+      if ((res.contas?.length ?? 0) === 0) linhas.push("   ↳ ⚠️ sem conta vinculada no painel — confira à mão");
+    } else {
+      linhas.push(`⏳ ${esc(res.rotulo)}: NÃO renovado — ${esc(res.motivo ?? "")} (está em /alertas)`);
+    }
+  }
+  return linhas.join("\n");
 }
