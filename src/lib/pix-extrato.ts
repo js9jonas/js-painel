@@ -4,6 +4,8 @@
 //
 // Prioridade (regra do Jonas, 18/10/2026): link Pix (webhook com txid) > extrato > comprovante do cliente.
 // O Pix do link também aparece no extrato: aqui ele vira "link" e é ignorado.
+// Datas: o Inter data os Pix da noite (depois das ~21h) com o dia seguinte — a análise usa `visto_em`
+// (quando o n8n viu), nunca `data`, que só serve pra chave única.
 import { pool } from "@/lib/db";
 
 /** Espera antes de analisar: o webhook do link costuma chegar em segundos, mas a ordem não é garantida. */
@@ -69,10 +71,10 @@ async function analisar(p: Linha): Promise<Resultado> {
        FROM public.pix_cobrancas c
       WHERE COALESCE(c.valor_pago, c.valor) = $1::numeric
         AND NOT EXISTS (SELECT 1 FROM public.pix_extrato e WHERE e.id_cobranca = c.id)
-        AND ((c.pago_em AT TIME ZONE 'America/Sao_Paulo')::date = $2::date
+        AND (c.pago_em BETWEEN $2::timestamptz - interval '24 hours' AND $2::timestamptz + interval '1 hour'
              OR (c.pago_em IS NULL AND c.status = 'ATIVA' AND c.criado_em > now() - interval '24 hours'))
-      ORDER BY c.pago_em NULLS LAST LIMIT 1`,
-    [p.valor, p.data]
+      ORDER BY abs(extract(epoch FROM c.pago_em - $2::timestamptz)) NULLS LAST LIMIT 1`,
+    [p.valor, p.visto_em]
   );
   const cob = cobs[0];
   if (cob?.pago_em) {
@@ -146,10 +148,11 @@ async function analisar(p: Linha): Promise<Resultado> {
   // 5) Sem pagamento recente registrado ANTES do Pix (o que vier depois é o próprio Pix sendo renovado à mão).
   const { rows: recentes } = await pool.query<{ id: number; data_pgto: string }>(
     `SELECT id, data_pgto::text FROM public.pagamentos
-      WHERE id_cliente = $1::bigint AND data_pgto >= $2::date - $3::int
+      WHERE id_cliente = $1::bigint
+        AND data_pgto >= ($2::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date - $3::int
         AND (atualizado_em IS NULL OR atualizado_em < $4::timestamptz AT TIME ZONE 'America/Sao_Paulo')
       ORDER BY data_pgto DESC LIMIT 1`,
-    [cliente.id_cliente, p.data, DIAS_PAGAMENTO_RECENTE, p.visto_em]
+    [cliente.id_cliente, p.visto_em, DIAS_PAGAMENTO_RECENTE, p.visto_em]
   );
   if (recentes[0]) {
     return {
@@ -163,8 +166,8 @@ async function analisar(p: Linha): Promise<Resultado> {
   const { rows: outro } = await pool.query<{ id: string }>(
     `SELECT id::text FROM public.pix_extrato
       WHERE id_assinatura = $1::bigint AND situacao = 'conclusivo' AND id <> $2::bigint
-        AND data >= $3::date - $4::int LIMIT 1`,
-    [a.id_assinatura, p.id, p.data, DIAS_PAGAMENTO_RECENTE]
+        AND visto_em >= $3::timestamptz - make_interval(days => $4::int) LIMIT 1`,
+    [a.id_assinatura, p.id, p.visto_em, DIAS_PAGAMENTO_RECENTE]
   );
   if (outro[0]) {
     return {

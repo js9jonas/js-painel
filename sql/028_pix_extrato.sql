@@ -10,7 +10,7 @@
 CREATE TABLE IF NOT EXISTS public.pix_extrato (
   id             bigserial PRIMARY KEY,
   chave          text NOT NULL UNIQUE,          -- data|valor|descrição|ocorrência no dia
-  data           date NOT NULL,                 -- dataEntrada do extrato (o extrato não traz hora)
+  data           date NOT NULL,                 -- dataEntrada do extrato (sem hora; Pix depois das ~21h vem com o dia seguinte)
   visto_em       timestamptz NOT NULL DEFAULT now(),  -- quando o n8n viu (precisão de ~1 min)
   valor          numeric(10,2) NOT NULL,
   nome           text,                          -- pagador, tirado da descrição

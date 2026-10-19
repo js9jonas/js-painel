@@ -38,6 +38,12 @@ no extrato e deve ser ignorado ali. Comprovante sozinho não renova (extrato é 
    cobrança do link paga no dia com o mesmo valor → "link"; cobrança aberta → espera até 30 min; pagador pela
    base + nome do cliente; 1 assinatura pagável; valor de plano do mesmo tipo/telas (período pelo plano);
    sem pagamento do cliente nos 7 dias antes do Pix; sem outro conclusivo da mesma assinatura.
+   ⚠️ **Data do Inter (achado 18/10 23:35):** o extrato do dia 18 já trazia Pix com `dataEntrada` 19 — os Pix
+   da noite (depois das ~21h, provavelmente data em UTC) vêm com o dia seguinte. Era a causa da Alexa anunciar
+   de novo à meia-noite (a lista "vistos" do dia novo começava vazia). Corrigido no n8n 18/10: nó novo
+   "Verifica ontem" (Redis GET de `inter:pix:vistos:<ontem>`) e "decidir novo pix" junta as duas listas.
+   Filtrar por data ou pular a execução das 00:00 NÃO resolveria (perderia os Pix da noite / repetiria às
+   00:01). No painel a análise usa `visto_em`, nunca `data` (que só serve pra chave única).
    Analisar em /alertas fica pra etapa 4 (em modo sombra seria repetir o fluxo normal do Jonas).
 3. 📋 Modo sombra com botão no /chat.
 4. 📋 Ativar renovação conclusiva.
