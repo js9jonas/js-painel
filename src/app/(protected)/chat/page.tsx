@@ -1229,8 +1229,8 @@ export default function ChatPage() {
     const texto =
       saudacao +
       `📦 Seu plano${identificacao ? ` *${identificacao}*` : ''}: *${telasTxt}*${a.valor ? ` por *${formatValor(a.valor)}/mês*` : ''}${beneficio}.\n\n` +
-      `Pra renovar, toque em *⚡ Ative na hora*: você paga pelo Pix no link e a renovação é confirmada na hora, sem precisar mandar comprovante 🚀\n\n` +
-      `Se preferir, toque em *⏳ Chave PIX* e me mande o comprovante. Essa confirmação é feita por mim e pode levar um tempinho.`
+      `✨ *Novidade:* agora a renovação é na hora! Toque em *⚡ Ative na hora*, pague pelo Pix no link seguro da JS Sistemas e pronto: liberado em segundos, sem mandar comprovante 🚀\n\n` +
+      `Prefere o jeito de antes? Toque em *⏳ Chave PIX* e me mande o comprovante (confirmação manual, pode levar um tempinho).`
     setEnviando(true)
     try {
       await fetch('/api/whatsapp/enviar-planos-botao', {
