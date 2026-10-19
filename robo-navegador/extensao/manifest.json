@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "JS Painel — robô do navegador",
   "description": "Executa no navegador as ações do js-painel em sites que só abrem em navegador real (POP Player, Duplecast, Central, FAST).",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "permissions": [
     "tabs",
     "alarms"

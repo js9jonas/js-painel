@@ -24,6 +24,16 @@
   const texto = (el) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
   const html = (s) => new DOMParser().parseFromString(s, "text/html");
 
+  // 403 = liberação do Cloudflare (cf_clearance) vencida. Em vez de recusar o pedido, o robô guarda a tarefa, vai para
+  // uma página protegida (o navegador refaz o desafio sozinho, ~1–2 min) e repete — só se nada foi gravado no POP
+  // antes do 403 (19/10/2026; antes a 1ª tentativa falhava e a pessoa tinha que pedir de novo).
+  class DesafioCloudflare extends Error {}
+  const MSG_DESAFIO = "O Cloudflare do POP pediu verificação de novo. O robô vai recarregar a página; tente em 1 minuto.";
+  const PENDENTE = "robo-pop-pendente";
+  /** O js-painel espera 4 min pelo POP (src/lib/robo.ts): passado isso, desiste da tarefa guardada. */
+  const ESPERA_PENDENTE_MS = 3 * 60_000;
+  let escreveu = false; // a tarefa atual já gravou algo no POP (aí repetir poderia duplicar)
+
   function normalizarMac(mac) {
     const hex = String(mac ?? "").replace(/[^0-9a-f]/gi, "").toUpperCase();
     if (hex.length !== 12) throw new Error(`MAC inválido: ${mac}`);
@@ -32,7 +42,7 @@
 
   async function obter(caminho) {
     const r = await fetch(BASE + caminho, { credentials: "include" });
-    if (r.status === 403) throw new Error("O Cloudflare do POP pediu verificação de novo. O robô vai recarregar a página; tente em 1 minuto.");
+    if (r.status === 403) throw new DesafioCloudflare(MSG_DESAFIO);
     return { url: r.url, doc: html(await r.text()) };
   }
 
@@ -59,7 +69,8 @@
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: dados.toString(),
     });
-    if (r.status === 403) throw new Error("O Cloudflare do POP recusou o envio. Tente de novo em 1 minuto.");
+    if (r.status === 403) throw new DesafioCloudflare("O Cloudflare do POP recusou o envio. Tente de novo em 1 minuto.");
+    escreveu = true;
     return { url: r.url, doc: html(await r.text()) };
   }
 
@@ -114,7 +125,8 @@
       headers: { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "x-requested-with": "XMLHttpRequest" },
       body: new URLSearchParams(campos).toString(),
     });
-    if (r.status === 403) throw new Error("O Cloudflare do POP pediu verificação de novo. O robô vai recarregar a página; tente em 1 minuto.");
+    if (r.status === 403) throw new DesafioCloudflare(MSG_DESAFIO);
+    if (campos.ajax) escreveu = true;
     const t = await r.text();
     try { return JSON.parse(t); } catch { throw new Error(`Resposta inesperada do Migrador de DNS: ${t.replace(/\s+/g, " ").slice(0, 120)}`); }
   }
@@ -194,6 +206,7 @@
       const atual = await detalhe(id);
       if (atual.mac !== normalizarMac(mac)) throw new Error(`A lista ${id} do POP é de outro MAC (${atual.mac}).`);
       await obter(`users.php?page=1&per_page=25&delete=${id}`);
+      escreveu = true;
       const depois = await listasDoMac(atual.mac);
       if (depois.some((l) => l.id === id)) throw new Error("O POP não apagou a lista.");
       return depois;
@@ -204,7 +217,44 @@
     const fn = acoes[tarefa.acao];
     if (!fn) throw new Error(`Ação desconhecida: ${tarefa.acao}`);
     await garantirSessao();
+    escreveu = false; // o login não conta como gravação
     return fn(tarefa.params ?? {});
+  }
+
+  /** Executa e devolve o resultado; no 403 sem nada gravado, guarda a tarefa e vai refazer o desafio (não volta). */
+  async function trabalhar(t, jaRepetida) {
+    estado(`executando ${t.acao}`);
+    let resultado;
+    try {
+      resultado = { id: t.id, ok: true, resultado: await executar(t) };
+    } catch (e) {
+      if (e instanceof DesafioCloudflare && !escreveu && !jaRepetida) {
+        sessionStorage.setItem(PENDENTE, JSON.stringify({ tarefa: t, credenciais, desde: Date.now() }));
+        estado("Cloudflare pediu verificação — refazendo e repetindo o pedido");
+        location.assign(BASE + "users.php");
+        return new Promise(() => {}); // segura o ciclo até a página trocar
+      }
+      resultado = { id: t.id, ok: false, erro: e instanceof Error ? e.message : String(e) };
+    }
+    await chrome.runtime.sendMessage({ tipo: "resultado", resultado }).catch(() => {});
+    // Ainda bloqueado (gravou algo antes, ou já era a repetição): navega para uma página protegida, onde o navegador
+    // refaz o desafio sozinho — recarregar a tela de login não adianta (ela fica fora da proteção).
+    if (!resultado.ok && /Cloudflare/.test(resultado.erro)) { location.assign(BASE + "users.php"); return new Promise(() => {}); }
+  }
+
+  /** Tarefa guardada antes do desafio: repete agora que a página carregou liberada (ou avisa que passou da hora). */
+  async function retomarPendente() {
+    let p = null;
+    try { p = JSON.parse(sessionStorage.getItem(PENDENTE) || "null"); } catch { /* estragado: ignora */ }
+    sessionStorage.removeItem(PENDENTE);
+    if (!p?.tarefa) return;
+    if (Date.now() - p.desde > ESPERA_PENDENTE_MS) {
+      const resultado = { id: p.tarefa.id, ok: false, erro: "O Cloudflare do POP demorou demais para liberar. Tente de novo." };
+      await chrome.runtime.sendMessage({ tipo: "resultado", resultado }).catch(() => {});
+      return;
+    }
+    credenciais = p.credenciais;
+    await trabalhar(p.tarefa, true);
   }
 
   async function ciclo() {
@@ -223,21 +273,10 @@
         else estado(`aguardando ${new Date().toLocaleTimeString("pt-BR")}`);
         continue;
       }
-      estado(`executando ${resp.tarefa.acao}`);
       credenciais = resp.credenciais;
-      const t = resp.tarefa;
-      let resultado;
-      try {
-        resultado = { id: t.id, ok: true, resultado: await executar(t) };
-      } catch (e) {
-        resultado = { id: t.id, ok: false, erro: e instanceof Error ? e.message : String(e) };
-      }
-      await chrome.runtime.sendMessage({ tipo: "resultado", resultado }).catch(() => {});
-      // 403 do Cloudflare = liberação (cf_clearance) vencida. Recarregar a tela de login não adianta (ela fica fora da
-      // proteção): navega para uma página protegida, onde o navegador refaz o desafio sozinho.
-      if (!resultado.ok && /Cloudflare/.test(resultado.erro)) { location.assign(BASE + "users.php"); return; }
+      await trabalhar(resp.tarefa, false);
     }
   }
 
-  ciclo();
+  retomarPendente().then(ciclo);
 })();

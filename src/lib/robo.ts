@@ -49,7 +49,8 @@ export async function executarNoRobo<T = unknown>(
     [alvo, acao, JSON.stringify(params), opts.usuario ?? null]
   );
   const id = Number(rows[0].id);
-  const limite = Date.now() + (opts.timeoutMs ?? 3 * 60_000);
+  // POP: o robô espera o Cloudflare refazer a verificação (~1–2 min) e repete o pedido (popplayer.js, 19/10/2026)
+  const limite = Date.now() + (opts.timeoutMs ?? (alvo === "popplayer" ? 4 : 3) * 60_000);
 
   while (Date.now() < limite) {
     await new Promise((r) => setTimeout(r, 1000));
