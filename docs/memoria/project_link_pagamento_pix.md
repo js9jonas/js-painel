@@ -47,7 +47,7 @@ O certificado da antiga "js-painel-cobrancas" (23/06) se perdeu, e o Inter só d
 1. ✅ Easypanel → js_painel → Ambiente (feito 18/10; o arquivo com o bloco foi apagado — recriar com `base64 -w0` do .crt/.key se preciso): troca `INTER_CLIENT_ID`/`SECRET`, acrescenta `INTER_CERT_BASE64`, `INTER_KEY_BASE64` e `INTER_WEBHOOK_TOKEN`).
 2. Commit + deploy, depois `curl -X PUT -H "x-internal-token: …" https://painel.jssistemas.online/api/interno/pix/webhook`.
 3. Teste real: Jonas paga o link de um cliente de teste e confere o card e o Telegram.
-4. Conferir a tarifa de QR dinâmico do Inter Empresas.
+4. Conferir a tarifa de QR dinâmico do Inter Empresas. — 20/10: extratos de 18–20/10 (via execuções do n8n "Inter - extrato") **sem nenhum débito de tarifa** pelas 3 `cob` pagas (R$85) e o Pix entra integral. Fontes públicas falam em 0,9% (mín. R$0,10, máx. R$1,50) acima de cota grátis do plano — 📋 olhar o extrato no início de novembro pra ver se vem tarifa agregada no mês.
 
 ## Produção (18/10/2026)
 
