@@ -129,3 +129,5 @@ Commits: `d23f09d`, `1a95e70`, `a59b1e2`, `41aebf8`, `d0d7eb9`.
   - ao gerar o novo Pix, cancelar o anterior no Inter (PATCH cob → `REMOVIDA_PELO_USUARIO_RECEBEDOR`, pelo pool do painel, sem ampliar o `app_portal_cliente`);
   - se o anterior já estiver pago, mostrar "pagamento anterior já recebido" em vez de gerar outro.
   - Antes, testar com R$ 0,01 se a permissão "emitir cobrança" do Inter deixa cancelar.
+
+- 📋 20/10: Jonas colou uma chave temporária da API do n8n no chat (leitura das execuções do extrato); apagada do scratchpad, expira ~26/10 — revogar antes se possível.
