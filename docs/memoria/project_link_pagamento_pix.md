@@ -150,4 +150,9 @@ Commits: `d23f09d`, `1a95e70`, `a59b1e2`, `41aebf8`, `d0d7eb9`.
 - Testado com build de produção local + navegador em tamanho de celular, geração interceptada (nenhuma cobrança no Inter):
   1 assinatura gera 1 Pix mensal ao abrir; "Pagar por mais tempo" → Trimestral gera o de 3 meses sem gerar outro sozinho;
   JS Contas (6 assinaturas) abre a escolha sem gerar nada.
+- **Correção no mesmo dia:** o Pix só é gerado sozinho se o vencimento estiver a até 10 dias (`DIAS_PRE_SELECAO`) ou já
+  tiver passado. Quem acabou de pagar e reabre o link (ou toca de novo em "Ative na hora") vê "✅ Sua assinatura está
+  em dia até dd/mm" + "Se quiser, você pode pagar adiantado:" e só gera tocando em "Pagar com Pix" — antes da correção
+  daria de cara com um Pix novo e poderia pagar em dobro sem querer (o 2º Pix renovaria mais 1 mês, sem ir para
+  /alertas, porque o pagamento anterior é de antes desse Pix). Testado: vence amanhã e vencida → geram sozinho; em dia → não.
 - 📋 Olhar o funil de novo em ~1 semana: abriu → gerou deve subir.

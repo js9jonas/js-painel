@@ -85,7 +85,11 @@ export default function PagarCliente({
   // escolha do cliente na hora de pagar). Com 1 assinatura e nada em aberto, quem abriu quer pagar já — o passo
   // "Confira sua assinatura" fazia a pessoa voltar pro WhatsApp e pedir a chave PIX. Roda só no navegador (prévias de
   // link não executam JS, então não geram cobrança) e uma vez só: depois de "Trocar período" a escolha é manual.
-  const autoGerar = assinaturas.length === 1 && !cobrancaAberta;
+  // Só quando o vencimento está perto (ou já passou): quem acabou de pagar e reabre o link vê "em dia" e paga
+  // adiantado só se quiser, em vez de dar de cara com um Pix novo e pagar em dobro sem querer.
+  const unica = assinaturas.length === 1 ? assinaturas[0] : null;
+  const emDiaAte = unica?.venc_contrato && diasAte(unica.venc_contrato) > DIAS_PRE_SELECAO ? unica.venc_contrato : null;
+  const autoGerar = !!unica && !cobrancaAberta && !emDiaAte;
   const [gerando, setGerando] = useState(autoGerar);
   const autoGerado = useRef(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -307,8 +311,17 @@ export default function PagarCliente({
   return (
     <div className="mt-4 space-y-4">
       <h1 className="text-xl font-semibold">{saudacao}</h1>
+      {emDiaAte && (
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          ✅ Sua assinatura está em dia até <b>{dataBR(emDiaAte)}</b>.
+        </p>
+      )}
       <p className="text-sm text-zinc-600">
-        {assinaturas.length > 1 ? "Escolha o que você quer pagar:" : "Confira sua assinatura:"}
+        {assinaturas.length > 1
+          ? "Escolha o que você quer pagar:"
+          : emDiaAte
+            ? "Se quiser, você pode pagar adiantado:"
+            : "Confira sua assinatura:"}
       </p>
 
       <ul className="space-y-2">
