@@ -104,6 +104,12 @@ no extrato e deve ser ignorado ali. Comprovante sozinho não renova (extrato é 
    `28ff937` 19/10 (✅ em produção): análise na hora quando não há cobrança do link ATIVA, não paga e dentro da validade (24 h,
    `EXPIRACAO_SEGUNDOS`) com o mesmo valor; com cobrança aberta, espera 3 min e a rota agenda a análise (setTimeout)
    em vez de esperar o job de 5 min. Antes: 3–8 min por Pix (Laerte "Aguardando análise" com a Alexa já anunciado).
+   21/10 (bug corrigido): "Pix do link" casava só por valor + 24 h — o Pix da Dalva (chave, 19:22) pegou a cobrança
+   do Lucas Gontijo (link, 19:23) e o Pix do Lucas foi pra "analisar"; Pedro Matos (19/10, Pix interno) também
+   pegou a cobrança de teste do JS Contas. Agora exige o mesmo banco: `ispbDaDescricao` ("Cp :91159764-" → ISPB;
+   "INTERNO" → Inter 00416968, não confirmado com Pix real) = `substr(end_to_end_id, 2, 8)` da cobrança; descrição
+   em formato desconhecido nunca vira link. Simulado nos 10 "link": 8 mantidos, 2 corrigidos. Registros 67, 1401 e
+   1426 refeitos à mão (`pagador_nome` das cobranças vem sempre NULL do Inter — não serve pra conferir).
 4. 📋 Ativar renovação conclusiva. Pré-requisito ✅ (em produção 19/10): modal Renovar avisa em vermelho quando a
    assinatura já tem pagamento nos últimos 3 dias (`GET /api/assinaturas/[id]/pagamentos-recentes`), com
    forma, conferência e pagador — evita renovar 2x o Pix que o link/extrato já renovou. Só aviso, sem trava

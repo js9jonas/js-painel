@@ -67,7 +67,21 @@ export async function registrarPixExtrato(lista: PixDoExtrato[]): Promise<{ rece
   return { recebidos: lista.length, novos };
 }
 
-type Linha = { id: string; data: string; visto_em: string; valor: string; nome: string | null };
+type Linha = { id: string; data: string; visto_em: string; valor: string; nome: string | null; descricao: string };
+
+/** ISPB do Inter: Pix "INTERNO" (conta Inter → conta Inter) não traz o código do banco na descrição. */
+const ISPB_INTER = "00416968";
+
+/**
+ * Banco de quem pagou, pela descrição do extrato ("PIX RECEBIDO - Cp :91159764-NOME" → 91159764). O `endToEndId`
+ * do Pix começa com "E" + esse mesmo código, então é o que liga o Pix do extrato à cobrança do link.
+ */
+export function ispbDaDescricao(descricao: string): string | null {
+  const m = descricao.match(/Cp\s*:\s*(\d{8})-/);
+  if (m) return m[1];
+  return /^PIX RECEBIDO INTERNO\b/i.test(descricao) ? ISPB_INTER : null;
+}
+
 type Resultado =
   | { situacao: "link"; id_cobranca: string; id_cliente: string; motivo: string }
   | { situacao: "conclusivo"; id_cliente: string; id_assinatura: string; analise: Record<string, unknown> }
@@ -75,7 +89,10 @@ type Resultado =
   | { situacao: "pendente" };
 
 async function analisar(p: Linha): Promise<Resultado> {
-  // 1) Pix do link: cobrança paga no mesmo dia com o mesmo valor, ainda não ligada a outro Pix do extrato.
+  // 1) Pix do link: cobrança paga no mesmo dia com o mesmo valor, ainda não ligada a outro Pix do extrato e paga
+  //    pelo mesmo banco. Só valor + horário confundia clientes: em 21/10/2026 o Pix da Dalva (chave, 19:22) pegou
+  //    a cobrança do Lucas Gontijo (link, 19:23), e o Pix do Lucas ficou sem cobrança.
+  const ispb = ispbDaDescricao(p.descricao);
   const { rows: cobs } = await pool.query<{ id: string; id_cliente: string; status: string; pago_em: string | null }>(
     `SELECT c.id::text, c.id_cliente::text, c.status, c.pago_em::text
        FROM public.pix_cobrancas c
@@ -83,8 +100,9 @@ async function analisar(p: Linha): Promise<Resultado> {
         AND NOT EXISTS (SELECT 1 FROM public.pix_extrato e WHERE e.id_cobranca = c.id)
         AND (c.pago_em BETWEEN $2::timestamptz - interval '24 hours' AND $2::timestamptz + interval '1 hour'
              OR (c.pago_em IS NULL AND c.status = 'ATIVA' AND c.criado_em > now() - interval '24 hours'))
+        AND (c.pago_em IS NULL OR substr(c.end_to_end_id, 2, 8) = $3)
       ORDER BY abs(extract(epoch FROM c.pago_em - $2::timestamptz)) NULLS LAST LIMIT 1`,
-    [p.valor, p.visto_em]
+    [p.valor, p.visto_em, ispb]
   );
   const cob = cobs[0];
   if (cob?.pago_em) {
@@ -201,7 +219,7 @@ export async function analisarPixPendentes(): Promise<number> {
   const { rows } = await pool.query<Linha>(
     // A espera só existe pro webhook do link chegar primeiro: sem cobrança aberta e dentro da validade (24 h) com o
     // mesmo valor, analisa na hora (19/10/2026 — antes todo Pix esperava 3 min + a volta do job de 5 min).
-    `SELECT e.id::text, e.data::text, e.visto_em::text, e.valor::text, e.nome FROM public.pix_extrato e
+    `SELECT e.id::text, e.data::text, e.visto_em::text, e.valor::text, e.nome, e.descricao FROM public.pix_extrato e
       WHERE e.situacao = 'pendente'
         AND (e.visto_em < now() - $1::interval
              OR NOT EXISTS (SELECT 1 FROM public.pix_cobrancas c
