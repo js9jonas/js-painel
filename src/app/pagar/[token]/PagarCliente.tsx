@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AssinaturaLink } from "@/lib/pix-link";
 
 type Cobranca = {
@@ -81,7 +81,13 @@ export default function PagarCliente({
     assinaturas.filter((a) => periodos[a.id_assinatura] !== a.meses).map((a) => a.id_assinatura)
   );
   const [cobranca, setCobranca] = useState<Cobranca | null>(cobrancaAberta);
-  const [gerando, setGerando] = useState(false);
+  // Pix gerado sozinho ao abrir (23/10/2026), no período atual da assinatura (sempre mensal: períodos maiores são
+  // escolha do cliente na hora de pagar). Com 1 assinatura e nada em aberto, quem abriu quer pagar já — o passo
+  // "Confira sua assinatura" fazia a pessoa voltar pro WhatsApp e pedir a chave PIX. Roda só no navegador (prévias de
+  // link não executam JS, então não geram cobrança) e uma vez só: depois de "Trocar período" a escolha é manual.
+  const autoGerar = assinaturas.length === 1 && !cobrancaAberta;
+  const [gerando, setGerando] = useState(autoGerar);
+  const autoGerado = useRef(false);
   const [erro, setErro] = useState<string | null>(null);
   const [pago, setPago] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -137,8 +143,28 @@ export default function PagarCliente({
     setSelecionadas((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
 
-  async function gerarPix() {
-    if (selecionadas.length === 0 || gerando) return;
+  function abrirEstendidos(ids: string[]) {
+    setEstendidosAbertos((l) => [...new Set([...l, ...ids])]);
+    // Só para o funil de /alertas; falha aqui não importa para o cliente
+    fetch(`/api/pagar/${token}/evento`, { method: "POST", body: JSON.stringify({ evento: "estendidos" }), keepalive: true }).catch(() => {});
+  }
+
+  /** Volta para a escolha com os planos estendidos abertos (o Pix já gerado segue válido até expirar). */
+  function trocarPeriodo() {
+    setCobranca(null);
+    setErro(null);
+    abrirEstendidos(selecionadas.filter((id) => (assinaturas.find((a) => a.id_assinatura === id)?.opcoes.length ?? 0) > 1));
+  }
+
+  useEffect(() => {
+    if (!autoGerar || autoGerado.current) return;
+    autoGerado.current = true;
+    gerarPix(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir a página
+  }, []);
+
+  async function gerarPix(automatico = false) {
+    if (selecionadas.length === 0 || (gerando && !automatico)) return;
     setGerando(true);
     setErro(null);
     try {
@@ -196,30 +222,68 @@ export default function PagarCliente({
     );
   }
 
+  // Gerando o Pix sozinho ao abrir: mostra só a espera (sem piscar a tela de escolha)
+  if (!cobranca && gerando && autoGerar && !erro) {
+    return (
+      <div className="mt-4 space-y-4">
+        <h1 className="text-xl font-semibold">{saudacao}</h1>
+        <div className="rounded-2xl border bg-white p-6 text-center text-sm text-zinc-600">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            Gerando seu Pix…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (cobranca) {
+    // O que está sendo pago (assinatura e período), para quem quer conferir antes de copiar
+    const pagando = cobranca.assinaturas.map((id) => {
+      const a = assinaturas.find((x) => x.id_assinatura === id);
+      const meses = Number((cobranca.itens ?? []).find((i) => i.startsWith(`${id}:`))?.split(":")[1]) || a?.meses || 1;
+      return { id, nome: a ? a.identificacao || a.plano : "", periodo: NOME_PERIODO[meses] ?? `${meses} meses` };
+    });
+    const podeTrocar = assinaturas.length > 1 || assinaturas.some((a) => a.opcoes.length > 1);
     return (
       <div className="mt-4 space-y-4">
         <h1 className="text-xl font-semibold">{saudacao}</h1>
         <div className="rounded-2xl border bg-white p-5 text-center">
           <p className="text-sm text-zinc-600">Valor</p>
           <p className="text-3xl font-bold">{reais(cobranca.valor)}</p>
-          <div
-            className="mx-auto mt-4 w-56 max-w-full [&>svg]:h-auto [&>svg]:w-full"
-            aria-label="QR Code do Pix"
-            dangerouslySetInnerHTML={{ __html: cobranca.qrSvg }}
-          />
-          <p className="mt-3 text-sm text-zinc-600">
-            Abra o app do seu banco, escolha <b>Pix → Ler QR Code</b> ou use o código abaixo em <b>Pix Copia e Cola</b>.
-          </p>
+          <ul className="mt-1 text-xs text-zinc-500">
+            {pagando.map((p) => (
+              <li key={p.id}>
+                {p.nome ? `${p.nome} · ` : ""}
+                {p.periodo}
+              </li>
+            ))}
+          </ul>
+          {/* Logo abaixo do valor: todo plano nasce mensal e o período maior é escolha do cliente na hora de pagar */}
+          {podeTrocar && (
+            <button onClick={trocarPeriodo} className="mt-1 text-xs font-medium text-emerald-700 underline">
+              {assinaturas.length > 1 ? "Escolher outras assinaturas ou pagar por mais tempo" : "Pagar por mais tempo (trimestral, semestral…)"}
+            </button>
+          )}
+          {/* Copiar vem primeiro (23/10/2026): quase todos abrem no celular, onde o QR não serve */}
           <button
             onClick={copiar}
             className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white active:bg-emerald-700"
           >
             {copiado ? "Código copiado ✓" : "Copiar código Pix"}
           </button>
+          <p className="mt-3 text-sm text-zinc-600">
+            Depois, abra o app do seu banco e escolha <b>Pix → Pix Copia e Cola</b>.
+          </p>
           <p className="mt-3 break-all rounded-lg bg-zinc-50 p-2 text-left font-mono text-[11px] text-zinc-500 select-all">
             {cobranca.pixCopiaECola}
           </p>
+          <p className="mt-4 text-xs text-zinc-500">Pagando por outro aparelho? Leia o QR Code:</p>
+          <div
+            className="mx-auto mt-2 w-48 max-w-full [&>svg]:h-auto [&>svg]:w-full"
+            aria-label="QR Code do Pix"
+            dangerouslySetInnerHTML={{ __html: cobranca.qrSvg }}
+          />
           <p className="mt-3 text-xs text-zinc-500">Válido até {cobranca.expiraEm}</p>
         </div>
 
@@ -236,11 +300,6 @@ export default function PagarCliente({
 
         {erro && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
 
-        {assinaturas.length > 1 && (
-          <button onClick={() => setCobranca(null)} className="w-full text-sm text-zinc-500 underline">
-            Escolher outras assinaturas
-          </button>
-        )}
       </div>
     );
   }
@@ -282,11 +341,7 @@ export default function PagarCliente({
               {marcada && a.opcoes.length > 1 && !estendidosAbertos.includes(a.id_assinatura) && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setEstendidosAbertos((l) => [...l, a.id_assinatura]);
-                    // Só para o funil de /alertas; falha aqui não importa para o cliente
-                    fetch(`/api/pagar/${token}/evento`, { method: "POST", body: JSON.stringify({ evento: "estendidos" }), keepalive: true }).catch(() => {});
-                  }}
+                  onClick={() => abrirEstendidos([a.id_assinatura])}
                   className="px-1 text-xs font-medium text-emerald-700 underline"
                 >
                   Planos estendidos ▾
@@ -328,7 +383,7 @@ export default function PagarCliente({
       {erro && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
 
       <button
-        onClick={gerarPix}
+        onClick={() => gerarPix()}
         disabled={selecionadas.length === 0 || gerando}
         className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50 active:bg-emerald-700"
       >

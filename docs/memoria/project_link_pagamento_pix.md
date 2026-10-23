@@ -131,3 +131,23 @@ Commits: `d23f09d`, `1a95e70`, `a59b1e2`, `41aebf8`, `d0d7eb9`.
   - Antes, testar com R$ 0,01 se a permissão "emitir cobrança" do Inter deixa cancelar.
 
 - 📋 20/10: Jonas colou uma chave temporária da API do n8n no chat (leitura das execuções do extrato); apagada do scratchpad, expira ~26/10 — revogar antes se possível.
+
+## 23/10/2026 — página gera o Pix sozinha (funil mostrou desistência antes de gerar)
+- **Funil 19–23/10:** Ative na hora 24 → link 24 → abriu 19 → gerou 13 → pagou 13 → renovou sozinho 13 (0 em /alertas;
+  mediana 42 s do Pix gerado ao pago). Chave PIX ganha de 2×1 nos botões (51 × 24). 6 abriram e não geraram: 5 abriram,
+  voltaram em 10–60 s e tocaram "⏳ Chave PIX" na mensagem anterior (quase todos com 1 assinatura) — a tela "Confira sua
+  assinatura" era um passo a mais. Aldenes e Junior queriam trimestral (estendidos escondidos).
+- **Mudanças (`PagarCliente.tsx`):**
+  - 1 assinatura e nenhum Pix aberto → gera o Pix **sozinho ao abrir**, no período atual (sempre mensal: todo plano
+    nasce mensal e período maior é escolha do cliente). Só no navegador (`useEffect`, uma vez por abertura): prévias de
+    link não rodam JS e não geram cobrança. Tela "Gerando seu Pix…" enquanto isso; se falhar, cai na tela de escolha com o erro.
+  - Tela do Pix: valor + "assinatura · período" + **"Pagar por mais tempo (trimestral, semestral…)"** logo abaixo do
+    valor → volta para a escolha com os estendidos abertos (conta no funil como `estendidos`); depois disso não gera sozinho.
+  - **"Copiar código Pix" acima do QR** (o QR passou para "Pagando por outro aparelho?").
+- Mensagem do link (`auto-resposta-suporte.ts`): "⚡ Toque em *Pagar agora* e copie o código Pix." (sem "confira o plano").
+- Continua: trocar o período depois de gerar deixa o Pix anterior válido por 24 h (pagar os dois → /alertas "pagou em
+  dobro?"). Cancelar o anterior no Inter segue como proposta (ver "Limitação conhecida" acima).
+- Testado com build de produção local + navegador em tamanho de celular, geração interceptada (nenhuma cobrança no Inter):
+  1 assinatura gera 1 Pix mensal ao abrir; "Pagar por mais tempo" → Trimestral gera o de 3 meses sem gerar outro sozinho;
+  JS Contas (6 assinaturas) abre a escolha sem gerar nada.
+- 📋 Olhar o funil de novo em ~1 semana: abriu → gerou deve subir.

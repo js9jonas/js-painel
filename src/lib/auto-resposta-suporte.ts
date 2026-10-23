@@ -247,7 +247,7 @@ export async function responderFalarComSuporte(params: RespostaSuporteParams) {
     if (!rows[0]) return
     const url = await obterLinkCliente(rows[0].id_cliente)
     const texto =
-      '⚡ Toque em *Pagar agora*, confira o plano e pague pelo Pix.\n\n' +
+      '⚡ Toque em *Pagar agora* e copie o código Pix.\n\n' +
       'A renovação é confirmada na hora, sem precisar mandar comprovante 🙌'
     const msgId = await enviarBotaoLinkWhatsapp(telefone, texto, { texto: 'Pagar agora', url })
     if (msgId) {
