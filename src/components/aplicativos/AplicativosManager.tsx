@@ -763,6 +763,9 @@ export default function AplicativosManager({ idCliente, nomeCliente, aplicativos
           id_app_registro={appPgto.id_app_registro}
           id_cliente={Number(idCliente)}
           nome_app={appPgto.nome_app ?? `App #${appPgto.id_app}`}
+          nomeCliente={nomeCliente}
+          id_app={appPgto.id_app}
+          temMac={!!appPgto.mac}
           validadeAtual={appPgto.validade ?? null}
           statusAtual={appPgto.status ?? null}
           onClose={() => {

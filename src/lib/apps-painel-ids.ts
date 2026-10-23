@@ -63,6 +63,19 @@ export const ID_APP_POPPLAYER = 32;
 // robô de navegador. Ver src/lib/duplecast.ts.
 export const ID_APP_DUPLECAST = 11;
 
+/** Apps renovados pela API (rota ativar-painel): Fun/Lazer/Core e SmartOne pelo painel, IBO Pro/IBOSOL por crédito,
+ *  Duplecast por código. Usado no "Gerenciar" de /clientes/[id] para oferecer "Renovar via API". */
+export function appRenovaPelaApi(idApp: string | number | null | undefined): boolean {
+  return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && (Number(idApp) === ID_APP_IBOPRO || appDaIbosol(idApp) || Number(idApp) === ID_APP_DUPLECAST));
+}
+
+/** O que a renovação pela API gasta: giftcode (SmartOne), código de ativação (Duplecast) ou crédito (os demais). */
+export function unidadeRenovacaoApi(idApp: string | number | null | undefined): "giftcode" | "código" | "crédito" {
+  if (Number(idApp) === ID_APP_SMARTONE) return "giftcode";
+  if (Number(idApp) === ID_APP_DUPLECAST) return "código";
+  return "crédito";
+}
+
 /** Apps em que o botão "Atualizar" consegue ler a validade direto na origem (painel ou conta do cliente). */
 export function appTemAtualizacao(idApp: string | number | null | undefined): boolean {
   return appTemCadastroComLista(idApp) || (idApp != null && idApp !== "" && [ID_APP_CLOUDDY, ID_APP_IBOPRO, ID_APP_IBOPLAYER, ID_APP_IBOXPLAYER, ID_APP_POPPLAYER, ID_APP_DUPLECAST].includes(Number(idApp)));

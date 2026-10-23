@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { renovarAplicativo } from "@/app/actions/renovarAplicativo";
 import { Select } from "@/components/ui/select";
+import { appRenovaPelaApi, unidadeRenovacaoApi } from "@/lib/apps-painel-ids";
 
 interface Props {
   id_app_registro: number;
   id_cliente: number;
   nome_app: string;
+  nomeCliente: string;
+  id_app: number | null;
+  temMac: boolean;
   validadeAtual: string | null; // ISO date string
   statusAtual: string | null;
   onClose: () => void;
@@ -39,26 +43,60 @@ function formatDate(d: string | null) {
 
 type Modo = "cortesia" | "pagamento" | "pendente";
 
+type ResultadoApi = { ok: true; validade: string | null; jaAtivado: boolean } | { ok: false; erro: string };
+
+// Mesma rota do "Renovar no painel" do /alertas: roda em segundo plano, a gente acompanha pelo jobId.
+// A rota já grava a validade devolvida pelo painel, status 'ativa' e o audit_log.
+async function renovarPelaApi(id_app_registro: number): Promise<ResultadoApi> {
+  try {
+    const res = await fetch(`/api/aplicativos/${id_app_registro}/ativar-painel`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.jobId) return { ok: false, erro: data.erro ?? "Não deu pra iniciar a renovação pela API." };
+    for (let i = 0; i < 90; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const job = await fetch(`/api/aplicativos/${id_app_registro}/ativar-painel?jobId=${encodeURIComponent(data.jobId)}`)
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!job?.done) continue;
+      return job.ok ? { ok: true, validade: job.validade ?? null, jaAtivado: !!job.jaAtivado } : { ok: false, erro: job.erro ?? "Não deu pra renovar pela API." };
+    }
+    return { ok: false, erro: "O painel demorou para responder. Confira o aparelho no painel antes de tentar de novo." };
+  } catch {
+    return { ok: false, erro: "Sem internet ou o sistema está atualizando. Tente de novo." };
+  }
+}
+
 export default function ModalRenovarAplicativo({
   id_app_registro,
   id_cliente,
   nome_app,
+  nomeCliente,
+  id_app,
+  temMac,
   validadeAtual,
   statusAtual,
   onClose,
 }: Props) {
   const isPendente = (statusAtual ?? "").toLowerCase() === "pendente";
+  const temApi = appRenovaPelaApi(id_app) && temMac;
+  const unidade = unidadeRenovacaoApi(id_app);
   const [modo, setModo] = useState<Modo>("pagamento");
   const [novaValidade, setNovaValidade] = useState(() =>
     isPendente ? (validadeAtual?.split("T")[0] ?? "") : calcNovaValidade(validadeAtual)
   );
   const [forma, setForma] = useState("INTER");
   const [valor, setValor] = useState("20");
+  const [viaApi, setViaApi] = useState(temApi);
   const [loading, setLoading] = useState(false);
+  const [etapa, setEtapa] = useState("");
   const [erro, setErro] = useState("");
+  const [aviso, setAviso] = useState("");
 
   const inputClass =
     "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all";
+
+  // Pendente não mexe na validade, então não renova no painel.
+  const usarApi = viaApi && temApi && modo !== "pendente";
 
   async function handleConfirmar() {
     if (modo === "pagamento" && !valor.trim()) {
@@ -67,20 +105,52 @@ export default function ModalRenovarAplicativo({
     }
     setLoading(true);
     setErro("");
+    setAviso("");
 
+    let validadeFinal = novaValidade;
+    if (usarApi) {
+      setEtapa("Renovando no painel…");
+      const r = await renovarPelaApi(id_app_registro);
+      if (!r.ok) {
+        setLoading(false);
+        setEtapa("");
+        setErro(`${r.erro} Nada foi registrado.`);
+        return;
+      }
+      if (r.validade) {
+        validadeFinal = r.validade.slice(0, 10);
+        setNovaValidade(validadeFinal);
+      }
+      if (r.jaAtivado) {
+        // Painel já estava renovado (renovação anterior, aba antiga): não gastou nada. Para antes de lançar
+        // pagamento, pra não registrar em dobro — o Jonas decide e confirma de novo, já sem a API.
+        setViaApi(false);
+        setLoading(false);
+        setEtapa("");
+        setAviso(`O painel já mostrava o app renovado${r.validade ? ` até ${formatDate(r.validade)}` : ""}. Nenhum ${unidade} foi gasto. Se ainda quiser registrar ${modo === "pagamento" ? "o pagamento" : "a cortesia"}, confira e clique em Confirmar de novo.`);
+        return;
+      }
+    }
+
+    setEtapa("Salvando…");
     const res = await renovarAplicativo({
       id_app_registro,
       id_cliente,
-      novaValidade,
+      novaValidade: validadeFinal,
       modo,
       valor: modo === "pagamento" ? parseFloat(valor) || 0 : 0,
       forma,
     });
 
     setLoading(false);
+    setEtapa("");
 
     if (res.success) {
       onClose();
+    } else if (usarApi) {
+      // A API já renovou e gravou a validade; só o lançamento falhou. Desmarca pra não gastar de novo.
+      setViaApi(false);
+      setErro(`Renovado no painel até ${formatDate(validadeFinal)}, mas não deu pra registrar ${modo === "pagamento" ? "o pagamento" : "a cortesia"}: ${res.error ?? "erro ao salvar"}. Confirme de novo (sem a API).`);
     } else {
       setErro(res.error ?? "Erro ao salvar.");
     }
@@ -116,9 +186,30 @@ export default function ModalRenovarAplicativo({
               type="date"
               value={novaValidade}
               onChange={(e) => setNovaValidade(e.target.value)}
-              className={inputClass}
+              disabled={usarApi}
+              className={`${inputClass} disabled:bg-zinc-50 disabled:text-zinc-400`}
             />
+            {usarApi && (
+              <p className="text-[11px] text-zinc-400 mt-1">Vale a validade que o painel devolver.</p>
+            )}
           </div>
+
+          {/* Renovar via API do app */}
+          {temApi && modo !== "pendente" && (
+            <label className="flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={viaApi}
+                onChange={(e) => setViaApi(e.target.checked)}
+                disabled={loading}
+                className="mt-0.5 h-4 w-4 accent-violet-600"
+              />
+              <span className="text-xs text-violet-800">
+                <b>Renovar via API</b> — renova 1 ano no painel do {nome_app} e <b>gasta 1 {unidade}</b>.
+                {viaApi && <span className="block text-violet-600 mt-0.5">Aparelho de {nomeCliente}.</span>}
+              </span>
+            </label>
+          )}
 
           {/* Seleção de modo */}
           <div>
@@ -180,6 +271,10 @@ export default function ModalRenovarAplicativo({
             </div>
           )}
 
+          {aviso && (
+            <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{aviso}</p>
+          )}
+
           {erro && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>
           )}
@@ -207,7 +302,7 @@ export default function ModalRenovarAplicativo({
                 : "bg-emerald-600 hover:bg-emerald-700"
             }`}
           >
-            {loading ? "Salvando..." : "Confirmar"}
+            {loading ? etapa || "Salvando..." : usarApi ? `Confirmar (gasta 1 ${unidade})` : "Confirmar"}
           </button>
         </div>
       </div>
